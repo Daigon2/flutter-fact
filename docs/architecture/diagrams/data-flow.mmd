@@ -1,0 +1,16 @@
+flowchart LR
+    W[Widget] --> N[Riverpod Notifier]
+    N --> U[Use Case]
+    U --> R[Repository Contract]
+    RI[Repository Implementation] -.implements.-> R
+    RI --> RD[Remote Datasource]
+    RI --> LD[Local Datasource]
+    RD --> S[Supabase]
+    LD --> DB[Local DB / Cache]
+
+    S --> DTO[Remote DTO]
+    DTO --> M[Mapper]
+    M --> E[Domain Entity]
+    E --> N
+    N --> PS[Presentation State]
+    PS --> W

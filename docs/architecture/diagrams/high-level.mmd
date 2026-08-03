@@ -1,0 +1,26 @@
+flowchart TB
+    APP[app<br/>bootstrap · routing · theme · localization]
+    CORE[core<br/>pure shared primitives]
+    SERVICES[services<br/>analytics · location · notifications · crash reporting]
+    FEATURES[features<br/>business capabilities]
+
+    APP --> FEATURES
+    APP --> SERVICES
+    FEATURES --> CORE
+    FEATURES --> SERVICES
+    SERVICES --> CORE
+
+    subgraph F[Example feature]
+      P[Presentation]
+      A[Application]
+      D[Domain]
+      DATA[Data]
+      P --> A
+      P --> D
+      A --> D
+      DATA --> D
+    end
+
+    FEATURES --> F
+    DATA --> SUPA[Supabase]
+    DATA --> LOCAL[Local storage]

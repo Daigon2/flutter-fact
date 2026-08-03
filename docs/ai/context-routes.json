@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "always": [
+    "CLAUDE.md"
+  ],
+  "onboarding": [
+    "START_HERE.md"
+  ],
+  "routes": {
+    "flutter_ui_change": {
+      "rules": [
+        ".claude/rules/flutter.md"
+      ],
+      "required": [
+        "affected_code",
+        "affected_tests"
+      ],
+      "conditional": [
+        "docs/engineering/flutter.md",
+        "docs/decisions/adr/ADR-003-riverpod-state-management.md",
+        "docs/decisions/adr/ADR-004-go-router-typed-navigation.md"
+      ]
+    },
+    "feature_implementation": {
+      "skill": ".claude/skills/implement-feature/SKILL.md",
+      "required": [
+        "feature_spec",
+        "docs/architecture/domain-map.md",
+        "affected_code",
+        "affected_tests"
+      ],
+      "conditional": [
+        "relevant_adrs",
+        "docs/engineering/testing.md",
+        "docs/engineering/security.md",
+        "docs/architecture/offline-and-sync.md"
+      ]
+    },
+    "supabase_change": {
+      "rules": [
+        ".claude/rules/supabase.md"
+      ],
+      "required": [
+        "docs/decisions/adr/ADR-001-supabase-backend.md",
+        "docs/engineering/security.md",
+        "affected_schema_and_tests"
+      ],
+      "conditional": [
+        "docs/architecture/data-flow.md",
+        "docs/architecture/offline-and-sync.md"
+      ]
+    },
+    "bug_fix": {
+      "skill": ".claude/skills/fix-bug/SKILL.md",
+      "required": [
+        "expected_behavior_source",
+        "affected_code",
+        "affected_tests"
+      ],
+      "conditional": [
+        "relevant_adr_or_standard"
+      ]
+    },
+    "code_review": {
+      "skill": ".claude/skills/review-change/SKILL.md",
+      "required": [
+        "actual_diff",
+        "docs/engineering/review.md"
+      ],
+      "conditional": [
+        "affected_standard",
+        "relevant_adr",
+        "docs/engineering/security.md"
+      ]
+    },
+    "architecture_change": {
+      "required": [
+        "docs/architecture/architecture-overview.md",
+        "docs/architecture/dependency-rules.md",
+        "docs/architecture/domain-map.md",
+        "relevant_adrs",
+        "docs/decisions/open-decisions.md"
+      ],
+      "conditional": [
+        "docs/architecture/quality-attributes.md",
+        "docs/architecture/data-flow.md",
+        "docs/architecture/offline-and-sync.md"
+      ]
+    },
+    "ai_system_change": {
+      "required": [
+        "docs/ai/operating-model.md",
+        "docs/ai/context-routing.md",
+        "docs/ai/evaluation.md",
+        "affected_ai_artifact"
+      ],
+      "conditional": [
+        "docs/ai/hooks.md",
+        "docs/ai/maintenance.md"
+      ]
+    }
+  }
+}

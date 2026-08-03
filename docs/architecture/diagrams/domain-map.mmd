@@ -1,0 +1,27 @@
+flowchart LR
+    ID[Identity]
+    CITY[City]
+    FACTS[Facts]
+    DISC[Discovery]
+    COLL[Collection]
+    PROG[Progression]
+    CHAL[Challenges]
+    TOURS[Tours]
+    PROF[Profile]
+    SET[Settings]
+
+    CITY --> FACTS
+    CITY --> DISC
+    CITY --> CHAL
+    CITY --> TOURS
+    FACTS --> DISC
+    FACTS --> COLL
+    FACTS --> CHAL
+    FACTS --> TOURS
+    ID --> COLL
+    ID --> PROF
+    COLL -->|FactCollected event| PROG
+    CHAL -->|Reward specification| PROG
+    TOURS -->|Completion event| PROG
+    COLL -->|Read model| PROF
+    PROG -->|Read model| PROF
