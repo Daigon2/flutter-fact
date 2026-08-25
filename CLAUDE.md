@@ -48,3 +48,28 @@ Run applicable checks from `docs/engineering/quality-gates.md`, self-review the 
 - decisions still requiring approval.
 
 Never claim an unexecuted check passed.
+
+## Reference repository (read-only)
+
+The FACT monorepo is a separate repository and is **never modified from here**.
+It is the behavioral source of truth, not an architectural one.
+
+Path: `C:\Users\Janek Postpischil\OneDrive\DokumenteClaudeSortierung\Documents\01_Persönliches\12_Claude\Claude Code\Fact`
+
+| Path there | What it is | How to use it |
+|---|---|---|
+| `02_Frontend/app/` | Live PWA (fact-cityguide.netlify.app) | Canonical source for behavior, copy, i18n keys and design tokens. Read only. |
+| `08_Flutter/` | Frozen provider-based port | Look up how MapLibre markers, the 3D avatar WebView and geofencing were solved. Never copy code without rebuilding it against the target architecture. |
+| `03_Backend/`, `supabase/` | Schema, RLS, RPCs | Shared with the PWA. Any change is a Level 3 decision and happens in that repository, not here. |
+| `06_Planung/specs/` | Rebuild parity spec | Lists the PWA features this rebuild must cover, with file and line references into `02_Frontend/app/`. |
+
+When PWA behavior and an accepted ADR disagree: keep the behavior, follow the
+ADR for structure, and report the conflict instead of resolving it silently.
+
+## Windows realities
+
+- Flutter SDK lives at `C:\flutter-fresh` and is not on PATH. `C:\flutter` is broken.
+- Prefer `dart analyze` over `flutter analyze` when the Flutter tool stalls.
+- This repository sits outside OneDrive on a pure ASCII path on purpose. Release
+  builds fail from the OneDrive path because of the non-ASCII directory name.
+- The shell is PowerShell. Backslash is not a line continuation character.

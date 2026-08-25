@@ -5,24 +5,32 @@ import subprocess
 import sys
 
 try:
-    json.load(sys.stdin)
+    json.loads(sys.stdin.read().lstrip("\ufeff"))
 except Exception:
     pass
 
+# -uall: ohne das meldet git bei neuen Ordnern nur den Ordner selbst, dann
+# bleiben frisch angelegte Dateien unsichtbar. git diff wuerde sie ganz uebersehen.
 result = subprocess.run(
-    ["git", "diff", "--name-only"],
-    capture_output=True,
-    text=True,
+    ["git", "status", "--porcelain", "-uall"], capture_output=True, text=True
 )
-changed = [line for line in result.stdout.splitlines() if line.strip()]
-dart_changed = any(p.endswith(".dart") for p in changed)
-migration_changed = any(p.startswith("supabase/") for p in changed)
+changed = [
+    line[3:].strip().strip('"').replace("\\", "/")
+    for line in result.stdout.splitlines()
+    if len(line) > 3
+]
 
 messages = []
-if dart_changed:
-    messages.append("Dart files changed: run format, analyze, custom_lint and affected tests before completion.")
-if migration_changed:
-    messages.append("Supabase files changed: verify migration compatibility and RLS positive/negative tests.")
+if any(p.endswith(".dart") for p in changed):
+    messages.append(
+        "Dart files changed: run format, analyze, custom_lint and affected tests "
+        "before completion."
+    )
+if any(p.startswith("supabase/") for p in changed):
+    messages.append(
+        "Supabase files changed: verify migration compatibility and RLS "
+        "positive/negative tests."
+    )
 
 if messages:
     print("\n".join(messages))

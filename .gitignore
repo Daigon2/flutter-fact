@@ -1,0 +1,33 @@
+# === Secrets ===
+*.env
+.env.*
+secrets/
+*.jks
+*.keystore
+*.p12
+key.properties
+
+# === Flutter / Dart ===
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.g.dart
+*.freezed.dart
+
+# === Android / iOS ===
+android/.gradle/
+android/local.properties
+android/app/release/
+ios/Pods/
+ios/.symlinks/
+
+# === Claude local ===
+.claude/settings.local.json
+
+# === OS / Editor ===
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
