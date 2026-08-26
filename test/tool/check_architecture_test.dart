@@ -1,0 +1,1338 @@
+// Black-Box-Test für tool/check_architecture.dart.
+//
+// Das Skript ist die einzige maschinelle Grenzkontrolle des Projekts, weil
+// riverpod_lint mit diesem Abhängigkeitsstand nicht auflösbar ist. Wird der
+// handgeschriebene Scanner falsch-negativ, verschwinden alle Architekturregeln
+// lautlos. Deshalb prüft dieser Test das Skript so, wie CI es aufruft: als
+// Prozess, über Exit-Code und Ausgabe. Kein Import aus dem Skript, keine
+// Änderung am Skript.
+//
+// Warum der Prozessaufruf ohne Skriptänderung funktioniert: das Skript liest
+// `Directory('lib')` relativ zum Arbeitsverzeichnis und meldet Pfade relativ
+// dazu. Ein absoluter Skriptpfad plus `workingDirectory` auf dem Temp-Baum
+// genügt also. `dart <absoluter Pfad>` braucht keine package_config im
+// Arbeitsverzeichnis, weil das Skript nur `dart:io` importiert.
+//
+// Laufzeit: alle Bäume werden einmal in setUpAll erzeugt und die Prozesse
+// parallel gestartet. Vier Prozessaufrufe für die gesamte Suite, danach werten
+// die einzelnen Tests nur noch die gespeicherte Ausgabe aus.
+//
+// Proben liegen ausschließlich unter Directory.systemTemp und werden in
+// tearDownAll gelöscht, auch wenn Tests fehlschlagen. Im Repository entsteht
+// keine Probe.
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+// ---------------------------------------------------------------------------
+// Infrastruktur
+// ---------------------------------------------------------------------------
+
+/// Ein Fund, aus der Ausgabe des Skripts zurückgelesen.
+class Fund {
+  const Fund({
+    required this.datei,
+    required this.zeile,
+    required this.gefunden,
+    required this.regel,
+    required this.istHinweis,
+  });
+
+  final String datei;
+  final int zeile;
+  final String gefunden;
+  final String regel;
+  final bool istHinweis;
+
+  @override
+  String toString() =>
+      '$datei:$zeile ${istHinweis ? '(Hinweis) ' : ''}$gefunden -> $regel';
+}
+
+/// Ergebnis eines Skriptlaufs in einem Probebaum.
+class Lauf {
+  Lauf({
+    required this.name,
+    required this.exitCode,
+    required this.ausgabe,
+    required this.fehlerausgabe,
+  }) : funde = leseFunde(ausgabe);
+
+  /// Liest die Fundblöcke aus der Ausgabe.
+  ///
+  /// Format je Fund: `  datei:zeile`, dann `    gefunden: ...`, dann
+  /// `    verletzt: ...`. Hinweise stehen hinter der Kopfzeile des
+  /// Hinweisblocks.
+  static List<Fund> leseFunde(String ausgabe) {
+    final ergebnis = <Fund>[];
+    final zeilen = const LineSplitter().convert(ausgabe);
+    final kopf = RegExp(r'^ {2}([\w./-]+\.dart):(\d+)$');
+    var imHinweisblock = false;
+
+    for (var i = 0; i < zeilen.length; i++) {
+      if (zeilen[i].contains('Hinweis bzw. Hinweise')) {
+        imHinweisblock = true;
+        continue;
+      }
+      final treffer = kopf.firstMatch(zeilen[i]);
+      if (treffer == null) {
+        continue;
+      }
+      final gefunden = i + 1 < zeilen.length ? zeilen[i + 1].trim() : '';
+      final regel = i + 2 < zeilen.length ? zeilen[i + 2].trim() : '';
+      ergebnis.add(
+        Fund(
+          datei: treffer.group(1)!,
+          zeile: int.parse(treffer.group(2)!),
+          gefunden: gefunden.startsWith('gefunden: ')
+              ? gefunden.substring('gefunden: '.length)
+              : '',
+          regel: regel.startsWith('verletzt: ')
+              ? regel.substring('verletzt: '.length)
+              : '',
+          istHinweis: imHinweisblock,
+        ),
+      );
+    }
+    return ergebnis;
+  }
+
+  final String name;
+  final int exitCode;
+  final String ausgabe;
+  final String fehlerausgabe;
+  final List<Fund> funde;
+
+  List<Fund> get verstoesse => funde.where((f) => !f.istHinweis).toList();
+
+  List<Fund> get hinweise => funde.where((f) => f.istHinweis).toList();
+
+  List<Fund> fuer(String datei) =>
+      funde.where((f) => f.datei == datei).toList();
+
+  Set<String> get dateienMitFund => funde.map((f) => f.datei).toSet();
+
+  String get bericht =>
+      'Baum "$name", Exit-Code $exitCode\n--- stdout ---\n$ausgabe'
+      '--- stderr ---\n$fehlerausgabe';
+}
+
+/// Pfad des zu prüfenden Skripts.
+///
+/// `FACT_ARCH_SCRIPT` gibt es nur für die Mutationsprobe: damit lässt sich die
+/// Suite gegen eine absichtlich blinde Kopie des Skripts laufen lassen, ohne
+/// das Original anzufassen. Ohne die Variable prüft die Suite das Skript im
+/// Repository.
+String _skriptPfad() {
+  final abweichung = Platform.environment['FACT_ARCH_SCRIPT'];
+  if (abweichung != null && abweichung.isNotEmpty) {
+    return abweichung;
+  }
+  return '${Directory.current.path}/tool/check_architecture.dart';
+}
+
+/// Findet die Dart-Kommandozeile. Unter `flutter test` ist
+/// `Platform.resolvedExecutable` der flutter_tester, nicht Dart.
+String _dartPfad() {
+  final wurzel = Platform.environment['FLUTTER_ROOT'];
+  if (wurzel != null && wurzel.isNotEmpty) {
+    final endung = Platform.isWindows ? '.exe' : '';
+    final kandidat = File('$wurzel/bin/cache/dart-sdk/bin/dart$endung');
+    if (kandidat.existsSync()) {
+      return kandidat.path;
+    }
+  }
+  if (Platform.resolvedExecutable.contains('dart-sdk')) {
+    return Platform.resolvedExecutable;
+  }
+  return Platform.isWindows ? 'dart.exe' : 'dart';
+}
+
+/// Schreibt einen Probebaum unterhalb von [wurzel].
+Directory _baueBaum(
+  Directory wurzel,
+  String name,
+  Map<String, String> dateien,
+) {
+  final baum = Directory('${wurzel.path}/$name')..createSync(recursive: true);
+  for (final eintrag in dateien.entries) {
+    final datei = File('${baum.path}/${eintrag.key}');
+    datei.parent.createSync(recursive: true);
+    datei.writeAsStringSync(eintrag.value);
+  }
+  return baum;
+}
+
+Future<Lauf> _starte(String name, Directory baum) async {
+  final ergebnis = await Process.run(
+    _dartPfad(),
+    <String>[_skriptPfad()],
+    workingDirectory: baum.path,
+    stdoutEncoding: utf8,
+    stderrEncoding: utf8,
+  );
+  return Lauf(
+    name: name,
+    exitCode: ergebnis.exitCode,
+    ausgabe: ergebnis.stdout as String,
+    fehlerausgabe: ergebnis.stderr as String,
+  );
+}
+
+/// Setzt eine Probe auf CRLF um, ohne vorhandene CRLF zu verdoppeln.
+String _crlf(String inhalt) =>
+    inhalt.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n');
+
+// ---------------------------------------------------------------------------
+// Proben
+// ---------------------------------------------------------------------------
+
+/// Baum 1: alles, was gemeldet werden muss. Jeder Fall bekommt eine eigene
+/// Datei, damit kein Fall einen anderen verdecken kann.
+Map<String, String> _verstossProben() => <String, String>{
+  // Alle Technikverbote der Domäne in einer Datei, eine Zeile je Verbot.
+  'lib/features/tours/domain/entities/technik_importe.dart': r'''
+import 'package:flutter/material.dart';
+import 'package:riverpod/riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
+
+class Tour {}
+''',
+  'lib/features/tours/domain/usecases/core_import.dart': r'''
+import 'package:fact_app/core/types/result.dart';
+
+class TourLaden {}
+''',
+  'lib/features/tours/domain/usecases/schicht_importe.dart': r'''
+import '../../data/tour_dto.dart';
+import '../../presentation/pages/tour_page.dart';
+
+class TourVerbiegen {}
+''',
+  'lib/features/tours/presentation/pages/supabase_seite.dart': r'''
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class TourSeite {}
+''',
+  'lib/features/tours/presentation/pages/fremdes_feature_paket.dart': r'''
+import 'package:fact_app/features/challenges/presentation/challenge_page.dart';
+import 'package:fact_app/features/challenges/data/challenge_dto.dart';
+
+class FremdSeite {}
+''',
+  'lib/features/tours/presentation/pages/fremdes_feature_relativ.dart': r'''
+import '../../../challenges/presentation/challenge_page.dart';
+import '../../../challenges/data/challenge_dto.dart';
+
+class FremdSeiteRelativ {}
+''',
+  'lib/app/di.dart': r'''
+import 'package:get_it/get_it.dart';
+import 'package:injectable/injectable.dart';
+
+class Container {}
+''',
+  // Gate 7 gilt projektweit, also auch in test/ und tool/.
+  'test/di_test.dart': r'''
+import 'package:get_it/get_it.dart';
+
+void main() {}
+''',
+  'tool/generieren.dart': r'''
+import 'package:injectable/injectable.dart';
+
+void main() {}
+''',
+  // Scanner: Schlüsselwort und URI in verschiedenen Zeilen.
+  'lib/features/tours/domain/entities/mehrzeilige_direktive.dart': r'''
+import
+    'package:flutter/material.dart';
+
+class Mehrzeilig {}
+''',
+  // Scanner: bedingte Direktive, Verstoß im zweiten URI.
+  'lib/features/tours/domain/entities/bedingte_direktive.dart': r'''
+import 'stub.dart'
+    if (dart.library.io) 'package:flutter/material.dart';
+
+class Bedingt {}
+''',
+  // Scanner: zwei verletzende URIs in einer Direktive geben zwei Meldungen.
+  'lib/features/tours/domain/entities/zwei_uris.dart': r'''
+import 'package:go_router/go_router.dart' if (dart.library.io) 'package:riverpod/riverpod.dart';
+
+class ZweiUris {}
+''',
+  // Scanner: auskommentierte Verbote werden ignoriert, der echte Verstoß
+  // dahinter wird trotzdem gemeldet und die Zeile verschiebt sich nicht.
+  'lib/features/tours/domain/entities/kommentierter_import.dart': r'''
+// import 'package:flutter/material.dart';
+/* import 'package:riverpod/riverpod.dart'; */
+import 'package:go_router/go_router.dart';
+
+class Kommentiert {}
+''',
+  // Scanner: Direktiven in einem dreifach gequoteten Literal sind Text, der
+  // echte Verstoß in Zeile 1 bleibt sichtbar.
+  'lib/features/tours/domain/entities/vorlage_im_literal.dart': r'''
+import 'package:go_router/go_router.dart';
+
+const vorlage = """
+import 'package:flutter/material.dart';
+export 'package:supabase_flutter/supabase_flutter.dart';
+""";
+''',
+  // Scanner: CRLF darf Zeilennummern nicht verschieben, weder beim URI einer
+  // Direktive (Zeile 4) noch bei einem Treffer im Code (Zeile 7).
+  'lib/features/tours/domain/entities/crlf.dart': _crlf(r'''
+// Datei mit CRLF-Zeilenenden.
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+void protokolliere() {
+  print('crlf');
+}
+'''),
+  // Scanner: rohe, dreifach gequotete und interpolierte Literale erzeugen
+  // keine Falschmeldung und verschieben die Position des echten Verstoßes in
+  // Zeile 12 nicht.
+  'lib/features/tours/presentation/widgets/literale.dart': r"""
+class Literale {
+  static const roh = r"context.go('/roh')";
+  static const drei = '''
+context.go('/drei')
+''';
+  static const gemischt = 'Pfad: ${Literale.roh.length} von ${1 + 2}';
+
+  // Ein Kommentar mit Apostroph: der Nutzer's Pfad.
+  static const escaped = 'context.go(\'/maskiert\')';
+
+  void tippen(dynamic context) {
+    context.go('/echt');
+  }
+}
+""",
+  // Regel 11: Geschäftsbegriff im Pfad unter core.
+  'lib/core/facts/helper.dart': r'''
+class FactHelper {}
+''',
+  // Gate 8: rohe Navigator-API außerhalb von lib/app/routing/.
+  'lib/features/tours/presentation/pages/navigator_api.dart': r'''
+class NavigatorSeite {
+  void oeffne(dynamic context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => this));
+  }
+}
+''',
+  // Gate 8: Route-Literal wird gemeldet, die Variante mit Variable nicht.
+  'lib/features/tours/presentation/pages/route_string.dart': r'''
+class RouteSeite {
+  void mitLiteral(dynamic context) {
+    context.go('/tours');
+  }
+
+  void mitVariable(dynamic context, String ziel) {
+    context.go(ziel);
+  }
+}
+''',
+  // Gate 9: print, debugPrint und die Tear-off-Form. printWidth und sprintf
+  // sind keine Verstöße.
+  'lib/features/tours/presentation/widgets/ausgabe.dart': r'''
+class Ausgabe {
+  void direkt() {
+    print('x');
+    debugPrint('y');
+  }
+
+  void indirekt() {
+    final f = print;
+    const printWidth = 3;
+    final text = sprintf('%d', [printWidth]);
+    f(text);
+  }
+}
+''',
+  // Regel 7: Instanziierung in presentation. Feld, abstrakte Deklaration,
+  // Provider-Bezug und benannter Konstruktor stehen bewusst daneben.
+  'lib/features/tours/presentation/widgets/instanziierung.dart': r'''
+abstract class TourRepository {}
+
+class TourAnsicht {
+  TourAnsicht(this.repository);
+
+  final TourRepository repository;
+
+  void baue(dynamic ref) {
+    final direkt = TourRepository();
+    final quelle = TourRemoteDataSource();
+    final client = SupabaseClient('url', 'key');
+    final ueberProvider = ref.watch(tourRepositoryProvider);
+    final benannt = TourRepository.remote();
+  }
+}
+''',
+  // Regel 12: der Notifier navigiert, das Widget in derselben Datei darf es.
+  'lib/features/tours/presentation/notifier_und_widget.dart': r'''
+class TourNotifier extends AsyncNotifier<int> {
+  void zurueck() {
+    router.pop();
+  }
+}
+
+class TourWidget {
+  void zurueck() {
+    router.pop();
+  }
+}
+''',
+  // Regel 13: verbotene Rückgabetypen im Repository-Vertrag, daneben ein
+  // erlaubter.
+  'lib/features/tours/domain/repositories/tour_repository.dart': r'''
+abstract class TourRepository {
+  Future<Map<String, dynamic>> roh();
+  AsyncValue<int> zustand();
+  Future<TourDto> eins();
+  Future<List<Tour>> alle();
+}
+''',
+  // Ä1: eine Schicht unterhalb einer Unterstruktur des Features wird wie eine
+  // Schicht behandelt. Vorher passte dieser Pfad auf kein Schichtmuster, damit
+  // fiel jedes Domänenverbot aus.
+  'lib/features/tours/karte/domain/entities/verschachtelte_domaene.dart': r'''
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class VerschachtelteDomaene {}
+''',
+  // Ä2: die Erlaubnisliste fängt genau die Pakete, die eine Verbotsliste nicht
+  // namentlich kennt.
+  'lib/features/tours/domain/entities/domain_weitere_sdk.dart': r'''
+import 'package:sqflite/sqflite.dart';
+import 'package:http/http.dart';
+import 'package:hive/hive.dart';
+
+class DomainWeitereSdk {}
+''',
+  // Ä2: dieselbe Erlaubnisliste schließt app/ und services/ aus, obwohl beide
+  // zum eigenen Paket gehören.
+  'lib/features/tours/domain/entities/domain_app_services.dart': r'''
+import 'package:fact_app/app/routing/routes.dart';
+import 'package:fact_app/services/supabase/supabase_client_provider.dart';
+
+class DomainAppServices {}
+''',
+  // Ä3: Regel 7 greift auch in application, weil ein Notifier je nach
+  // Reifegrad dort liegt.
+  'lib/features/tours/application/application_instanziierung.dart': r'''
+class TourSteuerung {
+  void baue() {
+    final direkt = TourRepository();
+    final client = SupabaseClient('url', 'key');
+  }
+}
+''',
+  // Ä4: presentation darf nicht auf das eigene data zeigen, weder über den
+  // Paketpfad noch relativ.
+  'lib/features/tours/presentation/pages/eigenes_data.dart': r'''
+import 'package:fact_app/features/tours/data/tour_dto.dart';
+import '../../data/tour_remote_data_source.dart';
+
+class EigenesData {}
+''',
+  // Ä5: integration_test/ wird eingelesen, Gate 7 gilt auch dort.
+  'integration_test/getit_test.dart': r'''
+import 'package:get_it/get_it.dart';
+
+void main() {}
+''',
+  // Ä6: presentation außerhalb von lib/features/<feature>/ ist dieselbe
+  // Schicht mit derselben Regel.
+  'lib/shared/presentation/geteilte_seite.dart': r'''
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class GeteilteSeite {}
+''',
+};
+
+/// Baum 2: alles, was still bleiben muss. Enthält die Gegenproben und die
+/// bekannten Lücken. Dieser Baum muss Exit-Code 0 ohne jeden Fund ergeben.
+Map<String, String> _stilleProben() => <String, String>{
+  // Gegenprobe zu Regel 8 und 9: Import innerhalb des eigenen Features,
+  // absolut und relativ.
+  'lib/features/tours/presentation/pages/eigenes_feature.dart': r'''
+import 'package:fact_app/features/tours/presentation/widgets/tour_karte.dart';
+import 'package:fact_app/features/tours/application/tour_steuerung.dart';
+import 'package:fact_app/features/tours/domain/entities/tour.dart';
+import 'package:fact_app/core/types/result.dart';
+import '../widgets/tour_karte.dart';
+
+class Eigen {}
+''',
+  // Gegenprobe zu Ä1 und Ä2: eine korrekte verschachtelte Domäne. Nur das
+  // Dart-SDK und die eigene Feature-Domäne, absolut und relativ geschrieben.
+  // Diese Datei muss still bleiben, sonst ist die Verschärfung zu breit.
+  'lib/features/tours/karte/domain/entities/saubere_verschachtelung.dart': r'''
+import 'dart:math';
+
+import 'package:fact_app/features/tours/karte/domain/entities/punkt.dart';
+import '../value_objects/zoomstufe.dart';
+
+class SaubereVerschachtelung {}
+''',
+  // Gegenprobe zu Ä3: application bezieht die Abhängigkeit über einen
+  // Provider und deklariert sie als Feld. Beides ist keine Instanziierung.
+  'lib/features/tours/application/saubere_steuerung.dart': r'''
+class TourSteuerung {
+  TourSteuerung(this.repository);
+
+  final TourRepository repository;
+
+  void laden(dynamic ref) {
+    final ueberProvider = ref.watch(tourRepositoryProvider);
+  }
+}
+''',
+  // Gegenprobe zu Ä5: eine Datei in integration_test/ ohne zweites DI-System.
+  'integration_test/saubere_integration_test.dart': r'''
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {}
+''',
+  // Gegenprobe zu Ä6: dasselbe presentation außerhalb von features, diesmal
+  // mit erlaubten Importen.
+  'lib/shared/presentation/saubere_seite.dart': r'''
+import 'package:flutter/material.dart';
+import 'package:fact_app/core/types/result.dart';
+
+class SaubereSeite {}
+''',
+  // Gegenprobe zu Ä1: ein Verzeichnis, dessen Name nur mit einem Schichtnamen
+  // beginnt, ist keine Schicht. Der Core-Import wäre in der Domäne ein Verstoß
+  // gegen Gate 6, in presentation ist er erlaubt. Bliebe er hier unbemerkt
+  // still, hätte das Muster "domain_helpers" als Domäne gelesen.
+  'lib/features/tours/presentation/domain_helpers/kein_domain.dart': r'''
+import 'package:fact_app/core/types/result.dart';
+
+class KeinDomain {}
+''',
+  // Gegenprobe zu Regel 11: technischer Begriff unter core.
+  'lib/core/types/result.dart': r'''
+class Result<T> {}
+''',
+  // Gegenprobe zu Gate 8: dieselbe Navigator-Nutzung in der
+  // Routing-Infrastruktur bleibt still.
+  'lib/app/routing/navigator_api.dart': r'''
+class RoutingSchale {
+  void oeffne(dynamic context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => this));
+    context.go('/tours');
+  }
+}
+''',
+  // Gegenprobe zu Regel 13.
+  'lib/features/tours/domain/repositories/sauberer_vertrag.dart': r'''
+abstract class SaubererRepository {
+  Future<List<Tour>> alle();
+  Stream<Tour> beobachte();
+}
+''',
+  // Bekannte Lücke 1: benannte Konstruktoren umgehen Regel 7. Bewusst so, ein
+  // breiteres Muster würde statische Factory-Helfer melden.
+  'lib/features/tours/presentation/widgets/luecke_benannt.dart': r'''
+class TourAnsicht {
+  void baue() {
+    final repository = TourRepository.remote();
+    final quelle = TourRemoteDataSource.fromEnv();
+  }
+}
+''',
+  // Bekannte Lücke 2: eine Direktive, die nicht am Zeilenanfang beginnt, wird
+  // nicht erkannt. Hier bleibt der Flutter-Import in der Domäne unsichtbar.
+  // Der erste Export zeigt in die eigene Domäne und ist erlaubt.
+  'lib/features/tours/domain/entities/luecke_zeilenanfang.dart': r'''
+export 'stub.dart'; import 'package:flutter/material.dart';
+
+class LueckeZeilenanfang {}
+''',
+  // Bekannte Lücke 3: Navigation mit einer Variable statt einem Literal wird
+  // nicht gemeldet. Genau so sieht eine typisierte Route aus.
+  'lib/features/tours/presentation/pages/luecke_route_variable.dart': r'''
+class RouteVariable {
+  void oeffne(dynamic context, String ziel) {
+    context.go(ziel);
+  }
+}
+''',
+  // Bekannte Lücke 4: ein fremdes domain/ ist kein Verstoß im Skript, Regel 10
+  // verlangt aber einen öffentlichen Vertrag.
+  'lib/features/tours/application/luecke_fremde_domain.dart': r'''
+import 'package:fact_app/features/challenges/domain/entities/challenge.dart';
+
+class LueckeFremdeDomain {}
+''',
+};
+
+/// Baum 3: nur ein Hinweis, kein Verstoß. Prüft die Exit-Code-Semantik.
+Map<String, String> _hinweisProben() => <String, String>{
+  'lib/features/tours/application/protokoll.dart': r'''
+import 'dart:async';
+import 'dart:developer';
+
+class Protokoll {}
+''',
+};
+
+// ---------------------------------------------------------------------------
+// Ablauf
+// ---------------------------------------------------------------------------
+
+void main() {
+  late Directory tempWurzel;
+  late Lauf verstoss;
+  late Lauf still;
+  late Lauf hinweis;
+  late Lauf ohneLib;
+
+  setUpAll(() async {
+    tempWurzel = Directory.systemTemp.createTempSync('fact_arch_check_');
+    final baumVerstoss = _baueBaum(tempWurzel, 'verstoesse', _verstossProben());
+    final baumStill = _baueBaum(tempWurzel, 'still', _stilleProben());
+    final baumHinweis = _baueBaum(tempWurzel, 'hinweis', _hinweisProben());
+    final baumOhneLib = _baueBaum(tempWurzel, 'ohne_lib', <String, String>{
+      'tool/leer.dart': 'void main() {}\n',
+    });
+
+    final laeufe = await Future.wait(<Future<Lauf>>[
+      _starte('verstoesse', baumVerstoss),
+      _starte('still', baumStill),
+      _starte('hinweis', baumHinweis),
+      _starte('ohne_lib', baumOhneLib),
+    ]);
+    verstoss = laeufe[0];
+    still = laeufe[1];
+    hinweis = laeufe[2];
+    ohneLib = laeufe[3];
+  });
+
+  tearDownAll(() {
+    // Auch nach fehlgeschlagenen Tests aufräumen. Windows hält Handles
+    // manchmal kurz, deshalb ein paar Versuche, danach lieber laut scheitern
+    // als ein verwaistes Temp-Verzeichnis verschweigen.
+    Object? letzterFehler;
+    for (var versuch = 0; versuch < 5; versuch++) {
+      try {
+        if (tempWurzel.existsSync()) {
+          tempWurzel.deleteSync(recursive: true);
+        }
+        return;
+      } on FileSystemException catch (fehler) {
+        letzterFehler = fehler;
+      }
+    }
+    fail('Temp-Baum ${tempWurzel.path} blieb liegen: $letzterFehler');
+  });
+
+  /// Vergleicht die Funde einer Datei genau: gleiche Zeilen, keine zusätzliche
+  /// Meldung, und pro Zeile eine Regel, die den erwarteten Text enthält.
+  void erwarteFunde(
+    Lauf lauf,
+    String datei,
+    List<(int zeile, String regelTeil)> erwartet,
+  ) {
+    final funde = lauf.fuer(datei);
+    expect(
+      funde.map((f) => f.zeile).toList()..sort(),
+      erwartet.map((e) => e.$1).toList()..sort(),
+      reason: 'Zeilennummern für $datei\n${lauf.bericht}',
+    );
+    for (final eintrag in erwartet) {
+      expect(
+        funde.where((f) => f.zeile == eintrag.$1).map((f) => f.regel),
+        anyElement(contains(eintrag.$2)),
+        reason:
+            'Regeltext in $datei Zeile ${eintrag.$1}\n'
+            '${lauf.bericht}',
+      );
+    }
+  }
+
+  group('Grundverhalten', () {
+    test('ein sauberer Baum ergibt Exit-Code 0 und keine Verstöße', () {
+      expect(still.exitCode, 0, reason: still.bericht);
+      expect(still.ausgabe, contains('keine Verstöße'), reason: still.bericht);
+      expect(still.funde, isEmpty, reason: still.bericht);
+    });
+
+    test('ein Baum mit Verstößen ergibt Exit-Code 1', () {
+      expect(verstoss.exitCode, 1, reason: verstoss.bericht);
+      expect(verstoss.verstoesse, isNotEmpty, reason: verstoss.bericht);
+    });
+
+    test('ein fehlendes lib/ ergibt Exit-Code 2, nicht 0 und nicht 1', () {
+      expect(ohneLib.exitCode, 2, reason: ohneLib.bericht);
+      expect(
+        ohneLib.fehlerausgabe,
+        contains('lib/ nicht gefunden'),
+        reason: ohneLib.bericht,
+      );
+    });
+
+    test('die Ausgabe nennt bei jedem Fund Datei, Zeile und Regel', () {
+      final kopf = RegExp(
+        r'Architektur-Check: (\d+) Verstoß bzw\. Verstöße',
+      ).firstMatch(verstoss.ausgabe);
+      expect(kopf, isNotNull, reason: verstoss.bericht);
+      expect(
+        verstoss.verstoesse.length,
+        int.parse(kopf!.group(1)!),
+        reason:
+            'Die Kopfzeile nennt eine andere Zahl als die Fundblöcke.\n'
+            '${verstoss.bericht}',
+      );
+      for (final fund in verstoss.verstoesse) {
+        expect(fund.datei, endsWith('.dart'), reason: verstoss.bericht);
+        expect(fund.zeile, greaterThan(0), reason: verstoss.bericht);
+        expect(fund.gefunden, isNotEmpty, reason: verstoss.bericht);
+        expect(fund.regel, isNotEmpty, reason: verstoss.bericht);
+      }
+      expect(
+        verstoss.ausgabe,
+        contains('docs/architecture/dependency-rules.md'),
+        reason: verstoss.bericht,
+      );
+    });
+
+    test('gemeldete Pfade sind relativ und in Posix-Schreibweise', () {
+      for (final fund in verstoss.funde) {
+        expect(fund.datei, isNot(contains(r'\')), reason: verstoss.bericht);
+        expect(fund.datei, isNot(startsWith('/')), reason: verstoss.bericht);
+        expect(fund.datei, isNot(contains(':')), reason: verstoss.bericht);
+      }
+    });
+
+    test('nur die erwarteten Dateien werden überhaupt gemeldet', () {
+      expect(verstoss.dateienMitFund, <String>{
+        'lib/app/di.dart',
+        'test/di_test.dart',
+        'tool/generieren.dart',
+        'integration_test/getit_test.dart',
+        'lib/core/facts/helper.dart',
+        'lib/shared/presentation/geteilte_seite.dart',
+        'lib/features/tours/application/application_instanziierung.dart',
+        'lib/features/tours/karte/domain/entities/verschachtelte_domaene.dart',
+        'lib/features/tours/domain/entities/domain_app_services.dart',
+        'lib/features/tours/domain/entities/domain_weitere_sdk.dart',
+        'lib/features/tours/presentation/pages/eigenes_data.dart',
+        'lib/features/tours/domain/entities/technik_importe.dart',
+        'lib/features/tours/domain/entities/mehrzeilige_direktive.dart',
+        'lib/features/tours/domain/entities/bedingte_direktive.dart',
+        'lib/features/tours/domain/entities/zwei_uris.dart',
+        'lib/features/tours/domain/entities/kommentierter_import.dart',
+        'lib/features/tours/domain/entities/vorlage_im_literal.dart',
+        'lib/features/tours/domain/entities/crlf.dart',
+        'lib/features/tours/domain/repositories/tour_repository.dart',
+        'lib/features/tours/domain/usecases/core_import.dart',
+        'lib/features/tours/domain/usecases/schicht_importe.dart',
+        'lib/features/tours/presentation/notifier_und_widget.dart',
+        'lib/features/tours/presentation/pages/fremdes_feature_paket.dart',
+        'lib/features/tours/presentation/pages/fremdes_feature_relativ.dart',
+        'lib/features/tours/presentation/pages/navigator_api.dart',
+        'lib/features/tours/presentation/pages/route_string.dart',
+        'lib/features/tours/presentation/pages/supabase_seite.dart',
+        'lib/features/tours/presentation/widgets/ausgabe.dart',
+        'lib/features/tours/presentation/widgets/instanziierung.dart',
+        'lib/features/tours/presentation/widgets/literale.dart',
+      }, reason: verstoss.bericht);
+    });
+  });
+
+  group('Import-Grenzen', () {
+    test('Domain darf keine Technik importieren', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/technik_importe.dart',
+        <(int, String)>[
+          (1, 'Regel 1: Domain darf Flutter nicht importieren'),
+          (2, 'Regel 2: Domain darf Riverpod nicht importieren'),
+          // flutter_riverpod trifft das Flutter-Verbot, nicht das
+          // Riverpod-Verbot. Festgehalten, damit die Reihenfolge der
+          // Verbotsmuster nicht unbemerkt kippt.
+          (3, 'Regel 1: Domain darf Flutter nicht importieren'),
+          (4, 'Regel 3: Domain darf Supabase nicht importieren'),
+          (5, 'Regel 4: Domain darf kein Routing importieren'),
+          (6, 'Regel 4: Domain darf keine Geräte-SDK importieren'),
+          (7, 'Regel 4: Domain darf keine Storage-SDK importieren'),
+          (8, 'Regel 4: Domain darf keine Karten-SDK importieren'),
+        ],
+      );
+    });
+
+    test('Domain darf nicht aus core importieren', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/usecases/core_import.dart',
+        <(int, String)>[
+          (1, 'Gate 6: Feature-Domain darf nicht aus core importieren'),
+        ],
+      );
+    });
+
+    test('Domain darf nicht auf data oder presentation zeigen', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/usecases/schicht_importe.dart',
+        <(int, String)>[
+          (1, 'domain darf nicht auf data zeigen'),
+          (2, 'domain darf nicht auf presentation zeigen'),
+        ],
+      );
+    });
+
+    test('Presentation darf Supabase nicht direkt aufrufen', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/pages/supabase_seite.dart',
+        <(int, String)>[
+          (1, 'Regel 5: Presentation darf Supabase nicht direkt aufrufen'),
+        ],
+      );
+    });
+
+    test('fremdes presentation und data über den Paketpfad', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/pages/fremdes_feature_paket.dart',
+        <(int, String)>[
+          (1, 'Regel 8: Feature darf presentation von "challenges" nicht'),
+          (2, 'Regel 9: Feature darf data von "challenges" nicht importieren'),
+        ],
+      );
+    });
+
+    test('fremdes presentation und data über einen relativen Pfad', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/pages/fremdes_feature_relativ.dart',
+        <(int, String)>[
+          (1, 'Regel 8: Feature darf presentation von "challenges" nicht'),
+          (2, 'Regel 9: Feature darf data von "challenges" nicht importieren'),
+        ],
+      );
+      final funde = verstoss.fuer(
+        'lib/features/tours/presentation/pages/fremdes_feature_relativ.dart',
+      );
+      expect(
+        funde.first.gefunden,
+        contains('aufgelöst: package:fact_app/features/challenges/'),
+        reason:
+            'Der relative Pfad muss in der Meldung aufgelöst erscheinen.\n'
+            '${verstoss.bericht}',
+      );
+    });
+
+    test(
+      'Gegenprobe: Importe innerhalb des eigenen Features bleiben still',
+      () {
+        expect(
+          still.fuer(
+            'lib/features/tours/presentation/pages/eigenes_feature.dart',
+          ),
+          isEmpty,
+          reason: still.bericht,
+        );
+      },
+    );
+
+    test('GetIt und injectable in lib, test und tool', () {
+      erwarteFunde(verstoss, 'lib/app/di.dart', <(int, String)>[
+        (1, 'ADR-005: GetIt ist ausgeschlossen'),
+        (2, 'ADR-005: injectable ist ausgeschlossen'),
+      ]);
+      erwarteFunde(verstoss, 'test/di_test.dart', <(int, String)>[
+        (1, 'ADR-005: GetIt ist ausgeschlossen'),
+      ]);
+      erwarteFunde(verstoss, 'tool/generieren.dart', <(int, String)>[
+        (1, 'ADR-005: injectable ist ausgeschlossen'),
+      ]);
+    });
+  });
+
+  group('Scanner', () {
+    test('mehrzeilige Direktive: gemeldet wird die Zeile des URI', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/mehrzeilige_direktive.dart',
+        <(int, String)>[(2, 'Regel 1: Domain darf Flutter nicht importieren')],
+      );
+    });
+
+    test('bedingte Direktive: der Verstoß im zweiten URI wird gefunden', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/bedingte_direktive.dart',
+        <(int, String)>[(2, 'Regel 1: Domain darf Flutter nicht importieren')],
+      );
+    });
+
+    test('zwei verletzende URIs in einer Direktive geben zwei Meldungen', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/zwei_uris.dart',
+        <(int, String)>[
+          (1, 'Regel 4: Domain darf kein Routing importieren'),
+          (1, 'Regel 2: Domain darf Riverpod nicht importieren'),
+        ],
+      );
+    });
+
+    test('auskommentierte Verbote werden ignoriert', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/kommentierter_import.dart',
+        <(int, String)>[(3, 'Regel 4: Domain darf kein Routing importieren')],
+      );
+    });
+
+    test('Direktiven in einem String-Literal sind kein Verstoß', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/vorlage_im_literal.dart',
+        <(int, String)>[(1, 'Regel 4: Domain darf kein Routing importieren')],
+      );
+    });
+
+    test('CRLF verschiebt keine Zeilennummer', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/crlf.dart',
+        <(int, String)>[
+          (4, 'Regel 1: Domain darf Flutter nicht importieren'),
+          (7, 'Gate 9: kein print() oder debugPrint()'),
+        ],
+      );
+      final printFund = verstoss
+          .fuer('lib/features/tours/domain/entities/crlf.dart')
+          .firstWhere((f) => f.zeile == 7);
+      expect(
+        printFund.gefunden,
+        "print('crlf');",
+        reason:
+            'Der Zeilentext einer CRLF-Datei darf kein Wagenrücklaufzeichen '
+            'enthalten.\n${verstoss.bericht}',
+      );
+    });
+
+    test('rohe, dreifache und interpolierte Literale bringen den Scanner nicht '
+        'aus dem Tritt', () {
+      // Das Muster steht in Zeile 2, 4 und 9 in Literalen, echter Verstoß
+      // erst in Zeile 12. Genau hier verschluckt eine zu breite Maskierung
+      // typischerweise den echten Fund.
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/widgets/literale.dart',
+        <(int, String)>[(12, 'ADR-004: keine rohen Route-Strings')],
+      );
+    });
+  });
+
+  group('Weitere Prüfungen', () {
+    test('Geschäftsbegriff im Pfad unter core', () {
+      erwarteFunde(verstoss, 'lib/core/facts/helper.dart', <(int, String)>[
+        (1, 'Regel 11: core darf das Konzept "fact" nicht besitzen'),
+      ]);
+    });
+
+    test('Gegenprobe: technischer Begriff unter core bleibt still', () {
+      expect(
+        still.fuer('lib/core/types/result.dart'),
+        isEmpty,
+        reason: still.bericht,
+      );
+    });
+
+    test('rohe Navigator-API außerhalb der Routing-Infrastruktur', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/pages/navigator_api.dart',
+        <(int, String)>[(3, 'ADR-004: die Navigator-API umgeht go_router')],
+      );
+    });
+
+    test(
+      'Gegenprobe: dieselbe Navigation in lib/app/routing/ bleibt still',
+      () {
+        expect(
+          still.fuer('lib/app/routing/navigator_api.dart'),
+          isEmpty,
+          reason: still.bericht,
+        );
+      },
+    );
+
+    test('Route-Literal wird gemeldet, eine Variable bewusst nicht', () {
+      // Die Ausnahme für Variablen ist im Skript begründet: typisierte Routen
+      // liefern den Pfad, ein Verbot würde korrekten Code melden.
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/pages/route_string.dart',
+        <(int, String)>[(3, 'ADR-004: keine rohen Route-Strings')],
+      );
+    });
+
+    test('print, debugPrint und die Tear-off-Form', () {
+      // printWidth in Zeile 9 und sprintf in Zeile 10 sind keine Verstöße.
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/widgets/ausgabe.dart',
+        <(int, String)>[
+          (3, 'Gate 9: kein print() oder debugPrint()'),
+          (4, 'Gate 9: kein print() oder debugPrint()'),
+          (8, 'Gate 9: kein print() oder debugPrint()'),
+        ],
+      );
+    });
+
+    test(
+      'dart:developer in lib/features ist ein Hinweis und lässt Exit-Code 0',
+      () {
+        expect(hinweis.exitCode, 0, reason: hinweis.bericht);
+        expect(hinweis.verstoesse, isEmpty, reason: hinweis.bericht);
+        expect(hinweis.hinweise, hasLength(1), reason: hinweis.bericht);
+        final fund = hinweis.hinweise.single;
+        expect(fund.datei, 'lib/features/tours/application/protokoll.dart');
+        expect(fund.zeile, 2);
+        expect(fund.regel, contains('Logging-Vertrag'));
+        expect(
+          hinweis.ausgabe,
+          contains('die den Lauf nicht abbrechen'),
+          reason: hinweis.bericht,
+        );
+      },
+    );
+
+    test('Regel 7: Instanziierung in presentation', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/widgets/instanziierung.dart',
+        <(int, String)>[
+          (9, 'Regel 7: presentation instanziiert keine Repositories'),
+          (10, 'Regel 7: presentation instanziiert keine Repositories'),
+          (11, 'Regel 7: presentation instanziiert keine Repositories'),
+        ],
+      );
+      // Zeile 1 abstrakte Deklaration, Zeile 6 Feld, Zeile 12 Provider-Bezug
+      // und Zeile 13 benannter Konstruktor sind bewusst nicht dabei.
+    });
+
+    test('Regel 12: der Notifier navigiert, das Widget daneben nicht', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/notifier_und_widget.dart',
+        <(int, String)>[(3, 'Regel 12: Notifier navigieren nicht')],
+      );
+    });
+
+    test('Regel 13: verbotene Rückgabetypen im Repository-Vertrag', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/repositories/tour_repository.dart',
+        <(int, String)>[
+          (2, 'Regel 13: Repository-Vertrag liefert keine JSON-Map'),
+          (3, 'Regel 13: Repository-Vertrag liefert kein AsyncValue'),
+          (4, 'Regel 13: Repository-Vertrag kennt keine DTOs'),
+        ],
+      );
+      // Zeile 5 ist Future<List<Tour>> und bleibt still.
+    });
+
+    test('Gegenprobe: ein sauberer Repository-Vertrag bleibt still', () {
+      expect(
+        still.fuer(
+          'lib/features/tours/domain/repositories/sauberer_vertrag.dart',
+        ),
+        isEmpty,
+        reason: still.bericht,
+      );
+    });
+  });
+
+  // Die sechs Verschärfungen Ä1 bis Ä6. Jede hat eine Positivprobe, und wo
+  // eine zu breite Umsetzung korrekten Code melden würde, auch eine
+  // Gegenprobe. Die Gegenproben liegen im stillen Baum, der insgesamt
+  // Exit-Code 0 ohne einen einzigen Fund ergeben muss.
+  group('Verschärfte Prüfungen', () {
+    test('Ä1: Schichtverbote greifen auch unterhalb einer Unterstruktur', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/karte/domain/entities/verschachtelte_domaene.dart',
+        <(int, String)>[
+          (1, 'Regel 1: Domain darf Flutter nicht importieren'),
+          (2, 'Regel 3: Domain darf Supabase nicht importieren'),
+        ],
+      );
+    });
+
+    test('Ä1 Gegenprobe: eine korrekte verschachtelte Domäne bleibt still', () {
+      expect(
+        still.fuer(
+          'lib/features/tours/karte/domain/entities/'
+          'saubere_verschachtelung.dart',
+        ),
+        isEmpty,
+        reason:
+            'Dart-SDK und eigene Feature-Domäne, absolut und relativ. Wird '
+            'hier etwas gemeldet, ist die Erlaubnisliste zu eng.\n'
+            '${still.bericht}',
+      );
+    });
+
+    test('Ä1 Gegenprobe: ein Verzeichnis "domain_helpers" ist keine Domäne', () {
+      expect(
+        still.fuer(
+          'lib/features/tours/presentation/domain_helpers/kein_domain.dart',
+        ),
+        isEmpty,
+        reason:
+            'Der Core-Import wäre in der Domäne ein Verstoß gegen Gate 6. Ein '
+            'Fund hier hieße, das Muster liest ein Präfix als Segment.\n'
+            '${still.bericht}',
+      );
+    });
+
+    test('Ä2: die Domäne darf app/ und services/ nicht importieren', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/domain_app_services.dart',
+        <(int, String)>[
+          (1, 'Domain-Erlaubnisliste'),
+          (2, 'Domain-Erlaubnisliste'),
+        ],
+      );
+    });
+
+    test('Ä2: sqflite, http und hive fallen in der Domäne durch', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/domain_weitere_sdk.dart',
+        <(int, String)>[
+          (1, 'Domain-Erlaubnisliste'),
+          (2, 'Domain-Erlaubnisliste'),
+          (3, 'Domain-Erlaubnisliste'),
+        ],
+      );
+    });
+
+    test(
+      'Ä2: die allgemeine Meldung nennt den Grund, nicht nur das Verbot',
+      () {
+        final fund = verstoss
+            .fuer('lib/features/tours/domain/entities/domain_weitere_sdk.dart')
+            .first;
+        expect(
+          fund.regel,
+          contains('dependency-rules.md'),
+          reason:
+              'Die Meldung muss auf das Quelldokument verweisen.\n'
+              '${verstoss.bericht}',
+        );
+        expect(
+          fund.regel,
+          contains('data oder services'),
+          reason:
+              'Die Meldung muss sagen, wohin die Technik stattdessen gehört.\n'
+              '${verstoss.bericht}',
+        );
+      },
+    );
+
+    test('Ä2: ein benanntes Verbot verdrängt die allgemeine Meldung', () {
+      // technik_importe.dart hat acht Importe, die alle ein benanntes Verbot
+      // treffen. Gäbe es zusätzlich die allgemeine Meldung, stünden hier
+      // sechzehn Funde und der Leser bekäme zwei Sätze für denselben Import.
+      final funde = verstoss.fuer(
+        'lib/features/tours/domain/entities/technik_importe.dart',
+      );
+      expect(funde, hasLength(8), reason: verstoss.bericht);
+      expect(
+        funde.where((f) => f.regel.contains('Domain-Erlaubnisliste')),
+        isEmpty,
+        reason: verstoss.bericht,
+      );
+    });
+
+    test('Ä3: Regel 7 greift auch in application', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/application/application_instanziierung.dart',
+        <(int, String)>[
+          (3, 'Regel 7: application instanziiert keine Repositories'),
+          (4, 'Regel 7: application instanziiert keine Repositories'),
+        ],
+      );
+    });
+
+    test(
+      'Ä3 Gegenprobe: Provider-Bezug und Feld in application bleiben still',
+      () {
+        expect(
+          still.fuer('lib/features/tours/application/saubere_steuerung.dart'),
+          isEmpty,
+          reason: still.bericht,
+        );
+      },
+    );
+
+    test('Ä4: presentation darf nicht auf das eigene data zeigen', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/pages/eigenes_data.dart',
+        <(int, String)>[
+          (1, 'presentation darf nicht auf data zeigen'),
+          (2, 'presentation darf nicht auf data zeigen'),
+        ],
+      );
+    });
+
+    test('Ä4: fremdes data bleibt eine Meldung, nicht zwei', () {
+      // Regel 9 deckt fremdes data schon ab. Die neue Prüfung gilt deshalb nur
+      // für das eigene Feature, sonst stünden hier zwei Sätze pro Import.
+      final funde = verstoss.fuer(
+        'lib/features/tours/presentation/pages/fremdes_feature_paket.dart',
+      );
+      expect(
+        funde.where((f) => f.zeile == 2),
+        hasLength(1),
+        reason: verstoss.bericht,
+      );
+    });
+
+    test('Ä4 Gegenprobe: presentation darf application und domain kennen', () {
+      expect(
+        still.fuer(
+          'lib/features/tours/presentation/pages/eigenes_feature.dart',
+        ),
+        isEmpty,
+        reason: still.bericht,
+      );
+    });
+
+    test('Ä5: Gate 7 greift auch in integration_test/', () {
+      erwarteFunde(
+        verstoss,
+        'integration_test/getit_test.dart',
+        <(int, String)>[(1, 'ADR-005: GetIt ist ausgeschlossen')],
+      );
+    });
+
+    test(
+      'Ä5 Gegenprobe: eine saubere Datei in integration_test/ bleibt still',
+      () {
+        expect(
+          still.fuer('integration_test/saubere_integration_test.dart'),
+          isEmpty,
+          reason: still.bericht,
+        );
+      },
+    );
+
+    test('Ä5: ein fehlendes integration_test/ bricht den Lauf nicht ab', () {
+      // Der Hinweisbaum hat kein integration_test/. Das Verzeichnis existiert
+      // im Repository derzeit ebenfalls nicht.
+      expect(hinweis.exitCode, 0, reason: hinweis.bericht);
+      expect(
+        hinweis.fehlerausgabe,
+        isEmpty,
+        reason:
+            'Ein fehlendes Verzeichnis darf keine Fehlerausgabe erzeugen.\n'
+            '${hinweis.bericht}',
+      );
+    });
+
+    test('Ä6: presentation außerhalb von features/ wird geprüft', () {
+      erwarteFunde(
+        verstoss,
+        'lib/shared/presentation/geteilte_seite.dart',
+        <(int, String)>[
+          (1, 'Regel 5: Presentation darf Supabase nicht direkt aufrufen'),
+        ],
+      );
+    });
+
+    test('Ä6 Gegenprobe: dasselbe presentation mit erlaubten Importen', () {
+      expect(
+        still.fuer('lib/shared/presentation/saubere_seite.dart'),
+        isEmpty,
+        reason: still.bericht,
+      );
+    });
+  });
+
+  // Diese Gruppe hält den heutigen Zustand fest. Jeder Test hier ist grün,
+  // weil das Skript nichts meldet, und das ist bei diesen vier Fällen so
+  // gewollt: die Begründung steht im Kopfkommentar von
+  // tool/check_architecture.dart unter "Bewusst offene Lücken". Wer eine
+  // dieser Lücken schließen will, muss zuerst die dortige Begründung
+  // widerlegen.
+  group('Bewusst offene Lücken (Entscheidung, nicht Versehen)', () {
+    test('Lücke 1: benannte Konstruktoren umgehen Regel 7', () {
+      expect(
+        still.fuer(
+          'lib/features/tours/presentation/widgets/luecke_benannt.dart',
+        ),
+        isEmpty,
+        reason:
+            'TourRepository.remote() trifft das Muster nicht, weil hinter dem '
+            'Namen ein Punkt statt einer Klammer steht. Ein breiteres Muster '
+            'würde statische Factory-Helfer melden.\n${still.bericht}',
+      );
+    });
+
+    test('Lücke 2: Direktiven werden nur am Zeilenanfang erkannt', () {
+      expect(
+        still.fuer(
+          'lib/features/tours/domain/entities/luecke_zeilenanfang.dart',
+        ),
+        isEmpty,
+        reason:
+            'Die zweite Direktive derselben Zeile bleibt unsichtbar, obwohl '
+            'sie Flutter in die Domäne holt. dart format erzeugt diese Form '
+            'nie, und das Format-Gate läuft in derselben Pipeline.\n'
+            '${still.bericht}',
+      );
+    });
+
+    test('Lücke 3: Navigation mit einer Variable wird nicht gemeldet', () {
+      expect(
+        still.fuer(
+          'lib/features/tours/presentation/pages/luecke_route_variable.dart',
+        ),
+        isEmpty,
+        reason:
+            'context.go(ziel) ist genau die Form, die eine typisierte Route '
+            'erzeugt. Ein Verbot würde überwiegend korrekten Code melden.\n'
+            '${still.bericht}',
+      );
+    });
+
+    test('Lücke 4: ein fremdes domain/ ist kein Verstoß', () {
+      expect(
+        still.fuer('lib/features/tours/application/luecke_fremde_domain.dart'),
+        isEmpty,
+        reason:
+            'Regel 10 verlangt einen öffentlichen Vertrag. Ein Import von '
+            'features/x/domain/ kann der Vertrag selbst sein oder dessen '
+            'Umgehung, und beides sieht im Quelltext gleich aus. Bleibt '
+            'Review-Sache.\n${still.bericht}',
+      );
+    });
+  });
+}
