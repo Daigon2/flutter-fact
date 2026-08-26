@@ -165,9 +165,11 @@ Begründung und Wiederaufnahme-Bedingung angepasst.
 ## Offene Entscheidungen
 
 > **Hinweis zur Öffentlichkeit dieses Dokuments.** Das Repository ist öffentlich.
-> Die Einträge E-06, E-07, E-16 und E-21 beschreiben offene Schwachstellen des
+> Die Einträge E-06, E-07, E-16, E-21, E-23 und E-24 beschreiben offene
+> Schwachstellen des
 > produktiven Backends, das die laufende PWA mitbenutzt. Der Eigentümer hat am
 > 26.08.2026 ausdrücklich entschieden, sie hier trotzdem im Klartext zu führen,
+> einschließlich der beiden schwereren Funde E-23 und E-24,
 > weil der Nutzen als Arbeitsdokument höher gewichtet wird als das Risiko.
 > Das ist eine bewusste Entscheidung, kein Versehen.
 
@@ -191,6 +193,8 @@ Nunito-600, Umgang mit `riverpod_lint`.
 | E-17 | **Creator-Foto.** Storage-Bucket, Policy, Moderation vor `is_approved`. | 3, Bucket-Anlage 4 | Phase 8 |
 | E-19 | **Trusted Time.** Der 45-Minuten-Timer für das Session-Ende und die Finale-Punkte ×1.5 rechnen clientseitig. `security.md` §1 verbietet vertrauenswürdige Zeitstempel aus dem Client. | 3 | Phase 5 |
 | E-20 | **Kamera-Permission** für Damals/Heute und Foto-Rätsel, mit Zweckbindung. | 3 | Phase 3 |
+| E-23 | **Die Distanzprüfung beim Sammeln ist nicht nur umgehbar, sie ist optional.** Die Policy `create policy "own collected" on public.collected_facts for all using (auth.uid() = user_id)` erlaubt dem Client, direkt in `collected_facts` einzufügen. Damit entfällt `collect_fact_validated` samt der 150-Meter-Prüfung vollständig, und der Trigger `handle_fact_collected` bucht danach Punkte, Stadtwertung und Trophäen. E-07 beschreibt nur, dass die Positionsangabe fälschbar ist; hier braucht man gar keine. | **4** | Phase 2 |
+| E-24 | **Coins und Punktestand sind direkt setzbar.** Die Policy `create policy "own profile" on public.profiles for all using (auth.uid() = id)` hat kein `WITH CHECK`. Der Client kann seine eigene Profilzeile aktualisieren, einschließlich `coins` und `score_total`. **Wichtig für die Reihenfolge der Behebung:** wer E-06 behebt, also `increment_coins` absichert, hat damit nichts gewonnen, solange E-24 offen ist. Die Funktion ist dann nur der bequemere von zwei Wegen. | **4** | Phase 2 |
 | E-21 | **`start_group_session` ist doppelt definiert**, in `2026-06-04_group_sessions.sql:193` und erneut in `2026-06-05_team_sessions.sql:473`. Welche Version produktiv läuft, hängt an der Ausführungsreihenfolge im SQL-Editor. Backend-Frage, aber der Client hängt daran. | 3, im anderen Repo | Phase 5 |
 
 ## Datenvertrag: die bekannten Fallen
