@@ -88,9 +88,16 @@ Before a pull request is marked ready:
 ```bash
 dart format --output=none --set-exit-if-changed .
 flutter analyze
-dart run custom_lint
 flutter test
+dart run tool/check_architecture.dart
 ```
+
+Riverpod lint is deliberately absent from this list: `riverpod_lint` via
+`custom_lint` is currently not installable. `quality-gates.md`, section "Accepted
+deviation: no Riverpod lint", holds the dependency chain, the rules that remain
+review-only and the condition for reinstating the requirement.
+`tool/check_architecture.dart` replaces the boundary part of that coverage, not
+the Riverpod-specific rules.
 
 Add integration, backend or platform-specific checks when the change affects those areas.
 

@@ -1,0 +1,259 @@
+# Neubau-Status
+
+Fortschritt des Flutter-Neubaus. Diese Datei ist die dauerhafte Quelle, nicht der
+Gesprächsverlauf. Wer nach einem Kontextverlust weiterarbeitet, liest zuerst hier.
+
+**Reihenfolge und Inhalt der 50 Schritte** stehen in `08_Flutter/REBUILD_PLAN.md`
+im Lese-Repo, die Anforderungen pro Screen in
+`06_Planung/specs/2026-07-23-flutter-rebuild-parity-spec.md`. Beide sind dort
+nicht in Git eingecheckt und existieren nur lokal.
+
+**Achtung:** Der REBUILD_PLAN gibt die Reihenfolge vor, nicht die Architektur.
+Sein Grundprinzip 4 nennt `provider` und ein globales `AppState`. Das widerspricht
+ADR-003 und ADR-005 und gilt hier nicht. Die drei nachgewiesenen Sachfehler des
+Plans stehen unten unter „Korrekturen an den Quelldokumenten".
+
+## Legende
+
+`[x]` fertig und verifiziert · `[~]` in Arbeit · `[ ]` offen · `[!]` blockiert
+durch eine offene Entscheidung
+
+## Phase 0, Fundament
+
+- [x] **1. Projekt-Gerüst.** `flutter create` mit Android und iOS, Store-IDs aus
+  dem alten Port übernommen (`de.factapp.fact_app`, `de.factapp.factApp`), damit
+  der Neubau im Store dieselbe App bleibt. Feature-Ordner nach Domain-Map,
+  Ownership in `lib/features/README.md`.
+- [x] **2. Pakete festgenagelt.** Abweichungen von der Planliste siehe
+  „Paket-Abweichungen" unten.
+- [x] **3. Design-Tokens.** `lib/app/theme/`, Werte aus `styles.css`, per Test
+  festgenagelt. Schriftgrößen und Schatten bewusst nicht global, siehe
+  „Bewusste Auslassungen".
+- [x] **4. i18n-Fundament.** Generiert aus `translations.jsx` und
+  `audio-strings.jsx`, kein ARB und kein `gen_l10n`, weil die punktierten
+  PWA-Schlüssel sonst verloren gehen. **716 Schlüssel je Sprache**, DE und EN
+  deckungsgleich. Generator unter `tool/generate_i18n.dart` mit `--check` für
+  Drift-Erkennung. 47 Tests.
+- [ ] **5. Datenmodell und Supabase-Client.** Defensives `Fact`-Mapping. Fünf
+  bekannte Cast-Fallen, siehe „Datenvertrag".
+- [ ] **6. App-Shell.** Routen, TabBar, MiniPlayer-Slot.
+
+## Phase 1, Auth und Onboarding
+
+- [ ] 7. Splash · [ ] 8. Audio-Aktivierungsdialog · [ ] 9. Login
+- [ ] 10. Signup · [ ] 11. Tutorial-Overlay
+
+## Phase 2, Map-Kern
+
+- [ ] 12. MapLibre mit gebackenem Style · [ ] 13. Kamera-Verhalten
+- [ ] 14. Kompass-Rotation · [ ] 15. Cluster-Layer · [ ] 16. Einzel-Marker
+- [ ] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
+- [ ] 19. Top-Chrome · [ ] 20. Sammel-Erlebnis
+
+## Phase 3, Fakt-Akte und Audio
+
+- [ ] 21. Fact-Detail-Sheet · [ ] 22. Collect-Reveal-Overlay
+- [ ] 23. Akte-Interaktion · [ ] 24. Damals/Heute · [!] 25. Audio-Service (TTS-Weg)
+- [ ] 26. Map-Audio-Kopplung
+
+## Phase 4, Rätsel-Engine
+
+- [ ] 27. Puzzle-Sheet mit vollem Mapping · [!] 28. Alle Rätseltypen
+  (sprachneutrale Auswertung) · [ ] 29. In-Puzzle-Hint · [ ] 30. Reveal-Screen
+- [!] 31. Hinweis-Ökonomie (Reward-Ledger) · [!] 32. Punkte gegen Coins
+
+## Phase 5, Challenge
+
+- [ ] 33. Wizard · [ ] 34. Solo-Setup · [ ] 35. Hotspot-Picker
+- [ ] 36. Phasen-Maschine · [ ] 37. Active-UI · [!] 38. Rätsel und Ökonomie
+- [ ] 39. Pause und Results · [!] 40. Gruppen-Flow (Realtime-Entscheidung)
+
+## Phase 6, Tour
+
+- [!] 41. TourSetupSheet · [!] 42. Route (OpenRouteService) · [ ] 43. HUD
+- [!] 44. Hint und Rätsel
+
+## Phase 7, Reiseführer und Profil
+
+- [ ] 45. Library · [ ] 46. Cover und Illustrationen · [!] 47. Chapters und
+  Reader („Frag Claude") · [ ] 48. Leaderboard · [ ] 49. Trophäen
+
+## Phase 8, Abschluss
+
+- [!] 50. Creator (Foto-Storage) und Paritäts-Sweep
+
+## Arbeit außerhalb der 50 Schritte
+
+Nicht im REBUILD_PLAN, aber notwendig:
+
+- [x] **Lint-Pflicht in den Dokumenten angepasst.** `quality-gates.md`,
+  `architecture-overview.md` §16 und `engineering-principles.md` führen
+  `riverpod_lint` nicht mehr als erfüllbare Pflicht, sondern als begründete
+  Abweichung mit prüfbarer Wiederaufnahme-Bedingung. ADR-003 bleibt bewusst
+  unberührt: dort steht die Aussage in den Konsequenzen, nicht in den Regeln.
+- [x] **Architektur-Gegenüberstellung.** Parity-Spec gegen die fünf ADRs,
+  Domain-Map und Dependency-Rules. Ergebnis: 21 offene Entscheidungen, unten
+  die noch offenen davon.
+- [x] **`tool/check_architecture.dart`.** Die neun Prüfungen aus
+  `docs/engineering/quality-gates.md`. Ersetzt teilweise `riverpod_lint`, das
+  nicht auflösbar ist.
+- [x] **Aufarbeitung der ersten Review.** Neun verifizierte Erkennungslücken im
+  Architektur-Check geschlossen, das Skript von 371 auf 989 Zeilen mit einem
+  eigenen Scanner, der Kommentare und String-Literale maskiert. Token-Paare
+  getrennt, erfundener Schattenwert entfernt.
+- [x] **Testabdeckung für `tool/check_architecture.dart`.** 53 Black-Box-Tests
+  in `test/tool/`, die das Skript als Prozess gegen temporäre Bäume prüfen,
+  vier Prozessaufrufe, rund 6 Sekunden. Mit Mutationsproben belegt: eine
+  absichtlich blind gemachte Prüfung macht die Suite rot.
+- [x] **Sechs weitere Lücken im Architektur-Check geschlossen.** Schichtmuster
+  greifen jetzt auch bei verschachtelten Feature-Strukturen (vorher fielen
+  `features/x/unterstruktur/domain/` komplett aus allen Prüfungen). Die Domäne
+  hat eine **Erlaubnisliste** statt einer Verbotsliste, und die Liste ist
+  derzeit leer, weil kein Paket aus `pubspec.yaml` qualifiziert. Regel 7 gilt
+  auch in `application`, `presentation` darf nicht auf das eigene `data`
+  zeigen, `integration_test/` wird mitgelesen, und `presentation` wird auch
+  außerhalb von `features/` geprüft.
+- [ ] **Zwei verbleibende Asymmetrien im Architektur-Check.** Erstens ist die
+  Cross-Feature-Prüfung flach: ein fremdes `features/x/unterstruktur/data/`
+  entkommt den Regeln 8 und 9, während dieselbe Verschachtelung für die
+  eigenen Schichten geschlossen ist. Zweitens hat `application` weiter nur
+  eine Verbotsliste. Letzteres setzt eine Aussage voraus, was „narrowly
+  scoped Core" konkret bedeutet, und die fehlt in `dependency-rules.md`.
+- [ ] **Vier bewusst offene Lücken**, je mit Begründung im Skript und einem
+  Test, der den heutigen Zustand festhält: benannte Konstruktoren umgehen
+  Regel 7, Direktiven werden nur am Zeilenanfang erkannt, `.go(variable)`
+  wird nicht gemeldet, und Regel 10 (Cross-Feature nur über öffentlichen
+  Vertrag) bleibt Review-Sache, weil am Text nicht unterscheidbar ist, ob ein
+  Import den Vertrag nutzt oder umgeht.
+- [ ] **CI-Workflow.** `.github/workflows/` existiert nicht. Kein Gate läuft
+  automatisch. `quality-gates.md` ruft zusätzlich
+  `tool/check_generated_code.dart`, das es noch nicht gibt.
+- [x] **Standort-Permissions.** `ACCESS_FINE_LOCATION`,
+  `ACCESS_COARSE_LOCATION` und `INTERNET` in `AndroidManifest.xml`,
+  `NSLocationWhenInUseUsageDescription` in `Info.plist`, Texte aus dem alten
+  Port übernommen. Beide Dateien nach der Änderung als valides XML bzw.
+  Property-List geparst. **Bewusst nur Vordergrund-Standort.** Hintergrund,
+  Kamera, Fotos, Mikrofon und Sensoren folgen je mit dem Paket, das sie
+  braucht, damit die Berechtigungsliste nicht vor den Features herläuft.
+- [x] **App-Name.** `android:label`, `CFBundleName` und `CFBundleDisplayName`
+  stehen auf „FACT".
+- [x] **Schrift-Lizenzen.** `OFL-Nunito.txt`, `OFL-DMSans.txt` und
+  `OFL-JetBrainsMono.txt` liegen in `assets/fonts/`, aus den offiziellen
+  Repositories geholt und am Inhalt als OFL-Text bestätigt.
+- [x] **Generierte Dateien werden versioniert.** `*.g.dart` und
+  `*.freezed.dart` stehen nicht mehr in `.gitignore`. Grund: ADR-004 verlangt
+  generierte typisierte Routen, und ohne CI-Workflow, der vorher
+  `build_runner` fährt, ließe sich ein frischer Klon nicht kompilieren. Die
+  Entscheidung kann neu bewertet werden, sobald CI existiert.
+- [x] **PR-Vorlage.** Die nicht abhakbare Checkbox „Custom lint" ist durch das
+  Architektur-Skript ersetzt.
+
+## Paket-Abweichungen von der Planliste
+
+| Paket | Stand | Grund |
+|---|---|---|
+| `provider` | **nicht aufgenommen** | ADR-003 verlangt Riverpod 3 |
+| `riverpod_annotation`, `riverpod_generator` | **nicht aufgenommen** | nicht gleichzeitig mit `go_router_builder` auflösbar; ADR-004 verlangt letzteres, Riverpod-Codegen ist optional. Provider werden manuell geschrieben. |
+| `riverpod_lint`, `custom_lint` | **nicht installierbar** | `riverpod_lint 3.1.8` verlangt `analyzer ^13.0.0`. `flutter_test` aus dem SDK pinnt `test_api 0.7.11`, was `test` in `analyzer >=8.0.0 <13.0.0` zwingt; der Ausweg über ältere `test`-Versionen ist durch `supabase_flutter` → `supabase 2.16.1` → `realtime_client 2.13.0` → `web_socket_channel ^3.0.3` versperrt. Zusätzlich kollidieren `analyzer_plugin ^0.14.0` gegen `^0.13.0`. Vier Auflösungsversuche verifiziert. |
+| `webview_flutter`, `flutter_compass`, `sensors_plus`, `flutter_tts`, `audioplayers`, `image_picker`, `share_plus`, `qr_flutter` | **noch nicht aufgenommen** | kommen phasenweise, jeweils mit Freigabe |
+
+`docs/engineering/quality-gates.md`, `architecture-overview.md` §16 und
+`engineering-principles.md` fordern `riverpod_lint` als Pflichtbasis. Diese
+Dokumente beschreiben derzeit einen unerreichbaren Zustand und werden mit
+Begründung und Wiederaufnahme-Bedingung angepasst.
+
+## Offene Entscheidungen
+
+> **Hinweis zur Öffentlichkeit dieses Dokuments.** Das Repository ist öffentlich.
+> Die Einträge E-06, E-07, E-16 und E-21 beschreiben offene Schwachstellen des
+> produktiven Backends, das die laufende PWA mitbenutzt. Der Eigentümer hat am
+> 26.08.2026 ausdrücklich entschieden, sie hier trotzdem im Klartext zu führen,
+> weil der Nutzen als Arbeitsdokument höher gewichtet wird als das Risiko.
+> Das ist eine bewusste Entscheidung, kein Versehen.
+
+
+Nummerierung aus der Architektur-Gegenüberstellung. Bereits entschieden und
+deshalb nicht mehr gelistet: Feature-Zuschnitt, Gold-Trennung im hellen Theme,
+Nunito-600, Umgang mit `riverpod_lint`.
+
+| Nr | Entscheidung | Level | Fällig vor |
+|---|---|---|---|
+| E-06 | **Reward-Ledger.** `increment_coins(uid, amount)` im geteilten Backend ist `security definer` und prüft den Betrag nicht. Der Client bestimmt, wie viele Coins er bekommt. Die gesamte Rätsel-Ökonomie hängt daran. Zusätzlich widersprechen sich die Zahlen der Quelle: Server bucht 10 beim Sammeln, die Map-Animation zeigt „+12", das Fact-Detail „+10 und ⭐+50", das Puzzle Basis 50. | **4** | Phase 4 |
+| E-07 | **Location-Spoofing.** `collect_fact_validated` prüft die 150-Meter-Distanz gegen die vom Client geschickte Position. | **4** | Phase 2 |
+| E-08 | **Sprachneutrale Rätsel-Auswertung.** Belegt, nicht vermutet: `puzzle-sheet.jsx:425` baut die acht Kompass-Knöpfe aus `puzzle.compass.N` bis `.NW` und vergleicht in Zeile 450 mit `String(pick) === String(puzzle.expected)`. `expected` kommt deutsch aus den Faktdaten, EN liefert `North` bis `Northwest`. **Auf Englisch ist das Kompass-Rätsel in der PWA unlösbar.** Verwandt: `puzzle-sheet.jsx:320-323` (Freitext), `screen-challenge.jsx:2326` mit hartcodierten deutschen Antworten in `:808` und `:954`, `bearingName: 'Westen'` in `:427`, `:805`, `:948`. Behebung heißt sprachfreier Antwortwert in den Faktdaten, also Datenstruktur im anderen Repo. | 3, bei Formatänderung 4 | Phase 4 |
+| E-09 | **Multiplayer echt oder Mock.** Backend ist fertig (`group_sessions`, `team_sessions`, Realtime-Kanäle). Realtime kommt in keinem Architekturdokument vor. | 3 | Phase 5 |
+| E-10 | **3D-Avatar.** WebView mit Three.js behalten (270 KB Assets, JS-Bridge, geografisch verankert auf bewegter Karte) oder in Flutter nachbauen (sichtbare Abweichung). | 3 | Phase 2 |
+| E-11 | **City-Identität.** Die Datenbank speichert `facts.city` als Anzeigename, das Frontend nutzt Slugs, die Brücke ist eine SQL-Funktion `_slugify`, welche die JS-Normalisierung nachbaut. Dieser Mismatch hat schon einmal `create_team_session` scheitern lassen. Domain-Map fordert `CityId` als Wertobjekt. | 3 | Phase 0 Schritt 5 |
+| E-13 | **AI-Zugang.** Anthropic-Schlüssel niemals im Client, `ai_proxy` und Edge Function nutzen, Quota serverseitig. | **4** | Phase 7 |
+| E-14 | **OpenRouteService** für Fußweg-Routen: Konto, Kosten, Rate Limits, Fallback. | **4** | Phase 6 |
+| E-15 | **TTS-Weg.** Gerät (`flutter_tts`) oder Cloud. Cloud heißt laufende Kosten. | 4 bei Cloud, sonst 3 | Phase 3 |
+| E-16 | **Leaderboard-Sichtbarkeit.** `user_city_scores` und `user_trophies` haben `USING (true)` für SELECT. Alle Punktestände und Trophäen sind für jeden lesbar. Zusammenspiel mit dem Schalter „Echten Namen zeigen". | **4** | Phase 7 |
+| E-17 | **Creator-Foto.** Storage-Bucket, Policy, Moderation vor `is_approved`. | 3, Bucket-Anlage 4 | Phase 8 |
+| E-19 | **Trusted Time.** Der 45-Minuten-Timer für das Session-Ende und die Finale-Punkte ×1.5 rechnen clientseitig. `security.md` §1 verbietet vertrauenswürdige Zeitstempel aus dem Client. | 3 | Phase 5 |
+| E-20 | **Kamera-Permission** für Damals/Heute und Foto-Rätsel, mit Zweckbindung. | 3 | Phase 3 |
+| E-21 | **`start_group_session` ist doppelt definiert**, in `2026-06-04_group_sessions.sql:193` und erneut in `2026-06-05_team_sessions.sql:473`. Welche Version produktiv läuft, hängt an der Ausführungsreihenfolge im SQL-Editor. Backend-Frage, aber der Client hängt daran. | 3, im anderen Repo | Phase 5 |
+
+## Datenvertrag: die bekannten Fallen
+
+Ein einzelner falscher Cast in `Fact.fromJson` löscht die gesamte Faktenliste,
+weil es keinen statischen Fallback gibt. Mapping deshalb feldweise mit
+Einzelfehler-Isolation: ein defektes Feld degradiert einen Fakt, ein defekter
+Fakt degradiert nicht die Liste.
+
+| Spalte | Typ in der Datenbank | Falle |
+|---|---|---|
+| `puzzle_fit` | `jsonb`, inhaltlich ein Array von 2 bis 4 Rätsel-Objekten | Früher war es ein Schwierigkeits-String `leicht\|mittel\|schwer`. Der alte Port trägt beide Bedeutungen im selben Feldnamen. Beim Neubau trennen: eine Liste `puzzles`, und wenn nötig eine abgeleitete `difficulty`. Das Mapping muss **alle** Felder übernehmen (`choices`, `targetCount`, `bearing`, `formula`, Bild), sonst degradiert jedes Rätsel auf Text. Genau daran ist der alte Port gescheitert. |
+| `hero` | `text[]` mit Vorgabe `['#2C3E50','#4A6741']` | Postgres-Array, kommt als JSON-Liste. Wird als Gradient benutzt. |
+| `hint_media` | `jsonb`-Objekt | Muss Map, http-String und `null` tolerieren. |
+| `_i18n` | `jsonb not null default '{}'` | **Existiert**, entgegen der Behauptung im REBUILD_PLAN. Migration `2026-06-06_i18n_facts.sql` legt Spalte und GIN-Index an und definiert `pickFact(fact, lang)` als einzigen erlaubten Zugriffsweg. |
+| `city` | `text`, nachträglich ergänzt | Existiert erst seit `2026-06-07`, gefüllt aus dem `nr`-Präfix, kann für neue Datensätze `NULL` sein. |
+| `zone`, `next_station_hint` | `integer`, `text` | Der REBUILD_PLAN nennt sie `next_hints`. Der Feldname im Plan stimmt nicht mit dem Schema überein. |
+
+## Korrekturen an den Quelldokumenten
+
+Nachgewiesene Sachfehler in den Vorlagen. Wer sie liest, muss das wissen.
+
+1. **REBUILD_PLAN Grundprinzip 3 behauptet, `facts` habe kein `_i18n`.** Falsch,
+   siehe oben. Wer dem Plan folgt, baut den zweisprachigen Renderpfad nicht.
+2. **REBUILD_PLAN Schritt 3 ordnet `:root` dem hellen und `.theme-dark` dem
+   dunklen Theme zu.** In `styles.css` ist `:root` das **dunkle** Theme, und die
+   überschreibende Klasse heißt `.theme-light`. Ein `.theme-dark` existiert dort
+   nicht.
+3. **Parity-Spec Abschnitt 0 nennt Nunito 600 nicht als benötigtes Gewicht.**
+   Es wird benutzt, in `chrome.jsx:115` und `:197` für die Tab-Bar und in
+   `screen-entdecken.jsx:170` für die Modus-Chips.
+4. **Parity-Spec und REBUILD_PLAN nennen 761 bis 763 i18n-Schlüssel.** Die
+   Quelle hat **716** je Sprache (683 aus `translations.jsx` plus 33 aus
+   `audio-strings.jsx`). Die 763 ist der Bestand des **alten Flutter-Ports**.
+   Die Rechnung geht auf: 763 minus 84 Schlüssel, die es in der PWA nicht gibt,
+   ergibt 679 gemeinsame, und 716 minus 679 sind die 37 fehlenden. Der Spec
+   nennt 35, weil er `creator.steps` und `profil.levelTitles` nicht zählt.
+5. **Zwei Schlüssel nutzen eine zweite Interpolationsform.**
+   `group.active.counter` und `group.results.summary` arbeiten mit `%d` statt
+   `{name}`, positionsweise ersetzt in `screen-challenge.jsx:3506` und `:3602`.
+   `AppStrings.text()` löst `%d` nicht auf. Wer den Gruppenmodus portiert,
+   formatiert diese beiden am Aufrufort. Per Test festgenagelt.
+
+## Bewusste Auslassungen
+
+Damit sie nicht später als Versehen „repariert" werden.
+
+- **Keine globale Schriftgrößen-Skala.** Die PWA setzt Größen direkt am Element.
+  Eine erfundene Skala würde beim Portieren von den echten Werten ablenken.
+- **Keine Schatten-Tokens.** `--shadow-sm`, `--shadow-md`, `--shadow-lg` und
+  `--shadow` haben in der PWA null `var()`-Verwendungen, alle 169 Schatten liegen
+  inline am Element.
+- **`.go(variable)` wird vom Architektur-Check nicht gemeldet.** Genau so sehen
+  typisierte Routen aus. Ein Verbot würde ADR-004-konformen Code melden.
+
+## Noch am Gerät zu verifizieren
+
+Nicht durch Tests abdeckbar, muss auf echter Hardware oder im Emulator geprüft
+werden.
+
+- Variable Schrift `Nunito[wght].ttf`: ob die Gewichtsachse über
+  `fontVariations` tatsächlich rendert. Schriften werden in Widget-Tests nicht
+  geladen.
+- `maplibre_gl 0.27.0`: ob `minSdk` angehoben werden muss.
+- Der erste Android- und iOS-Build überhaupt. Beide Plattformen sind seit
+  `flutter create` nicht compiliert worden.

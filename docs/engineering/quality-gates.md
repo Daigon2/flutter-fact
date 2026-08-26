@@ -19,12 +19,58 @@ Required baseline:
 
 - Dart analyzer with strict language options;
 - Flutter lint baseline;
-- Riverpod lint via `custom_lint`;
 - no ignored analyzer warnings without reason.
+
+### Accepted deviation: no Riverpod lint
+
+`riverpod_lint` via `custom_lint` was part of this baseline. It is currently not
+installable, so the requirement is suspended rather than met. Verified in an
+isolated copy of the project with four resolution attempts on Dart 3.12.1 and
+Flutter 3.44.1:
+
+```text
+riverpod_lint 3.1.8          requires analyzer ^13.0.0
+flutter_test (from the SDK)  pins test_api 0.7.11 and matcher 0.12.19 and thereby
+                             forces test into a range with analyzer >=8.0.0 <13.0.0
+supabase_flutter             blocks the escape via older test versions
+                             (supabase 2.16.1 -> realtime_client 2.13.0 ->
+                             web_socket_channel ^3.0.3)
+riverpod_lint >=3.1.4-dev.1  requires analyzer_plugin ^0.14.0
+custom_lint >=0.7.4          requires analyzer_plugin ^0.13.0  (conflict)
+```
+
+The conflict sits between the pinned Flutter SDK, `supabase_flutter` and the
+lint packages. No change to FACT code resolves it. Two details, because they
+have been stated wrongly before: `riverpod_annotation` is not part of this
+project and is not involved, and `custom_lint` on its own does resolve. Without
+a plugin it checks nothing, which is why it is not in the pipeline either.
+
+Partial replacement: `tool/check_architecture.dart` runs the boundary checks
+below and additionally rules 7, 12 and 13 from
+`../architecture/dependency-rules.md`, which `riverpod_lint` would have caught
+in part. It is not a substitute for the Riverpod-specific rules. Currently
+unenforced by any tool, and therefore review-only:
+
+- `notifier_extends`;
+- `avoid_public_notifier_states`;
+- `provider_dependencies`;
+- `scoped_providers_should_specify_dependencies`;
+- `unsupported_provider_value`.
+
+Resumption condition: the requirement returns to the baseline as soon as
+`custom_lint` and `riverpod_lint` can both be added to `dev_dependencies` and
+`flutter pub get` resolves them against the unchanged `pubspec.yaml`, without a
+`dependency_overrides` entry. That needs two things at once: the `flutter_test`
+version shipped with the pinned Flutter SDK must permit a `test` version whose
+`analyzer` constraint covers the `analyzer` major `riverpod_lint` requires, and
+`custom_lint` and `riverpod_lint` must agree on one `analyzer_plugin` major.
+Re-check after every Flutter SDK upgrade and after every major upgrade of
+`supabase_flutter`. When it resolves, add the packages, put the baseline entry
+back and delete this section.
 
 ## Custom boundary checks
 
-Create a repository script, initially simple and deterministic, that fails CI for:
+A repository script, kept simple and deterministic, fails CI for:
 
 1. `supabase_flutter` imports below `features/**/presentation`.
 2. Flutter imports below `features/**/domain`.
@@ -36,7 +82,8 @@ Create a repository script, initially simple and deterministic, that fails CI fo
 8. raw `context.go('/...')` patterns outside routing infrastructure.
 9. production `print()` calls.
 
-A later custom lint package is justified only if scripts become too weak.
+`tool/check_architecture.dart` implements these checks. A later custom lint
+package is justified only if scripts become too weak.
 
 ## CI gates
 
@@ -45,13 +92,18 @@ Every pull request:
 ```text
 dart format --output=none --set-exit-if-changed .
 flutter analyze
-dart run custom_lint
 flutter test
-architecture boundary script
-generated-code consistency check
+dart run tool/check_architecture.dart
 ```
 
 Critical backend migrations additionally run Supabase policy/function tests.
+
+Two gates are absent from that list on purpose and must not be reported as
+running:
+
+- Riverpod lint, see "Accepted deviation: no Riverpod lint" above;
+- the generated-code consistency check, because `tool/check_generated_code.dart`
+  does not exist yet.
 
 ## Pull request architecture section
 
@@ -87,10 +139,11 @@ Minimum pull-request pipeline:
 ```bash
 dart format --output=none --set-exit-if-changed .
 flutter analyze
-dart run custom_lint
 flutter test --coverage
 dart run tool/check_architecture.dart
-dart run tool/check_generated_code.dart
+# Still missing, do not add before it exists or resolves:
+#   dart run custom_lint              (see the accepted deviation above)
+#   dart run tool/check_generated_code.dart  (script not written yet)
 ```
 
 Conditional jobs:

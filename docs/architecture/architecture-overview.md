@@ -300,13 +300,20 @@ FACT is selectively offline-capable.
 The implementation phase must add:
 
 - `flutter_lints` or a stricter agreed lint baseline;
-- `riverpod_lint` and `custom_lint`;
 - CI validation for formatting, analysis, tests and generated code;
 - import-boundary checks;
 - a script rejecting Supabase imports in presentation/domain;
 - a script rejecting Flutter/Riverpod imports in domain;
 - ownership checks for cross-feature imports;
 - ADR review when a rule must be broken.
+
+`riverpod_lint` and `custom_lint` were part of this list. They are currently not
+installable because of a conflict between the pinned Flutter SDK,
+`supabase_flutter` and the lint packages. The verified dependency chain, the
+rules that stay unenforced and the condition under which the requirement returns
+are recorded in `../engineering/quality-gates.md`, section "Accepted deviation:
+no Riverpod lint". `tool/check_architecture.dart` covers the import-boundary and
+ownership items above; it does not cover the Riverpod-specific rules.
 
 ## 17. Decision protocol
 
