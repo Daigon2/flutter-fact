@@ -19,16 +19,13 @@ Für Details nicht hier suchen, sondern:
 
 **Zuletzt aktualisiert:** 26.08.2026
 
-**Phase 0 (Fundament), Schritt 6 von 50 in Arbeit.**
+**Phase 0 (Fundament) ist abgeschlossen. Schritte 1 bis 6 von 50 fertig.**
 
-Fertig: Projektgerüst, Pakete, Design-Tokens, i18n, Fakt-Datenmodell mit
-Supabase-Zugang, dazu das Architektur-Prüfskript mit eigener Testsuite.
+Steht: Projektgerüst, Pakete, Design-Tokens, i18n, Fakt-Datenmodell mit
+Supabase-Zugang, App-Shell mit typisierten Routen und Tab-Leiste, dazu das
+Architektur-Prüfskript mit eigener Testsuite.
 
-In Arbeit: die App-Shell, also typisierte Routen, die schwebende Tab-Leiste,
-unabhängige Navigationsstapel je Tab, Platz für den Mini-Player und die
-Supabase-Initialisierung im Start.
-
-**Kennzahlen:** 285 Tests grün, alle vier Gates auf Exit-Code 0.
+**Kennzahlen:** 298 Tests grün, alle vier Gates auf Exit-Code 0.
 
 **Wichtig:** Die App ist noch **nie gestartet**. Kein Android-Build, kein
 iOS-Build, kein Emulatorlauf. Grüne Tests sagen nichts darüber, ob der erste
@@ -38,11 +35,17 @@ Gerätebuild durchläuft.
 
 ## Als Nächstes
 
-1. **Schritt 6 abschließen** (App-Shell), dann ist Phase 0 komplett.
-2. **Erster Gerätebuild.** Das ist der wichtigste ungeprüfte Punkt. Offen ist,
-   ob `maplibre_gl` eine höhere `minSdk` braucht und ob die Schriften rendern.
-3. **Phase 1** (Schritte 7 bis 11): Splash, Audio-Dialog, Login, Signup,
-   Tutorial-Overlay.
+1. **Erster Gerätebuild.** Der wichtigste ungeprüfte Punkt überhaupt. Offen
+   ist, ob `maplibre_gl` eine höhere `minSdk` verlangt, ob die vier SVG-Icons
+   und Nunito bei 10px sauber rendern und wie die Tab-Leiste mit echter Safe
+   Area sitzt. Alles bisher Geprüfte ist strukturell, nicht optisch.
+2. **Phase 1** (Schritte 7 bis 11): Splash, Audio-Dialog, Login, Signup,
+   Tutorial-Overlay. Die Auth-Weiche im Router ist vorbereitet und gibt heute
+   `null` zurück.
+3. **Offen zur Entscheidung:** die vier Deep-Link-Pfade `/map`, `/collection`,
+   `/challenges`, `/profile`. Die PWA liefert dafür keine Vorlage, sie kennt
+   keine URLs. Sobald Push-Nachrichten oder geteilte Links darauf zeigen, sind
+   die Strings festgelegt.
 
 Vor Phase 2 (Karte) ist eine Entscheidung fällig: **wie Discovery, Tours,
 Challenges und Collection eine Karte teilen**, ohne dass ein Feature die
@@ -55,10 +58,21 @@ Presentation eines anderen importiert. Der Vorschlag steht in
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
 
-### 26.08.2026, Schritt 6 begonnen: App-Shell
+### 26.08.2026, Schritt 6: App-Shell, Phase 0 abgeschlossen
 
-Erstmals Codegen im Einsatz (`go_router_builder`), weil ADR-004 typisierte
-Routen verlangt. Erzeugte Dateien werden versioniert, siehe unten.
+Vier Tabs, aus `chrome.jsx:55-60` belegt statt geraten. `StatefulShellRoute`
+für unabhängige Stapel, typisierte Routen über `go_router_builder`, also
+erstmals Codegen.
+
+Überraschend war dreierlei. Erstens rechnet der alte Port den Bodenabstand der
+Leiste als Summe aus 14 und der Safe Area, die Quelle nimmt das Maximum, und
+er setzt die Unschärfe auf 18 statt der 24 aus `chrome.jsx:78`. Beides nicht
+übernommen. Zweitens zählt `Container` die Rahmenstärke zum Innenabstand,
+`DecoratedBox` nicht, was den ersten Höhentest bei 76 statt 78 scheitern ließ.
+Drittens schließt `analysis_options.yaml` alle `*.g.dart` aus: der Analyzer
+ist für die erzeugte Routendatei blind, ein Fehler dort fällt erst beim
+Kompilieren auf. Gemessen mit einer absichtlich fehlerhaften Probedatei, nicht
+vermutet.
 
 ### 26.08.2026, Nachbesserungen am Fundament
 
@@ -181,9 +195,12 @@ startet.
 ### Generierten Code neu erzeugen
 
 ```
-dart run build_runner build --delete-conflicting-outputs
+dart run build_runner build
 dart run tool/generate_i18n.dart
 ```
+
+`--delete-conflicting-outputs` gibt es in `build_runner` 2.15.1 nicht mehr, das
+Flag wird nur mit einer Warnung ignoriert.
 
 Erzeugte Dateien **sind versioniert**, `*.g.dart` steht nicht in
 `.gitignore`. Grund: ADR-004 verlangt generierte typisierte Routen, und ohne

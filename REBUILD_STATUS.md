@@ -36,7 +36,17 @@ durch eine offene Entscheidung
   Drift-Erkennung. 47 Tests.
 - [ ] **5. Datenmodell und Supabase-Client.** Defensives `Fact`-Mapping. Fünf
   bekannte Cast-Fallen, siehe „Datenvertrag".
-- [ ] **6. App-Shell.** Routen, TabBar, MiniPlayer-Slot.
+- [x] **6. App-Shell.** Typisierte Routen über `go_router_builder`, vier Tabs
+  aus `chrome.jsx:55-60` belegt, `StatefulShellRoute` für unabhängige Stapel,
+  schwebende Tab-Leiste mit den Werten der Quelle, reservierter
+  Mini-Player-Platz, Supabase im Start verdrahtet. Der Scroll-Freiraum kommt
+  über `Scaffold(extendBody: true)`, sodass keine Seite ihn selbst kennen muss.
+  Fehlt die Supabase-Konfiguration, startet ein Fehlerbildschirm mit dem
+  nötigen Befehl statt eines stillen Absturzes.
+  Nicht nachgebaut: der Inset-Anteil des Leisten-Schattens (`BoxShadow` kann
+  das nicht) und der Challenge-Punkt, weil dessen Sitzungszustand
+  (`window.__huntActive`) im Neubau noch nicht existiert. Maße für beides im
+  Code dokumentiert.
 
 ## Phase 1, Auth und Onboarding
 
@@ -193,6 +203,7 @@ Nunito-600, Umgang mit `riverpod_lint`.
 | E-17 | **Creator-Foto.** Storage-Bucket, Policy, Moderation vor `is_approved`. | 3, Bucket-Anlage 4 | Phase 8 |
 | E-19 | **Trusted Time.** Der 45-Minuten-Timer für das Session-Ende und die Finale-Punkte ×1.5 rechnen clientseitig. `security.md` §1 verbietet vertrauenswürdige Zeitstempel aus dem Client. | 3 | Phase 5 |
 | E-20 | **Kamera-Permission** für Damals/Heute und Foto-Rätsel, mit Zweckbindung. | 3 | Phase 3 |
+| E-25 | **Vier Deep-Link-Pfade als öffentlicher Vertrag.** `/map`, `/collection`, `/challenges`, `/profile`. Die PWA liefert keine Vorlage, sie kennt keine URLs, sondern schaltet mit `setRoute(...)` um. Gewählt wurden die Domänennamen aus der Domain-Map statt der PWA-Bezeichner `wallet` und `profil`. Sobald Push-Nachrichten, geteilte Links oder Universal Links darauf zeigen, sind die Strings fest. Jetzt umbenennen kostet eine Zeile je Route, später eine Migration. | 3 | vor externem Teilen, siehe OD-014 |
 | E-23 | **Die Distanzprüfung beim Sammeln ist nicht nur umgehbar, sie ist optional.** Die Policy `create policy "own collected" on public.collected_facts for all using (auth.uid() = user_id)` erlaubt dem Client, direkt in `collected_facts` einzufügen. Damit entfällt `collect_fact_validated` samt der 150-Meter-Prüfung vollständig, und der Trigger `handle_fact_collected` bucht danach Punkte, Stadtwertung und Trophäen. E-07 beschreibt nur, dass die Positionsangabe fälschbar ist; hier braucht man gar keine. | **4** | Phase 2 |
 | E-24 | **Coins und Punktestand sind direkt setzbar.** Die Policy `create policy "own profile" on public.profiles for all using (auth.uid() = id)` hat kein `WITH CHECK`. Der Client kann seine eigene Profilzeile aktualisieren, einschließlich `coins` und `score_total`. **Wichtig für die Reihenfolge der Behebung:** wer E-06 behebt, also `increment_coins` absichert, hat damit nichts gewonnen, solange E-24 offen ist. Die Funktion ist dann nur der bequemere von zwei Wegen. | **4** | Phase 2 |
 | E-21 | **`start_group_session` ist doppelt definiert**, in `2026-06-04_group_sessions.sql:193` und erneut in `2026-06-05_team_sessions.sql:473`. Welche Version produktiv läuft, hängt an der Ausführungsreihenfolge im SQL-Editor. Backend-Frage, aber der Client hängt daran. | 3, im anderen Repo | Phase 5 |
