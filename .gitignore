@@ -13,8 +13,19 @@ key.properties
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
-*.g.dart
-*.freezed.dart
+# Generierte Dart-Dateien werden bewusst versioniert und stehen deshalb NICHT
+# hier. Grund: ADR-004 verlangt generierte typisierte Routen, und es gibt keinen
+# CI-Workflow, der vorher `build_runner` fahren könnte. Wären sie ignoriert,
+# ließe sich ein frischer Klon nicht kompilieren. Die Sprach-Maps entstehen
+# außerdem aus der PWA unter 02_Frontend/app/, auf die dieses Repository keinen
+# Zugriff hat, sie sind also gar nicht anderswo reproduzierbar.
+#
+# Erneut erzeugen:
+#   dart run tool/generate_i18n.dart
+#   dart run build_runner build --delete-conflicting-outputs
+#
+# Sobald ein CI-Workflow existiert, der `build_runner` vor `analyze` und `test`
+# ausführt, kann diese Entscheidung neu bewertet werden.
 
 # === Android / iOS ===
 android/.gradle/

@@ -16,7 +16,7 @@ Describe the user or engineering outcome.
 
 - [ ] Formatting
 - [ ] Analyze
-- [ ] Custom lint
+- [ ] Architecture boundary script (`dart run tool/check_architecture.dart`)
 - [ ] Unit/notifier/widget tests
 - [ ] Integration/backend tests where applicable
 - [ ] Manual verification

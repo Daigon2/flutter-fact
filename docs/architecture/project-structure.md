@@ -25,6 +25,7 @@ lib/
 │   │   ├── route_guards.dart
 │   │   ├── route_refresh.dart
 │   │   └── routes/
+│   ├── shell/
 │   ├── theme/
 │   ├── localization/
 │   └── fact_app.dart
@@ -104,6 +105,12 @@ features/settings/
 ```
 
 ## Placement rules
+
+- `app/shell/` holds the app-wide chrome: the bottom navigation shell, the tab
+  bar and the slot reserved for the mini player. It is app-wide composition in
+  the sense of `architecture-overview.md` §5, not routing infrastructure, so it
+  does not belong under `app/routing/`. It contains no business rules and no
+  feature imports; feature pages are supplied through the router.
 
 - Riverpod providers that construct data/application dependencies live near the implementation they expose.
 - Feature UI providers live in `presentation`.
