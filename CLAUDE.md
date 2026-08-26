@@ -29,7 +29,9 @@ Report conflicts instead of choosing silently.
 
 ## Task routing
 
-Read `START_HERE.md`, then use `docs/ai/context-routing.md` to load only the documents relevant to the task. Do not read all of `docs/` by default.
+**Read `HANDOFF.md` first.** It states where the rebuild stands, what happened last, what comes next, and what is machine-specific about the setup. It is the only file that must be read on every session, and it is kept short on purpose.
+
+Then use `docs/ai/context-routing.md` to load only the documents relevant to the task. Do not read all of `docs/` by default. `START_HERE.md` is onboarding material for a new contributor, not a per-task requirement.
 
 Use skills for repeatable workflows and specialist agents only when isolated context adds value.
 
@@ -48,6 +50,8 @@ Run applicable checks from `docs/engineering/quality-gates.md`, self-review the 
 - decisions still requiring approval.
 
 Never claim an unexecuted check passed.
+
+When a rebuild step is finished, update `HANDOFF.md` in the same change: current state, what comes next, and one protocol entry. Record what was **surprising**, because that is the part nobody can read back out of the code. Detail belongs in `REBUILD_STATUS.md`, which tracks all 50 steps, the open decisions and the data contract traps. Keep the two apart: `HANDOFF.md` is the entry point, `REBUILD_STATUS.md` is the reference. Two documents repeating each other will drift, and a stale document is worse than none.
 
 ## Reference repository (read-only)
 
