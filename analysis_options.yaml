@@ -13,6 +13,12 @@ analyzer:
 
 linter:
   rules:
+    # Erzwingt package:-Importe. Ohne das sind beide Importstile erlaubt, und
+    # ein relatives '../../anderes_feature/presentation/x.dart' ist optisch
+    # harmlos, verletzt aber Regel 8 der dependency-rules. Der
+    # Architektur-Check erkennt inzwischen beide Formen; diese Regel sorgt
+    # dafür, dass die riskantere gar nicht erst entsteht.
+    always_use_package_imports: true
     always_declare_return_types: true
     avoid_dynamic_calls: true
     avoid_print: true

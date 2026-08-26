@@ -31,6 +31,14 @@ flutter:
   fonts:
     - family: Nunito
       fonts:
+        # 600 wird von der PWA für die Tab-Bar und die Modus-Chips genutzt
+        # (chrome.jsx:115 und :197, screen-entdecken.jsx:170). Google Fonts
+        # liefert dafür keine statische Datei mehr, nur noch die variable
+        # Nunito[wght].ttf. Diese Instanz ist daraus mit fontTools bei wght=600
+        # herausgeschnitten, deshalb ist sie größer als die anderen drei: sie
+        # trägt den vollen Zeichensatz statt nur Latin.
+        - asset: assets/fonts/Nunito-SemiBold.ttf
+          weight: 600
         - asset: assets/fonts/Nunito-Bold.ttf
           weight: 700
         - asset: assets/fonts/Nunito-ExtraBold.ttf
