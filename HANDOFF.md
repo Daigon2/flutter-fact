@@ -464,11 +464,19 @@ einen kurzen ASCII-Pfad.
 Müssen alle vier auf Exit-Code 0 stehen, bevor etwas committet wird:
 
 ```
-dart format --output=none --set-exit-if-changed .
+dart format --output=none --set-exit-if-changed lib test tool
 dart analyze
 dart run tool/check_architecture.dart
 flutter test
 ```
+
+**Warum `lib test tool` und nicht `.`:** ab dem ersten Gerätebuild existiert
+`build/`, und darin liegen Gradle-Zwischenprodukte mit Pfaden jenseits der
+Windows-Längengrenze. `dart format .` stürzt dort mit
+`PathNotFoundException: Directory listing failed` ab und liefert Exit-Code 1,
+ohne dass am Quellcode etwas falsch ist. Vor dem 27.08.2026 fiel das nicht auf,
+weil `build/` nie existierte. `build/` und `.dart_tool/` stehen in
+`.gitignore`, das Gate soll sie also ohnehin nicht ansehen.
 
 **Hänge kein `| tail` an einen dieser Befehle, wenn du den Exit-Code
 auswertest.** Die Pipe maskiert ihn, und genau dadurch wurde hier schon ein

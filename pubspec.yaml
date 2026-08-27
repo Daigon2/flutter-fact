@@ -15,7 +15,24 @@ dependencies:
   flutter_svg: ^2.3.0
   geolocator: ^14.0.3
   go_router: ^18.0.0
-  maplibre_gl: ^0.27.0
+  # Bewusst auf 0.26.x festgenagelt, nicht auf 0.27.0. Belegt am 27.08.2026 beim
+  # ersten Geraetebuild: mit AGP 9.0.1 aus dem Flutter-Template gibt es keine
+  # Einstellung, mit der 0.27.0 und `app_links` gleichzeitig bauen.
+  #
+  #   android.builtInKotlin=false  ->  maplibre_gl 0.27.0 scheitert. Es wendet ab
+  #     AGP 9 das Kotlin-Plugin absichtlich nicht mehr selbst an und erwartet die
+  #     `kotlin`-Erweiterung von AGP, die es mit `false` nirgends gibt:
+  #     "Could not find method kotlin() ... on project ':maplibre_gl'".
+  #   android.builtInKotlin=true   ->  `app_links` scheitert. AGP 9 lehnt es ab,
+  #     wenn das Kotlin-Plugin zusaetzlich von aussen angewendet wird, und genau
+  #     das tut Flutters Gradle-Plugin fuer Plugin-Module.
+  #
+  # 0.26.1 wendet `kotlin-android` unbedingt an und ist damit mit dem
+  # Template-Standard `false` verstaendlich. `flutter pub outdated` sagt fuer
+  # beide Pakete "all up-to-date", es gibt also keinen Weg nach vorn.
+  # Wieder anheben, sobald `app_links` oder Flutters Gradle-Plugin nachgezogen
+  # hat, und dann den ersten Geraetebuild erneut fahren.
+  maplibre_gl: ^0.26.1
   supabase_flutter: ^2.17.2
 
 dev_dependencies:

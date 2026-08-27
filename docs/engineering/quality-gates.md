@@ -90,7 +90,7 @@ package is justified only if scripts become too weak.
 Every pull request:
 
 ```text
-dart format --output=none --set-exit-if-changed .
+dart format --output=none --set-exit-if-changed lib test tool
 flutter analyze
 flutter test
 dart run tool/check_architecture.dart
@@ -137,7 +137,7 @@ An architecture review is mandatory when a change:
 Minimum pull-request pipeline:
 
 ```bash
-dart format --output=none --set-exit-if-changed .
+dart format --output=none --set-exit-if-changed lib test tool
 flutter analyze
 flutter test --coverage
 dart run tool/check_architecture.dart
