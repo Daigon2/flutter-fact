@@ -107,7 +107,22 @@ durch eine offene Entscheidung
   Anmeldung das heutige Datum schreibt; „Angemeldet bleiben" ist gebaut, aber
   wirkungslos, genau wie in der Quelle, siehe E-33.
   **Passwort-Reset entfällt**, siehe E-34.
-- [ ] 10. Signup · [ ] 11. Tutorial-Overlay
+- [x] **10. Registrierung.** Username-Feld mit fünf Statuszuständen und
+  entprellter Prüfung über `check_username`, Passwort-Stärkeanzeige, Stadt-Picker
+  mit Suche und Username-Vorschlag, Einwilligung, Fortschrittsleiste (statisch,
+  die Quelle hat nur einen Schritt). Nutzt die geteilten Bausteine aus Schritt 9.
+  Drei Defekte der Quelle bewusst **nicht** übernommen: der Wettlauf der
+  Username-Prüfung (die Quelle bricht den geplanten Check erst nach dem `return`
+  ab, ein älterer Check setzt danach „frei", obwohl das Feld ungültig ist), das
+  rote Kreuz am geleerten Feld, und das Verschlucken des Fehlers beim Schreiben
+  des Usernames. Der Bestätigungshinweis bei unbestätigter E-Mail steht in einer
+  positiven Box, nicht wie in der Quelle in der roten Fehlerbox.
+  Gemeldet, nicht gelöst: die AGB-Zustimmung wird nirgends übertragen, es gibt
+  also keinen Nachweis; der Client schreibt direkt in `profiles`, dieselbe Klasse
+  wie E-24; `raw_user_meta_data` ist frei beschreibbar und trägt trotzdem `name`
+  und `hometown`; und `check_username` vergleicht case-insensitiv, während der
+  Eindeutigkeitsindex case-sensitiv ist.
+- [ ] 11. Tutorial-Overlay
 
 ## Phase 2, Map-Kern
 
@@ -321,6 +336,9 @@ eine Migration, vorher eine Zeile.
 | E-33 | **„Angemeldet bleiben" ist wirkungslos.** In der PWA wird `stayIn` gesetzt und **nirgends gelesen**, `persistSession` kommt dort nicht vor. Das Kästchen ist im Neubau nachgebaut, die Semantik nicht: Sitzungspersistenz wäre eine Auth-Verhaltensänderung. Zu entscheiden: implementieren, oder das Kästchen entfernen. Ein Haken, der nichts tut, ist gegenüber dem Nutzer eine Unwahrheit. | 3 | vor Auslieferung |
 | E-34 | **Passwort-Reset ist nicht angeboten.** `supabase_flutter 2.17.2` fährt standardmäßig `AuthFlowType.pkce`, und `resetPasswordForEmail` legt den Code-Verifier **auf dem Gerät** ab. Ohne `redirectTo` ginge der Link an die Site-URL, also in die PWA, die den Verifier nicht hat: der Tausch scheitert. Eine Mail zu schicken, deren Link niemand einlösen kann, ist schlechter als kein Angebot. Der Nutzer sieht deshalb kein „Vergessen?" über dem Passwortfeld, Zurücksetzen läuft über die PWA. Die Behebung braucht ein Deep-Link-Ziel und damit eine **neue öffentliche Vertragsfläche**. | 3 | vor Auslieferung |
 | E-35 | **`FactButton` kann nicht nach `core/widgets`.** Sein eigener Kommentar verlangt den Umzug, sobald ein zweiter Aufrufer existiert; der existiert seit Schritt 9. Regel 11 des Prüfskripts zerlegt aber den Pfad und meldet, dass `core` das Konzept `fact` nicht besitzen darf, nachgewiesen mit einer Wegwerf-Probe. Zu entscheiden: bei `identity` lassen, oder unter einem Namen ohne Fachbegriff umziehen. | 2 | wenn ein drittes Feature ihn braucht |
+| E-36 | **Bei 360 logischen Pixeln passt die Sprachzeile nicht einzeilig.** Gerechnet mit echten Schriftmetriken: zwei Karten à 127,1 plus Knopf-Untergrenze 65,3 plus 16 Abstände ergibt 337,5 gegen 316 verfügbare Pixel, Fehlbetrag rund 21. Die Quelle hat dasselbe Problem und schneidet mit `#root { overflow: hidden }` etwa vier Pixel des Knopfes ab. Zur Wahl: kleinere Flagge unter einer Breitenschwelle (Quelle: 30), kürzere Knopfbeschriftung oder nur das Emoji, die Zeile auf schmalen Geräten zweizeilig legen, oder abschneiden wie die Quelle. Aktuell entschieden ist nichts: die Titel brechen dort um, nichts läuft über, und ein Test hält die **Ursache** fest, damit die nächste Änderung dort anschlägt. | 2 | vor Auslieferung |
+| E-37 | **Das Launcher-Symbol ist noch das Flutter-Logo.** Android 12 und neuer zeichnet `@mipmap/ic_launcher` über die SplashScreen-API mitten in den nativen Startbildschirm. Der Hintergrund ist seit dem 27.08.2026 richtig (`#FF0F0D0A`), das Symbol nicht. Braucht das FACT-Symbol in allen Dichten, plus eine Entscheidung, ob der native Startbildschirm es überhaupt zeigen soll. | 2 | vor Auslieferung |
+| E-38 | **Materials Laufweite verbreitert Beschriftungen, die die Quelle ohne führt.** `bodyMedium` gibt `letterSpacing` zwischen 0,25 und 0,3 an Texte weiter, die in der PWA keine haben. „Deutsch" ist dadurch 56,1 statt 54,3 Pixel breit, und genau dieser Betrag hat die Sprachzeile bei 411 zum Umbruch gebracht. Betrifft **jede** Textbreite der App, nicht nur diesen Bildschirm. Zu entscheiden: die Laufweite global auf null setzen, wo die Quelle keine angibt, oder als Abweichung hinnehmen. | 3 | vor Phase 2, weil es alle Maße betrifft |
 
 ## Datenvertrag: die bekannten Fallen
 
@@ -419,6 +437,14 @@ werden.
 - Variable Schrift `Nunito[wght].ttf`: ob die Gewichtsachse über
   `fontVariations` tatsächlich rendert. Schriften werden in Widget-Tests nicht
   geladen.
-- `maplibre_gl 0.27.0`: ob `minSdk` angehoben werden muss.
-- Der erste Android- und iOS-Build überhaupt. Beide Plattformen sind seit
-  `flutter create` nicht compiliert worden.
+- ~~`maplibre_gl 0.27.0`: ob `minSdk` angehoben werden muss.~~ **Am 27.08.2026
+  geprüft und widerlegt.** Es setzt bei `minSdkVersion 21` an. Der echte Konflikt
+  lag bei AGP 9 und Kotlin, Begründung im Kommentar in `pubspec.yaml`.
+- ~~Der erste Android-Build überhaupt.~~ **Am 27.08.2026 gelaufen.** Debug-APK
+  gebaut, auf dem Emulator installiert, Startbildschirm, Anmeldung und
+  Registrierung gesehen (Pixel 8, 411 logische Pixel, Systemschriftgröße 1.0).
+  **iOS ist weiter nie compiliert worden.**
+- Offen bleibt: iOS, echte Hardware, 360 und 320 logische Pixel,
+  Systemschriftgröße 2.0, und ein Vergleich mit einem Screenshot der laufenden
+  PWA, um Schriftmetriken, Schatten und Abstände zu belegen statt sie aus
+  Zahlenwerten zu schließen.

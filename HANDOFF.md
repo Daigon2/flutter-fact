@@ -19,7 +19,8 @@ Für Details nicht hier suchen, sondern:
 
 **Zuletzt aktualisiert:** 27.08.2026
 
-**Phase 0 abgeschlossen. Phase 1 läuft, Schritte 7 bis 9 von 50 fertig.**
+**Phase 0 abgeschlossen. Phase 1 läuft, Schritte 7 bis 10 von 50 fertig. Die App
+ist erstmals auf einem Gerät gelaufen.**
 
 Steht: Projektgerüst, Pakete, Design-Tokens, i18n, Fakt-Datenmodell mit
 Supabase-Zugang, App-Shell mit typisierten Routen und Tab-Leiste, das
@@ -27,7 +28,8 @@ Architektur-Prüfskript mit eigener Testsuite, der Startbildschirm mit zentraler
 Router-Weiche für Erstlauf und Sitzung, der Audio-Aktivierungsdialog und die
 Anmeldung samt Supabase-Anbindung.
 
-**Kennzahlen:** 463 Tests grün, alle vier Gates auf Exit-Code 0.
+**Kennzahlen:** 605 Tests grün, alle vier Gates auf Exit-Code 0, und
+`flutter build apk --debug` läuft.
 
 **Neu und projektweit nützlich:** `test/support/app_fonts.dart` lädt die echten
 Schriften in Widget-Tests. Ohne das zeichnet `flutter test` jede Glyphe als
@@ -38,9 +40,11 @@ Rumpf von `testWidgets` hängt er. Dazu `lib/core/async/detached_work.dart` mit
 `reportDetached`, weil `docs/engineering/flutter.md:151` für abgekoppelte
 Arbeit nicht nur einen Helfer, sondern auch eine Fehlermeldung verlangt.
 
-**Wichtig:** Die App ist noch **nie gestartet**. Kein Android-Build, kein
-iOS-Build, kein Emulatorlauf. Grüne Tests sagen nichts darüber, ob der erste
-Gerätebuild durchläuft.
+**Stand der optischen Prüfung:** Startbildschirm, Anmeldung und Registrierung
+sind am Emulator gesehen (Pixel 8, 411 logische Pixel, Systemschriftgröße 1.0).
+Ungeprüft bleiben iOS, echte Hardware, andere Bildschirmbreiten und große
+Systemschrift. Alle Aussagen zu 360 und 320 Pixeln und zu Skalierung 2.0 sind
+strukturell.
 
 **Der Build-Blocker ist seit dem 27.08.2026 gelöst**, siehe „Android-Build:
 gelöst" unter „Rechner einrichten". Es war nie ein Netzwerkproblem: Java legt
@@ -80,6 +84,51 @@ Presentation eines anderen importiert. Der Vorschlag steht in
 ## Protokoll
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
+
+### 27.08.2026, erster Gerätelauf
+
+Der Build-Blocker fiel, und danach lief die App zum ersten Mal. Vier Funde, die
+keine Testsuite hätte finden können, und drei davon haben eine Annahme
+widerlegt.
+
+**Der Paketkonflikt war nicht die `minSdk`.** Seit Phase 0 stand in
+`REBUILD_STATUS.md` die Vermutung, `maplibre_gl` könnte eine höhere `minSdk`
+verlangen. Es setzt bei 21 an, völlig unkritisch. Der echte Konflikt liegt
+zwischen AGP 9.0.1, das das Flutter-Template selbst wählt, und der Art, wie zwei
+Pakete auf Flutters Kotlin-Umstellung reagieren. `maplibre_gl 0.27.0` braucht
+`android.builtInKotlin=true`, `app_links` braucht `false`, und `app_links` ist
+nicht einmal direkt eingebunden. Beide sind laut `flutter pub outdated` aktuell.
+Gelöst durch Festnageln auf `^0.26.1`, Begründung in `pubspec.yaml`.
+
+**Das Format-Gate war ab dem ersten Build kaputt.** `dart format .` stürzt in
+`build/` an Pfaden jenseits der Windows-Längengrenze ab und meldet Exit-Code 1,
+ohne dass am Code etwas falsch ist. Bis zu diesem Tag fiel das nicht auf, weil
+`build/` nie existierte. Das Gate zielt jetzt auf `lib test tool`.
+
+**Die Sprachzeile brach um, und mein Verdacht war falsch.** Sichtbar stand
+„Deutsch" als „Deutsc / h". Ich hatte die Deckelung des Kopfhörer-Knopfes auf
+115 Pixel verdächtigt; die band bei Skalierung 1.0 nie. Die Ursache ist `Row`
+mit `Expanded`, das die Breite verteilt, bevor es die Kinder nach ihrem Bedarf
+fragt. Gemessen: eine Karte braucht 127,1 Pixel min-content, verfügbar waren
+118. Der Defekt trat damit auch bei 390 auf, dem Rahmenmaß der Quelle.
+
+**Und der Fund mit der größten Reichweite ist einer am Testnetz:** die Tests
+prüfen auf **Überlauf**, und ein Zeilenumbruch ist keiner. Flutter meldet
+nichts, es bricht einfach um. Es gab Tests für genau diese Zeile, und sie waren
+blind. Jetzt ist die Einzeiligkeit zugesichert. Dasselbe Muster beim nativen
+Startbildschirm: eine Mutationsprobe hat belegt, dass XML für `flutter test`
+vollständig unsichtbar ist, die Farbe auf Weiß zu setzen überlebte alle vier
+Gates. Dafür gibt es jetzt Dateiprüfungen.
+
+Nebenbefunde, jeder eine Zeile wert. Der wirksame native Startbildschirm ist
+`drawable-v21/`, nicht `drawable/`, und `NormalTheme` wiegt schwerer als
+`LaunchTheme`, weil `FlutterActivity` in `onCreate` darauf umstellt. Der
+Emulator hatte 2 GB und schoss die App per `lowmemorykiller` ab, jetzt 4 GB.
+Und zweimal habe ich mir selbst falsche Ergebnisse gebaut, indem ich Auswertung
+und Ausgabe in eine `&&`-Kette gemischt habe: einmal kam ein Exit-Code 0 von
+`tail`, während der Build mit 1 abbrach, einmal lief ein Build gar nicht, weil
+ein vorgeschaltetes `grep` die Kette abbrach. Die Warnung in „Befehle" gilt
+nicht nur für die Gates.
 
 ### 27.08.2026, Schritt 9: Anmeldung mit Auth-Unterbau
 
