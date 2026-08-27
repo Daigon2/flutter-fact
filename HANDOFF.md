@@ -35,10 +35,12 @@ Gerätebuild durchläuft.
 
 ## Als Nächstes
 
-1. **Erster Gerätebuild.** Der wichtigste ungeprüfte Punkt überhaupt. Offen
-   ist, ob `maplibre_gl` eine höhere `minSdk` verlangt, ob die vier SVG-Icons
-   und Nunito bei 10px sauber rendern und wie die Tab-Leiste mit echter Safe
-   Area sitzt. Alles bisher Geprüfte ist strukturell, nicht optisch.
+1. **Android-Build zum Laufen bringen.** Blockiert durch einen
+   Loopback-Fehler von Gradle, siehe „Rechner einrichten". Der erste Punkt
+   dort braucht Administratorrechte. Solange das offen ist, kann niemand
+   prüfen, ob `maplibre_gl` eine höhere `minSdk` verlangt, ob die vier
+   SVG-Icons und Nunito bei 10px rendern und wie die Tab-Leiste mit echter
+   Safe Area sitzt.
 2. **Phase 1** (Schritte 7 bis 11): Splash, Audio-Dialog, Login, Signup,
    Tutorial-Overlay. Die Auth-Weiche im Router ist vorbereitet und gibt heute
    `null` zurück.
@@ -163,6 +165,59 @@ flutter run --dart-define=SUPABASE_URL=https://<projekt>.supabase.co --dart-defi
 Gilt genauso für `flutter build apk`, `flutter build ipa` und `flutter test`.
 Alternativ `--dart-define-from-file=env.json`, diese Datei gehört **nicht** ins
 Repository.
+
+### Android-Build scheitert derzeit: „Unable to establish loopback connection"
+
+**Der erste Gerätebuild ist auf diesem Rechner nicht möglich.** Gradle bricht
+nach etwa fünf Sekunden ab:
+
+```
+java.io.IOException: Unable to establish loopback connection
+Caused by: java.net.SocketException: Invalid argument: connect
+	at sun.nio.ch.PipeImpl$Initializer$LoopbackConnector.run
+```
+
+Der Emulator selbst läuft (`Pixel_8`, Android 17, API 37). Der Fehler entsteht
+im Gradle-Launcher, wenn er sich mit seinem Daemon-Prozess verbindet:
+`DefaultDaemonConnector.connectToDaemon` → `SocketConnection.<init>` →
+`PipeImpl`.
+
+**Achtung, die Notiz im alten REBUILD_PLAN nennt die falsche Ursache.** Dort
+steht, `-Djava.io.tmpdir=C:/gtmp` plus `JAVA_TOOL_OPTIONS` löse das. Das ist
+geprüft und hilft nicht.
+
+Ausgeschlossen, jeweils einzeln getestet:
+
+| Vermutung | Ergebnis |
+|---|---|
+| Temp-Pfad mit Leerzeichen | `-Djava.io.tmpdir=C:/gtmp` gesetzt, Variable wird übernommen, Fehler bleibt |
+| Sandbox der Werkzeugumgebung | Build auch ohne Sandbox identisch fehlgeschlagen |
+| Loopback generell blockiert | Python bindet und verbindet 127.0.0.1 fehlerfrei |
+| Java kann keine NIO-Pipe | minimales `Pipe.open()`-Programm läuft mit demselben JDK durch |
+| reservierte Portbereiche | nur 5357 und 50000–50059 belegt, unkritisch |
+| Speichermangel | `-Xmx8G` auf 2G reduziert, Fehler bleibt. Frei waren 4,8 von 31,5 GB |
+| IPv6-Auflösung von localhost | `preferIPv4Stack` in `JAVA_TOOL_OPTIONS`, `GRADLE_OPTS` und `org.gradle.jvmargs`, Fehler bleibt |
+| hängender Gradle-Daemon | `gradlew --stop` meldete, dass keiner läuft |
+
+**Verbleibender Verdacht, in dieser Reihenfolge zu prüfen:**
+
+1. **Endpoint Protection.** Es läuft ein Prozess `endpointprotection` mit
+   erhöhten Rechten. Solche Produkte hängen sich in Winsock ein, und das
+   erklärt, warum ein triviales Java-Programm durchkommt und Gradle mit seinen
+   vielen Sockets nicht. Testweise deaktivieren oder eine Ausnahme für
+   `java.exe` und das Projektverzeichnis eintragen. **Braucht Administrator,
+   also Handarbeit.**
+2. **Das JDK.** Genutzt wird die JetBrains Runtime aus Android Studio
+   (`C:\Program Files\Android\Android Studio\jbr`, OpenJDK 21.0.10), ein
+   für IntelliJ gepatchter Build. Ein reguläres Temurin 21 installieren und
+   `flutter config --jdk-dir <pfad>` setzen. Auf dem Rechner ist derzeit kein
+   zweites JDK vorhanden.
+3. **Gradle 9.1.0.** Vom Flutter-Template gesetzt und sehr neu. Testweise auf
+   eine 8.x-Version in `android/gradle/wrapper/gradle-wrapper.properties`
+   herunterziehen.
+
+Bis das gelöst ist, sind alle Aussagen über die App **strukturell**: Tests,
+Analyse und Grenzprüfung. Nichts ist optisch am Gerät verifiziert.
 
 ### Nicht aus einem OneDrive-Pfad bauen
 
