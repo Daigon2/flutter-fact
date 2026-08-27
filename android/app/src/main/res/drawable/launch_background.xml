@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
+<!--
+  Das Fensterbild des Startvorgangs. Android zeichnet es, sobald der Prozess
+  steht, und ersetzt es durch den ersten Flutter-Frame.
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+  **Wirksam ist auf jedem heutigen Gerät nicht diese Datei, sondern
+  drawable-v21/launch_background.xml**: `minSdk` ist 24, und der
+  Versions-Qualifizierer hat Vorrang. Diese Fassung ist der Rückfall der
+  `flutter create`-Vorlage für alles unter API 21, den es hier nicht gibt. Sie
+  wird trotzdem mitgeführt, damit die beiden nicht auseinanderlaufen.
+
+  Vorher stand hier `@android:color/white`, in der v21-Fassung
+  `?android:colorBackground`, was gegen das damalige helle Eltern-Theme
+  ebenfalls Weiß ergab. Zur Farbe siehe values/colors.xml.
+
+  Ein eigenes Startsymbol gehört, wenn es kommt, als zweites <item> mit
+  <bitmap android:gravity="center"> hierher. Auf Android 12 und neuer zeichnet
+  das System stattdessen das App-Symbol; das ist eine eigene Aufgabe.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/fact_splash_background" />
 </layer-list>

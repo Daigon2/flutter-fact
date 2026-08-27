@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Der Hintergrund des nativen Startbildschirms, also dessen, was Android
+      zeigt, bevor der erste Flutter-Frame steht. Android-Farben sind ARGB,
+      deshalb steht die volle Deckkraft vorn: #FF + 0F0D0A.
+
+      Warum genau diese Farbe: `SplashPage.surface` in
+      lib/features/identity/presentation/pages/splash_page.dart setzt sie als
+      `backgroundColor` des Scaffolds, und der Startbildschirm ist der erste
+      Flutter-Bildschirm überhaupt. Sie stammt aus 02_Frontend/app/index.html
+      Zeile 103, dem `body`-Hintergrund der PWA auf Mobil (`@media (max-width:
+      500px)`). Damit ist der Übergang nahtlos: gleiche Farbe vor und nach dem
+      ersten Frame, kein Blitzen.
+
+      In der Quelle kursieren vier verschiedene "Marken-Dunkel", drei davon
+      wären hier falsch:
+
+        #15171A   manifest.json und <meta name="theme-color">
+        #1A1714   `body` auf Desktop
+        #0f0d0a   `body` auf Mobil                     <- dieser hier
+        #13100E   `tok.bg` des dunklen Themes, und `fact_bg` im alten
+                  Flutter-Port
+
+      Gewählt ist der Mobil-Wert, weil diese App auf einem Telefon läuft und
+      weil es die Farbe ist, die der erste Flutter-Frame tatsächlich zeichnet.
+      `tok.bg` ist auf dem Startbildschirm gar nicht zu sehen: darüber liegt
+      der vierschichtige Verlauf mit `position: absolute; inset: 0`.
+    -->
+    <color name="fact_splash_background">#FF0F0D0A</color>
+</resources>

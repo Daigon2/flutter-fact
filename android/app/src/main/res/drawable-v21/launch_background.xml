@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
+<!--
+  **Das ist die Datei, die auf jedem heutigen Gerät wirkt**, denn `minSdk` ist
+  24 und ein `-v21`-Qualifizierer hat vor `drawable/` Vorrang. Wer nur
+  `drawable/launch_background.xml` ändert, ändert nichts Sichtbares.
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+  Hier stand `?android:colorBackground` aus der `flutter create`-Vorlage. Das
+  löste gegen das damalige helle Eltern-Theme zu Weiß auf, und beim ersten
+  Gerätelauf war genau das mehrere Sekunden zu sehen. Zur Farbe siehe
+  values/colors.xml, zu den Themes values/styles.xml.
+
+  Inhaltsgleich mit drawable/launch_background.xml. Beide verweisen auf
+  dieselbe benannte Farbe, es gibt also keinen zweiten Wert, der driften
+  könnte. Den Qualifizierer bräuchte diese Fassung nicht mehr; die Vorlage legt
+  beide Dateien an, und eine davon zu entfernen ist eine eigene Aufräum-
+  Entscheidung.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/fact_splash_background" />
 </layer-list>

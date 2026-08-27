@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:fact_app/app/localization/app_language.dart';
 import 'package:fact_app/app/localization/app_strings.dart';
 import 'package:fact_app/app/theme/fact_typography.dart';
 import 'package:fact_app/features/identity/presentation/widgets/flag_mark.dart';
 import 'package:fact_app/features/identity/presentation/widgets/splash_pressable.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 /// Sprachauswahl und Audio-Knopf des Startbildschirms,
@@ -31,18 +34,23 @@ class SplashLanguageRow extends StatelessWidget {
   /// Breite der Flaggen, `<Flag size={30}/>`.
   static const double flagSize = 30;
 
-  /// Höchstbreite des Audio-Knopfes, siehe [_audioGuideButton].
-  ///
-  /// Ein Drittel der Zeilenbreite bei den 390 Pixeln, auf die die Quelle gebaut
-  /// ist (`chrome.jsx:135`): 390 minus die 44 Pixel Innenabstand der
-  /// Inhaltsspalte sind 346, davon ein Drittel 115.
-  static const double audioButtonMaxWidth = 115;
+  /// Abstand zwischen Flagge und Textspalte einer Karte, `gap: 10`.
+  static const double cardContentSpacing = 10;
+
+  /// Abstand zwischen den drei Feldern, `gap: 8` am Flex-Container.
+  static const double fieldSpacing = 8;
+
+  /// Rahmenstärke aller drei Felder, `1.5px solid`.
+  static const double fieldBorderWidth = 1.5;
 
   /// Innenabstand aller drei Felder, `padding: '11px 14px'`.
   static const EdgeInsets fieldPadding = EdgeInsets.symmetric(
     horizontal: 14,
     vertical: 11,
   );
+
+  /// Schriftgröße des Kopfhörer-Emojis, `fontSize: 28`.
+  static const double audioEmojiSize = 28;
 
   /// Texte der aktiven Sprache, für den Audio-Knopf.
   final AppStrings strings;
@@ -58,32 +66,26 @@ class SplashLanguageRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      // Die drei Felder sind in CSS gleich hoch, weil Flex-Kinder gestreckt
-      // werden. Der Audio-Knopf ist das höchste und gibt damit das Maß vor.
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 8,
-        children: <Widget>[
-          Expanded(
-            child: _languageCard(
-              language: AppLanguage.de,
-              kind: FlagKind.de,
-              label: 'Deutsch',
-              subtitle: 'Weiter auf Deutsch',
-            ),
-          ),
-          Expanded(
-            child: _languageCard(
-              language: AppLanguage.en,
-              kind: FlagKind.gb,
-              label: 'English',
-              subtitle: 'Continue in English',
-            ),
-          ),
-          _audioGuideButton(),
-        ],
-      ),
+    // Kein `Row` mit `Expanded` und kein `IntrinsicHeight`: die Verteilung der
+    // Breite und die gleiche Höhe der drei Felder macht [_FieldRow] selbst.
+    // Warum, steht dort.
+    return _FieldRow(
+      spacing: fieldSpacing,
+      children: <Widget>[
+        _languageCard(
+          language: AppLanguage.de,
+          kind: FlagKind.de,
+          label: 'Deutsch',
+          subtitle: 'Weiter auf Deutsch',
+        ),
+        _languageCard(
+          language: AppLanguage.en,
+          kind: FlagKind.gb,
+          label: 'English',
+          subtitle: 'Continue in English',
+        ),
+        _audioGuideButton(),
+      ],
     );
   }
 
@@ -111,7 +113,7 @@ class SplashLanguageRow extends StatelessWidget {
               color: selected
                   ? const Color.fromRGBO(232, 56, 13, 0.55)
                   : const Color.fromRGBO(255, 255, 255, 0.12),
-              width: 1.5,
+              width: fieldBorderWidth,
             ),
           ),
           // `boxShadow: '0 0 0 3px rgba(232,56,13,0.12)'`: kein Versatz, keine
@@ -127,7 +129,7 @@ class SplashLanguageRow extends StatelessWidget {
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
-          spacing: 10,
+          spacing: cardContentSpacing,
           children: <Widget>[
             FlagMark(kind: kind, size: flagSize),
             Expanded(
@@ -160,78 +162,357 @@ class SplashLanguageRow extends StatelessWidget {
     );
   }
 
-  /// Der Kopfhörer-Knopf, gedeckelt auf [audioButtonMaxWidth].
+  /// Der Kopfhörer-Knopf.
   ///
-  /// ## Warum die Deckelung nötig ist
-  ///
-  /// Er ist das einzige der drei Felder ohne `Expanded`, weil die Quelle ihn
-  /// aus seinem Inhalt heraus bemisst (`screen-auth.jsx:356-370`, kein `flex`).
-  /// Wächst seine Beschriftung mit der Systemschriftgröße, nimmt er den beiden
-  /// Sprachkarten Platz weg, bis dort die 30 Pixel der Flagge plus 10 Pixel
-  /// Abstand nicht mehr hineinpassen. Gemessen mit echten Schriften: bei 360
-  /// Pixeln Breite und Skalierung 2.0 lief die innere Zeile der Karte um 3,8
-  /// Pixel über.
-  ///
-  /// Ein Drittel, weil die drei Felder in CSS gleichrangige Flex-Kinder sind:
-  /// mehr als seinen gleichen Anteil darf das eine Feld, das nicht schrumpfen
-  /// kann, nicht beanspruchen. Bei Skalierung 1.0 **bindet die Deckelung
-  /// nicht**, der Knopf ist dort mit etwa 88 Pixeln schmaler als die 115; das
-  /// Aussehen des Normalfalls ändert sich also nicht. Per Test zugesichert.
-  ///
-  /// **Warum eine Konstante und nicht ein Drittel der gemessenen Zeile:** ein
-  /// `LayoutBuilder` an dieser Stelle ist nicht möglich. Der Startbildschirm
-  /// legt seine Inhaltsspalte in ein `IntrinsicHeight`
-  /// (`splash_page.dart:273`), und `LayoutBuilder` kann keine intrinsischen
-  /// Maße liefern: "LayoutBuilder does not support returning intrinsic
-  /// dimensions." Ausprobiert, der ganze Bildschirm bricht damit zusammen.
-  ///
-  /// Die PWA braucht das alles nicht, weil sie den Fall nicht kennt: ihre 11
-  /// und 14 Pixel sind CSS-`px` und folgen der Textgrößen-Einstellung des
-  /// Betriebssystems nicht, und was trotzdem zu breit wird, schneidet
-  /// `#root { overflow: hidden }` ab. In Flutter ist derselbe Zustand ein
-  /// Fehler, deshalb bricht die Beschriftung hier stattdessen um.
+  /// Die Quelle gibt ihm keine Breite (`screen-auth.jsx:356-370`, kein `flex`),
+  /// er bemisst sich also an seinem Inhalt. Hier gilt dasselbe, mit einer
+  /// Einschränkung: er tritt zurück, wenn die beiden Sprachkarten den Platz für
+  /// ihren Titel brauchen. Die Rechnung dazu steht in [_FieldRow].
   Widget _audioGuideButton() {
     final label = strings.text('audio.splash.button');
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: audioButtonMaxWidth),
-      child: SplashPressable(
-        onPressed: onAudioGuidePressed,
-        // `aria-label` der Quelle ist derselbe Schlüssel wie die Beschriftung.
-        semanticLabel: label,
-        child: Container(
-          padding: fieldPadding,
-          decoration: const BoxDecoration(
-            color: Color.fromRGBO(255, 255, 255, 0.06),
-            borderRadius: BorderRadius.all(Radius.circular(cornerRadius)),
-            border: Border.fromBorderSide(
-              BorderSide(
-                color: Color.fromRGBO(255, 255, 255, 0.12),
-                width: 1.5,
-              ),
+    return SplashPressable(
+      onPressed: onAudioGuidePressed,
+      // `aria-label` der Quelle ist derselbe Schlüssel wie die Beschriftung.
+      semanticLabel: label,
+      child: Container(
+        padding: fieldPadding,
+        decoration: const BoxDecoration(
+          color: Color.fromRGBO(255, 255, 255, 0.06),
+          borderRadius: BorderRadius.all(Radius.circular(cornerRadius)),
+          border: Border.fromBorderSide(
+            BorderSide(
+              color: Color.fromRGBO(255, 255, 255, 0.12),
+              width: fieldBorderWidth,
             ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            spacing: 4,
-            children: <Widget>[
-              // `fontSize: 28`, ohne feste Zeilenhöhe: die Quelle setzt keine,
-              // und eine gekappte Zeile schneidet dem Emoji die Oberkante ab.
-              const Text('🎧', style: TextStyle(fontSize: 28)),
-              Text(
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          spacing: 4,
+          children: <Widget>[
+            // `fontSize: 28`, ohne feste Zeilenhöhe: die Quelle setzt keine,
+            // und eine gekappte Zeile schneidet dem Emoji die Oberkante ab.
+            const Text('🎧', style: TextStyle(fontSize: audioEmojiSize)),
+            _TwoLineFloor(
+              child: Text(
                 label,
-                // Mittig, damit eine durch die Deckelung umgebrochene
-                // Beschriftung unter dem Emoji sitzt statt links wegzulaufen.
-                // Bei einer Zeile ist das nicht zu sehen.
+                // Mittig, damit eine umgebrochene Beschriftung unter dem Emoji
+                // sitzt statt links wegzulaufen. Bei einer Zeile ist das nicht
+                // zu sehen.
                 textAlign: TextAlign.center,
                 style: FactTypography.bodyText.copyWith(
                   fontSize: 11,
                   color: const Color.fromRGBO(255, 255, 255, 0.45),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+  }
+}
+
+/// Die drei Felder der Sprachzeile: nebeneinander, gleich hoch, mit [spacing]
+/// dazwischen.
+///
+/// Erwartet genau drei Kinder in dieser Reihenfolge: Sprachkarte, Sprachkarte,
+/// Kopfhörer-Knopf.
+///
+/// ## Warum das kein `Row` mit `Expanded` ist
+///
+/// In der Quelle sind die beiden Karten `flex: 1`, der Knopf hat keine
+/// Breitenangabe. `flex: 1` heißt in CSS `flex-basis: 0%`, und daraus folgt
+/// zweierlei, das ein `Row` nicht abbilden kann:
+///
+///  1. Die Karten dürfen **nicht unter ihre min-content-Breite** schrumpfen.
+///     Das ist `min-width: auto`, die automatische Mindestbreite eines
+///     Flex-Kindes: Rahmen, Innenabstand, Flagge, Abstand und das längste
+///     unteilbare Wort der Textspalte. Bei der deutschen Karte ist das der
+///     Titel `Deutsch`.
+///  2. Beim Schrumpfen gibt der **Knopf** nach, nicht die Karten: die
+///     gewichtete Schrumpfrate eines Kindes mit `flex-basis: 0%` ist null.
+///
+/// `Row` verteilt die Breite, **bevor** es die Kinder nach ihrem Bedarf fragt.
+/// Mit `Expanded` bekommt jede Karte genau ein Drittel, und was nicht
+/// hineinpasst, bricht um. Genau das war der Defekt, am Emulator gesehen und
+/// mit echten Schriften nachgerechnet: bei 411 logischen Pixeln (Pixel 8)
+/// blieben der Textspalte 54,7 Pixel, `Deutsch` braucht 56,1, und der Titel
+/// stand als "Deutsc / h" auf zwei Zeilen. Bei 390, dem Rahmenmaß der Quelle,
+/// waren es 44,2 Pixel; dort brachen beide Titel um.
+///
+/// **Ein `LayoutBuilder` ist kein Ausweg.** Der Startbildschirm legt seine
+/// Inhaltsspalte in ein `IntrinsicHeight` (`splash_page.dart`), und
+/// `LayoutBuilder` kann keine intrinsischen Maße liefern: "LayoutBuilder does
+/// not support returning intrinsic dimensions." Ein eigenes Layout kann es,
+/// weil es die intrinsischen Breiten seiner Kinder erfragt, statt Widgets
+/// während des Layouts zu bauen.
+///
+/// ## Die Verteilung
+///
+/// Gerechnet wird mit den intrinsischen Breiten der Kinder, nicht mit
+/// Konstanten. Damit hängt die Zeile nicht an Schriftschnitt, Sprache oder
+/// Textgrößen-Einstellung:
+///
+/// ```
+/// frei  = Breite - 2 * spacing
+/// Karte = min-content der breiteren Karte, auf ganze Pixel aufgerundet
+/// Knopf = frei - 2 * Karte, begrenzt auf [Untergrenze, Inhaltsbreite]
+/// Karte = (frei - Knopf) / 2
+/// ```
+///
+/// Die Untergrenze des Knopfes ist seine eigene min-content-Breite. Sie fällt
+/// klein aus, weil [_TwoLineFloor] der Beschriftung eine zweite Zeile erlaubt;
+/// als harte Grenze bleibt das Emoji. Gemessen mit echten Schriften:
+/// Inhaltsbreite 99,7 Pixel, Untergrenze 65,3.
+///
+/// Ergebnis bei Systemschriftgröße 1.0: bei 411 und bei 390 logischen Pixeln
+/// bekommen die Karten ihre 128 Pixel, die Titel stehen einzeilig, und der
+/// Knopf nimmt 95 beziehungsweise 74 Pixel und bricht seine Beschriftung um.
+/// Die Quelle bricht sie dort ebenfalls um; bei 390 reicht es selbst ihr nicht,
+/// dort schneidet `#root { overflow: hidden }` den Knopf um vier Pixel ab.
+///
+/// **Bei 360 logischen Pixeln geht es in keiner Aufteilung auf:** zwei Karten
+/// à 128, ein Knopf mit 65 und 16 Pixel Abstand sind 337, verfügbar sind 316.
+/// Dann schrumpfen die Karten weiter und die Titel brechen wieder um. Was dann
+/// nachgeben soll (kleinere Flagge, kürzere Beschriftung, zweite Zeile), ist
+/// eine Gestaltungsfrage und keine Layout-Frage. Die Quelle schneidet an dieser
+/// Stelle ab. Hier bewusst nicht entschieden.
+///
+/// Bei Systemschriftgröße 2.0 gilt dasselbe auf jedem Format: die Untergrenze
+/// des Knopfes bindet, die Karten bekommen den Rest, die Texte brechen um.
+/// Überlaufen darf dabei nichts, das ist per Test zugesichert.
+class _FieldRow extends MultiChildRenderObjectWidget {
+  const _FieldRow({required this.spacing, required super.children});
+
+  /// Abstand zwischen zwei Feldern.
+  final double spacing;
+
+  @override
+  _RenderFieldRow createRenderObject(BuildContext context) =>
+      _RenderFieldRow(spacing: spacing);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderFieldRow renderObject) {
+    renderObject.spacing = spacing;
+  }
+}
+
+/// Position eines Feldes in [_RenderFieldRow].
+class _FieldParentData extends ContainerBoxParentData<RenderBox> {}
+
+/// Das Layout hinter [_FieldRow].
+class _RenderFieldRow extends RenderBox
+    with
+        ContainerRenderObjectMixin<RenderBox, _FieldParentData>,
+        RenderBoxContainerDefaultsMixin<RenderBox, _FieldParentData> {
+  _RenderFieldRow({required double spacing}) : _spacing = spacing;
+
+  static const double _unbounded = double.infinity;
+
+  double _spacing;
+
+  /// Abstand zwischen zwei Feldern.
+  double get spacing => _spacing;
+
+  set spacing(double value) {
+    if (value == _spacing) {
+      return;
+    }
+    _spacing = value;
+    markNeedsLayout();
+  }
+
+  RenderBox get _firstCard => firstChild!;
+
+  RenderBox get _secondCard => childAfter(_firstCard)!;
+
+  RenderBox get _audioButton => childAfter(_secondCard)!;
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _FieldParentData) {
+      child.parentData = _FieldParentData();
+    }
+  }
+
+  /// Die min-content-Breite der breiteren Sprachkarte.
+  ///
+  /// Aufgerundet: die Rechnung im Kind zieht Rahmen, Innenabstand, Flagge und
+  /// Abstand von dieser Zahl wieder ab, und eine Abweichung im letzten Bit
+  /// würde den Titel umbrechen lassen. Der Aufschlag ist kleiner als ein
+  /// logisches Pixel und verändert keine Maßangabe der Quelle.
+  double get _cardFloor => math
+      .max(
+        _firstCard.getMinIntrinsicWidth(_unbounded),
+        _secondCard.getMinIntrinsicWidth(_unbounded),
+      )
+      .ceilToDouble();
+
+  /// Die Breite, die die breitere Karte hätte, wenn niemand sie beschränkt.
+  double get _cardContent => math.max(
+    _firstCard.getMaxIntrinsicWidth(_unbounded),
+    _secondCard.getMaxIntrinsicWidth(_unbounded),
+  );
+
+  /// Die Breiten der drei Felder für eine gegebene Gesamtbreite.
+  ///
+  /// Siehe die Rechnung im Klassenkommentar von [_FieldRow].
+  ({double card, double button}) _distribute(double availableWidth) {
+    final buttonContent = _audioButton.getMaxIntrinsicWidth(_unbounded);
+    if (!availableWidth.isFinite) {
+      // Ohne Obergrenze gibt es nichts zu verteilen. Dieser Fall entsteht in
+      // intrinsischen Abfragen, nicht im Layout des Startbildschirms.
+      return (card: _cardContent, button: buttonContent);
+    }
+    final buttonFloor = math.min(
+      _audioButton.getMinIntrinsicWidth(_unbounded),
+      buttonContent,
+    );
+    final free = availableWidth - 2 * spacing;
+    final button = math.min(
+      math.max(free - 2 * _cardFloor, buttonFloor),
+      buttonContent,
+    );
+    return (card: math.max((free - button) / 2, 0), button: button);
+  }
+
+  /// Die drei Felder mit ihrer Breite, in Zeichenreihenfolge.
+  List<(RenderBox, double)> _fields(({double card, double button}) widths) {
+    return <(RenderBox, double)>[
+      (_firstCard, widths.card),
+      (_secondCard, widths.card),
+      (_audioButton, widths.button),
+    ];
+  }
+
+  double _totalWidth(({double card, double button}) widths) =>
+      2 * widths.card + widths.button + 2 * spacing;
+
+  @override
+  double computeMinIntrinsicWidth(double height) =>
+      2 * _cardFloor +
+      _audioButton.getMinIntrinsicWidth(_unbounded) +
+      2 * spacing;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) =>
+      2 * _cardContent +
+      _audioButton.getMaxIntrinsicWidth(_unbounded) +
+      2 * spacing;
+
+  // Alle drei Felder sind Textblöcke: ihre Höhe steht mit ihrer Breite fest,
+  // und damit fallen kleinste und größte Höhe zusammen.
+  @override
+  double computeMinIntrinsicHeight(double width) => _intrinsicHeight(width);
+
+  @override
+  double computeMaxIntrinsicHeight(double width) => _intrinsicHeight(width);
+
+  double _intrinsicHeight(double width) {
+    var height = 0.0;
+    for (final (field, fieldWidth) in _fields(_distribute(width))) {
+      height = math.max(height, field.getMaxIntrinsicHeight(fieldWidth));
+    }
+    return height;
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    final widths = _distribute(constraints.maxWidth);
+    var height = 0.0;
+    for (final (field, fieldWidth) in _fields(widths)) {
+      final size = field.getDryLayout(
+        BoxConstraints(minWidth: fieldWidth, maxWidth: fieldWidth),
+      );
+      height = math.max(height, size.height);
+    }
+    return constraints.constrain(Size(_totalWidth(widths), height));
+  }
+
+  @override
+  void performLayout() {
+    assert(
+      childCount == 3,
+      '_FieldRow erwartet Sprachkarte, Sprachkarte und Kopfhörer-Knopf, '
+      'bekommen hat es $childCount Kinder.',
+    );
+    final widths = _distribute(constraints.maxWidth);
+    final fields = _fields(widths);
+
+    // Erster Durchgang: endgültige Breite, Höhe frei. Erst danach ist bekannt,
+    // welches der drei Felder das höchste ist.
+    var height = 0.0;
+    for (final (field, fieldWidth) in fields) {
+      field.layout(
+        BoxConstraints(minWidth: fieldWidth, maxWidth: fieldWidth),
+        parentUsesSize: true,
+      );
+      height = math.max(height, field.size.height);
+    }
+    height = constraints.constrainHeight(height);
+
+    // Zweiter Durchgang: alle Felder auf diese Höhe, das ist
+    // `align-items: stretch` des Flex-Containers. Ohne ihn wäre der Rahmen des
+    // kürzeren Feldes niedriger als der des höchsten.
+    //
+    // Bewusst ein echtes zweites Layout und nicht die intrinsische Höhe der
+    // Kinder: die intrinsische Höhe eines `Row` schätzt die Breitenverteilung
+    // seiner Flex-Kinder, und eine Schätzung, die zu niedrig ausfällt, würde
+    // Text abschneiden.
+    var x = 0.0;
+    for (final (field, fieldWidth) in fields) {
+      field.layout(
+        BoxConstraints.tightFor(width: fieldWidth, height: height),
+        parentUsesSize: true,
+      );
+      (field.parentData! as _FieldParentData).offset = Offset(x, 0);
+      x += fieldWidth + spacing;
+    }
+    size = constraints.constrain(Size(_totalWidth(widths), height));
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    defaultPaint(context, offset);
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    return defaultHitTestChildren(result, position: position);
+  }
+}
+
+/// Erlaubt dem Kind, bis auf die Hälfte seiner Inhaltsbreite zu schrumpfen.
+///
+/// Gemeint ist die Beschriftung des Kopfhörer-Knopfes, und gemeint ist damit
+/// eine zweite Zeile. Ohne das wäre die min-content-Breite des Knopfes seine
+/// Beschriftung in **einer** Zeile: Flutter meldet für `Audio-Guide` als
+/// kleinste intrinsische Breite die ganze Zeichenkette, weil es dafür nur an
+/// Leerzeichen trennt. Der Knopf könnte dann nie zurücktreten, und die Karten
+/// hätten weiterhin zu wenig Platz für ihren Titel.
+///
+/// Umbrechen **kann** Flutter dort, gemessen: bei Systemschriftgröße 2.0 und
+/// einer Obergrenze von 84 Pixeln stehen `Audio-` und `Guide` auf zwei Zeilen.
+/// Nur die intrinsische Auskunft kennt diese Trennstelle nicht. Deshalb steht
+/// die Hälfte hier als Regel: zwei Zeilen ja, eine dritte nicht, denn dafür
+/// müsste Flutter innerhalb eines Wortes trennen, und das tut die Quelle nie.
+class _TwoLineFloor extends SingleChildRenderObjectWidget {
+  const _TwoLineFloor({required Widget super.child});
+
+  @override
+  _RenderTwoLineFloor createRenderObject(BuildContext context) =>
+      _RenderTwoLineFloor();
+}
+
+/// Das Layout hinter [_TwoLineFloor].
+class _RenderTwoLineFloor extends RenderProxyBox {
+  @override
+  double computeMinIntrinsicWidth(double height) {
+    final child = this.child;
+    if (child == null) {
+      return 0;
+    }
+    return child.getMaxIntrinsicWidth(height) / 2;
   }
 }
