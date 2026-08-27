@@ -650,7 +650,15 @@ void main() {
       // Die Regel aus der Quelle: `flex: 1` heißt `flex-basis: 0%`, und ein
       // Flex-Kind mit dieser Basis schrumpft nicht unter seine automatische
       // Mindestbreite. Der Knopf ohne Breitenangabe gibt nach.
-      await pumpWidth(tester, 411);
+      //
+      // Gemessen wird bei 390, dem Rahmenmaß der Quelle, und nicht mehr bei
+      // 411: seit E-38 (Materials Laufweite raus) reicht die Zeile auf dem
+      // Emulator aus, der Knopf muss dort nicht mehr zurücktreten, und die
+      // Regel wäre bei 411 nicht mehr beobachtbar. Neu gemessen statt
+      // aufgeweicht: bei 390 sind es 346 Pixel Zeile, 125,35 Mindestbreite je
+      // Karte und 96,92 Wunschbreite des Knopfes, der auf 78 gedrückt wird.
+      // Der Zustand bei 411 steht im Test darunter.
+      await pumpWidth(tester, 390);
 
       final german = fieldOf(tester, 'Deutsch');
       final english = fieldOf(tester, 'English');
@@ -667,6 +675,35 @@ void main() {
         reason: 'der Knopf tritt zurück, statt die Karten zu drängen',
       );
       expect(renderedLines(tester, 'Audio-Guide'), 2, reason: 'er bricht um');
+    });
+
+    testWidgets('auf dem Emulatormaß passt die Zeile seit E-38 vollständig', (
+      tester,
+    ) async {
+      // 411 ist das Maß des Emulators (Pixel 8: 1080 Pixel bei Dichte 420) und
+      // die Breite, bei der die Zeile im ersten Gerätelauf brach. Materials
+      // Laufweite hat jede Beschriftung um 0,25 Pixel je Zeichen verbreitert,
+      // beim Knopf also um 2,75 auf 99,67. Ohne sie will er 96,92 und bekommt
+      // sie: die Zeile geht auf, und "Audio-Guide" steht einzeilig.
+      //
+      // Diese Zusicherung ist die Gegenprobe zu E-38. Käme Materials Laufweite
+      // zurück, stünde hier wieder 95 statt 96,92 und zwei Zeilen statt einer.
+      await pumpWidth(tester, 411);
+
+      final german = fieldOf(tester, 'Deutsch');
+      final audio = fieldOf(tester, '🎧');
+
+      expect(
+        audio.size.width,
+        audio.getMaxIntrinsicWidth(double.infinity),
+        reason: 'der Knopf bekommt seine Wunschbreite',
+      );
+      expect(
+        german.size.width,
+        greaterThan(german.getMinIntrinsicWidth(double.infinity)),
+        reason: 'und die Karten trotzdem mehr als ihr Minimum',
+      );
+      expect(renderedLines(tester, 'Audio-Guide'), 1);
     });
 
     testWidgets('alle drei Felder sind gleich hoch', (tester) async {
@@ -717,6 +754,11 @@ void main() {
       // Geprüft wird die Ursache und nicht nur die Folge: wer die Zeile später
       // auch dort einzeilig bekommt, muss eine Maßangabe der Quelle ändern, und
       // dann fällt dieser Test und will gelesen werden.
+      //
+      // E-38 hat den Fehlbetrag verkleinert und nicht beseitigt. Neu gemessen:
+      // 2 mal 125,35 plus 63,96 plus 16 sind 330,66 gegen 316 verfügbare Pixel,
+      // also rund 14,7 zu viel. Vorher waren es 335,53 und rund 19,5. Die
+      // Aussage dieses Tests bleibt damit bestehen, E-36 ist weiter offen.
       await pumpWidth(tester, 360);
 
       final row = tester.getSize(find.byType(SplashLanguageRow)).width;

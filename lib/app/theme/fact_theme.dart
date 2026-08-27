@@ -65,6 +65,9 @@ abstract final class FactTheme {
       scaffoldBackgroundColor: tokens.bg,
       canvasColor: tokens.bg,
       colorScheme: scheme,
+      // Materials Laufweite raus (E-38), Begründung bei [_withoutTracking].
+      // Das muss über `typography` laufen und wäre in [_textTheme] wirkungslos.
+      typography: _withoutTracking(base.typography),
       textTheme: _textTheme(base.textTheme, tokens),
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: tokens.coin,
@@ -79,6 +82,11 @@ abstract final class FactTheme {
   /// Bildet die PWA-Rollen auf die Material-Slots ab, die Flutter-Widgets ohne
   /// eigenen Stil verwenden. Größen bleiben bei Materials Vorgaben, weil FACT
   /// seine echten Größen pro Screen aus dem JSX setzt.
+  ///
+  /// Hier steht **keine** Laufweite, und ein `letterSpacing: null` hätte hier
+  /// auch keine Wirkung: `base` kommt aus dem `ThemeData`-Konstruktor und trägt
+  /// weder Schriftgröße noch Laufweite. Beides kommt erst aus der Geometrie,
+  /// siehe [_withoutTracking].
   static TextTheme _textTheme(TextTheme base, FactColors tokens) {
     final display = FactTypography.displayTitle.copyWith(color: tokens.ink);
     final heading = FactTypography.heading.copyWith(color: tokens.ink);
@@ -101,6 +109,108 @@ abstract final class FactTheme {
       labelLarge: base.labelLarge?.merge(label),
       labelMedium: base.labelMedium?.merge(label),
       labelSmall: base.labelSmall?.merge(label),
+    );
+  }
+
+  /// Nimmt Materials Laufweite aus den drei Geometrie-Themes (E-38).
+  ///
+  /// ## Warum hier und nicht in [_textTheme]
+  ///
+  /// Die Laufweite steht nicht in dem `textTheme`, das der
+  /// `ThemeData`-Konstruktor baut. Sie kommt aus `Typography.englishLike2021`
+  /// und wird erst vom `Theme`-Widget eingemischt, über
+  /// `ThemeData.localize(theme, theme.typography.geometryThemeFor(category))`.
+  /// Dieses `localize` setzt `textTheme: localTextGeometry.merge(textTheme)`.
+  /// Die Geometrie ist dabei die **Basis**, das eigene `textTheme` überschreibt
+  /// nur deren nicht-leere Felder. Ein `letterSpacing: null` in [_textTheme]
+  /// wäre deshalb wirkungslos: es ließe genau den Wert durch, den es entfernen
+  /// soll. An einer Wegwerf-Probe gemessen, nicht vermutet.
+  ///
+  /// Derselbe Aufruf speist auch `primaryTextTheme`. FACT liest den heute
+  /// nirgends, es gibt weder eine `AppBar` noch eine Fundstelle in `lib/`, aber
+  /// er ist über `Theme.of(context).primaryTextTheme` erreichbar und wird auf
+  /// diesem Weg gratis mit erledigt.
+  ///
+  /// ## Warum null und nicht 0
+  ///
+  /// Gezeichnet wird beides gleich. `null` heißt „kein Zuschlag angegeben",
+  /// `0.0` heißt „Zuschlag ist null". Der Unterschied zeigt sich beim Mischen:
+  /// ein Stil mit `0.0` überschreibt eine Laufweite, die von außen käme, ein
+  /// Stil mit `null` lässt sie durch. E-38 sagt „auf null setzen, wo die Quelle
+  /// keine angibt", und das ist „nicht angegeben" und nicht „ausdrücklich
+  /// null". Die Stellen, an denen die PWA eine Laufweite angibt, setzen sie
+  /// weiterhin selbst und gewinnen in beiden Varianten.
+  ///
+  /// ## Warum die Stile von Hand kopiert werden
+  ///
+  /// `TextStyle.copyWith` kann kein Feld auf `null` zurücksetzen, und
+  /// `TextStyle.apply(letterSpacingFactor: 0)` ergibt `0.0`, nicht `null`. Also
+  /// wird der Stil neu gebaut. Die Geometrie trägt `fontSize`, `height`,
+  /// `textBaseline` und `leadingDistribution`, die dürfen dabei nicht
+  /// verlorengehen. `test/app/theme/fact_theme_tracking_test.dart` nagelt das
+  /// mit einem Rundlauf gegen `Typography.englishLike2021` fest.
+  static Typography _withoutTracking(Typography typography) {
+    return typography.copyWith(
+      englishLike: _textThemeWithoutTracking(typography.englishLike),
+      dense: _textThemeWithoutTracking(typography.dense),
+      tall: _textThemeWithoutTracking(typography.tall),
+    );
+  }
+
+  static TextTheme _textThemeWithoutTracking(TextTheme theme) {
+    return TextTheme(
+      displayLarge: _styleWithoutTracking(theme.displayLarge),
+      displayMedium: _styleWithoutTracking(theme.displayMedium),
+      displaySmall: _styleWithoutTracking(theme.displaySmall),
+      headlineLarge: _styleWithoutTracking(theme.headlineLarge),
+      headlineMedium: _styleWithoutTracking(theme.headlineMedium),
+      headlineSmall: _styleWithoutTracking(theme.headlineSmall),
+      titleLarge: _styleWithoutTracking(theme.titleLarge),
+      titleMedium: _styleWithoutTracking(theme.titleMedium),
+      titleSmall: _styleWithoutTracking(theme.titleSmall),
+      bodyLarge: _styleWithoutTracking(theme.bodyLarge),
+      bodyMedium: _styleWithoutTracking(theme.bodyMedium),
+      bodySmall: _styleWithoutTracking(theme.bodySmall),
+      labelLarge: _styleWithoutTracking(theme.labelLarge),
+      labelMedium: _styleWithoutTracking(theme.labelMedium),
+      labelSmall: _styleWithoutTracking(theme.labelSmall),
+    );
+  }
+
+  /// Baut den Stil ohne `letterSpacing` neu und übernimmt jedes andere Feld.
+  ///
+  /// `fontFamily` und `fontFamilyFallback` werden ohne `package` gesetzt: die
+  /// Getter liefern den bereits aufgelösten Namen, ein zweites `package` würde
+  /// das Präfix doppeln.
+  static TextStyle? _styleWithoutTracking(TextStyle? style) {
+    if (style == null) {
+      return null;
+    }
+    return TextStyle(
+      inherit: style.inherit,
+      color: style.color,
+      backgroundColor: style.backgroundColor,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      fontStyle: style.fontStyle,
+      wordSpacing: style.wordSpacing,
+      textBaseline: style.textBaseline,
+      height: style.height,
+      leadingDistribution: style.leadingDistribution,
+      locale: style.locale,
+      foreground: style.foreground,
+      background: style.background,
+      shadows: style.shadows,
+      fontFeatures: style.fontFeatures,
+      fontVariations: style.fontVariations,
+      decoration: style.decoration,
+      decorationColor: style.decorationColor,
+      decorationStyle: style.decorationStyle,
+      decorationThickness: style.decorationThickness,
+      debugLabel: style.debugLabel,
+      fontFamily: style.fontFamily,
+      fontFamilyFallback: style.fontFamilyFallback,
+      overflow: style.overflow,
     );
   }
 }

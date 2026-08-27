@@ -28,8 +28,12 @@ Architektur-Prüfskript mit eigener Testsuite, der Startbildschirm mit zentraler
 Router-Weiche für Erstlauf und Sitzung, der Audio-Aktivierungsdialog und die
 Anmeldung samt Supabase-Anbindung.
 
-**Kennzahlen:** 605 Tests grün, alle vier Gates auf Exit-Code 0, und
+**Kennzahlen:** 614 Tests grün, alle vier Gates auf Exit-Code 0, und
 `flutter build apk --debug` läuft.
+
+**Wo die Arbeit liegt:** die Schritte 7 bis 10 lagen bis zum 27.08.2026 nur auf
+`claude/fact-flutter-splash-screen-a2bfc9` und waren **nie nach `main` gemerged**.
+Wer von `main` aus anfängt, bekommt Schritt 6. Der Merge steht weiterhin aus.
 
 **Neu und projektweit nützlich:** `test/support/app_fonts.dart` lädt die echten
 Schriften in Widget-Tests. Ohne das zeichnet `flutter test` jede Glyphe als
@@ -57,10 +61,10 @@ gelaufen.
 
 ## Als Nächstes
 
-1. **Materials Laufweite global auf null**, wo die Quelle keine angibt (E-38,
-   am 27.08.2026 entschieden). **Vor** Schritt 11 machen, weil es alle Textmaße
-   verschiebt: die festgenagelten Werte in den Tests müssen neu gemessen und der
-   Gerätelauf wiederholt werden. Danach ist jede weitere Messung verlässlich.
+1. **Den Gerätelauf wiederholen.** E-38 ist umgesetzt, damit ist jede
+   Beschriftung ohne eigene Laufweite schmaler geworden. Kein Test meldet
+   Überlauf oder Umbruch, aber die optische Prüfung von Splash, Anmeldung und
+   Registrierung ist formal wieder offen.
 2. **Schritt 11, Tutorial-Overlay.** Entsteht unter `lib/app/onboarding/`
    (E-26). Neun Schritte, zwei davon Vollbild. Sechs sind heute voll baubar,
    drei degradieren paritätstreu, weil ihre Anker erst mit der Karte entstehen.
@@ -84,6 +88,32 @@ Presentation eines anderen importiert. Der Vorschlag steht in
 ## Protokoll
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
+
+### 27.08.2026, E-38: Materials Laufweite raus
+
+Der Eingriff sitzt woanders, als jeder erwartet, der sich `FactTheme` ansieht.
+Materials `letterSpacing` steht **nicht** in dem `textTheme`, das `_textTheme`
+zusammenbaut, sondern in `ThemeData.typography`, und das `Theme`-Widget mischt
+es erst beim Lokalisieren ein, als **Basis** unter dem eigenen Stil
+(`theme_data.dart:1762`, `localTextGeometry.merge(baseTheme.textTheme)`). Ein
+`letterSpacing: null` in `_textTheme` hätte deshalb genau den Wert
+durchgelassen, den es entfernen soll. An einer Wegwerf-Probe gemessen: dort
+stand schon vorher `null`, und auch `fontSize` war `null`. Der Eingriff läuft
+jetzt über `typography` und erledigt `textTheme` und `primaryTextTheme` in einem.
+
+Zweitens: alle 15 hartcodierten Laufweiten der Identity-Bildschirme sind gegen
+`screen-auth.jsx` belegt und **keine einzige wurde geändert**. Verdächtig waren
+0.1, 0.15 und 0.25, weil das genau die Material-2021-Werte sind. Sie stehen
+trotzdem so in der Quelle, der Gleichklang ist Zufall. Wer hier pauschal
+aufgeräumt hätte, hätte die Parität zerstört.
+
+Drittens ist nur ein einziges festgenageltes Maß gefallen, und zwar aus dem
+umgekehrten Grund als vermutet: bei 411 Pixeln gibt der Kopfhörer-Knopf jetzt
+nicht mehr nach, weil die Zeile aufgeht. Die Regel gilt weiter, sie ist bei 411
+nur nicht mehr beobachtbar. Deshalb auf 390 verlegt, das Rahmenmaß der Quelle,
+mit unveränderten exakten Zusicherungen statt einer aufgeweichten Toleranz.
+E-36 bleibt offen: der Fehlbetrag bei 360 schrumpft von rund 19,5 auf rund
+14,7, er verschwindet nicht.
 
 ### 27.08.2026, erster Gerätelauf
 
