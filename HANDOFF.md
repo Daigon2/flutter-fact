@@ -35,10 +35,12 @@ Gerätebuild durchläuft.
 
 ## Als Nächstes
 
-1. **Erster Gerätebuild.** Der wichtigste ungeprüfte Punkt überhaupt. Offen
-   ist, ob `maplibre_gl` eine höhere `minSdk` verlangt, ob die vier SVG-Icons
-   und Nunito bei 10px sauber rendern und wie die Tab-Leiste mit echter Safe
-   Area sitzt. Alles bisher Geprüfte ist strukturell, nicht optisch.
+1. **Android-Build zum Laufen bringen.** Blockiert durch einen
+   Loopback-Fehler von Gradle, siehe „Rechner einrichten". Der erste Punkt
+   dort braucht Administratorrechte. Solange das offen ist, kann niemand
+   prüfen, ob `maplibre_gl` eine höhere `minSdk` verlangt, ob die vier
+   SVG-Icons und Nunito bei 10px rendern und wie die Tab-Leiste mit echter
+   Safe Area sitzt.
 2. **Phase 1** (Schritte 7 bis 11): Splash, Audio-Dialog, Login, Signup,
    Tutorial-Overlay. Die Auth-Weiche im Router ist vorbereitet und gibt heute
    `null` zurück.
@@ -164,6 +166,87 @@ Gilt genauso für `flutter build apk`, `flutter build ipa` und `flutter test`.
 Alternativ `--dart-define-from-file=env.json`, diese Datei gehört **nicht** ins
 Repository.
 
+### Android-Build scheitert derzeit: „Unable to establish loopback connection"
+
+**Der erste Gerätebuild ist auf diesem Rechner nicht möglich.** Gradle bricht
+nach etwa fünf Sekunden ab:
+
+```
+java.io.IOException: Unable to establish loopback connection
+Caused by: java.net.SocketException: Invalid argument: connect
+	at sun.nio.ch.PipeImpl$Initializer$LoopbackConnector.run
+```
+
+Der Emulator selbst läuft (`Pixel_8`, Android 17, API 37). Der Fehler entsteht
+im Gradle-Launcher, wenn er sich mit seinem Daemon-Prozess verbindet:
+`DefaultDaemonConnector.connectToDaemon` → `SocketConnection.<init>` →
+`PipeImpl`.
+
+**Achtung, die Notiz im alten REBUILD_PLAN nennt die falsche Ursache.** Dort
+steht, `-Djava.io.tmpdir=C:/gtmp` plus `JAVA_TOOL_OPTIONS` löse das. Das ist
+geprüft und hilft nicht.
+
+Ausgeschlossen, jeweils einzeln getestet:
+
+| Vermutung | Ergebnis |
+|---|---|
+| Temp-Pfad mit Leerzeichen | `-Djava.io.tmpdir=C:/gtmp` gesetzt, Variable wird übernommen, Fehler bleibt |
+| Sandbox der Werkzeugumgebung | Build auch ohne Sandbox identisch fehlgeschlagen |
+| Loopback generell blockiert | Python bindet und verbindet 127.0.0.1 fehlerfrei |
+| Java kann keine NIO-Pipe | minimales `Pipe.open()`-Programm läuft mit demselben JDK durch |
+| reservierte Portbereiche | nur 5357 und 50000–50059 belegt, unkritisch |
+| Speichermangel | `-Xmx8G` auf 2G reduziert, Fehler bleibt. Frei waren 4,8 von 31,5 GB |
+| IPv6-Auflösung von localhost | `preferIPv4Stack` in `JAVA_TOOL_OPTIONS`, `GRADLE_OPTS` und `org.gradle.jvmargs`, Fehler bleibt |
+| hängender Gradle-Daemon | `gradlew --stop` meldete, dass keiner läuft |
+| Daemon-Registry beschädigt | `~/.gradle/daemon/` beiseitegelegt, Fehler blieb, wieder zurückgelegt |
+| Neustart des Rechners | Fehler unverändert |
+| **TotalAV** | **vollständig deinstalliert und neu gestartet, Fehler unverändert. Damit ausgeschlossen.** Windows Defender ist danach von selbst angesprungen, Echtzeitschutz und Manipulationsschutz aktiv, keine Schutzlücke |
+
+**Es ist kein Projektproblem.** Ein leeres Gradle-Testprojekt unter
+`C:\gtmp\gt` scheitert identisch. Gradle kann auf diesem Rechner generell
+nicht starten, unabhängig von Flutter, diesem Repository und dem langen
+Worktree-Pfad.
+
+**Und es lief hier früher.** `~/.gradle/daemon/` enthält Verzeichnisse für die
+Versionen 8.2.1, 9.0.0 und 9.1.0. Am 26.08.2026 um 20:46 hat TotalAV seine
+Datei `knap.data` aktualisiert, also am selben Tag, an dem der Fehler auftrat.
+
+Ein Minimalfall in Java, der Gradles Muster nachbaut, läuft dagegen durch:
+`Pipe.open()` allein, ein lokaler Socket auf 127.0.0.1, und `Pipe.open()`
+während dieser Socket offen ist. Alle drei erfolgreich mit demselben JDK. Java
+kann es also, Gradle nicht.
+
+**Verbleibender Verdacht, in dieser Reihenfolge zu prüfen:**
+
+0. **Neustart.** Der billigste Schritt. Behebt halb angewandte Treiber-Updates
+   und setzt TotalAVs Kernel-Treiber neu auf. Ein Windows-Update war zum
+   Zeitpunkt des Fehlers zur Installation vormerkt.
+
+1. **Winsock-Katalog zurücksetzen.** Der klassische Auslöser für
+   `WSAEINVAL` bei `connect` ist ein beschädigter Winsock-Katalog, etwa durch
+   Reste einer Sicherheitssoftware. Braucht eine Eingabeaufforderung als
+   Administrator und einen Neustart:
+
+   ```
+   netsh winsock reset
+   netsh int ip reset
+   ```
+
+2. **Das JDK.** Genutzt wird die JetBrains Runtime aus Android Studio
+   (OpenJDK 21.0.10), ein für IntelliJ gepatchter Build. Ein zweites JDK ist
+   auf dem Rechner nicht vorhanden, der Verdacht war deshalb nicht prüfbar.
+   Temurin 21 installieren und `flutter config --jdk-dir <pfad>` setzen.
+
+   Netzwerkseitig ist nichts auffällig: nur WLAN aktiv, Hamachi nicht present,
+   Default-Route und Loopback-Route normal, reservierte Portbereiche
+   unkritisch.
+3. **Gradle 9.1.0.** Vom Flutter-Template gesetzt und sehr neu. Testweise auf
+   eine 8.x-Version in `android/gradle/wrapper/gradle-wrapper.properties`
+   herunterziehen.
+
+Bis das gelöst ist, sind alle Aussagen über die App **strukturell**: Tests,
+Analyse und Grenzprüfung. Nichts ist optisch am Gerät verifiziert.
+
 ### Nicht aus einem OneDrive-Pfad bauen
 
 Der AOT-Compiler bricht an Nicht-ASCII-Verzeichnisnamen. Dieses Repository
@@ -242,6 +325,39 @@ kommen aus der PWA, nicht aus dem alten Flutter-Port, der an mehreren Stellen
 weggedriftet ist.
 
 ---
+
+## Arbeitsweise mit Claude
+
+Bewährt hat sich, was nicht im Code steht und deshalb hier festgehalten wird.
+
+**Spezialisten arbeiten, die Hauptsitzung orchestriert.** Die Agenten aus
+`.claude/agents/` erledigen die Umsetzung, die Hauptsitzung schreibt die
+Aufträge, entscheidet und führt widersprüchliche Ergebnisse zusammen. Das
+Auftragsformat steht in `docs/ai/context-routing.md` unter „Context packet",
+das Antwortformat in `docs/ai/agent-output.md`.
+
+Was einen guten Auftrag ausmacht, gemessen an dem, was heute Fehler gefunden
+hat: nicht „schau mal drüber", sondern benannte Prüfpunkte. Nicht „teste es",
+sondern „lege eine Probe an, die den Verstoß enthält, führe die Prüfung aus,
+lösche die Probe und berichte, was du so verifiziert hast". Der Unterschied
+war heute mehrfach der zwischen einem grünen Lauf und einem gefundenen Fehler.
+
+**Nach jedem Block eine unabhängige Review.** `code-reviewer` hat im ersten
+Änderungssatz fünf blockierende Fehler in etwa 700 Zeilen gefunden, darunter
+neun Erkennungslücken im Prüfskript, jede einzeln nachgewiesen. Der Wert liegt
+im frischen Kontext: der Prüfer weiß nicht, was sich der Autor gedacht hat.
+
+**Vor den großen Brocken der `architecture-guardian`,** nicht danach. Bei der
+Rätsel-Engine und beim Map-Host entscheidet die Struktur, was danach zwei- bis
+dreitausend Zeilen kostet.
+
+**Jeden Schritt ansagen,** in der Form „Schritt N von 50: Titel". Der Stand
+gehört zusätzlich hierher, siehe unten, weil eine Sitzung endet und diese
+Datei bleibt.
+
+**Nie behaupten, was nicht gelaufen ist.** Und beim Prüfen von Exit-Codes kein
+`| tail` anhängen, siehe „Befehle". Diese eine Pipe hat hier schon zweimal ein
+rotes Gate als grün ausgegeben.
 
 ## Diese Datei pflegen
 
