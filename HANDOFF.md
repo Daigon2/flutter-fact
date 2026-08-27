@@ -412,7 +412,7 @@ diesem Rechner laufen. Gradle ist nur der erste, der es merkt.
 | Vermutung | Ergebnis |
 |---|---|
 | Selektor-Implementierung | Auch der alte `sun.nio.ch.WindowsSelectorProvider`, erzwungen per Systemeigenschaft, scheitert identisch. Nicht wepoll-spezifisch. |
-| Das JDK | JBR 21.0.10, JBR 17.0.14 (aus `~/.jdks`) und PyCharms JBR 25.0.2 scheitern identisch. **Achtung:** alle drei sind JetBrains Runtimes, ein Vanilla-JDK gibt es auf dem Rechner nicht. Der Verdacht ist damit eingegrenzt, nicht erledigt. |
+| Das JDK | **Endgültig ausgeschlossen.** JBR 21.0.10, JBR 17.0.14, PyCharms JBR 25.0.2 und **Temurin 21.0.12**, also ein ungepatchtes OpenJDK, scheitern alle identisch. Der Temurin-Build liefert zusätzlich echte Zeilennummern: geworfen wird in `PipeImpl.java:103`, nachdem `LoopbackConnector` intern die `SocketException` gefangen hat; Aufrufer ist `WEPollSelectorImpl.java:79` über `PipeImpl.java:197`. |
 | Gradle-Daemon | `--no-daemon` scheitert identisch, es ist nicht der Handshake mit dem Daemon. |
 | Sandbox der Werkzeugumgebung | Mit abgeschalteter Sandbox identisch gescheitert. |
 | JVM-Umgebungsvariablen | `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `GRADLE_OPTS`, `JAVA_OPTS` sind alle leer, in Prozess, Benutzer und System. Keine globale `~/.gradle/gradle.properties`. Die frühere Fehlersuche hat nichts hinterlassen. |
@@ -440,18 +440,18 @@ diesem Rechner laufen. Gradle ist nur der erste, der es merkt.
    netsh int ip reset
    ```
 
-2. **Ein Vanilla-JDK.** Alle drei vorhandenen Laufzeiten sind JetBrains
-   Runtimes und scheitern identisch. Ein ungepatchtes OpenJDK ist die einzige
-   noch offene Variable und der billigste verbleibende Test:
+2. **Ein Vanilla-JDK: geprüft und erledigt.** Temurin 21.0.12 ist am
+   27.08.2026 installiert (`C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`)
+   und scheitert identisch. Das JDK ist damit keine Variable mehr, und
+   `flutter config --jdk-dir` löst nichts.
 
-   ```
-   winget install EclipseAdoptium.Temurin.21.JDK
-   ```
+   Bleibt also der Netzwerk-Stack von Windows aus Punkt 1. Wenn Winsock- und
+   IP-Reset samt Neustart nichts bringen, ist die nächste Stufe `sfc /scannow`
+   und danach eine reparierende Windows-Installation: dann ist eine
+   Systemkomponente beschädigt, und das ist kein Projektproblem mehr.
 
-   Danach die Probe oben mit dessen `java.exe` starten. Antwortet sie mit
-   zweimal `OK`, ist der Blocker weg: dann
-   `flutter config --jdk-dir "C:\Program Files\Eclipse Adoptium\jdk-21..."`
-   setzen und bauen.
+   **Nach jedem Versuch die Probe von oben, nicht einen Build.** Eine Sekunde
+   statt Minuten, und sie sagt genau dasselbe.
 
    Netzwerkseitig ist nichts auffällig: nur WLAN aktiv, Hamachi nicht present,
    Default-Route und Loopback-Route normal, reservierte Portbereiche
