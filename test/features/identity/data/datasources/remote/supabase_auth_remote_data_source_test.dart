@@ -58,6 +58,60 @@ void main() {
       expect(failure.code, 'over_email_send_rate_limit');
     });
 
+    test('user_already_exists wird AuthEmailAlreadyRegistered', () {
+      final failure = translate(
+        const AuthApiException(
+          'User already registered',
+          statusCode: '422',
+          code: 'user_already_exists',
+        ),
+      );
+
+      expect(failure, isA<AuthEmailAlreadyRegistered>());
+      expect(failure.code, 'user_already_exists');
+    });
+
+    test('email_exists ebenfalls', () {
+      // GoTrue kennt zwei Codes für denselben Sachverhalt.
+      final failure = translate(
+        const AuthApiException(
+          'Email address already in use',
+          statusCode: '422',
+          code: 'email_exists',
+        ),
+      );
+
+      expect(failure, isA<AuthEmailAlreadyRegistered>());
+    });
+
+    test('weak_password wird AuthPasswordRejected', () {
+      final failure = translate(
+        const AuthApiException(
+          'Password should be at least 6 characters',
+          statusCode: '422',
+          code: 'weak_password',
+        ),
+      );
+
+      expect(failure, isA<AuthPasswordRejected>());
+      expect(failure.code, 'weak_password');
+    });
+
+    test('AuthWeakPasswordException trägt denselben Code', () {
+      // Ein eigener Ausnahmetyp in gotrue, der seinen Code selbst setzt
+      // (`types/auth_exception.dart:93-100`). Ohne diesen Test wäre nicht
+      // belegt, dass der Vergleich über den Code beide Formen fängt.
+      final failure = translate(
+        AuthWeakPasswordException(
+          message: 'Password should be at least 6 characters',
+          statusCode: '422',
+          reasons: const <String>['length'],
+        ),
+      );
+
+      expect(failure, isA<AuthPasswordRejected>());
+    });
+
     test('der Code schlägt die Meldung', () {
       // Die Rückfallebene darf nicht mitreden, wenn ein Code da ist. Sonst
       // bekäme ein Server, der Code und Meldung uneinheitlich setzt, zwei
@@ -92,6 +146,29 @@ void main() {
       );
 
       expect(failure, isA<AuthEmailNotConfirmed>());
+    });
+
+    test('"already registered" wird AuthEmailAlreadyRegistered', () {
+      // Rückfallebene für älteren oder selbst betriebenen GoTrue, der
+      // `error_code` nicht füllt. Derselbe Teilstring wie in der PWA
+      // (`screen-auth.jsx:640`).
+      final failure = translate(
+        const AuthApiException('User already registered', statusCode: '422'),
+      );
+
+      expect(failure, isA<AuthEmailAlreadyRegistered>());
+      expect(failure.code, '422');
+    });
+
+    test('"Password should" wird AuthPasswordRejected', () {
+      final failure = translate(
+        const AuthApiException(
+          'Password should be at least 6 characters',
+          statusCode: '422',
+        ),
+      );
+
+      expect(failure, isA<AuthPasswordRejected>());
     });
 
     test('eine unbekannte Meldung wird AuthRequestRejected', () {
@@ -132,6 +209,25 @@ void main() {
 
       expect(failure, isA<AuthBackendUnavailable>());
       expect(failure.code, 'FormatException');
+    });
+  });
+
+  group('Namen der Backend-Objekte', () {
+    test('Tabelle, Spalten und RPC stehen wie im Schema', () {
+      // Diese fünf Zeichenketten sind der Datenvertrag der Username-Operationen.
+      // Ein Tippfehler darin ist keine Ausnahme, sondern eine stille falsche
+      // Anfrage: PostgREST bildet RPC-Argumente über den Namen ab, ein
+      // unbekannter Parametername kommt als `null` an.
+      //
+      // Belegt gegen `03_Backend/supabase-schema.sql:201` und `:521-526`.
+      expect(SupabaseAuthRemoteDataSource.profilesTable, 'profiles');
+      expect(SupabaseAuthRemoteDataSource.usernameColumn, 'username');
+      expect(SupabaseAuthRemoteDataSource.profileIdColumn, 'id');
+      expect(
+        SupabaseAuthRemoteDataSource.checkUsernameFunction,
+        'check_username',
+      );
+      expect(SupabaseAuthRemoteDataSource.checkUsernameParameter, 'p_username');
     });
   });
 

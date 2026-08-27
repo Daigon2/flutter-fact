@@ -17,6 +17,7 @@ class AuthCheckbox extends StatelessWidget {
     required this.checked,
     required this.label,
     required this.onChanged,
+    this.labelSpans,
     super.key,
   });
 
@@ -45,7 +46,24 @@ class AuthCheckbox extends StatelessWidget {
   final bool checked;
 
   /// Die Beschriftung rechts.
+  ///
+  /// Auch dann gesetzt, wenn [labelSpans] gezeichnet wird: dann ist es die
+  /// Fassung für Screenreader.
   final String label;
+
+  /// Eine ausgezeichnete Beschriftung, wenn [label] nicht genügt.
+  ///
+  /// Genau ein Aufrufer: die Einwilligung der Registrierung setzt
+  /// "Nutzungsbedingungen" und "Datenschutzerklärung" rot und fett
+  /// (`screen-auth.jsx:782-784`).
+  ///
+  /// **Die beiden roten Teile sind in der Quelle keine Links.** Ein Tap darauf
+  /// trifft den `onClick` des umschließenden `<div>` und kippt nur das Kästchen.
+  /// Es gibt im PWA-Ordner eine `privacy.html`, die von hier **nicht** verlinkt
+  /// ist. Deshalb nimmt dieser Parameter `InlineSpan` ohne Erkenner: ein
+  /// `TapGestureRecognizer` bräuchte eine Lebensdauer-Verwaltung und würde
+  /// Verhalten hinzufügen, das die Quelle nicht hat.
+  final List<InlineSpan>? labelSpans;
 
   /// Wird beim Tippen aufgerufen. Die Quelle übergibt keinen neuen Wert, der
   /// Aufrufer kippt ihn selbst; hier genauso, damit der Zustand beim Besitzer
@@ -76,20 +94,23 @@ class AuthCheckbox extends StatelessWidget {
               child: _box(colors),
             ),
             const SizedBox(width: gap),
-            Expanded(
-              child: Text(
-                label,
-                style: FactTypography.bodyText.copyWith(
-                  fontSize: labelFontSize,
-                  color: colors.ink2,
-                  height: labelLineHeight,
-                ),
-              ),
-            ),
+            Expanded(child: _label(colors)),
           ],
         ),
       ),
     );
+  }
+
+  Widget _label(FactColors colors) {
+    final style = FactTypography.bodyText.copyWith(
+      fontSize: labelFontSize,
+      color: colors.ink2,
+      height: labelLineHeight,
+    );
+    if (labelSpans case final List<InlineSpan> spans) {
+      return Text.rich(TextSpan(children: spans), style: style);
+    }
+    return Text(label, style: style);
   }
 
   Widget _box(FactColors colors) {

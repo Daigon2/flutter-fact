@@ -58,6 +58,62 @@ abstract interface class AuthRepository {
     required String email,
     required String password,
   });
+
+  /// Erstellt ein Konto, `02_Frontend/app/api.jsx:46-54` (`Api.signUp`).
+  ///
+  /// ## Eine abgemeldete Sitzung ist hier **kein** Fehlschlag
+  ///
+  /// Anders als bei [signInWithPassword]. Verlangt das Supabase-Projekt eine
+  /// E-Mail-Bestätigung, dann ist das Konto angelegt, aber niemand angemeldet;
+  /// GoTrue liefert dafür eine Antwort **ohne** Sitzung, statt zu werfen. Genau
+  /// dieser Fall ist der Rückgabewert `AuthSession.signedOut()`, und der
+  /// Aufrufer muss ihn behandeln: die Registrierung zeigt dann den Hinweis
+  /// `signup.confirmEmailHint`. Ein Fehlschlag kommt als [AuthFailure].
+  ///
+  /// ## [name] und [hometown] sind **nicht vertrauenswürdig**
+  ///
+  /// Beide landen in `auth.users.raw_user_meta_data` (`options.data` in der
+  /// Quelle). Dieses Feld ist vom Client frei beschreibbar, jeder angemeldete
+  /// Nutzer kann es über `updateUser` beliebig ändern. Wer daraus später eine
+  /// Anzeige, eine Berechtigung oder eine Stadt-Zuordnung ableitet, baut auf
+  /// Nutzereingaben ohne Prüfung. Verlässlich ist nur, was serverseitig
+  /// geschrieben wird.
+  Future<AuthSession> signUpWithPassword({
+    required String email,
+    required String password,
+    required String name,
+    required String hometown,
+  });
+
+  /// Ob [username] schon vergeben ist,
+  /// `02_Frontend/app/api.jsx:246-249` (`Api.checkUsername`).
+  ///
+  /// `true` heißt **vergeben**, wie der Rückgabewert der RPC `check_username`.
+  ///
+  /// ## Warum das hier steht und nicht in einem eigenen Vertrag
+  ///
+  /// Weil es Teil des Registriervorgangs ist, und den besitzt `identity`
+  /// (`lib/features/README.md:12`). Ein zweiter Vertrag für zwei Methoden hätte
+  /// eine zweite Verdrahtung in `bootstrap.dart` und einen zweiten Standard
+  /// gebraucht, ohne eine Grenze zu ziehen, die es fachlich gibt.
+  ///
+  /// **Notiz für Phase 7:** das *Ändern* eines bestehenden Usernames gehört
+  /// **nicht** hierher, sondern zu `features/profile`, das laut
+  /// `lib/features/README.md:21` den Anzeigenamen besitzt. Dort hängt mehr
+  /// dran: `Api.setUsername` kennt ein `isChange`-Flag, das
+  /// `username_changed_at` setzt, und die PWA leitet daraus eine einmalige
+  /// Änderung samt Sperrfrist ab (`username.change`, `username.cooldown`,
+  /// `username.locked`). Diese Schlüssel bleiben in Schritt 10 ungenutzt.
+  Future<bool> checkUsernameTaken(String username);
+
+  /// Schreibt [username] in das Profil von [userId],
+  /// `02_Frontend/app/api.jsx:253-258` (`Api.setUsername`).
+  ///
+  /// Wirft [AuthFailure], wenn das Schreiben scheitert. Der Aufrufer darf den
+  /// Fehler **nicht** verschlucken: die Quelle tut das
+  /// (`.catch(() => {})`, `screen-auth.jsx:632`), und der Nutzer führt danach
+  /// einen Namen im Kopf, den niemand gespeichert hat.
+  Future<void> setUsername({required String userId, required String username});
 }
 
 /// Der Standard, solange niemand eine echte Anmeldung eingesetzt hat:
@@ -116,6 +172,40 @@ final class _UnavailableAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {
-    throw const AuthBackendUnavailable(code: 'auth_repository_not_configured');
+    throw _notConfigured;
   }
+
+  @override
+  Future<AuthSession> signUpWithPassword({
+    required String email,
+    required String password,
+    required String name,
+    required String hometown,
+  }) async {
+    throw _notConfigured;
+  }
+
+  /// Wirft, statt "frei" oder "vergeben" zu behaupten.
+  ///
+  /// Beide Antworten wären eine Lüge, und die zweite die schlechtere: sie
+  /// zeigte am Feld "Bereits vergeben" für einen Namen, den niemand hat. Der
+  /// Aufrufer bildet die Ausnahme auf `idle` ab, genau wie bei einer
+  /// unerreichbaren Prüfung in der Quelle; sichtbar wird der Fehlschlag dann
+  /// beim Registrieren.
+  @override
+  Future<bool> checkUsernameTaken(String username) async {
+    throw _notConfigured;
+  }
+
+  @override
+  Future<void> setUsername({
+    required String userId,
+    required String username,
+  }) async {
+    throw _notConfigured;
+  }
+
+  static const AuthBackendUnavailable _notConfigured = AuthBackendUnavailable(
+    code: 'auth_repository_not_configured',
+  );
 }

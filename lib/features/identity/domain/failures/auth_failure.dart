@@ -96,3 +96,37 @@ final class AuthBackendUnavailable extends AuthFailure {
   @override
   String get kind => 'backendUnavailable';
 }
+
+/// Zu dieser E-Mail-Adresse gibt es schon ein Konto.
+///
+/// Eigener Fall und nicht [AuthRequestRejected], weil die Registrierung dafür
+/// einen eigenen Satz zeigt (`onboarding.errAlreadyRegistered`).
+///
+/// **Das ist eine Auskunft darüber, welche Adressen ein Konto haben**, und damit
+/// genau die Unterscheidung, die [AuthInvalidCredentials] bewusst *nicht* macht.
+/// Der Unterschied ist nicht Inkonsequenz, sondern die Quelle: GoTrue antwortet
+/// bei der Registrierung von sich aus mit `user_already_exists`, sobald die
+/// Bestätigungspflicht im Projekt aus ist. Wer diese Auskunft schließen will,
+/// muss das im Supabase-Projekt tun (Einstellung "Confirm email"), nicht im
+/// Client. Die PWA zeigt denselben Satz (`screen-auth.jsx:640`).
+final class AuthEmailAlreadyRegistered extends AuthFailure {
+  /// Siehe [AuthFailure].
+  const AuthEmailAlreadyRegistered({super.code, super.stackTrace});
+
+  @override
+  String get kind => 'emailAlreadyRegistered';
+}
+
+/// Der Server hat das Passwort abgelehnt, in der Regel als zu kurz.
+///
+/// Die Mindestlänge kennt nur der Server (im Projekt sechs Zeichen, siehe
+/// `onboarding.errPassword`). Der Client prüft sie ausdrücklich **nicht**, damit
+/// eine serverseitig geänderte Regel nicht zwei Wahrheiten hat; dieselbe
+/// Begründung wie beim Verzicht auf eine Formatprüfung der E-Mail-Adresse.
+final class AuthPasswordRejected extends AuthFailure {
+  /// Siehe [AuthFailure].
+  const AuthPasswordRejected({super.code, super.stackTrace});
+
+  @override
+  String get kind => 'passwordRejected';
+}

@@ -38,4 +38,28 @@ class SupabaseAuthRepository implements AuthRepository {
   }) {
     return _remote.signInWithPassword(email: email, password: password);
   }
+
+  @override
+  Future<AuthSession> signUpWithPassword({
+    required String email,
+    required String password,
+    required String name,
+    required String hometown,
+  }) {
+    return _remote.signUpWithPassword(
+      email: email,
+      password: password,
+      name: name,
+      hometown: hometown,
+    );
+  }
+
+  @override
+  Future<bool> checkUsernameTaken(String username) =>
+      _remote.checkUsernameTaken(username);
+
+  @override
+  Future<void> setUsername({required String userId, required String username}) {
+    return _remote.setUsername(userId: userId, username: username);
+  }
 }

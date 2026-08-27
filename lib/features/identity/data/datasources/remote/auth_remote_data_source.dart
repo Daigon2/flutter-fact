@@ -29,4 +29,21 @@ abstract interface class AuthRemoteDataSource {
     required String email,
     required String password,
   });
+
+  /// Legt ein Konto an. Wirft [AuthFailure].
+  ///
+  /// Eine abgemeldete Sitzung ist der Bestätigungsfall und **kein** Fehlschlag,
+  /// siehe `AuthRepository.signUpWithPassword`.
+  Future<AuthSession> signUpWithPassword({
+    required String email,
+    required String password,
+    required String name,
+    required String hometown,
+  });
+
+  /// `true` heißt vergeben. Wirft [AuthFailure].
+  Future<bool> checkUsernameTaken(String username);
+
+  /// Schreibt den Username in das Profil. Wirft [AuthFailure].
+  Future<void> setUsername({required String userId, required String username});
 }

@@ -91,7 +91,7 @@ ProviderScope productionProviderScope({required Widget child}) {
     overrides: [
       authRepositoryProvider.overrideWith(
         (ref) => SupabaseAuthRepository(
-          SupabaseAuthRemoteDataSource(ref.watch(supabaseClientProvider).auth),
+          SupabaseAuthRemoteDataSource(ref.watch(supabaseClientProvider)),
         ),
       ),
     ],

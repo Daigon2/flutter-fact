@@ -3,6 +3,7 @@ import 'package:fact_app/app/localization/app_strings.dart';
 import 'package:fact_app/features/identity/domain/failures/auth_failure.dart';
 import 'package:fact_app/features/identity/presentation/formatting/auth_failure_text.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/login_notifier.dart';
+import 'package:fact_app/features/identity/presentation/notifiers/signup_notifier.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Die dritte Station der Fehlerübersetzung: Fehlschlag zu i18n-Schlüssel.
@@ -41,6 +42,41 @@ void main() {
       );
     });
 
+    test('die Eingabeprüfungen der Registrierung', () {
+      expect(
+        authFailureTextKey(const SignupInputIncomplete()),
+        'onboarding.errRequired',
+      );
+      expect(
+        authFailureTextKey(const SignupTermsNotAccepted()),
+        'signup.errAcceptTerms',
+      );
+      expect(
+        authFailureTextKey(const SignupUsernameUnusable()),
+        'username.required',
+      );
+    });
+
+    test('Anmeldung und Registrierung teilen den Pflichttext', () {
+      // Zwei Typen, ein Schlüssel. Der eigene Typ existiert, damit der
+      // Fehlerkanal der Registrierung nicht "Login" heißt.
+      expect(
+        authFailureTextKey(const SignupInputIncomplete()),
+        authFailureTextKey(const LoginInputIncomplete()),
+      );
+    });
+
+    test('eine bekannte Adresse und ein abgelehntes Passwort', () {
+      expect(
+        authFailureTextKey(const AuthEmailAlreadyRegistered()),
+        'onboarding.errAlreadyRegistered',
+      );
+      expect(
+        authFailureTextKey(const AuthPasswordRejected()),
+        'onboarding.errPassword',
+      );
+    });
+
     test('ein unerwarteter Fehler bekommt auch einen Text', () {
       // Der Fehlerkanal kann alles tragen. Ohne diesen Zweig stünde die
       // Fehlerbox leer, und der Nutzer sähe einen Bildschirm, der nichts sagt.
@@ -62,12 +98,53 @@ void main() {
           authInvalidLoginKey,
           authEmailNotConfirmedKey,
           authGenericKey,
+          authTermsNotAcceptedKey,
+          authUsernameRequiredKey,
+          authAlreadyRegisteredKey,
+          authPasswordRejectedKey,
+          signupGenericKey,
         ]) {
           expect(strings.hasText(key), isTrue, reason: key);
           expect(strings.text(key), isNot(key), reason: key);
         }
       });
     }
+  });
+
+  group('Der Sammeltext ist ein Parameter', () {
+    test('der Standard ist der Text der Anmeldung', () {
+      expect(
+        authFailureTextKey(const AuthBackendUnavailable()),
+        'onboarding.errGeneric',
+      );
+    });
+
+    test('die Registrierung übergibt ihren eigenen', () {
+      // Die Quelle hat zwei verschiedene Sätze: "Fehler beim Anmelden." gegen
+      // "Registrierung fehlgeschlagen." (`screen-auth.jsx:478` und `:642`).
+      expect(
+        authFailureTextKey(
+          const AuthBackendUnavailable(),
+          genericKey: signupGenericKey,
+        ),
+        'signup.errGeneric',
+      );
+      expect(
+        AppStrings.of(AppLanguage.de).text(signupGenericKey),
+        'Registrierung fehlgeschlagen.',
+      );
+    });
+
+    test('der Parameter überschreibt nur den Restfall', () {
+      // Sonst bekäme jeder Fehler auf der Registrierung denselben Satz.
+      expect(
+        authFailureTextKey(
+          const AuthEmailAlreadyRegistered(),
+          genericKey: signupGenericKey,
+        ),
+        'onboarding.errAlreadyRegistered',
+      );
+    });
   });
 
   group('Nichts vom Backend erreicht die Oberfläche', () {

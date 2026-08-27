@@ -19,7 +19,7 @@ import 'package:flutter/material.dart';
 /// noch einmal angefasst wird. Wenn der Reset kommt, kommt er mit.
 class AuthLabel extends StatelessWidget {
   /// Erzeugt die Beschriftung.
-  const AuthLabel({required this.text, super.key});
+  const AuthLabel({required this.text, this.suffix, super.key});
 
   /// `fontSize: 9`.
   static const double fontSize = 9;
@@ -27,20 +27,53 @@ class AuthLabel extends StatelessWidget {
   /// `marginBottom: 6`.
   static const double bottomSpacing = 6;
 
+  /// Deckkraft von [suffix], `opacity: 0.5`.
+  static const double suffixOpacity = 0.5;
+
   /// Die Beschriftung. Wird großgeschrieben gezeigt, `textTransform:
   /// uppercase` steht am Element und nicht in der Übersetzung.
   final String text;
 
+  /// Ein Zusatz hinter einem Mittelpunkt, halb durchsichtig.
+  ///
+  /// Genau ein Aufrufer: der Stadt-Picker der Registrierung schreibt
+  /// `HEIMATSTADT · OPTIONAL` (`screen-auth.jsx:739`). Die Quelle gibt
+  /// `AuthLabel` dort ein zusammengesetztes Kind mit einem `<span>` bei
+  /// `opacity: 0.5` mit; ein `Widget`-Parameter wäre die allgemeinere Lösung und
+  /// die schlechtere, weil er den einzigen Aufrufer nicht besser beschreibt und
+  /// die Schriftrolle aus der Hand gäbe.
+  final String? suffix;
+
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: FactTypography.mono.copyWith(
-        fontSize: fontSize,
-        color: context.factColors.ink3,
-        letterSpacing: 0.2,
-      ),
+    final style = FactTypography.mono.copyWith(
+      fontSize: fontSize,
+      color: context.factColors.ink3,
+      letterSpacing: 0.2,
     );
+    if (suffix case final String extra) {
+      final base = style.color!;
+      return Text.rich(
+        TextSpan(
+          children: <InlineSpan>[
+            TextSpan(text: text.toUpperCase()),
+            TextSpan(
+              // Der Mittelpunkt steht in der Quelle **innerhalb** des halb
+              // durchsichtigen `<span>`, das Leerzeichen davor außerhalb.
+              text: ' · ${extra.toUpperCase()}',
+              // CSS-`opacity` auf einem Text ist eine Deckkraft **auf** die
+              // schon gesetzte Farbe. `ink3` trägt im dunklen Theme selbst
+              // einen Alphawert, deshalb multipliziert und nicht ersetzt.
+              style: style.copyWith(
+                color: base.withValues(alpha: base.a * suffixOpacity),
+              ),
+            ),
+          ],
+        ),
+        style: style,
+      );
+    }
+    return Text(text.toUpperCase(), style: style);
   }
 }
 
