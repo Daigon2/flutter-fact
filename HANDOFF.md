@@ -326,6 +326,39 @@ weggedriftet ist.
 
 ---
 
+## Arbeitsweise mit Claude
+
+Bewährt hat sich, was nicht im Code steht und deshalb hier festgehalten wird.
+
+**Spezialisten arbeiten, die Hauptsitzung orchestriert.** Die Agenten aus
+`.claude/agents/` erledigen die Umsetzung, die Hauptsitzung schreibt die
+Aufträge, entscheidet und führt widersprüchliche Ergebnisse zusammen. Das
+Auftragsformat steht in `docs/ai/context-routing.md` unter „Context packet",
+das Antwortformat in `docs/ai/agent-output.md`.
+
+Was einen guten Auftrag ausmacht, gemessen an dem, was heute Fehler gefunden
+hat: nicht „schau mal drüber", sondern benannte Prüfpunkte. Nicht „teste es",
+sondern „lege eine Probe an, die den Verstoß enthält, führe die Prüfung aus,
+lösche die Probe und berichte, was du so verifiziert hast". Der Unterschied
+war heute mehrfach der zwischen einem grünen Lauf und einem gefundenen Fehler.
+
+**Nach jedem Block eine unabhängige Review.** `code-reviewer` hat im ersten
+Änderungssatz fünf blockierende Fehler in etwa 700 Zeilen gefunden, darunter
+neun Erkennungslücken im Prüfskript, jede einzeln nachgewiesen. Der Wert liegt
+im frischen Kontext: der Prüfer weiß nicht, was sich der Autor gedacht hat.
+
+**Vor den großen Brocken der `architecture-guardian`,** nicht danach. Bei der
+Rätsel-Engine und beim Map-Host entscheidet die Struktur, was danach zwei- bis
+dreitausend Zeilen kostet.
+
+**Jeden Schritt ansagen,** in der Form „Schritt N von 50: Titel". Der Stand
+gehört zusätzlich hierher, siehe unten, weil eine Sitzung endet und diese
+Datei bleibt.
+
+**Nie behaupten, was nicht gelaufen ist.** Und beim Prüfen von Exit-Codes kein
+`| tail` anhängen, siehe „Befehle". Diese eine Pipe hat hier schon zweimal ein
+rotes Gate als grün ausgegeben.
+
 ## Diese Datei pflegen
 
 Wer einen Schritt abschließt, aktualisiert hier:
