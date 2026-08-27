@@ -199,14 +199,37 @@ Ausgeschlossen, jeweils einzeln getestet:
 | IPv6-Auflösung von localhost | `preferIPv4Stack` in `JAVA_TOOL_OPTIONS`, `GRADLE_OPTS` und `org.gradle.jvmargs`, Fehler bleibt |
 | hängender Gradle-Daemon | `gradlew --stop` meldete, dass keiner läuft |
 
+**Es ist kein Projektproblem.** Ein leeres Gradle-Testprojekt unter
+`C:\gtmp\gt` scheitert identisch. Gradle kann auf diesem Rechner generell
+nicht starten, unabhängig von Flutter, diesem Repository und dem langen
+Worktree-Pfad.
+
+**Und es lief hier früher.** `~/.gradle/daemon/` enthält Verzeichnisse für die
+Versionen 8.2.1, 9.0.0 und 9.1.0. Am 26.08.2026 um 20:46 hat TotalAV seine
+Datei `knap.data` aktualisiert, also am selben Tag, an dem der Fehler auftrat.
+
+Ein Minimalfall in Java, der Gradles Muster nachbaut, läuft dagegen durch:
+`Pipe.open()` allein, ein lokaler Socket auf 127.0.0.1, und `Pipe.open()`
+während dieser Socket offen ist. Alle drei erfolgreich mit demselben JDK. Java
+kann es also, Gradle nicht.
+
 **Verbleibender Verdacht, in dieser Reihenfolge zu prüfen:**
 
-1. **Endpoint Protection.** Es läuft ein Prozess `endpointprotection` mit
-   erhöhten Rechten. Solche Produkte hängen sich in Winsock ein, und das
-   erklärt, warum ein triviales Java-Programm durchkommt und Gradle mit seinen
-   vielen Sockets nicht. Testweise deaktivieren oder eine Ausnahme für
-   `java.exe` und das Projektverzeichnis eintragen. **Braucht Administrator,
+0. **Neustart.** Der billigste Schritt. Behebt halb angewandte Treiber-Updates
+   und setzt TotalAVs Kernel-Treiber neu auf. Ein Windows-Update war zum
+   Zeitpunkt des Fehlers zur Installation vormerkt.
+
+1. **TotalAV.** Installiert unter `C:\Program Files (x86)\TotalAV\Endpoint
+   Protection SDK\`, mit eigener `firewall.dll`, `firewall.tools`, einem
+   `drivers`-Verzeichnis und einem laufenden `TotalAV VPN Connection Service`.
+   Deaktivieren des Echtzeitschutzes allein half nicht, der Prozess
+   `endpointprotection` lief weiter. Nächster Schritt wäre eine vollständige
+   Deinstallation zum Test, nicht nur ein Abschalten. **Braucht Administrator,
    also Handarbeit.**
+
+   Netzwerkseitig ist nichts auffällig: nur WLAN aktiv, Hamachi nicht present,
+   Default-Route und Loopback-Route normal, reservierte Portbereiche
+   unkritisch.
 2. **Das JDK.** Genutzt wird die JetBrains Runtime aus Android Studio
    (`C:\Program Files\Android\Android Studio\jbr`, OpenJDK 21.0.10), ein
    für IntelliJ gepatchter Build. Ein reguläres Temurin 21 installieren und
