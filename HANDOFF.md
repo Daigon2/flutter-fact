@@ -66,9 +66,13 @@ gelaufen.
    Überlauf oder Umbruch, aber die optische Prüfung von Splash, Anmeldung und
    Registrierung ist formal wieder offen.
 2. **Schritt 11, Tutorial-Overlay.** Entsteht unter `lib/app/onboarding/`
-   (E-26). Neun Schritte, zwei davon Vollbild. Sechs sind heute voll baubar,
-   drei degradieren paritätstreu, weil ihre Anker erst mit der Karte entstehen.
-   Braucht eine Anker-Registry in `lib/core/anchors/` (E-27).
+   (E-26), die Anker-Registry unter `lib/core/anchors/` (E-27, am 27.08.2026
+   entschieden). Neun Schritte, zwei davon Vollbild. **Vier sind heute voll
+   baubar, fünf degradieren** paritätstreu, weil ihre Anker auf dem
+   Kartenbildschirm liegen und der noch ein Platzhalter ist. Die frühere Zahl
+   6/3 war falsch, siehe Korrektur 13 in `REBUILD_STATUS.md`. Ein fehlender
+   Anker darf weder abstürzen noch den Schritt überspringen: die Quelle setzt
+   das Rechteck auf `null` und zeichnet den Schritt ohne Pfeil und Ring weiter.
 3. **Unabhängige Review der Schritte 9, 10 und 11.** Schritt 9 und 10 sind
    committet und **nicht** geprüft. Die Reviews haben in dieser Sitzung jedes Mal
    echte Fehler gefunden, insgesamt zehn Mutationen, die die Suite überlebten.

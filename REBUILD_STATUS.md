@@ -298,7 +298,7 @@ Nummerierung aus der Architektur-Gegenüberstellung. Bereits entschieden und
 deshalb nicht mehr gelistet: Feature-Zuschnitt, Gold-Trennung im hellen Theme,
 Nunito-600, Umgang mit `riverpod_lint`, dazu **E-25** (siehe unten).
 
-**E-26 und E-38 sind am 27.08.2026 entschieden.**
+**E-26, E-27 und E-38 sind am 27.08.2026 entschieden.**
 
 *E-26, Ordner für das Tutorial:* es entsteht unter **`lib/app/onboarding/`**, als
 App-Komposition. Kein vierter Feature-Ordner, damit keine Änderung an
@@ -316,6 +316,34 @@ jede Textbreite der App. Jetzt einmal im Theme statt später an jedem Bildschirm
 **Folge, die dazugehört:** das verschiebt Texte auf allen bisherigen
 Bildschirmen, die festgenagelten Maße in den Tests müssen neu gemessen werden,
 und der erste Gerätelauf danach gehört wiederholt.
+
+*E-27, Anker-Registry:* der Mechanismus entsteht unter **`lib/core/anchors/`**,
+die Ankerkennungen bleiben bei der Oberfläche, die sie besitzt. Heute sind das
+die zwei Tab-Anker in `lib/app/shell/`, ab Phase 2 die fünf Kartenanker in
+`lib/features/discovery/presentation/`. Ausschlaggebend war die Importrichtung,
+nicht die Frage „ist das allgemein genug für `core`": ab Phase 2 registrieren
+sich Widgets aus `features/*/presentation/`, und `dependency-rules.md:20` lässt
+für die nur Application, Domain und eng abgegrenztes Core zu. Von den beiden
+Kandidaten ist `core` damit der einzige legale. Der übliche Gegengrund, nämlich
+die Änderung eines akzeptierten Dokuments, trägt hier nicht: der `app/`-Baum in
+`project-structure.md` kennt wegen E-26 ohnehin kein `onboarding/` und muss so
+oder so nachgezogen werden.
+
+**Was diese Entscheidung ausdrücklich nicht absichert:** Regel 11 des
+Prüfskripts zerlegt nur Pfade und sieht den Dateiinhalt nie. Eine Datei
+`lib/core/anchors/anchor_ids.dart` mit Fachkennungen darin würde das Gate
+passieren und trotzdem genau das verletzen, was E-27 verhindern soll. Die
+Trennung hält hier die Review, nicht die Maschine. Deshalb gehört ein Satz dazu
+in die „Placement rules" von `project-structure.md`.
+
+**Ebenfalls am 27.08.2026 freigegeben:** ein Edit an
+`docs/architecture/project-structure.md`, obwohl das Dokument `status:
+accepted` trägt. Er trägt `anchors/` und `onboarding/` ein, ergänzt die
+Placement rules um den Satz oben und zieht dabei vier Abweichungen nach, die
+heute schon im Code stehen und im Dokument fehlen: `lib/core/diagnostics/`,
+`lib/core/async/`, `lib/services/supabase/`, sowie `bootstrap/` und
+`fact_app.dart`, die real `lib/app/bootstrap.dart` und `lib/app/app.dart`
+heißen.
 
 **E-25 ist am 27.08.2026 entschieden.** Die vier Tab-Pfade bleiben `/map`,
 `/collection`, `/challenges`, `/profile`, also die Domänennamen aus der
@@ -345,7 +373,6 @@ eine Migration, vorher eine Zeile.
 | E-23 | **Die Distanzprüfung beim Sammeln ist nicht nur umgehbar, sie ist optional.** Die Policy `create policy "own collected" on public.collected_facts for all using (auth.uid() = user_id)` erlaubt dem Client, direkt in `collected_facts` einzufügen. Damit entfällt `collect_fact_validated` samt der 150-Meter-Prüfung vollständig, und der Trigger `handle_fact_collected` bucht danach Punkte, Stadtwertung und Trophäen. E-07 beschreibt nur, dass die Positionsangabe fälschbar ist; hier braucht man gar keine. | **4** | Phase 2 |
 | E-24 | **Coins und Punktestand sind direkt setzbar.** Die Policy `create policy "own profile" on public.profiles for all using (auth.uid() = id)` hat kein `WITH CHECK`. Der Client kann seine eigene Profilzeile aktualisieren, einschließlich `coins` und `score_total`. **Wichtig für die Reihenfolge der Behebung:** wer E-06 behebt, also `increment_coins` absichert, hat damit nichts gewonnen, solange E-24 offen ist. Die Funktion ist dann nur der bequemere von zwei Wegen. | **4** | Phase 2 |
 | E-21 | **`start_group_session` ist doppelt definiert**, in `2026-06-04_group_sessions.sql:193` und erneut in `2026-06-05_team_sessions.sql:473`. Welche Version produktiv läuft, hängt an der Ausführungsreihenfolge im SQL-Editor. Backend-Frage, aber der Client hängt daran. | 3, im anderen Repo | Phase 5 |
-| E-27 | **`lib/core/anchors/` als allgemeine Fähigkeit.** Das Tutorial muss die Bildschirmposition fremder Widgets kennen. Die PWA löst das über `getBoundingClientRect` auf `[data-tour-anchor]`, was es in Flutter nicht gibt. Vorgesehen ist eine Anker-Registry in `core`, in der sich Widgets mit einer Kennung anmelden, wobei **die Kennungen selbst nicht in `core` liegen**, sondern bei der Oberfläche, die sie besitzt. Sonst greift `_checkCoreConcepts` zu Recht ein. `docs/architecture/project-structure.md` zählt die `core`-Kandidaten auf und kennt `anchors` nicht, es ist also eine Ergänzung eines akzeptierten Dokuments. Alternative wären Bildschirmanteile wie im alten Port, die die Parity-Spec als Lücke markiert. | 3 | Schritt 11 |
 | E-28 | **Text für `audio.dialog.volumeHint`.** Der Schlüssel wird in `screen-auth.jsx:251` benutzt und existiert **in der PWA nicht**; sie zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Beide Vorlagen beschreiben den Kasten, als hätte er Text. Im Neubau entfällt er, weil ein handgeschriebener Schlüssel beim nächsten Lauf von `tool/generate_i18n.dart` verschwindet und `--check` rot macht. Nötig ist ein DE- und EN-Text, und die Behebung gehört in die PWA, nicht hierher. | 2 | vor Auslieferung |
 | E-29 | **DM Sans Kursiv und 700 fehlen als Asset.** Das Goethe-Zitat auf dem Startbildschirm ist kursiv, das letzte Wort fett. `assets/fonts/` hat nur 400, 500 und 600, alle aufrecht. Die PWA hat dasselbe Loch (`styles.css:3` lädt weder Italic noch 700) und lässt den Browser synthetisieren; Flutter tut das für Asset-Schriften nicht. `fontStyle: italic` und `w700` stehen im Code, damit die Absicht stimmt, sobald die Dateien da sind. | 2 | vor Auslieferung |
 | E-30 | **`reference-features/settings.md` widerspricht `dependency-rules.md`.** `settings.md:19-27` zeigt einen Notifier in `presentation/notifiers/` neben einem `data/settings_store.dart`, Zeile 33-38 sagt „persists through `SettingsStore`", Zeile 42-44 begründet ausdrücklich, dass es **keine** Domänenschicht gibt. Es gibt keine Verdrahtung, die das erfüllt: den direkten Import meldet `tool/check_architecture.dart` um Zeile 946, und ohne Domänenschicht gibt es keinen Ort für den Vertrag. Der gebaute Code weicht deshalb ab und legt den Vertrag nach `lib/features/settings/domain/audio_mode_store.dart`. Zu entscheiden: `settings.md` korrigieren, oder die Ausnahme im Abschnitt „Exceptions" der `dependency-rules.md` schriftlich fassen. | 3 | vor dem Ausbau von `features/settings` |
@@ -433,6 +460,18 @@ Nachgewiesene Sachfehler in den Vorlagen. Wer sie liest, muss das wissen.
    „5-Schritt". Es sind **neun**, belegt dreifach: neun Objekte im `STEPS`-Array,
    `tour.step1` bis `tour.step9` in beiden Sprachen, und die Anzeige rechnet mit
    `STEPS.length`. Hier hilft es nicht, der Quelle zu glauben, man muss zählen.
+13. **Die Anker-Bilanz des Tutorials, und damit der Umfang von Schritt 11.**
+   `HANDOFF.md` hat behauptet, sechs der neun Schritte seien heute voll baubar
+   und drei degradierten. Aus `screen-tour.jsx:140-169` folgt etwas anderes:
+   neun Schritte, davon zwei Hero-Schritte ohne Anker und sieben mit Anker, und
+   von diesen sieben liegen **fünf** auf dem Kartenbildschirm (`balloon`,
+   `user-marker`, `coins`, `mode-tour`, `compass`). `map_page.dart` ist heute
+   ein Platzhalter mit einem einzigen `Text`. Voll baubar sind also die Schritte
+   1, 5, 7 und 9, es heißt **4 baubar und 5 degradierend**. Zwei der fünf,
+   `balloon` und `user-marker`, sind auch in der PWA keine festen Anker: sie
+   fallen dort auf Bildschirmanteile zurück (`:219` und `:239`). Die
+   „Bildschirmanteile", welche die Parity-Spec als Lücke des alten Ports
+   markiert, sind für genau diese zwei also der dokumentierte Weg der Quelle.
 
 ## Bewusste Auslassungen
 
