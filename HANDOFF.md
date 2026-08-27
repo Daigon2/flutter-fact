@@ -19,14 +19,15 @@ Für Details nicht hier suchen, sondern:
 
 **Zuletzt aktualisiert:** 27.08.2026
 
-**Phase 0 abgeschlossen. Phase 1 läuft, Schritte 7 und 8 von 50 fertig.**
+**Phase 0 abgeschlossen. Phase 1 läuft, Schritte 7 bis 9 von 50 fertig.**
 
 Steht: Projektgerüst, Pakete, Design-Tokens, i18n, Fakt-Datenmodell mit
 Supabase-Zugang, App-Shell mit typisierten Routen und Tab-Leiste, das
 Architektur-Prüfskript mit eigener Testsuite, der Startbildschirm mit zentraler
-Router-Weiche für den Erstlauf, und der Audio-Aktivierungsdialog.
+Router-Weiche für Erstlauf und Sitzung, der Audio-Aktivierungsdialog und die
+Anmeldung samt Supabase-Anbindung.
 
-**Kennzahlen:** 384 Tests grün, alle vier Gates auf Exit-Code 0.
+**Kennzahlen:** 463 Tests grün, alle vier Gates auf Exit-Code 0.
 
 **Neu und projektweit nützlich:** `test/support/app_fonts.dart` lädt die echten
 Schriften in Widget-Tests. Ohne das zeichnet `flutter test` jede Glyphe als
@@ -51,9 +52,10 @@ Gerätebuild durchläuft.
    prüfen, ob `maplibre_gl` eine höhere `minSdk` verlangt, ob die vier
    SVG-Icons und Nunito bei 10px rendern und wie die Tab-Leiste mit echter
    Safe Area sitzt.
-2. **Phase 1 weiterführen** (Schritte 9 bis 11): Login, Signup,
-   Tutorial-Overlay. Die Weiche im Router ist gebaut und entscheidet über den
-   Erstlauf, die Sitzung fehlt noch.
+2. **Phase 1 abschließen** (Schritte 10 und 11): Registrierung und
+   Tutorial-Overlay. Die geteilten Formular-Bausteine stehen in
+   `lib/features/identity/presentation/widgets/`, die Registrierung soll sie
+   benutzen statt sie zu verdoppeln.
 3. **Entschieden am 27.08.2026:** die vier Deep-Link-Pfade bleiben `/map`,
    `/collection`, `/challenges`, `/profile`, also die Domänennamen statt der
    PWA-Bezeichner. Splash, Login und Signup sind **eigene Routen** `/splash`,
@@ -70,6 +72,50 @@ Presentation eines anderen importiert. Der Vorschlag steht in
 ## Protokoll
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
+
+### 27.08.2026, Schritt 9: Anmeldung mit Auth-Unterbau
+
+Vertrag in `identity/domain/repositories/`, Supabase-Anbindung in `data/`,
+Sitzungszustand und Bildschirm in `presentation/`. 463 Tests.
+
+Der Kern war keine Zeichenaufgabe, sondern eine Verdrahtungsfrage:
+**`presentation` darf `data` nicht importieren**, ein Anmeldeformular braucht
+aber Supabase. Der Weg, der alle neun Prüfungen erfüllt: ein Provider, der auf
+den **Domänenvertrag** typisiert ist, mit einem untätigen Standard, und die
+Implementierung kommt per Override aus `bootstrap.dart`. Der Standard fällt zur
+sicheren Seite aus, er kann keinen angemeldeten Nutzer erfinden, und
+`flutter test` läuft weiter ohne `--dart-define`.
+
+Überraschend war viererlei. Erstens hätte die naheliegende Lösung an Regel 7
+gescheitert: das Prüfskript meldet in `presentation` jeden Konstruktoraufruf
+einer Klasse, deren Name auf `Repository`, `DataSource` oder `Client` endet. Ein
+`const UnavailableAuthRepository()` im Provider wäre ein Verstoß. Die drei
+bestehenden Store-Provider überleben die Prüfung nur, weil ihre Klassen auf
+`Store` enden. Gelöst über einen kleingeschriebenen `const`-Wert im Vertrag,
+vorher mit zwei Wegwerf-Proben belegt.
+
+Zweitens ist `Override` aus `flutter_riverpod 3.4.2` **nicht exportiert**, eine
+Funktion `List<Override> productionOverrides()` ist nicht schreibbar. Die
+benannte, testbare Funktion gibt deshalb die `ProviderScope` selbst zurück.
+
+Drittens der teuerste Testfehler dieser Sitzung: eine Mutation von
+`AuthSession.==` auf Identität **überlebte** die Suite. Ursache ist Darts
+`const`-Kanonisierung. Zwei gleich geschriebene `const AuthSession.signedIn(...)`
+sind dasselbe Objekt, der Gleichheitstest prüfte also nichts, und mit ihm der
+Test gegen das Erneuerungs-Gewitter im Router. Echte Sitzungen entstehen zur
+Laufzeit und sind nicht konstant. Nach der Korrektur fällt die Mutation an fünf
+Stellen.
+
+Viertens ist der Passwort-Reset **nicht angeboten**, und der Grund ist neu:
+`supabase_flutter` fährt standardmäßig PKCE, und `resetPasswordForEmail` legt
+den Code-Verifier auf dem Gerät ab. Der Link ginge an die Site-URL, also in die
+PWA, die den Verifier nicht hat. Eine Mail zu schicken, deren Link niemand
+einlösen kann, ist schlechter als kein Angebot. Zurücksetzen läuft bis auf
+Weiteres über die PWA.
+
+Nebenbefund: `FactButton` kann **nicht** nach `core/widgets` umziehen, wie sein
+eigener Kommentar vorschlägt. Regel 11 zerlegt den Pfad und meldet, dass `core`
+das Konzept `fact` nicht besitzen darf. Nachgewiesen, nicht vermutet.
 
 ### 27.08.2026, Schritt 8: Audio-Aktivierungsdialog
 
@@ -313,10 +359,70 @@ Worktree-Pfad.
 Versionen 8.2.1, 9.0.0 und 9.1.0. Am 26.08.2026 um 20:46 hat TotalAV seine
 Datei `knap.data` aktualisiert, also am selben Tag, an dem der Fehler auftrat.
 
-Ein Minimalfall in Java, der Gradles Muster nachbaut, läuft dagegen durch:
-`Pipe.open()` allein, ein lokaler Socket auf 127.0.0.1, und `Pipe.open()`
-während dieser Socket offen ist. Alle drei erfolgreich mit demselben JDK. Java
-kann es also, Gradle nicht.
+### Eingegrenzt am 27.08.2026: es ist `Selector.open()`
+
+Die vollständige Stapelspur (`gradle help --no-daemon --stacktrace`) zeigt einen
+anderen Aufrufweg als bisher angenommen:
+
+```
+sun.nio.ch.PipeImpl$Initializer.run
+sun.nio.ch.PipeImpl.<init>
+sun.nio.ch.WEPollSelectorImpl.<init>
+sun.nio.ch.WEPollSelectorProvider.openSelector
+java.nio.channels.Selector.open
+org.gradle.internal.remote.internal.inet.SocketConnection$SocketInputStream.<init>
+```
+
+**Es scheitert nicht `Pipe.open()`, sondern `Selector.open()`.** Der frühere
+Schluss „Java kann es, Gradle nicht" verglich zwei verschiedene Codepfade:
+`Pipe.open()` erzeugt `PipeImpl(sp, buffering: true)`, der Selektor erzeugt
+`PipeImpl(sp, buffering: false)`. Ersteres gelingt, Letzteres nicht.
+
+Damit gibt es einen **Minimalfall von 20 Zeilen, der in einer Sekunde
+antwortet.** Das ist die Prüfschleife für jeden Behebungsversuch, kein
+Gerätebuild nötig. Als `SelectorProbe.java` ablegen und mit
+`java SelectorProbe.java` starten (Quelldatei-Modus, kein `javac` nötig):
+
+```java
+import java.nio.channels.Pipe;
+import java.nio.channels.Selector;
+
+public class SelectorProbe {
+  public static void main(String[] a) {
+    try { Pipe p = Pipe.open(); p.source().close(); p.sink().close();
+      System.out.println("Pipe.open() OK");
+    } catch (Throwable t) { System.out.println("Pipe.open() FEHLER: " + t); }
+    try { Selector s = Selector.open(); s.close();
+      System.out.println("Selector.open() OK");
+    } catch (Throwable t) { System.out.println("Selector.open() FEHLER: " + t.getCause()); }
+  }
+}
+```
+
+Erwartet auf einem gesunden Rechner: beide Zeilen `OK`. Auf diesem Rechner:
+`Pipe.open() OK`, dann
+`Selector.open() FEHLER: java.net.SocketException: Invalid argument: connect`.
+
+**Warum das schwerer wiegt als ein Build-Problem:** `Selector.open()` ist eine
+Grundfunktion von Java NIO. Kein Java-Werkzeug, das Selektoren benutzt, kann auf
+diesem Rechner laufen. Gradle ist nur der erste, der es merkt.
+
+### Am 27.08.2026 zusätzlich ausgeschlossen
+
+| Vermutung | Ergebnis |
+|---|---|
+| Selektor-Implementierung | Auch der alte `sun.nio.ch.WindowsSelectorProvider`, erzwungen per Systemeigenschaft, scheitert identisch. Nicht wepoll-spezifisch. |
+| Das JDK | JBR 21.0.10, JBR 17.0.14 (aus `~/.jdks`) und PyCharms JBR 25.0.2 scheitern identisch. **Achtung:** alle drei sind JetBrains Runtimes, ein Vanilla-JDK gibt es auf dem Rechner nicht. Der Verdacht ist damit eingegrenzt, nicht erledigt. |
+| Gradle-Daemon | `--no-daemon` scheitert identisch, es ist nicht der Handshake mit dem Daemon. |
+| Sandbox der Werkzeugumgebung | Mit abgeschalteter Sandbox identisch gescheitert. |
+| JVM-Umgebungsvariablen | `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `GRADLE_OPTS`, `JAVA_OPTS` sind alle leer, in Prozess, Benutzer und System. Keine globale `~/.gradle/gradle.properties`. Die frühere Fehlersuche hat nichts hinterlassen. |
+| Winsock-Katalog | `netsh winsock show catalog` zeigt ausschließlich Basisdienstanbieter, **keinen einzigen Layered Service Provider**. Der klassische Auslöser für `WSAEINVAL` ist damit unwahrscheinlicher als gedacht. |
+| Netzwerk-Filtertreiber | `Get-NetAdapterBinding` zeigt ausschließlich Microsoft-Komponenten. Kein Rest von TotalAV, keine VPN- oder Proxy-Filter. |
+| Defender Network Protection | `EnableNetworkProtection = 0`, also aus. Echtzeitschutz an, das ist Dateiprüfung. |
+| Portbereiche | Dynamischer TCP-Bereich ab 49152 mit 16384 Ports, ausgeschlossen sind genau 61 (5357 und 50000–50059). Keine Erschöpfung. |
+| `hosts`-Datei | Keine Einträge für `localhost`, `127.0.0.1` oder `::1`. |
+| Reihenfolge im Prozess | `Selector.open()` scheitert auch als **allererste** Netzoperation, dreimal hintereinander. Nicht die Folge eines vorher geschlossenen Sockets. |
+| Gradle 8.x im Cache | `gradle-8.12-all` ist ein **abgebrochener Download** (0-Byte-`.zip.part`). Ein Herunterziehen auf 8.x braucht also doch einen Download. |
 
 **Verbleibender Verdacht, in dieser Reihenfolge zu prüfen:**
 
@@ -334,10 +440,18 @@ kann es also, Gradle nicht.
    netsh int ip reset
    ```
 
-2. **Das JDK.** Genutzt wird die JetBrains Runtime aus Android Studio
-   (OpenJDK 21.0.10), ein für IntelliJ gepatchter Build. Ein zweites JDK ist
-   auf dem Rechner nicht vorhanden, der Verdacht war deshalb nicht prüfbar.
-   Temurin 21 installieren und `flutter config --jdk-dir <pfad>` setzen.
+2. **Ein Vanilla-JDK.** Alle drei vorhandenen Laufzeiten sind JetBrains
+   Runtimes und scheitern identisch. Ein ungepatchtes OpenJDK ist die einzige
+   noch offene Variable und der billigste verbleibende Test:
+
+   ```
+   winget install EclipseAdoptium.Temurin.21.JDK
+   ```
+
+   Danach die Probe oben mit dessen `java.exe` starten. Antwortet sie mit
+   zweimal `OK`, ist der Blocker weg: dann
+   `flutter config --jdk-dir "C:\Program Files\Eclipse Adoptium\jdk-21..."`
+   setzen und bauen.
 
    Netzwerkseitig ist nichts auffällig: nur WLAN aktiv, Hamachi nicht present,
    Default-Route und Loopback-Route normal, reservierte Portbereiche

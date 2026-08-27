@@ -88,7 +88,26 @@ durch eine offene Entscheidung
   Browser-Standardschrift, in der die PWA sie unbeabsichtigt rendert. Folge,
   die dazugehört: Arial kennt kein Gewicht 900, in der PWA sehen beide Knöpfe
   gleich fett aus, hier nicht.
-- [ ] 9. Login · [ ] 10. Signup · [ ] 11. Tutorial-Overlay
+- [x] **9. Anmeldung.** Vertrag in `identity/domain/repositories/`, damit Regel
+  13 greift, Supabase-Anbindung in `data/`, Zugang über einen auf den Vertrag
+  typisierten Provider mit untätigem Standard plus Override in `bootstrap.dart`.
+  Direkt geht es nicht: `presentation` darf `data` nicht importieren. Der
+  Standard fällt zur sicheren Seite aus und kann keinen angemeldeten Nutzer
+  erfinden; `flutter test` läuft weiter ohne `--dart-define`.
+  Fehlerübersetzung in drei Stationen: Vendor-Ausnahme in der Datenquelle,
+  `AuthFailure` ohne Text und ohne Backend-Meldung in der Domäne, i18n-Zuordnung
+  in `presentation/formatting/`. `AuthException.code` ist brauchbar, die
+  Aufzählung `ErrorCode` kennt aber `invalid_credentials` nicht, deshalb bleibt
+  der Teilstring-Vergleich als Rückfallebene an genau einer Stelle.
+  Die Weiche erfüllt jetzt **beide** Hälften von `app.jsx:69`: ein angemeldeter
+  Nutzer sieht keinen Startbildschirm.
+  Bewusste Abweichungen: im Fehler-Restfall generischer Text statt der rohen
+  englischen Supabase-Meldung (`cross-cutting-concerns.md` verbietet
+  Backend-Details); kein Beitrittsdatum, weil die Quelle dort bei jeder
+  Anmeldung das heutige Datum schreibt; „Angemeldet bleiben" ist gebaut, aber
+  wirkungslos, genau wie in der Quelle, siehe E-33.
+  **Passwort-Reset entfällt**, siehe E-34.
+- [ ] 10. Signup · [ ] 11. Tutorial-Overlay
 
 ## Phase 2, Map-Kern
 
@@ -299,6 +318,9 @@ eine Migration, vorher eine Zeile.
 | E-30 | **`reference-features/settings.md` widerspricht `dependency-rules.md`.** `settings.md:19-27` zeigt einen Notifier in `presentation/notifiers/` neben einem `data/settings_store.dart`, Zeile 33-38 sagt „persists through `SettingsStore`", Zeile 42-44 begründet ausdrücklich, dass es **keine** Domänenschicht gibt. Es gibt keine Verdrahtung, die das erfüllt: den direkten Import meldet `tool/check_architecture.dart` um Zeile 946, und ohne Domänenschicht gibt es keinen Ort für den Vertrag. Der gebaute Code weicht deshalb ab und legt den Vertrag nach `lib/features/settings/domain/audio_mode_store.dart`. Zu entscheiden: `settings.md` korrigieren, oder die Ausnahme im Abschnitt „Exceptions" der `dependency-rules.md` schriftlich fassen. | 3 | vor dem Ausbau von `features/settings` |
 | E-31 | **Die strengste Regel des Projekts steht nur im Prüfskript.** Der Block „Forbidden" in `dependency-rules.md` listet `domain → data`, `domain → presentation`, `data → presentation`, `feature A presentation → feature B presentation` und `core → any feature`. **`presentation → eigenes data` steht dort nicht.** Das Verbot ist eine Ableitung aus der Weißliste der Tabelle „Allowed layer dependencies", und das Skript begründet es auch so. Eine Regel, die Schritt 9, Schritt 10 und danach jedes Feature mit Repository formt, sollte wörtlich dastehen. | 3 | bald, es kostet eine Zeile |
 | E-32 | **`project-structure.md:115` ist zweideutig, und beide Lesarten sind im Code umgesetzt.** Der Satz lautet „Riverpod providers that construct data/application dependencies live near the implementation they expose". `lib/features/facts/data/repositories/supabase_fact_repository.dart` liest ihn als „neben der Implementierung" und wird damit für `presentation` unerreichbar; `lib/core/diagnostics/diagnostics_providers.dart` zitiert dieselbe Regel für „neben dem **Vertrag**". Solange der Satz offen ist, entscheidet der Zufall, welche Vorbildstelle jemand zuerst liest. Vorschlag: ergänzen, dass solche Provider ausschließlich von der App-Komposition gelesen werden und höhere Schichten über einen vertragsseitigen Provider plus Override zugreifen. | 3 | vor Phase 2 |
+| E-33 | **„Angemeldet bleiben" ist wirkungslos.** In der PWA wird `stayIn` gesetzt und **nirgends gelesen**, `persistSession` kommt dort nicht vor. Das Kästchen ist im Neubau nachgebaut, die Semantik nicht: Sitzungspersistenz wäre eine Auth-Verhaltensänderung. Zu entscheiden: implementieren, oder das Kästchen entfernen. Ein Haken, der nichts tut, ist gegenüber dem Nutzer eine Unwahrheit. | 3 | vor Auslieferung |
+| E-34 | **Passwort-Reset ist nicht angeboten.** `supabase_flutter 2.17.2` fährt standardmäßig `AuthFlowType.pkce`, und `resetPasswordForEmail` legt den Code-Verifier **auf dem Gerät** ab. Ohne `redirectTo` ginge der Link an die Site-URL, also in die PWA, die den Verifier nicht hat: der Tausch scheitert. Eine Mail zu schicken, deren Link niemand einlösen kann, ist schlechter als kein Angebot. Der Nutzer sieht deshalb kein „Vergessen?" über dem Passwortfeld, Zurücksetzen läuft über die PWA. Die Behebung braucht ein Deep-Link-Ziel und damit eine **neue öffentliche Vertragsfläche**. | 3 | vor Auslieferung |
+| E-35 | **`FactButton` kann nicht nach `core/widgets`.** Sein eigener Kommentar verlangt den Umzug, sobald ein zweiter Aufrufer existiert; der existiert seit Schritt 9. Regel 11 des Prüfskripts zerlegt aber den Pfad und meldet, dass `core` das Konzept `fact` nicht besitzen darf, nachgewiesen mit einer Wegwerf-Probe. Zu entscheiden: bei `identity` lassen, oder unter einem Namen ohne Fachbegriff umziehen. | 2 | wenn ein drittes Feature ihn braucht |
 
 ## Datenvertrag: die bekannten Fallen
 
