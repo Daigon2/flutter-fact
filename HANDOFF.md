@@ -42,16 +42,24 @@ Arbeit nicht nur einen Helfer, sondern auch eine Fehlermeldung verlangt.
 iOS-Build, kein Emulatorlauf. Grüne Tests sagen nichts darüber, ob der erste
 Gerätebuild durchläuft.
 
+**Der Build-Blocker ist seit dem 27.08.2026 gelöst**, siehe „Android-Build:
+gelöst" unter „Rechner einrichten". Es war nie ein Netzwerkproblem: Java legt
+für `Selector.open()` einen Unix-Domain-Socket im Temp-Verzeichnis an, und
+AF_UNIX ist auf diesem Rechner unter `AppData` nicht verbindbar. Die Umgehung
+ist eine Umgebungsvariable. Damit ist der erste Gerätebuild jetzt möglich und
+steht als Nächstes an.
+
 ---
 
 ## Als Nächstes
 
-1. **Android-Build zum Laufen bringen.** Blockiert durch einen
-   Loopback-Fehler von Gradle, siehe „Rechner einrichten". Der erste Punkt
-   dort braucht Administratorrechte. Solange das offen ist, kann niemand
-   prüfen, ob `maplibre_gl` eine höhere `minSdk` verlangt, ob die vier
-   SVG-Icons und Nunito bei 10px rendern und wie die Tab-Leiste mit echter
-   Safe Area sitzt.
+1. **Den ersten Gerätebuild machen.** Der Blocker ist gelöst, gebaut wurde
+   trotzdem noch nie. Jetzt endlich prüfbar: ob `maplibre_gl` eine höhere
+   `minSdk` verlangt, ob die vier SVG-Icons und Nunito bei 10px rendern, wie
+   die Tab-Leiste mit echter Safe Area sitzt, ob die variable Schrift über
+   `fontVariations` wirklich das Gewicht 600 zeigt, und ob die Maße der
+   Bildschirme aus Phase 1 am Gerät stimmen. Bisher sind alle Aussagen darüber
+   **strukturell**, nicht optisch.
 2. **Phase 1 abschließen** (Schritte 10 und 11): Registrierung und
    Tutorial-Overlay. Die geteilten Formular-Bausteine stehen in
    `lib/features/identity/presentation/widgets/`, die Registrierung soll sie
@@ -314,74 +322,80 @@ Gilt genauso für `flutter build apk`, `flutter build ipa` und `flutter test`.
 Alternativ `--dart-define-from-file=env.json`, diese Datei gehört **nicht** ins
 Repository.
 
-### Android-Build scheitert derzeit: „Unable to establish loopback connection"
+### Android-Build: gelöst am 27.08.2026
 
-**Der erste Gerätebuild ist auf diesem Rechner nicht möglich.** Gradle bricht
-nach etwa fünf Sekunden ab:
+**Ursache: `Selector.open()` scheitert, weil Java dafür einen Unix-Domain-Socket
+im Temp-Verzeichnis anlegt, und AF_UNIX auf diesem Rechner unter `AppData`
+nicht verbindbar ist.**
+
+Die Fehlermeldung war die ganze Zeit irreführend. Sie lautet „Unable to
+establish loopback connection", und alle Verdächtigen, die man daraufhin prüft,
+liegen im Netzwerk-Stack. Der scheiternde Vorgang ist aber **kein
+Netzwerkaufruf**, sondern ein Verbindungsaufbau auf eine **Datei**.
+
+Der Weg dorthin, aus den JDK-Quellen (`lib/src.zip` von Temurin):
 
 ```
-java.io.IOException: Unable to establish loopback connection
-Caused by: java.net.SocketException: Invalid argument: connect
-	at sun.nio.ch.PipeImpl$Initializer$LoopbackConnector.run
+WEPollSelectorImpl.java:79   new PipeImpl(sp, /* AF_UNIX */ true, /*buffering*/ false)
+PipeImpl.java:127            createListener(preferUnixDomain)
+PipeImpl.java:132            SocketChannel.open(sa)      // sa ist eine UnixDomainSocketAddress
 ```
 
-Der Emulator selbst läuft (`Pixel_8`, Android 17, API 37). Der Fehler entsteht
-im Gradle-Launcher, wenn er sich mit seinem Daemon-Prozess verbindet:
-`DefaultDaemonConnector.connectToDaemon` → `SocketConnection.<init>` →
-`PipeImpl`.
+`Pipe.open()` ruft denselben Konstruktor mit `false` und geht über TCP, deshalb
+**gelingt `Pipe.open()` und scheitert `Selector.open()`**. Wer die beiden
+verwechselt, schließt aus einem erfolgreichen `Pipe.open()`, Java sei in Ordnung,
+und sucht danach an der falschen Stelle. Genau das ist hier zwei Tage passiert.
 
-**Achtung, die Notiz im alten REBUILD_PLAN nennt die falsche Ursache.** Dort
-steht, `-Djava.io.tmpdir=C:/gtmp` plus `JAVA_TOOL_OPTIONS` löse das. Das ist
-geprüft und hilft nicht.
+Der Pfad der Socket-Datei kommt aus `jdk.net.unixdomain.tmpdir` und zeigt
+standardmäßig auf `java.io.tmpdir`, unter Windows also nach
+`%LOCALAPPDATA%\Temp`. Gemessen:
 
-Ausgeschlossen, jeweils einzeln getestet:
-
-| Vermutung | Ergebnis |
+| Verzeichnis für die Socket-Datei | AF_UNIX `connect` |
 |---|---|
-| Temp-Pfad mit Leerzeichen | `-Djava.io.tmpdir=C:/gtmp` gesetzt, Variable wird übernommen, Fehler bleibt |
-| Sandbox der Werkzeugumgebung | Build auch ohne Sandbox identisch fehlgeschlagen |
-| Loopback generell blockiert | Python bindet und verbindet 127.0.0.1 fehlerfrei |
-| Java kann keine NIO-Pipe | minimales `Pipe.open()`-Programm läuft mit demselben JDK durch |
-| reservierte Portbereiche | nur 5357 und 50000–50059 belegt, unkritisch |
-| Speichermangel | `-Xmx8G` auf 2G reduziert, Fehler bleibt. Frei waren 4,8 von 31,5 GB |
-| IPv6-Auflösung von localhost | `preferIPv4Stack` in `JAVA_TOOL_OPTIONS`, `GRADLE_OPTS` und `org.gradle.jvmargs`, Fehler bleibt |
-| hängender Gradle-Daemon | `gradlew --stop` meldete, dass keiner läuft |
-| Daemon-Registry beschädigt | `~/.gradle/daemon/` beiseitegelegt, Fehler blieb, wieder zurückgelegt |
-| Neustart des Rechners | Fehler unverändert |
-| **TotalAV** | **vollständig deinstalliert und neu gestartet, Fehler unverändert. Damit ausgeschlossen.** Windows Defender ist danach von selbst angesprungen, Echtzeitschutz und Manipulationsschutz aktiv, keine Schutzlücke |
+| `C:\Users\<user>\AppData\Local\Temp` (Standard) | **Fehler** |
+| `C:\Users\<user>\AppData\Local\<beliebig>` | **Fehler** |
+| `C:\Users\<user>\AppData\<beliebig>` | **Fehler** |
+| `C:\Users\<user>\<beliebig>` | OK |
+| `C:\Users\Public\<beliebig>` | OK |
+| `C:\Windows\Temp` | OK |
+| `C:\gtmp` | OK |
 
-**Es ist kein Projektproblem.** Ein leeres Gradle-Testprojekt unter
-`C:\gtmp\gt` scheitert identisch. Gradle kann auf diesem Rechner generell
-nicht starten, unabhängig von Flutter, diesem Repository und dem langen
-Worktree-Pfad.
+**Alles unter `AppData` scheitert, alles andere funktioniert.** `bind` gelingt
+jeweils, die Socket-Datei entsteht, nur `connect` darauf nicht. Nicht die
+Ursache: Pfadlänge (61 Bytes am Wurzelpfad gehen, 54 unter `AppData` nicht), der
+8.3-Kurzname `JANEKP~1`, das Leerzeichen im Profilnamen, Reparse-Punkte, der
+Ordnerschutz von Defender.
 
-**Und es lief hier früher.** `~/.gradle/daemon/` enthält Verzeichnisse für die
-Versionen 8.2.1, 9.0.0 und 9.1.0. Am 26.08.2026 um 20:46 hat TotalAV seine
-Datei `knap.data` aktualisiert, also am selben Tag, an dem der Fehler auftrat.
+**Warum es früher funktionierte:** vermutlich hat sich die Bedingung unter
+`AppData` geändert, nicht Java und nicht Gradle. Der eigentliche Systemdefekt
+ist damit nicht behoben, nur umgangen.
 
-### Eingegrenzt am 27.08.2026: es ist `Selector.open()`
+#### Die Umgehung
 
-Die vollständige Stapelspur (`gradle help --no-daemon --stacktrace`) zeigt einen
-anderen Aufrufweg als bisher angenommen:
+Eine Benutzer-Umgebungsvariable, keine Administratorrechte nötig:
 
 ```
-sun.nio.ch.PipeImpl$Initializer.run
-sun.nio.ch.PipeImpl.<init>
-sun.nio.ch.WEPollSelectorImpl.<init>
-sun.nio.ch.WEPollSelectorProvider.openSelector
-java.nio.channels.Selector.open
-org.gradle.internal.remote.internal.inet.SocketConnection$SocketInputStream.<init>
+[Environment]::SetEnvironmentVariable('JAVA_TOOL_OPTIONS', '-Djdk.net.unixdomain.tmpdir=C:\gtmp', 'User')
 ```
 
-**Es scheitert nicht `Pipe.open()`, sondern `Selector.open()`.** Der frühere
-Schluss „Java kann es, Gradle nicht" verglich zwei verschiedene Codepfade:
-`Pipe.open()` erzeugt `PipeImpl(sp, buffering: true)`, der Selektor erzeugt
-`PipeImpl(sp, buffering: false)`. Ersteres gelingt, Letzteres nicht.
+Wirkt in jedem **neu gestarteten** Programm, also auch in Android Studio.
+Bestehende Terminals neu öffnen. Jede JVM gibt danach die Zeile
+`Picked up JAVA_TOOL_OPTIONS: ...` auf der Fehlerausgabe aus, das ist normal.
 
-Damit gibt es einen **Minimalfall von 20 Zeilen, der in einer Sekunde
-antwortet.** Das ist die Prüfschleife für jeden Behebungsversuch, kein
-Gerätebuild nötig. Als `SelectorProbe.java` ablegen und mit
-`java SelectorProbe.java` starten (Quelldatei-Modus, kein `javac` nötig):
+Belegt am leeren Testprojekt unter `C:\gtmp\gt`:
+
+```
+ohne die Variable : EXIT=1  java.io.IOException: Unable to establish loopback connection
+mit der Variable  : EXIT=0  BUILD SUCCESSFUL in 5s
+```
+
+Das Verzeichnis `C:\gtmp` muss existieren. Jeder Pfad außerhalb von `AppData`
+geht.
+
+#### Die Prüfschleife: eine Sekunde statt eines Builds
+
+Als `SelectorProbe.java` ablegen, mit `java SelectorProbe.java` starten
+(Quelldatei-Modus, kein `javac` nötig). Liegt unter `C:\gtmp\SelectorProbe.java`.
 
 ```java
 import java.nio.channels.Pipe;
@@ -399,93 +413,41 @@ public class SelectorProbe {
 }
 ```
 
-Erwartet auf einem gesunden Rechner: beide Zeilen `OK`. Auf diesem Rechner:
-`Pipe.open() OK`, dann
+Gesund: beide Zeilen `OK`. Defekt: `Pipe.open() OK`, dann
 `Selector.open() FEHLER: java.net.SocketException: Invalid argument: connect`.
 
-**Warum das schwerer wiegt als ein Build-Problem:** `Selector.open()` ist eine
-Grundfunktion von Java NIO. Kein Java-Werkzeug, das Selektoren benutzt, kann auf
-diesem Rechner laufen. Gradle ist nur der erste, der es merkt.
+#### Was vorher ausgeschlossen wurde, und die Lehre daraus
 
-### Am 27.08.2026 zusätzlich ausgeschlossen
+Diese Liste ist Geschichte, nicht Arbeitsvorrat. Sie steht hier, weil sie zeigt,
+wie teuer eine irreführende Fehlermeldung wird: **vierzehn Vermutungen, jede
+einzeln gemessen, alle im Netzwerk-Stack, alle richtig ausgeschlossen und alle
+am falschen Objekt.**
 
-| Vermutung | Ergebnis |
-|---|---|
-| Selektor-Implementierung | Auch der alte `sun.nio.ch.WindowsSelectorProvider`, erzwungen per Systemeigenschaft, scheitert identisch. Nicht wepoll-spezifisch. |
-| Das JDK | **Endgültig ausgeschlossen.** JBR 21.0.10, JBR 17.0.14, PyCharms JBR 25.0.2 und **Temurin 21.0.12**, also ein ungepatchtes OpenJDK, scheitern alle identisch. Der Temurin-Build liefert zusätzlich echte Zeilennummern: geworfen wird in `PipeImpl.java:103`, nachdem `LoopbackConnector` intern die `SocketException` gefangen hat; Aufrufer ist `WEPollSelectorImpl.java:79` über `PipeImpl.java:197`. |
-| Gradle-Daemon | `--no-daemon` scheitert identisch, es ist nicht der Handshake mit dem Daemon. |
-| Sandbox der Werkzeugumgebung | Mit abgeschalteter Sandbox identisch gescheitert. |
-| JVM-Umgebungsvariablen | `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `GRADLE_OPTS`, `JAVA_OPTS` sind alle leer, in Prozess, Benutzer und System. Keine globale `~/.gradle/gradle.properties`. Die frühere Fehlersuche hat nichts hinterlassen. |
-| Winsock-Katalog | `netsh winsock show catalog` zeigt ausschließlich Basisdienstanbieter, **keinen einzigen Layered Service Provider**. Der klassische Auslöser für `WSAEINVAL` ist damit unwahrscheinlicher als gedacht. |
-| Netzwerk-Filtertreiber | `Get-NetAdapterBinding` zeigt ausschließlich Microsoft-Komponenten. Kein Rest von TotalAV, keine VPN- oder Proxy-Filter. |
-| Defender Network Protection | `EnableNetworkProtection = 0`, also aus. Echtzeitschutz an, das ist Dateiprüfung. |
-| Portbereiche | Dynamischer TCP-Bereich ab 49152 mit 16384 Ports, ausgeschlossen sind genau 61 (5357 und 50000–50059). Keine Erschöpfung. |
-| `hosts`-Datei | Keine Einträge für `localhost`, `127.0.0.1` oder `::1`. |
-| Reihenfolge im Prozess | `Selector.open()` scheitert auch als **allererste** Netzoperation, dreimal hintereinander. Nicht die Folge eines vorher geschlossenen Sockets. |
-| Gradle 8.x im Cache | `gradle-8.12-all` ist ein **abgebrochener Download** (0-Byte-`.zip.part`). Ein Herunterziehen auf 8.x braucht also doch einen Download. |
-| **Winsock- und IP-Reset** | `netsh winsock reset` und `netsh int ip reset` ausgeführt, Neustart am 27.08.2026 um 18:23:39 durchgeführt, danach erneut gemessen: **Fehler unverändert.** Damit ist der bisher oberste Verdacht erledigt. |
+Temp-Pfad mit Leerzeichen · Sandbox der Werkzeugumgebung · Loopback generell
+(Python verbindet 127.0.0.1 fehlerfrei) · `Pipe.open()` (gelingt, siehe oben) ·
+reservierte und ausgeschlossene Portbereiche · Speichermangel ·
+IPv6-Auflösung von `localhost` · hängender Gradle-Daemon · beschädigte
+Daemon-Registry · Neustart · TotalAV vollständig deinstalliert ·
+Selektor-Implementierung (auch der alte `WindowsSelectorProvider`) · das JDK
+(JBR 17, 21, 25 **und** Temurin 21) · `--no-daemon` · alle fünf
+JVM-Umgebungsvariablen · Winsock-Katalog (kein einziger Layered Service
+Provider) · Netzwerk-Filtertreiber (nur Microsoft) · Defender Network
+Protection · `hosts`-Datei · Reihenfolge im Prozess · **Winsock- und IP-Reset
+samt Neustart**.
 
-**Verbleibender Verdacht, in dieser Reihenfolge zu prüfen:**
+Eine Fehlspur ist erwähnenswert, weil sie überzeugend aussah: im WFP-Dump steht
+ein Filter von **Rivet Networks** (Killer Networking) auf
+`FWPM_LAYER_ALE_CONNECT_REDIRECT_V4`, ohne Bedingungen, mit Aktion
+`FWP_ACTION_CALLOUT_TERMINATING`, und die Software ist längst deinstalliert. Das
+passte perfekt zur Fehlermeldung und war trotzdem falsch. Widerlegt hat es ein
+einfacher Gegencheck: ein Filter ohne Bedingungen würde **jede** Verbindung
+treffen, und das Netz funktioniert. Drei Löschversuche über die WFP-Schnittstelle
+scheiterten ohnehin an `ERROR_NOT_SUPPORTED`, es wurde also nichts verändert.
 
-0. **Neustart.** Der billigste Schritt. Behebt halb angewandte Treiber-Updates
-   und setzt TotalAVs Kernel-Treiber neu auf. Ein Windows-Update war zum
-   Zeitpunkt des Fehlers zur Installation vormerkt.
+Die Lehre: **den Aufrufweg lesen, bevor man der Fehlermeldung glaubt.** Die
+vollständige Stapelspur (`--stacktrace`) und dreißig Zeilen JDK-Quelle haben
+gelöst, was vierzehn Systemmessungen nicht gelöst haben.
 
-1. **Winsock-Katalog zurücksetzen.** Der klassische Auslöser für
-   `WSAEINVAL` bei `connect` ist ein beschädigter Winsock-Katalog, etwa durch
-   Reste einer Sicherheitssoftware. Braucht eine Eingabeaufforderung als
-   Administrator und einen Neustart:
-
-   ```
-   netsh winsock reset
-   netsh int ip reset
-   ```
-
-2. **Ein Vanilla-JDK: geprüft und erledigt.** Temurin 21.0.12 ist am
-   27.08.2026 installiert (`C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`)
-   und scheitert identisch. Das JDK ist damit keine Variable mehr, und
-   `flutter config --jdk-dir` löst nichts.
-
-   Der Netzwerk-Stack-Reset aus Punkt 1 ist ebenfalls erledigt und hat nichts
-   gebracht. Damit sind alle Verdachtspunkte der alten Liste abgearbeitet.
-
-3. **Noch nicht geprüft, weil es Administratorrechte braucht: fremde
-   WFP-Callouts.** Die Windows Filtering Platform ist die einzige Schicht, die
-   Loopback-Verbindungen filtern kann und in keiner der bisherigen Messungen
-   sichtbar war. Ein Callout-Treiber einer deinstallierten Sicherheitssoftware
-   überlebt die Deinstallation, wenn er als Boot-Start-Treiber registriert ist.
-   TotalAV war zum Zeitpunkt des ersten Fehlers auf dem Rechner. Als
-   Administrator:
-
-   ```
-   netsh wfp show state file=C:\gtmp\wfp.xml
-   ```
-
-   Danach in `C:\gtmp\wfp.xml` nach Anbieternamen suchen, die nicht von
-   Microsoft sind. Findet sich einer, ist der Treiber gezielt zu entfernen.
-
-4. **Beschädigte Systemkomponente.** Wenn Punkt 3 nichts zeigt:
-   `sfc /scannow`, danach
-   `DISM /Online /Cleanup-Image /RestoreHealth`, danach eine reparierende
-   Windows-Installation. Dann ist es kein Projektproblem mehr.
-
-5. **Ausweichen statt reparieren.** Der Neubau ist auf einem anderen Rechner
-   oder in einer CI baubar. Solange nur dieser eine Rechner betroffen ist, ist
-   das der schnellste Weg zu einem ersten Gerätebuild, und die Reparatur kann
-   parallel laufen.
-
-   **Nach jedem Versuch die Probe von oben, nicht einen Build.** Eine Sekunde
-   statt Minuten, und sie sagt genau dasselbe.
-
-   Netzwerkseitig ist nichts auffällig: nur WLAN aktiv, Hamachi nicht present,
-   Default-Route und Loopback-Route normal, reservierte Portbereiche
-   unkritisch.
-3. **Gradle 9.1.0.** Vom Flutter-Template gesetzt und sehr neu. Testweise auf
-   eine 8.x-Version in `android/gradle/wrapper/gradle-wrapper.properties`
-   herunterziehen.
-
-Bis das gelöst ist, sind alle Aussagen über die App **strukturell**: Tests,
-Analyse und Grenzprüfung. Nichts ist optisch am Gerät verifiziert.
 
 ### Nicht aus einem OneDrive-Pfad bauen
 
