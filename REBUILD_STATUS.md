@@ -298,6 +298,25 @@ Nummerierung aus der Architektur-Gegenüberstellung. Bereits entschieden und
 deshalb nicht mehr gelistet: Feature-Zuschnitt, Gold-Trennung im hellen Theme,
 Nunito-600, Umgang mit `riverpod_lint`, dazu **E-25** (siehe unten).
 
+**E-26 und E-38 sind am 27.08.2026 entschieden.**
+
+*E-26, Ordner für das Tutorial:* es entsteht unter **`lib/app/onboarding/`**, als
+App-Komposition. Kein vierter Feature-Ordner, damit keine Änderung an
+`domain-map.md` und `lib/features/README.md` nötig wird. `features/identity/`
+war ausdrücklich nicht die Wahl: die PWA führt zwei unabhängige Flags,
+`fact_has_launched` für den Splash und `fact_tour_shown` für das Tutorial, und in
+Phase 2 wächst das Tutorial um fünf Kartenanker. Ein Wechsel nach
+`features/onboarding/` bleibt später möglich und kostet ein Verschieben plus
+Importe, keine Umschreibung.
+
+*E-38, Laufweite:* Materials `letterSpacing` wird **global auf null gesetzt, wo
+die Quelle keine angibt**. Grund: es verbreitert jede Beschriftung um etwa 1,75
+Pixel, hat die Sprachzeile bei 411 Pixeln zum Umbruch gebracht, und betrifft
+jede Textbreite der App. Jetzt einmal im Theme statt später an jedem Bildschirm.
+**Folge, die dazugehört:** das verschiebt Texte auf allen bisherigen
+Bildschirmen, die festgenagelten Maße in den Tests müssen neu gemessen werden,
+und der erste Gerätelauf danach gehört wiederholt.
+
 **E-25 ist am 27.08.2026 entschieden.** Die vier Tab-Pfade bleiben `/map`,
 `/collection`, `/challenges`, `/profile`, also die Domänennamen aus der
 Domain-Map statt der PWA-Bezeichner `wallet` und `profil`. Begründung: sie sind
@@ -326,7 +345,6 @@ eine Migration, vorher eine Zeile.
 | E-23 | **Die Distanzprüfung beim Sammeln ist nicht nur umgehbar, sie ist optional.** Die Policy `create policy "own collected" on public.collected_facts for all using (auth.uid() = user_id)` erlaubt dem Client, direkt in `collected_facts` einzufügen. Damit entfällt `collect_fact_validated` samt der 150-Meter-Prüfung vollständig, und der Trigger `handle_fact_collected` bucht danach Punkte, Stadtwertung und Trophäen. E-07 beschreibt nur, dass die Positionsangabe fälschbar ist; hier braucht man gar keine. | **4** | Phase 2 |
 | E-24 | **Coins und Punktestand sind direkt setzbar.** Die Policy `create policy "own profile" on public.profiles for all using (auth.uid() = id)` hat kein `WITH CHECK`. Der Client kann seine eigene Profilzeile aktualisieren, einschließlich `coins` und `score_total`. **Wichtig für die Reihenfolge der Behebung:** wer E-06 behebt, also `increment_coins` absichert, hat damit nichts gewonnen, solange E-24 offen ist. Die Funktion ist dann nur der bequemere von zwei Wegen. | **4** | Phase 2 |
 | E-21 | **`start_group_session` ist doppelt definiert**, in `2026-06-04_group_sessions.sql:193` und erneut in `2026-06-05_team_sessions.sql:473`. Welche Version produktiv läuft, hängt an der Ausführungsreihenfolge im SQL-Editor. Backend-Frage, aber der Client hängt daran. | 3, im anderen Repo | Phase 5 |
-| E-26 | **Wo das Tutorial-Overlay wohnt.** Die Domain-Map nennt keinen Eigentümer für Onboarding, und `lib/features/README.md` sagt, dass der Zuschnitt der drei zusätzlichen Feature-Ordner auf Bestätigung wartet. Ein vierter (`features/onboarding/`) ist dieselbe Klasse von Entscheidung. Ohne Freigabe gebaut wird deshalb unter `lib/app/onboarding/`, was als App-Komposition keine Eskalation braucht und dieselbe innere Struktur hat. Ein Wechsel kostet ein Verschieben plus Importe, keine Umschreibung. `identity` ist ausdrücklich **nicht** der Eigentümer: die PWA führt zwei unabhängige Flags, `fact_has_launched` (Splash) und `fact_tour_shown` (Tutorial), und in Phase 2 wächst das Tutorial um fünf Kartenanker. | 3 | vor Phase 2 |
 | E-27 | **`lib/core/anchors/` als allgemeine Fähigkeit.** Das Tutorial muss die Bildschirmposition fremder Widgets kennen. Die PWA löst das über `getBoundingClientRect` auf `[data-tour-anchor]`, was es in Flutter nicht gibt. Vorgesehen ist eine Anker-Registry in `core`, in der sich Widgets mit einer Kennung anmelden, wobei **die Kennungen selbst nicht in `core` liegen**, sondern bei der Oberfläche, die sie besitzt. Sonst greift `_checkCoreConcepts` zu Recht ein. `docs/architecture/project-structure.md` zählt die `core`-Kandidaten auf und kennt `anchors` nicht, es ist also eine Ergänzung eines akzeptierten Dokuments. Alternative wären Bildschirmanteile wie im alten Port, die die Parity-Spec als Lücke markiert. | 3 | Schritt 11 |
 | E-28 | **Text für `audio.dialog.volumeHint`.** Der Schlüssel wird in `screen-auth.jsx:251` benutzt und existiert **in der PWA nicht**; sie zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Beide Vorlagen beschreiben den Kasten, als hätte er Text. Im Neubau entfällt er, weil ein handgeschriebener Schlüssel beim nächsten Lauf von `tool/generate_i18n.dart` verschwindet und `--check` rot macht. Nötig ist ein DE- und EN-Text, und die Behebung gehört in die PWA, nicht hierher. | 2 | vor Auslieferung |
 | E-29 | **DM Sans Kursiv und 700 fehlen als Asset.** Das Goethe-Zitat auf dem Startbildschirm ist kursiv, das letzte Wort fett. `assets/fonts/` hat nur 400, 500 und 600, alle aufrecht. Die PWA hat dasselbe Loch (`styles.css:3` lädt weder Italic noch 700) und lässt den Browser synthetisieren; Flutter tut das für Asset-Schriften nicht. `fontStyle: italic` und `w700` stehen im Code, damit die Absicht stimmt, sobald die Dateien da sind. | 2 | vor Auslieferung |
@@ -338,7 +356,6 @@ eine Migration, vorher eine Zeile.
 | E-35 | **`FactButton` kann nicht nach `core/widgets`.** Sein eigener Kommentar verlangt den Umzug, sobald ein zweiter Aufrufer existiert; der existiert seit Schritt 9. Regel 11 des Prüfskripts zerlegt aber den Pfad und meldet, dass `core` das Konzept `fact` nicht besitzen darf, nachgewiesen mit einer Wegwerf-Probe. Zu entscheiden: bei `identity` lassen, oder unter einem Namen ohne Fachbegriff umziehen. | 2 | wenn ein drittes Feature ihn braucht |
 | E-36 | **Bei 360 logischen Pixeln passt die Sprachzeile nicht einzeilig.** Gerechnet mit echten Schriftmetriken: zwei Karten à 127,1 plus Knopf-Untergrenze 65,3 plus 16 Abstände ergibt 337,5 gegen 316 verfügbare Pixel, Fehlbetrag rund 21. Die Quelle hat dasselbe Problem und schneidet mit `#root { overflow: hidden }` etwa vier Pixel des Knopfes ab. Zur Wahl: kleinere Flagge unter einer Breitenschwelle (Quelle: 30), kürzere Knopfbeschriftung oder nur das Emoji, die Zeile auf schmalen Geräten zweizeilig legen, oder abschneiden wie die Quelle. Aktuell entschieden ist nichts: die Titel brechen dort um, nichts läuft über, und ein Test hält die **Ursache** fest, damit die nächste Änderung dort anschlägt. | 2 | vor Auslieferung |
 | E-37 | **Das Launcher-Symbol ist noch das Flutter-Logo.** Android 12 und neuer zeichnet `@mipmap/ic_launcher` über die SplashScreen-API mitten in den nativen Startbildschirm. Der Hintergrund ist seit dem 27.08.2026 richtig (`#FF0F0D0A`), das Symbol nicht. Braucht das FACT-Symbol in allen Dichten, plus eine Entscheidung, ob der native Startbildschirm es überhaupt zeigen soll. | 2 | vor Auslieferung |
-| E-38 | **Materials Laufweite verbreitert Beschriftungen, die die Quelle ohne führt.** `bodyMedium` gibt `letterSpacing` zwischen 0,25 und 0,3 an Texte weiter, die in der PWA keine haben. „Deutsch" ist dadurch 56,1 statt 54,3 Pixel breit, und genau dieser Betrag hat die Sprachzeile bei 411 zum Umbruch gebracht. Betrifft **jede** Textbreite der App, nicht nur diesen Bildschirm. Zu entscheiden: die Laufweite global auf null setzen, wo die Quelle keine angibt, oder als Abweichung hinnehmen. | 3 | vor Phase 2, weil es alle Maße betrifft |
 
 ## Datenvertrag: die bekannten Fallen
 

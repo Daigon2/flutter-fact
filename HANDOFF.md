@@ -64,11 +64,18 @@ steht als Nächstes an.
    `fontVariations` wirklich das Gewicht 600 zeigt, und ob die Maße der
    Bildschirme aus Phase 1 am Gerät stimmen. Bisher sind alle Aussagen darüber
    **strukturell**, nicht optisch.
-2. **Phase 1 abschließen** (Schritte 10 und 11): Registrierung und
-   Tutorial-Overlay. Die geteilten Formular-Bausteine stehen in
-   `lib/features/identity/presentation/widgets/`, die Registrierung soll sie
-   benutzen statt sie zu verdoppeln.
-3. **Entschieden am 27.08.2026:** die vier Deep-Link-Pfade bleiben `/map`,
+2. **Materials Laufweite global auf null**, wo die Quelle keine angibt (E-38,
+   am 27.08.2026 entschieden). **Vor** Schritt 11 machen, weil es alle Textmaße
+   verschiebt: die festgenagelten Werte in den Tests müssen neu gemessen und der
+   Gerätelauf wiederholt werden. Danach ist jede weitere Messung verlässlich.
+3. **Schritt 11, Tutorial-Overlay.** Entsteht unter `lib/app/onboarding/`
+   (E-26). Neun Schritte, zwei davon Vollbild. Sechs sind heute voll baubar,
+   drei degradieren paritätstreu, weil ihre Anker erst mit der Karte entstehen.
+   Braucht eine Anker-Registry in `lib/core/anchors/` (E-27).
+4. **Unabhängige Review der Schritte 9, 10 und 11.** Schritt 9 und 10 sind
+   committet und **nicht** geprüft. Die Reviews haben in dieser Sitzung jedes Mal
+   echte Fehler gefunden, insgesamt zehn Mutationen, die die Suite überlebten.
+5. **Entschieden am 27.08.2026:** die vier Deep-Link-Pfade bleiben `/map`,
    `/collection`, `/challenges`, `/profile`, also die Domänennamen statt der
    PWA-Bezeichner. Splash, Login und Signup sind **eigene Routen** `/splash`,
    `/login`, `/signup` mit zentraler Redirect-Weiche. Damit ist E-25 in
