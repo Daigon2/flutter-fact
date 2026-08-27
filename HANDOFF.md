@@ -198,6 +198,9 @@ Ausgeschlossen, jeweils einzeln getestet:
 | Speichermangel | `-Xmx8G` auf 2G reduziert, Fehler bleibt. Frei waren 4,8 von 31,5 GB |
 | IPv6-Auflösung von localhost | `preferIPv4Stack` in `JAVA_TOOL_OPTIONS`, `GRADLE_OPTS` und `org.gradle.jvmargs`, Fehler bleibt |
 | hängender Gradle-Daemon | `gradlew --stop` meldete, dass keiner läuft |
+| Daemon-Registry beschädigt | `~/.gradle/daemon/` beiseitegelegt, Fehler blieb, wieder zurückgelegt |
+| Neustart des Rechners | Fehler unverändert |
+| **TotalAV** | **vollständig deinstalliert und neu gestartet, Fehler unverändert. Damit ausgeschlossen.** Windows Defender ist danach von selbst angesprungen, Echtzeitschutz und Manipulationsschutz aktiv, keine Schutzlücke |
 
 **Es ist kein Projektproblem.** Ein leeres Gradle-Testprojekt unter
 `C:\gtmp\gt` scheitert identisch. Gradle kann auf diesem Rechner generell
@@ -219,22 +222,24 @@ kann es also, Gradle nicht.
    und setzt TotalAVs Kernel-Treiber neu auf. Ein Windows-Update war zum
    Zeitpunkt des Fehlers zur Installation vormerkt.
 
-1. **TotalAV.** Installiert unter `C:\Program Files (x86)\TotalAV\Endpoint
-   Protection SDK\`, mit eigener `firewall.dll`, `firewall.tools`, einem
-   `drivers`-Verzeichnis und einem laufenden `TotalAV VPN Connection Service`.
-   Deaktivieren des Echtzeitschutzes allein half nicht, der Prozess
-   `endpointprotection` lief weiter. Nächster Schritt wäre eine vollständige
-   Deinstallation zum Test, nicht nur ein Abschalten. **Braucht Administrator,
-   also Handarbeit.**
+1. **Winsock-Katalog zurücksetzen.** Der klassische Auslöser für
+   `WSAEINVAL` bei `connect` ist ein beschädigter Winsock-Katalog, etwa durch
+   Reste einer Sicherheitssoftware. Braucht eine Eingabeaufforderung als
+   Administrator und einen Neustart:
+
+   ```
+   netsh winsock reset
+   netsh int ip reset
+   ```
+
+2. **Das JDK.** Genutzt wird die JetBrains Runtime aus Android Studio
+   (OpenJDK 21.0.10), ein für IntelliJ gepatchter Build. Ein zweites JDK ist
+   auf dem Rechner nicht vorhanden, der Verdacht war deshalb nicht prüfbar.
+   Temurin 21 installieren und `flutter config --jdk-dir <pfad>` setzen.
 
    Netzwerkseitig ist nichts auffällig: nur WLAN aktiv, Hamachi nicht present,
    Default-Route und Loopback-Route normal, reservierte Portbereiche
    unkritisch.
-2. **Das JDK.** Genutzt wird die JetBrains Runtime aus Android Studio
-   (`C:\Program Files\Android\Android Studio\jbr`, OpenJDK 21.0.10), ein
-   für IntelliJ gepatchter Build. Ein reguläres Temurin 21 installieren und
-   `flutter config --jdk-dir <pfad>` setzen. Auf dem Rechner ist derzeit kein
-   zweites JDK vorhanden.
 3. **Gradle 9.1.0.** Vom Flutter-Template gesetzt und sehr neu. Testweise auf
    eine 8.x-Version in `android/gradle/wrapper/gradle-wrapper.properties`
    herunterziehen.
