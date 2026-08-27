@@ -7,6 +7,8 @@ import 'package:fact_app/app/shell/shell_tab.dart';
 import 'package:fact_app/app/shell/shell_tab_icon.dart';
 import 'package:fact_app/app/theme/fact_colors.dart';
 import 'package:fact_app/features/discovery/presentation/pages/map_page.dart';
+import 'package:fact_app/features/identity/domain/first_launch_store.dart';
+import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
 import 'package:fact_app/features/profile/presentation/pages/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,6 +31,13 @@ void main() {
         overrides: [
           languagePreferenceStoreProvider.overrideWithValue(
             InMemoryLanguagePreferenceStore(language),
+          ),
+          // Vorbedingung, keine Erwartung: ohne diese Überschreibung ist der
+          // Erstlauf offen, und die Weiche in `route_guards.dart` schickt die
+          // App auf den Startbildschirm statt in die Shell. Die Tab-Leiste
+          // gäbe es dann gar nicht.
+          firstLaunchStoreProvider.overrideWithValue(
+            InMemoryFirstLaunchStore(hasLaunched: true),
           ),
         ],
         child: const FactApp(),

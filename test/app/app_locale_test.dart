@@ -2,6 +2,8 @@ import 'package:fact_app/app/app.dart';
 import 'package:fact_app/app/localization/app_language.dart';
 import 'package:fact_app/app/localization/language_preference_store.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
+import 'package:fact_app/features/identity/domain/first_launch_store.dart';
+import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +19,11 @@ void main() {
         overrides: [
           languagePreferenceStoreProvider.overrideWithValue(
             InMemoryLanguagePreferenceStore(language),
+          ),
+          // Vorbedingung: ohne das startet die App auf dem Startbildschirm,
+          // und dessen Dauer-Animationen lassen `pumpAndSettle` auflaufen.
+          firstLaunchStoreProvider.overrideWithValue(
+            InMemoryFirstLaunchStore(hasLaunched: true),
           ),
         ],
         child: const FactApp(),

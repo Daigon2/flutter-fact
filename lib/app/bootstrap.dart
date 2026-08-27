@@ -1,7 +1,11 @@
 import 'package:fact_app/app/app.dart';
 import 'package:fact_app/app/startup_failure_app.dart';
+import 'package:fact_app/features/identity/data/datasources/remote/supabase_auth_remote_data_source.dart';
+import 'package:fact_app/features/identity/data/repositories/supabase_auth_repository.dart';
+import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
 import 'package:fact_app/services/supabase/supabase_config.dart';
 import 'package:fact_app/services/supabase/supabase_initializer.dart';
+import 'package:fact_app/services/supabase/supabase_providers.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -32,9 +36,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// vorbereitete Erklärung gibt.
 ///
 /// `flutter test` ist davon nicht betroffen: Widget-Tests bauen `FactApp`
-/// direkt und rufen `bootstrap` nie. `supabaseClientProvider` wird erst beim
-/// ersten Lesen ausgewertet, also nur in Tests, die ihn selbst überschreiben.
-/// Ohne `--dart-define` laufen die Tests deshalb unverändert.
+/// direkt und rufen `bootstrap` nie, sehen also die Standardimplementierungen
+/// der Feature-Provider statt der Overrides aus [productionProviderScope].
+/// `supabaseClientProvider` wird erst beim ersten Lesen ausgewertet, also nur in
+/// Tests, die ihn selbst überschreiben. Ohne `--dart-define` laufen die Tests
+/// deshalb unverändert.
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -45,5 +51,50 @@ Future<void> bootstrap() async {
     return;
   }
 
-  runApp(const ProviderScope(child: FactApp()));
+  runApp(productionProviderScope(child: const FactApp()));
+}
+
+/// Die `ProviderScope` der laufenden App: [child] plus alles, was der Betrieb
+/// anders macht als der Test.
+///
+/// ## Warum das eine benannte Funktion ist und nicht inline in [bootstrap]
+///
+/// Damit ein Test sie prüfen kann. Die Standardimplementierungen der Feature-
+/// Provider sind absichtlich still und untätig (`unavailableAuthRepository`),
+/// und ein stiller Standard ohne Netz ist ein Risiko: fehlt der Override hier,
+/// startet die App, sieht heil aus, und niemand kann sich anmelden. Der Test
+/// dazu steht in `test/app/bootstrap_test.dart` und liest `overrides` aus dem
+/// Ergebnis.
+///
+/// Zurückgegeben wird die ganze `ProviderScope` und nicht die Liste: der Typ
+/// `Override` ist aus `flutter_riverpod 3.4.2` **nicht exportiert**
+/// (`flutter_riverpod.dart`, `show`-Liste), eine Funktion mit dem Rückgabetyp
+/// `List<Override>` ist also nicht schreibbar. Über das Feld
+/// `ProviderScope.overrides` kommt ein Test trotzdem an die Liste.
+///
+/// ## Warum `overrideWith` und nicht `overrideWithValue`
+///
+/// `overrideWithValue` bräuchte die Instanz **jetzt**, und die braucht
+/// `supabaseClientProvider`, der `Supabase.instance.client` liest. Der Wert
+/// würde also beim Start ausgewertet, statt beim ersten Zugriff. `overrideWith`
+/// bleibt faul: solange niemand die Anmeldung anfasst, entsteht nichts.
+/// Vorbild ist `factRemoteDataSourceProvider`.
+///
+/// ## Warum die Kette hier steht und nicht neben der Implementierung
+///
+/// `dependency-rules.md` gibt der App-Komposition Zugriff auf "all public
+/// feature entry points and services", und nur ihr. Ein Provider neben der
+/// Supabase-Implementierung wäre für `presentation` unerreichbar (Regel: kein
+/// Import aus `data`) und damit eine Falle für den nächsten Aufrufer.
+ProviderScope productionProviderScope({required Widget child}) {
+  return ProviderScope(
+    overrides: [
+      authRepositoryProvider.overrideWith(
+        (ref) => SupabaseAuthRepository(
+          SupabaseAuthRemoteDataSource(ref.watch(supabaseClientProvider).auth),
+        ),
+      ),
+    ],
+    child: child,
+  );
 }

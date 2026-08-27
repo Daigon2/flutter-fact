@@ -17,15 +17,25 @@ Für Details nicht hier suchen, sondern:
 
 ## Stand
 
-**Zuletzt aktualisiert:** 26.08.2026
+**Zuletzt aktualisiert:** 27.08.2026
 
-**Phase 0 (Fundament) ist abgeschlossen. Schritte 1 bis 6 von 50 fertig.**
+**Phase 0 abgeschlossen. Phase 1 läuft, Schritte 7 und 8 von 50 fertig.**
 
 Steht: Projektgerüst, Pakete, Design-Tokens, i18n, Fakt-Datenmodell mit
-Supabase-Zugang, App-Shell mit typisierten Routen und Tab-Leiste, dazu das
-Architektur-Prüfskript mit eigener Testsuite.
+Supabase-Zugang, App-Shell mit typisierten Routen und Tab-Leiste, das
+Architektur-Prüfskript mit eigener Testsuite, der Startbildschirm mit zentraler
+Router-Weiche für den Erstlauf, und der Audio-Aktivierungsdialog.
 
-**Kennzahlen:** 298 Tests grün, alle vier Gates auf Exit-Code 0.
+**Kennzahlen:** 384 Tests grün, alle vier Gates auf Exit-Code 0.
+
+**Neu und projektweit nützlich:** `test/support/app_fonts.dart` lädt die echten
+Schriften in Widget-Tests. Ohne das zeichnet `flutter test` jede Glyphe als
+Quadrat der Schriftgröße, und **jede Layout-Zusicherung misst ein Layout, das
+es auf keinem Gerät gibt**. Zum Größenvergleich: „FACT" in Nunito Black 64
+belegt 166 Pixel, mit der Ersatzschrift 256. Aufruf nur aus `setUpAll`, im
+Rumpf von `testWidgets` hängt er. Dazu `lib/core/async/detached_work.dart` mit
+`reportDetached`, weil `docs/engineering/flutter.md:151` für abgekoppelte
+Arbeit nicht nur einen Helfer, sondern auch eine Fehlermeldung verlangt.
 
 **Wichtig:** Die App ist noch **nie gestartet**. Kein Android-Build, kein
 iOS-Build, kein Emulatorlauf. Grüne Tests sagen nichts darüber, ob der erste
@@ -41,13 +51,14 @@ Gerätebuild durchläuft.
    prüfen, ob `maplibre_gl` eine höhere `minSdk` verlangt, ob die vier
    SVG-Icons und Nunito bei 10px rendern und wie die Tab-Leiste mit echter
    Safe Area sitzt.
-2. **Phase 1** (Schritte 7 bis 11): Splash, Audio-Dialog, Login, Signup,
-   Tutorial-Overlay. Die Auth-Weiche im Router ist vorbereitet und gibt heute
-   `null` zurück.
-3. **Offen zur Entscheidung:** die vier Deep-Link-Pfade `/map`, `/collection`,
-   `/challenges`, `/profile`. Die PWA liefert dafür keine Vorlage, sie kennt
-   keine URLs. Sobald Push-Nachrichten oder geteilte Links darauf zeigen, sind
-   die Strings festgelegt.
+2. **Phase 1 weiterführen** (Schritte 9 bis 11): Login, Signup,
+   Tutorial-Overlay. Die Weiche im Router ist gebaut und entscheidet über den
+   Erstlauf, die Sitzung fehlt noch.
+3. **Entschieden am 27.08.2026:** die vier Deep-Link-Pfade bleiben `/map`,
+   `/collection`, `/challenges`, `/profile`, also die Domänennamen statt der
+   PWA-Bezeichner. Splash, Login und Signup sind **eigene Routen** `/splash`,
+   `/login`, `/signup` mit zentraler Redirect-Weiche. Damit ist E-25 in
+   `REBUILD_STATUS.md` geschlossen und der Vertrag um drei Pfade gewachsen.
 
 Vor Phase 2 (Karte) ist eine Entscheidung fällig: **wie Discovery, Tours,
 Challenges und Collection eine Karte teilen**, ohne dass ein Feature die
@@ -59,6 +70,97 @@ Presentation eines anderen importiert. Der Vorschlag steht in
 ## Protokoll
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
+
+### 27.08.2026, Schritt 8: Audio-Aktivierungsdialog
+
+Der 🎧-Knopf des Startbildschirms öffnet ihn, „Aktivieren" setzt eine
+Präferenz, „Abbrechen" schließt nur. 384 Tests.
+
+**Wichtig zur Erwartung:** der Dialog setzt eine Präferenz, die **nichts
+bewirkt**. Es gibt keine Wiedergabe und keine Sprachausgabe, die sie liest.
+Nicht gebaut, jeweils dokumentiert statt implementiert: die
+iOS-DeviceMotion-Berechtigung, die gesprochene Hilfe (`announceHelp`, gehört zu
+Schritt 25 und der offenen Entscheidung E-15) und `fact_audio_help_shown`, das
+ohne die Hilfe keinen Konsumenten hat.
+
+Überraschend war viererlei. Erstens verlangte die Aufgabe eine echte
+Architekturentscheidung statt Zeichnen: der Bildschirm gehört `identity`, die
+Audio-Präferenz laut `lib/features/README.md:22` aber `settings`, und Regel 8
+der Dependency-Rules verbietet den direkten Import. Der Ausweg steht in Regel
+10, „an app-level composition adapter": `SplashRoute.build` setzt die Aktion
+ein, `identity` erfährt nichts von `settings`.
+
+Zweitens rendern die beiden Dialog-Knöpfe in der PWA in der
+**Browser-Standardschrift**. Ein `<button>` erbt `font-family` nicht, und
+`styles.css` holt das nur für `.tab-pill button` nach, während jeder andere
+Knopf der App Nunito ausdrücklich setzt. Hier ist Nunito 14 gewählt, also die
+Absicht statt des sichtbaren Zustands. Nebenwirkung, die dazugehört: Arial
+kennt kein Gewicht 900, in der PWA sehen beide Knöpfe gleich fett aus, im
+Nachbau nicht.
+
+Drittens, und das ist der Fund mit der größten Reichweite: **`flutter test`
+lädt keine Schriften.** Jede Glyphe ist ein Quadrat der Schriftgröße, „FACT"
+belegt dort 256 statt 166 Pixel. Alle Layout-Zusicherungen der Schritte 7 und 8
+haben damit ein Layout geprüft, das es nicht gibt, und die Knopfzeile des
+Dialogs lief schon bei Skalierung 1.0 um. Behoben mit
+`test/support/app_fonts.dart`. Aufruf nur aus `setUpAll`: im Rumpf von
+`testWidgets` hängt `FontLoader`, weil dort eine `FakeAsync`-Zone läuft, in der
+echte Datei-Ein-/Ausgabe nie fortschreitet.
+
+Viertens fielen mit echten Schriften zwei **echte** Überläufe auf, beide in
+Schritt 7 und beide bei doppelter Systemschrift, also innerhalb von Androids
+Maximum: die Wortmarke um 65 Pixel und die Sprachzeile um 3,8 Pixel. Die
+Wortmarke skaliert jetzt bewusst nicht mit (CSS-`px` folgt der
+Betriebssystem-Textgröße nicht, und eine feste Kachel neben einem mitwachsenden
+Schriftzug wäre ein halb skaliertes Logo), der Kopfhörer-Knopf ist auf 115
+Pixel gedeckelt. Ein `LayoutBuilder` wäre dort der naheliegende Weg und ist
+unmöglich: die Inhaltsspalte liegt in einem `IntrinsicHeight`, und der bricht
+mit `LayoutBuilder does not support returning intrinsic dimensions`.
+
+### 27.08.2026, Schritt 7: Startbildschirm und Router-Weiche
+
+`/splash` außerhalb der Shell, dazu `route_guards.dart` mit der Weiche als
+reiner Funktion und `FirstLaunchStore` nach dem Muster des Sprach-Speichers.
+Login und Signup existieren als Platzhalter, damit die drei Ausgänge ein Ziel
+haben. 348 Tests.
+
+Überraschend war fünferlei. Erstens ist der Splash **kein Ladebildschirm**: der
+zeitgesteuerte Boot-Splash der PWA wurde am 06.06.2026 in Commit `83be52f`
+absichtlich entfernt, das Skript in `index.html:222-245` beginnt mit
+`if (!splash) return` und ist toter Code. Die Zahlen 1200 ms und 15000 ms, die
+in den Vorlagen stehen, gehören zu diesem toten Pfad. Was „SplashScreen" heißt,
+ist ein interaktiver Bildschirm mit drei gleichrangigen Ausgängen, darunter ein
+Gastmodus, der in beiden Vorlagen fehlt.
+
+Zweitens ist `slideUp` **zweimal** definiert, in `styles.css:251` mit
+`translateY(100%)` und in `index.html:25` mit 24 Pixeln plus Deckkraft. Der
+Inline-Block steht nach dem Stylesheet, bei gleichnamigen `@keyframes` gewinnt
+die letzte Definition. Wer nur das Stylesheet liest, baut das Falsche.
+
+Drittens ist `onboarding.quote` ein **toter Schlüssel**: er existiert, wird in
+der PWA nirgends benutzt und weicht im Text ab (»…« statt „…", plus
+„(vermutlich)"). Für das sichtbare Goethe-Zitat gibt es also keinen Schlüssel,
+und Invariante 4 („kein Text hartcodieren") hat hier keine Quelle.
+
+Viertens, und das ist die teuerste Falle: eine eigene `MediaQuery` um `FactApp`
+in einem Widget-Test **verdeckt die echte**. `pumpWidget` steckt das Widget in
+ein `View`, und erst dieses legt `MediaQuery.fromView` an. Die eigene sitzt
+darunter, `size` und `padding` fallen auf Null, und jede Layout-Zusicherung ist
+lautlos wertlos. Der richtige Weg ist
+`tester.platformDispatcher.accessibilityFeaturesTestValue`. Gemessen, nicht
+vermutet: 141 statt 0 als `view.padding.top`.
+
+Fünftens hat die Safe Area andersherum gelegen als angenommen.
+`index.html:101-107` setzt `env(safe-area-inset-*)` als `padding` an den
+**`body`**, die PWA rückt also den ganzen Bildschirm samt Verlauf und Pins ein.
+Eine `SafeArea` nur um die Inhaltsspalte hätte die Wortmarke richtig und die
+fünf Pins um die Notch-Höhe zu hoch gesetzt. Die unabhängige Review hat das
+gefunden, nachdem die erste Vorgabe das Gegenteil verlangte.
+
+Nebenbefund zur Arbeitsweise: die Review hat drei Mutationen gefunden, die die
+Suite überlebten, darunter „der Knopf Anmelden öffnet die Registrierung". Die
+Tests sahen vollständig aus und waren es nicht. Mutationsproben sind der
+einzige Weg, das zu merken.
 
 ### 26.08.2026, Schritt 6: App-Shell, Phase 0 abgeschlossen
 

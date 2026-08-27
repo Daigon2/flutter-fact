@@ -10,8 +10,10 @@ nicht in Git eingecheckt und existieren nur lokal.
 
 **Achtung:** Der REBUILD_PLAN gibt die Reihenfolge vor, nicht die Architektur.
 Sein Grundprinzip 4 nennt `provider` und ein globales `AppState`. Das widerspricht
-ADR-003 und ADR-005 und gilt hier nicht. Die drei nachgewiesenen Sachfehler des
-Plans stehen unten unter „Korrekturen an den Quelldokumenten".
+ADR-003 und ADR-005 und gilt hier nicht. Die nachgewiesenen Sachfehler des
+Plans und der Parity-Spec stehen unten unter „Korrekturen an den
+Quelldokumenten". Es sind inzwischen zwölf, und **auch Kommentare in der PWA
+selbst** sind darunter.
 
 ## Legende
 
@@ -34,8 +36,10 @@ durch eine offene Entscheidung
   PWA-Schlüssel sonst verloren gehen. **716 Schlüssel je Sprache**, DE und EN
   deckungsgleich. Generator unter `tool/generate_i18n.dart` mit `--check` für
   Drift-Erkennung. 47 Tests.
-- [ ] **5. Datenmodell und Supabase-Client.** Defensives `Fact`-Mapping. Fünf
-  bekannte Cast-Fallen, siehe „Datenvertrag".
+- [x] **5. Datenmodell und Supabase-Client.** Defensives `Fact`-Mapping. Fünf
+  bekannte Cast-Fallen, siehe „Datenvertrag". (Das Kästchen stand bis zum
+  27.08.2026 fälschlich auf offen, obwohl der Schritt laut Protokoll in
+  `HANDOFF.md` und laut `test/features/facts/` fertig war.)
 - [x] **6. App-Shell.** Typisierte Routen über `go_router_builder`, vier Tabs
   aus `chrome.jsx:55-60` belegt, `StatefulShellRoute` für unabhängige Stapel,
   schwebende Tab-Leiste mit den Werten der Quelle, reservierter
@@ -50,8 +54,41 @@ durch eine offene Entscheidung
 
 ## Phase 1, Auth und Onboarding
 
-- [ ] 7. Splash · [ ] 8. Audio-Aktivierungsdialog · [ ] 9. Login
-- [ ] 10. Signup · [ ] 11. Tutorial-Overlay
+- [x] **7. Startbildschirm.** `/splash` außerhalb der Shell, Weiche als reine
+  Funktion in `lib/app/routing/route_guards.dart`, `FirstLaunchStore` in
+  `lib/features/identity/domain/`. **Kein Ladebildschirm und kein Timer**: der
+  zeitgesteuerte Boot-Splash der PWA ist seit Commit `83be52f` (06.06.2026)
+  entfernt, die Zahlen 1200 ms und 15000 ms in den Vorlagen gehören zu totem
+  Code. Drei gleichrangige Ausgänge, darunter der Gastmodus „Ohne Konto
+  erkunden", der in beiden Vorlagen fehlt.
+  Bewusste Abweichungen, jede im Code begründet: die Erstlauf-Merkung wird
+  **nur** auf dem Gast-Weg gesetzt, nicht wie in `app.jsx:477` bei jeder
+  Navigation (dort sieht man den Startbildschirm nach einem abgebrochenen
+  Signup nie wieder); Überlauf über `IntrinsicHeight` statt Abschneiden, weil
+  Flutter sonst einen Overflow-Fehler zeigt; `MediaQuery.disableAnimations`
+  schaltet beide Animationen ab, was gleichzeitig Systemeinstellung und
+  Testbarkeit erfüllt.
+  Offen: der Startbildschirm deckt nur die erste Hälfte von `app.jsx:69` ab.
+  Die zweite (`&& !Storage.getUser()`, also „angemeldet heißt kein Splash")
+  braucht die Sitzung und gehört in Schritt 9 in die Weiche, nicht in den
+  Speicher.
+- [x] **8. Audio-Aktivierungsdialog.** `showDialog` mit
+  `barrierDismissible: false`, weil die Quelle kein Schließen durch Tippen auf
+  den Hintergrund kennt. `AudioModeStore` in `lib/features/settings/domain/`,
+  denn die Audio-Präferenz gehört `settings`, während der auslösende Knopf
+  `identity` gehört; verdrahtet über den von Regel 10 vorgesehenen
+  App-Kompositions-Adapter in `SplashRoute.build`.
+  **Die Präferenz bewirkt noch nichts**, weil es keine Wiedergabe gibt. Nicht
+  gebaut und jeweils dokumentiert: iOS-DeviceMotion-Berechtigung, gesprochene
+  Hilfe (Schritt 25, E-15), `fact_audio_help_shown`.
+  Der Lautstärke-Hinweis der Quelle **entfällt**, siehe E-28: sein i18n-
+  Schlüssel existiert in der PWA nicht, sie zeigt dem Nutzer den rohen
+  Schlüsselnamen.
+  Bewusste Abweichung: die beiden Knöpfe bekommen Nunito statt der
+  Browser-Standardschrift, in der die PWA sie unbeabsichtigt rendert. Folge,
+  die dazugehört: Arial kennt kein Gewicht 900, in der PWA sehen beide Knöpfe
+  gleich fett aus, hier nicht.
+- [ ] 9. Login · [ ] 10. Signup · [ ] 11. Tutorial-Overlay
 
 ## Phase 2, Map-Kern
 
@@ -123,6 +160,45 @@ Nicht im REBUILD_PLAN, aber notwendig:
   auch in `application`, `presentation` darf nicht auf das eigene `data`
   zeigen, `integration_test/` wird mitgelesen, und `presentation` wird auch
   außerhalb von `features/` geprüft.
+- [x] **Echte Schriften in Widget-Tests.** `test/support/app_fonts.dart`.
+  `flutter test` lädt die Schriften aus `pubspec.yaml` nicht und zeichnet jede
+  Glyphe als Quadrat der Schriftgröße. Jede Maß- und Überlaufprüfung hat
+  vorher ein Layout geprüft, das es auf keinem Gerät gibt: „FACT" belegt dort
+  256 statt 166 Pixel, und die Knopfzeile des Audio-Dialogs lief schon bei
+  Skalierung 1.0 um. Aufruf **nur aus `setUpAll`**, im Rumpf von `testWidgets`
+  hängt `FontLoader` in der `FakeAsync`-Zone. Bytes werden synchron gelesen und
+  in ein `SynchronousFuture` gepackt, `rootBundle` funktioniert nicht, weil
+  Schriften in `FontManifest.json` stehen und nicht im Asset-Manifest.
+- [x] **`reportDetached` für abgekoppelte Arbeit.**
+  `lib/core/async/detached_work.dart`. `docs/engineering/flutter.md:151`
+  verlangt „an explicit helper **and error reporting**"; drei Aufrufstellen
+  hatten nur den Helfer. Ohne Meldung heißt ein gescheiterter Schreibvorgang:
+  Zustand sagt `true`, Speicher sagt `false`, nach dem Neustart ist die
+  Einstellung weg, und nirgends liegt eine Spur.
+- [ ] **Der Provider in `features/facts/data/` ist eine Sackgasse, und sein
+  Kommentar behauptet das Gegenteil.**
+  `lib/features/facts/data/repositories/supabase_fact_repository.dart`
+  deklariert `factRepositoryProvider` neben der Implementierung und schreibt
+  dazu, Widgets und Notifier lesten „diesen Provider". Genau das können sie
+  nicht: `presentation → data` wird von `tool/check_architecture.dart` um Zeile
+  946 als Verstoß gemeldet. Dasselbe gilt für `factRemoteDataSourceProvider`.
+  Es ist **kein** Regelverstoß, weil es heute nur die App-Komposition liest,
+  aber es ist ein Kopiervorbild mit falscher Begründung. Der Weg, der
+  funktioniert, steht seit Schritt 9 in `lib/features/identity/`: Vertrag in
+  `domain/repositories/`, Provider auf den Vertrag typisiert in
+  `presentation/notifiers/`, Implementierung per Override aus `bootstrap.dart`.
+  Behebung gehört zu dem Schritt, der `facts` an die Karte hängt, nicht
+  hierher. Siehe E-32.
+- [ ] **Quellprüfung im i18n-Generator für unbekannte Schlüssel.** `t('...')`
+  im JSX ohne Eintrag im Wörterbuch ist für `tool/generate_i18n.dart` heute
+  unsichtbar; die Prüfung liest nur die beiden Wörterbuchdateien. Genau diese
+  Lücke hat `audio.dialog.volumeHint` (E-28) durchgelassen, gefunden wurde er
+  von Hand. Eine Prüfung wäre billig und deckt die ganze Fehlerklasse ab.
+- [ ] **Gate für generierten Code fehlt.** `docs/engineering/quality-gates.md`
+  nennt `tool/check_generated_code.dart`, das Skript existiert nicht. Ein
+  veralteter `*.g.dart`-Stand fällt heute nur auf, wenn jemand zufällig
+  `build_runner` startet. Am 27.08.2026 einmal von Hand geprüft: ein frischer
+  Lauf erzeugt `app_routes.g.dart` byteidentisch.
 - [ ] **Zwei verbleibende Asymmetrien im Architektur-Check.** Erstens ist die
   Cross-Feature-Prüfung flach: ein fremdes `features/x/unterstruktur/data/`
   entkommt den Regeln 8 und 9, während dieselbe Verschachtelung für die
@@ -186,7 +262,17 @@ Begründung und Wiederaufnahme-Bedingung angepasst.
 
 Nummerierung aus der Architektur-Gegenüberstellung. Bereits entschieden und
 deshalb nicht mehr gelistet: Feature-Zuschnitt, Gold-Trennung im hellen Theme,
-Nunito-600, Umgang mit `riverpod_lint`.
+Nunito-600, Umgang mit `riverpod_lint`, dazu **E-25** (siehe unten).
+
+**E-25 ist am 27.08.2026 entschieden.** Die vier Tab-Pfade bleiben `/map`,
+`/collection`, `/challenges`, `/profile`, also die Domänennamen aus der
+Domain-Map statt der PWA-Bezeichner `wallet` und `profil`. Begründung: sie sind
+deckungsgleich mit den Feature-Ordnern, und die PWA kennt ohnehin keine URLs,
+gegen die man sich angleichen könnte. Gleichzeitig entschieden: Splash, Login
+und Signup werden **eigene Routen** `/splash`, `/login`, `/signup` mit
+zentraler Redirect-Weiche, nicht zustandsgesteuerte Overlays. Der öffentliche
+Vertrag umfasst damit sieben Pfade statt vier. Ab jetzt kostet ein Umbenennen
+eine Migration, vorher eine Zeile.
 
 | Nr | Entscheidung | Level | Fällig vor |
 |---|---|---|---|
@@ -203,10 +289,16 @@ Nunito-600, Umgang mit `riverpod_lint`.
 | E-17 | **Creator-Foto.** Storage-Bucket, Policy, Moderation vor `is_approved`. | 3, Bucket-Anlage 4 | Phase 8 |
 | E-19 | **Trusted Time.** Der 45-Minuten-Timer für das Session-Ende und die Finale-Punkte ×1.5 rechnen clientseitig. `security.md` §1 verbietet vertrauenswürdige Zeitstempel aus dem Client. | 3 | Phase 5 |
 | E-20 | **Kamera-Permission** für Damals/Heute und Foto-Rätsel, mit Zweckbindung. | 3 | Phase 3 |
-| E-25 | **Vier Deep-Link-Pfade als öffentlicher Vertrag.** `/map`, `/collection`, `/challenges`, `/profile`. Die PWA liefert keine Vorlage, sie kennt keine URLs, sondern schaltet mit `setRoute(...)` um. Gewählt wurden die Domänennamen aus der Domain-Map statt der PWA-Bezeichner `wallet` und `profil`. Sobald Push-Nachrichten, geteilte Links oder Universal Links darauf zeigen, sind die Strings fest. Jetzt umbenennen kostet eine Zeile je Route, später eine Migration. | 3 | vor externem Teilen, siehe OD-014 |
 | E-23 | **Die Distanzprüfung beim Sammeln ist nicht nur umgehbar, sie ist optional.** Die Policy `create policy "own collected" on public.collected_facts for all using (auth.uid() = user_id)` erlaubt dem Client, direkt in `collected_facts` einzufügen. Damit entfällt `collect_fact_validated` samt der 150-Meter-Prüfung vollständig, und der Trigger `handle_fact_collected` bucht danach Punkte, Stadtwertung und Trophäen. E-07 beschreibt nur, dass die Positionsangabe fälschbar ist; hier braucht man gar keine. | **4** | Phase 2 |
 | E-24 | **Coins und Punktestand sind direkt setzbar.** Die Policy `create policy "own profile" on public.profiles for all using (auth.uid() = id)` hat kein `WITH CHECK`. Der Client kann seine eigene Profilzeile aktualisieren, einschließlich `coins` und `score_total`. **Wichtig für die Reihenfolge der Behebung:** wer E-06 behebt, also `increment_coins` absichert, hat damit nichts gewonnen, solange E-24 offen ist. Die Funktion ist dann nur der bequemere von zwei Wegen. | **4** | Phase 2 |
 | E-21 | **`start_group_session` ist doppelt definiert**, in `2026-06-04_group_sessions.sql:193` und erneut in `2026-06-05_team_sessions.sql:473`. Welche Version produktiv läuft, hängt an der Ausführungsreihenfolge im SQL-Editor. Backend-Frage, aber der Client hängt daran. | 3, im anderen Repo | Phase 5 |
+| E-26 | **Wo das Tutorial-Overlay wohnt.** Die Domain-Map nennt keinen Eigentümer für Onboarding, und `lib/features/README.md` sagt, dass der Zuschnitt der drei zusätzlichen Feature-Ordner auf Bestätigung wartet. Ein vierter (`features/onboarding/`) ist dieselbe Klasse von Entscheidung. Ohne Freigabe gebaut wird deshalb unter `lib/app/onboarding/`, was als App-Komposition keine Eskalation braucht und dieselbe innere Struktur hat. Ein Wechsel kostet ein Verschieben plus Importe, keine Umschreibung. `identity` ist ausdrücklich **nicht** der Eigentümer: die PWA führt zwei unabhängige Flags, `fact_has_launched` (Splash) und `fact_tour_shown` (Tutorial), und in Phase 2 wächst das Tutorial um fünf Kartenanker. | 3 | vor Phase 2 |
+| E-27 | **`lib/core/anchors/` als allgemeine Fähigkeit.** Das Tutorial muss die Bildschirmposition fremder Widgets kennen. Die PWA löst das über `getBoundingClientRect` auf `[data-tour-anchor]`, was es in Flutter nicht gibt. Vorgesehen ist eine Anker-Registry in `core`, in der sich Widgets mit einer Kennung anmelden, wobei **die Kennungen selbst nicht in `core` liegen**, sondern bei der Oberfläche, die sie besitzt. Sonst greift `_checkCoreConcepts` zu Recht ein. `docs/architecture/project-structure.md` zählt die `core`-Kandidaten auf und kennt `anchors` nicht, es ist also eine Ergänzung eines akzeptierten Dokuments. Alternative wären Bildschirmanteile wie im alten Port, die die Parity-Spec als Lücke markiert. | 3 | Schritt 11 |
+| E-28 | **Text für `audio.dialog.volumeHint`.** Der Schlüssel wird in `screen-auth.jsx:251` benutzt und existiert **in der PWA nicht**; sie zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Beide Vorlagen beschreiben den Kasten, als hätte er Text. Im Neubau entfällt er, weil ein handgeschriebener Schlüssel beim nächsten Lauf von `tool/generate_i18n.dart` verschwindet und `--check` rot macht. Nötig ist ein DE- und EN-Text, und die Behebung gehört in die PWA, nicht hierher. | 2 | vor Auslieferung |
+| E-29 | **DM Sans Kursiv und 700 fehlen als Asset.** Das Goethe-Zitat auf dem Startbildschirm ist kursiv, das letzte Wort fett. `assets/fonts/` hat nur 400, 500 und 600, alle aufrecht. Die PWA hat dasselbe Loch (`styles.css:3` lädt weder Italic noch 700) und lässt den Browser synthetisieren; Flutter tut das für Asset-Schriften nicht. `fontStyle: italic` und `w700` stehen im Code, damit die Absicht stimmt, sobald die Dateien da sind. | 2 | vor Auslieferung |
+| E-30 | **`reference-features/settings.md` widerspricht `dependency-rules.md`.** `settings.md:19-27` zeigt einen Notifier in `presentation/notifiers/` neben einem `data/settings_store.dart`, Zeile 33-38 sagt „persists through `SettingsStore`", Zeile 42-44 begründet ausdrücklich, dass es **keine** Domänenschicht gibt. Es gibt keine Verdrahtung, die das erfüllt: den direkten Import meldet `tool/check_architecture.dart` um Zeile 946, und ohne Domänenschicht gibt es keinen Ort für den Vertrag. Der gebaute Code weicht deshalb ab und legt den Vertrag nach `lib/features/settings/domain/audio_mode_store.dart`. Zu entscheiden: `settings.md` korrigieren, oder die Ausnahme im Abschnitt „Exceptions" der `dependency-rules.md` schriftlich fassen. | 3 | vor dem Ausbau von `features/settings` |
+| E-31 | **Die strengste Regel des Projekts steht nur im Prüfskript.** Der Block „Forbidden" in `dependency-rules.md` listet `domain → data`, `domain → presentation`, `data → presentation`, `feature A presentation → feature B presentation` und `core → any feature`. **`presentation → eigenes data` steht dort nicht.** Das Verbot ist eine Ableitung aus der Weißliste der Tabelle „Allowed layer dependencies", und das Skript begründet es auch so. Eine Regel, die Schritt 9, Schritt 10 und danach jedes Feature mit Repository formt, sollte wörtlich dastehen. | 3 | bald, es kostet eine Zeile |
+| E-32 | **`project-structure.md:115` ist zweideutig, und beide Lesarten sind im Code umgesetzt.** Der Satz lautet „Riverpod providers that construct data/application dependencies live near the implementation they expose". `lib/features/facts/data/repositories/supabase_fact_repository.dart` liest ihn als „neben der Implementierung" und wird damit für `presentation` unerreichbar; `lib/core/diagnostics/diagnostics_providers.dart` zitiert dieselbe Regel für „neben dem **Vertrag**". Solange der Satz offen ist, entscheidet der Zufall, welche Vorbildstelle jemand zuerst liest. Vorschlag: ergänzen, dass solche Provider ausschließlich von der App-Komposition gelesen werden und höhere Schichten über einen vertragsseitigen Provider plus Override zugreifen. | 3 | vor Phase 2 |
 
 ## Datenvertrag: die bekannten Fallen
 
@@ -248,6 +340,42 @@ Nachgewiesene Sachfehler in den Vorlagen. Wer sie liest, muss das wissen.
    `{name}`, positionsweise ersetzt in `screen-challenge.jsx:3506` und `:3602`.
    `AppStrings.text()` löst `%d` nicht auf. Wer den Gruppenmodus portiert,
    formatiert diese beiden am Aufrufort. Per Test festgenagelt.
+
+6. **Der zeitgesteuerte Boot-Splash existiert nicht mehr.** Er wurde am
+   06.06.2026 in Commit `83be52f` aus `index.html` entfernt („Startbildschirm-Marke
+   '!' entfernt"). Das Steuerskript steht noch da, beginnt aber mit
+   `if (!splash) return`. Die Zahlen `MIN_MS = 1200` und `TIMEOUT_MS = 15000`
+   gehören zu diesem toten Pfad, ebenso `@keyframes splashFadeOut`. Wer sie
+   nachbaut, baut einen Ladebildschirm, den die Quelle bewusst abgeschafft hat.
+7. **REBUILD_PLAN Schritt 7 ist unvollständig.** Er nennt Wortmarke, Untertitel,
+   Sprachpicker, CTAs, Ballon-Pins, Bottom-Wash und Goethe-Zitat, aber nicht das
+   Gitter-Overlay, den radialen Lichtkegel, den Kennzahlen-Streifen „950+ / 4",
+   den 🎧-Knopf und den Gast-Ausgang „Ohne Konto erkunden". Der Gast-Ausgang
+   fehlt auch in der Parity-Spec, obwohl er die Startmaschine substanziell
+   verändert: ohne ihn wäre die Anmeldung faktisch Pflicht.
+8. **`@keyframes slideUp` ist zweimal definiert**, in `styles.css:251` mit
+   `translateY(100%)` und in `index.html:25` mit `translateY(24px)` plus
+   Deckkraft. Der Inline-Block steht nach dem Stylesheet, bei gleichnamigen
+   Keyframes gewinnt die letzte Definition. **Maßgeblich ist `index.html:25`.**
+   Dasselbe gilt für `.screen-transition`. Wer nur `styles.css` liest, portiert
+   die falsche Animation.
+9. **Parity-Spec: der Wortmarken-Untertitel ist kein großgeschriebenes Literal.**
+   Die Quelle enthält `Stadtführer · Urban Explorer` in gemischter Schreibung und
+   macht die Großschreibung per `textTransform: uppercase`
+   (`screen-auth.jsx:51`). Ein Nachbau muss die Transformation übernehmen.
+10. **Parity-Spec: die `audio.dialog.*`-Schlüssel fehlen nicht.** `title`, `body`,
+   `activate` und `cancel` existieren in `audio-strings.jsx`. Es fehlt genau
+   einer, `audio.dialog.volumeHint`, und der fehlt **in der PWA selbst**: sie
+   zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Siehe E-28.
+11. **REBUILD_PLAN: das Signup hat kein Feld „Name".** Es hat ein Feld
+   **Username** mit dem Regex `^[a-zA-Z0-9_]{2,20}$`, `maxLength 20` und einem
+   um 500 ms verzögerten Server-Check über `check_username`. Der alte
+   Flutter-Port ist an dieser Stelle richtig, der Plan nicht.
+12. **Die Kommentare der PWA über die Tutorial-Schritte sind falsch.**
+   `screen-tour.jsx:2` und `:137` sagen „8 Schritte", `storage.jsx:99` sagt
+   „5-Schritt". Es sind **neun**, belegt dreifach: neun Objekte im `STEPS`-Array,
+   `tour.step1` bis `tour.step9` in beiden Sprachen, und die Anzeige rechnet mit
+   `STEPS.length`. Hier hilft es nicht, der Quelle zu glauben, man muss zählen.
 
 ## Bewusste Auslassungen
 

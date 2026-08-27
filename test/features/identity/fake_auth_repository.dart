@@ -1,0 +1,92 @@
+import 'dart:async';
+
+import 'package:fact_app/features/identity/domain/entities/auth_session.dart';
+import 'package:fact_app/features/identity/domain/failures/auth_failure.dart';
+import 'package:fact_app/features/identity/domain/repositories/auth_repository.dart';
+
+/// Steuerbarer Ersatz für [AuthRepository].
+///
+/// Ein Fake und kein Mock: `docs/engineering/testing.md` §5 verlangt für
+/// Repositories und zustandstragende Mitspieler einen Fake. Er zählt Aufrufe,
+/// weil die Zahl an einer Stelle Verhalten ist (ein gesperrter Knopf darf
+/// `signIn` nicht zweimal starten), aber er prüft keine Aufrufreihenfolgen.
+///
+/// Liegt beim besitzenden Feature, wie es `testing.md` §Fixtures verlangt.
+class FakeAuthRepository implements AuthRepository {
+  /// [initial] ist der Zustand, den [currentSession] vor der ersten Ausgabe
+  /// liefert.
+  FakeAuthRepository({AuthSession initial = const AuthSession.signedOut()})
+    : _current = initial;
+
+  final StreamController<AuthSession> _sessions =
+      StreamController<AuthSession>.broadcast();
+
+  AuthSession _current;
+
+  /// Was [signInWithPassword] wirft, oder `null` für Erfolg.
+  AuthFailure? failure;
+
+  /// Kennung, die eine erfolgreiche Anmeldung liefert.
+  String userId = 'user-1';
+
+  /// Solange gesetzt und nicht erfüllt, hängt [signInWithPassword]. Damit ist
+  /// der Ladezustand prüfbar, ohne mit Zeit zu arbeiten
+  /// (`testing.md`: "Do not use arbitrary delays").
+  Completer<void>? gate;
+
+  /// Wie oft [signInWithPassword] gerufen wurde.
+  int signInCount = 0;
+
+  /// Womit zuletzt gerufen wurde. Prüft, dass die Adresse getrimmt und das
+  /// Passwort **nicht** getrimmt ankommt.
+  String? lastEmail;
+
+  /// Siehe [lastEmail].
+  String? lastPassword;
+
+  /// Ob noch jemand am Sitzungsstrom hängt. Zeigt, ob `ref.onDispose` das
+  /// Abonnement wirklich abgeräumt hat.
+  bool get hasSessionListeners => _sessions.hasListener;
+
+  /// Schickt [session] über den Strom, wie Supabase es bei
+  /// `onAuthStateChange` tut.
+  void emit(AuthSession session) {
+    _current = session;
+    _sessions.add(session);
+  }
+
+  /// Schickt einen Fehler über den Strom, wie der Vendor es bei einer
+  /// fehlgeschlagenen Token-Erneuerung tut.
+  void emitError(Object error) => _sessions.addError(error);
+
+  /// Schließt den Strom. Für [close_sinks] und damit kein Test einen offenen
+  /// Controller hinterlässt.
+  Future<void> close() => _sessions.close();
+
+  @override
+  AuthSession currentSession() => _current;
+
+  @override
+  Stream<AuthSession> sessionChanges() => _sessions.stream;
+
+  @override
+  Future<AuthSession> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    signInCount++;
+    lastEmail = email;
+    lastPassword = password;
+    final open = gate;
+    if (open != null) {
+      await open.future;
+    }
+    final problem = failure;
+    if (problem != null) {
+      throw problem;
+    }
+    final session = AuthSession.signedIn(userId: userId);
+    emit(session);
+    return session;
+  }
+}
