@@ -50,32 +50,25 @@ strukturell.
 gelöst" unter „Rechner einrichten". Es war nie ein Netzwerkproblem: Java legt
 für `Selector.open()` einen Unix-Domain-Socket im Temp-Verzeichnis an, und
 AF_UNIX ist auf diesem Rechner unter `AppData` nicht verbindbar. Die Umgehung
-ist eine Umgebungsvariable. Damit ist der erste Gerätebuild jetzt möglich und
-steht als Nächstes an.
+ist eine Umgebungsvariable, siehe dort. Der erste Gerätebuild ist am selben Tag
+gelaufen.
 
 ---
 
 ## Als Nächstes
 
-1. **Den ersten Gerätebuild machen.** Der Blocker ist gelöst, gebaut wurde
-   trotzdem noch nie. Jetzt endlich prüfbar: ob `maplibre_gl` eine höhere
-   `minSdk` verlangt, ob die vier SVG-Icons und Nunito bei 10px rendern, wie
-   die Tab-Leiste mit echter Safe Area sitzt, ob die variable Schrift über
-   `fontVariations` wirklich das Gewicht 600 zeigt, und ob die Maße der
-   Bildschirme aus Phase 1 am Gerät stimmen. Bisher sind alle Aussagen darüber
-   **strukturell**, nicht optisch.
-2. **Materials Laufweite global auf null**, wo die Quelle keine angibt (E-38,
+1. **Materials Laufweite global auf null**, wo die Quelle keine angibt (E-38,
    am 27.08.2026 entschieden). **Vor** Schritt 11 machen, weil es alle Textmaße
    verschiebt: die festgenagelten Werte in den Tests müssen neu gemessen und der
    Gerätelauf wiederholt werden. Danach ist jede weitere Messung verlässlich.
-3. **Schritt 11, Tutorial-Overlay.** Entsteht unter `lib/app/onboarding/`
+2. **Schritt 11, Tutorial-Overlay.** Entsteht unter `lib/app/onboarding/`
    (E-26). Neun Schritte, zwei davon Vollbild. Sechs sind heute voll baubar,
    drei degradieren paritätstreu, weil ihre Anker erst mit der Karte entstehen.
    Braucht eine Anker-Registry in `lib/core/anchors/` (E-27).
-4. **Unabhängige Review der Schritte 9, 10 und 11.** Schritt 9 und 10 sind
+3. **Unabhängige Review der Schritte 9, 10 und 11.** Schritt 9 und 10 sind
    committet und **nicht** geprüft. Die Reviews haben in dieser Sitzung jedes Mal
    echte Fehler gefunden, insgesamt zehn Mutationen, die die Suite überlebten.
-5. **Entschieden am 27.08.2026:** die vier Deep-Link-Pfade bleiben `/map`,
+4. **Entschieden am 27.08.2026:** die vier Deep-Link-Pfade bleiben `/map`,
    `/collection`, `/challenges`, `/profile`, also die Domänennamen statt der
    PWA-Bezeichner. Splash, Login und Signup sind **eigene Routen** `/splash`,
    `/login`, `/signup` mit zentraler Redirect-Weiche. Damit ist E-25 in
