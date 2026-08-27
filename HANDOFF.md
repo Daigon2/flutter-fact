@@ -423,6 +423,7 @@ diesem Rechner laufen. Gradle ist nur der erste, der es merkt.
 | `hosts`-Datei | Keine Einträge für `localhost`, `127.0.0.1` oder `::1`. |
 | Reihenfolge im Prozess | `Selector.open()` scheitert auch als **allererste** Netzoperation, dreimal hintereinander. Nicht die Folge eines vorher geschlossenen Sockets. |
 | Gradle 8.x im Cache | `gradle-8.12-all` ist ein **abgebrochener Download** (0-Byte-`.zip.part`). Ein Herunterziehen auf 8.x braucht also doch einen Download. |
+| **Winsock- und IP-Reset** | `netsh winsock reset` und `netsh int ip reset` ausgeführt, Neustart am 27.08.2026 um 18:23:39 durchgeführt, danach erneut gemessen: **Fehler unverändert.** Damit ist der bisher oberste Verdacht erledigt. |
 
 **Verbleibender Verdacht, in dieser Reihenfolge zu prüfen:**
 
@@ -445,10 +446,33 @@ diesem Rechner laufen. Gradle ist nur der erste, der es merkt.
    und scheitert identisch. Das JDK ist damit keine Variable mehr, und
    `flutter config --jdk-dir` löst nichts.
 
-   Bleibt also der Netzwerk-Stack von Windows aus Punkt 1. Wenn Winsock- und
-   IP-Reset samt Neustart nichts bringen, ist die nächste Stufe `sfc /scannow`
-   und danach eine reparierende Windows-Installation: dann ist eine
-   Systemkomponente beschädigt, und das ist kein Projektproblem mehr.
+   Der Netzwerk-Stack-Reset aus Punkt 1 ist ebenfalls erledigt und hat nichts
+   gebracht. Damit sind alle Verdachtspunkte der alten Liste abgearbeitet.
+
+3. **Noch nicht geprüft, weil es Administratorrechte braucht: fremde
+   WFP-Callouts.** Die Windows Filtering Platform ist die einzige Schicht, die
+   Loopback-Verbindungen filtern kann und in keiner der bisherigen Messungen
+   sichtbar war. Ein Callout-Treiber einer deinstallierten Sicherheitssoftware
+   überlebt die Deinstallation, wenn er als Boot-Start-Treiber registriert ist.
+   TotalAV war zum Zeitpunkt des ersten Fehlers auf dem Rechner. Als
+   Administrator:
+
+   ```
+   netsh wfp show state file=C:\gtmp\wfp.xml
+   ```
+
+   Danach in `C:\gtmp\wfp.xml` nach Anbieternamen suchen, die nicht von
+   Microsoft sind. Findet sich einer, ist der Treiber gezielt zu entfernen.
+
+4. **Beschädigte Systemkomponente.** Wenn Punkt 3 nichts zeigt:
+   `sfc /scannow`, danach
+   `DISM /Online /Cleanup-Image /RestoreHealth`, danach eine reparierende
+   Windows-Installation. Dann ist es kein Projektproblem mehr.
+
+5. **Ausweichen statt reparieren.** Der Neubau ist auf einem anderen Rechner
+   oder in einer CI baubar. Solange nur dieser eine Rechner betroffen ist, ist
+   das der schnellste Weg zu einem ersten Gerätebuild, und die Reparatur kann
+   parallel laufen.
 
    **Nach jedem Versuch die Probe von oben, nicht einen Build.** Eine Sekunde
    statt Minuten, und sie sagt genau dasselbe.
