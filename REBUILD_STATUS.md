@@ -122,7 +122,25 @@ durch eine offene Entscheidung
   wie E-24; `raw_user_meta_data` ist frei beschreibbar und trägt trotzdem `name`
   und `hometown`; und `check_username` vergleicht case-insensitiv, während der
   Eindeutigkeitsindex case-sensitiv ist.
-- [ ] 11. Tutorial-Overlay
+- [x] **11. Tutorial-Overlay.** Neun Schritte unter `lib/app/onboarding/`
+  (E-26), aufgehängt über `AppShellRoute.builder` um `AppShell`, ohne eigene
+  Route: das Overlay hängt über der ganzen Shell, ein Tipp auf einen fremden
+  Tab-Knopf schaltet den Schritt weiter statt den Zweig zu wechseln.
+  Anker-Registry in `lib/core/anchors/` (E-27), Mechanismus dort, Kennungen bei
+  der besitzenden Oberfläche (`ShellTab.anchorId`, `DiscoveryAnchors`).
+  Vier Schritte sind heute voll baubar (1, 5, 7, 9), fünf degradieren
+  paritätstreu ohne Pfeil und Ring, weil ihre Anker auf dem Kartenbildschirm
+  liegen und der noch ein Platzhalter ist (Korrektur 13).
+  `fact_tour_shown` in `lib/app/onboarding/tour_store.dart`, nach dem
+  Speichermuster von `language_preference_store.dart`, unabhängig von
+  `fact_has_launched` und **nicht** in `route_guards.dart`.
+  Zwei goldene Meta-Zeilen der Hero-Schritte als E-39-Ergänzung nachgetragen
+  (`tour.step1.meta`, `tour.step9.meta`), wortwörtlich aus der Quelle.
+  Zwei Funde einer unabhängigen Review behoben: `OnboardingHost` hätte mit der
+  naheliegenden `if (shown) return child;`-Fassung beim Tourende die ganze
+  Shell samt aller vier Navigationsstapel neu aufgebaut; `TourBubble` schnitt
+  Text bei großer Systemschrift lautlos ab, weil `Stack` clippt statt einen
+  Überlauf zu melden.
 
 ## Phase 2, Map-Kern
 
@@ -402,7 +420,7 @@ Tutorial, der Planer zählt in `stops`. Nicht `tour.stepOf` genannt, weil
 | E-23 | **Die Distanzprüfung beim Sammeln ist nicht nur umgehbar, sie ist optional.** Die Policy `create policy "own collected" on public.collected_facts for all using (auth.uid() = user_id)` erlaubt dem Client, direkt in `collected_facts` einzufügen. Damit entfällt `collect_fact_validated` samt der 150-Meter-Prüfung vollständig, und der Trigger `handle_fact_collected` bucht danach Punkte, Stadtwertung und Trophäen. E-07 beschreibt nur, dass die Positionsangabe fälschbar ist; hier braucht man gar keine. | **4** | Phase 2 |
 | E-24 | **Coins und Punktestand sind direkt setzbar.** Die Policy `create policy "own profile" on public.profiles for all using (auth.uid() = id)` hat kein `WITH CHECK`. Der Client kann seine eigene Profilzeile aktualisieren, einschließlich `coins` und `score_total`. **Wichtig für die Reihenfolge der Behebung:** wer E-06 behebt, also `increment_coins` absichert, hat damit nichts gewonnen, solange E-24 offen ist. Die Funktion ist dann nur der bequemere von zwei Wegen. | **4** | Phase 2 |
 | E-21 | **`start_group_session` ist doppelt definiert**, in `2026-06-04_group_sessions.sql:193` und erneut in `2026-06-05_team_sessions.sql:473`. Welche Version produktiv läuft, hängt an der Ausführungsreihenfolge im SQL-Editor. Backend-Frage, aber der Client hängt daran. | 3, im anderen Repo | Phase 5 |
-| E-28 | **Text für `audio.dialog.volumeHint`.** Der Schlüssel wird in `screen-auth.jsx:251` benutzt und existiert **in der PWA nicht**; sie zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Beide Vorlagen beschreiben den Kasten, als hätte er Text. **Die technische Sperre ist seit E-39 weg:** ein handgeschriebener Schlüssel überlebt den Generator jetzt, die Ergänzungs-Map ist der vorgesehene Ort dafür. Offen ist nur noch der Wortlaut, je ein Satz DE und EN. Solange er fehlt, entfällt der Kasten im Neubau weiter, denn erfundener Nutzertext ist keine Lösung. Die bessere Behebung bleibt ein Schlüssel in der PWA; dann räumt die Gegenprüfung des Generators den lokalen Eintrag von selbst wieder ab. | 2 | vor Auslieferung |
+| E-28 | **Text für `audio.dialog.volumeHint`.** Der Schlüssel wird in `screen-auth.jsx:251` benutzt und existiert **in der PWA nicht**; sie zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Beide Vorlagen beschreiben den Kasten, als hätte er Text. **Die technische Sperre ist seit E-39 weg:** ein handgeschriebener Schlüssel überlebt den Generator jetzt, die Ergänzungs-Map ist der vorgesehene Ort dafür. Offen ist nur noch der Wortlaut, je ein Satz DE und EN. Solange er fehlt, entfällt der Kasten im Neubau weiter, denn erfundener Nutzertext ist keine Lösung. Die bessere Behebung bleibt ein Schlüssel in der PWA; dann räumt die Gegenprüfung des Generators den lokalen Eintrag von selbst wieder ab.<br><br>**Vorschlag, am 28.08.2026 hergeleitet, nicht freigegeben:** DE „Dreh die Lautstärke vorher auf. Der Guide spricht laut los, sobald du in der Nähe einer Sehenswürdigkeit bist.", EN „Turn your volume up first. The guide speaks out loud when you approach a landmark." Bewusst ohne Stummschalter-Hinweis: das ist ein iOS-Begriff und steuert auf keiner der beiden Plattformen die Medienlautstärke, ein Hinweis darauf wäre für die halbe Zielgruppe falsch. Das 🔊-Symbol rendert die PWA außerhalb des Strings, gehört also nicht in den Wert. | 2 | vor Auslieferung |
 | E-29 | **DM Sans Kursiv und 700 fehlen als Asset.** Das Goethe-Zitat auf dem Startbildschirm ist kursiv, das letzte Wort fett. `assets/fonts/` hat nur 400, 500 und 600, alle aufrecht. Die PWA hat dasselbe Loch (`styles.css:3` lädt weder Italic noch 700) und lässt den Browser synthetisieren; Flutter tut das für Asset-Schriften nicht. `fontStyle: italic` und `w700` stehen im Code, damit die Absicht stimmt, sobald die Dateien da sind. | 2 | vor Auslieferung |
 | E-30 | **`reference-features/settings.md` widerspricht `dependency-rules.md`.** `settings.md:19-27` zeigt einen Notifier in `presentation/notifiers/` neben einem `data/settings_store.dart`, Zeile 33-38 sagt „persists through `SettingsStore`", Zeile 42-44 begründet ausdrücklich, dass es **keine** Domänenschicht gibt. Es gibt keine Verdrahtung, die das erfüllt: den direkten Import meldet `tool/check_architecture.dart` um Zeile 946, und ohne Domänenschicht gibt es keinen Ort für den Vertrag. Der gebaute Code weicht deshalb ab und legt den Vertrag nach `lib/features/settings/domain/audio_mode_store.dart`. Zu entscheiden: `settings.md` korrigieren, oder die Ausnahme im Abschnitt „Exceptions" der `dependency-rules.md` schriftlich fassen. | 3 | vor dem Ausbau von `features/settings` |
 | E-31 | **Die strengste Regel des Projekts steht nur im Prüfskript.** Der Block „Forbidden" in `dependency-rules.md` listet `domain → data`, `domain → presentation`, `data → presentation`, `feature A presentation → feature B presentation` und `core → any feature`. **`presentation → eigenes data` steht dort nicht.** Das Verbot ist eine Ableitung aus der Weißliste der Tabelle „Allowed layer dependencies", und das Skript begründet es auch so. Eine Regel, die Schritt 9, Schritt 10 und danach jedes Feature mit Repository formt, sollte wörtlich dastehen. | 3 | bald, es kostet eine Zeile |

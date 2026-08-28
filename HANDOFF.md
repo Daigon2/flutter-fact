@@ -17,19 +17,18 @@ Für Details nicht hier suchen, sondern:
 
 ## Stand
 
-**Zuletzt aktualisiert:** 28.08.2026
+**Zuletzt aktualisiert:** 28.08.2026, Abend
 
-**Phase 0 abgeschlossen. Phase 1 läuft, Schritte 7 bis 10 von 50 fertig. Die App
-ist erstmals auf einem Gerät gelaufen.**
+**Phase 0 und Phase 1 abgeschlossen. Schritte 1 bis 11 von 50 fertig.** Die App
+ist erstmals auf einem Gerät gelaufen, der Gerätelauf ist wegen E-38 seither
+nicht wiederholt.
 
-Steht: Projektgerüst, Pakete, Design-Tokens, i18n, Fakt-Datenmodell mit
-Supabase-Zugang, App-Shell mit typisierten Routen und Tab-Leiste, das
-Architektur-Prüfskript mit eigener Testsuite, der Startbildschirm mit zentraler
-Router-Weiche für Erstlauf und Sitzung, der Audio-Aktivierungsdialog und die
-Anmeldung samt Supabase-Anbindung.
+Steht zusätzlich seit dem Vormittag: die Anker-Registry in `lib/core/anchors/`
+(E-27), eine Ergänzungs-Map für Oberflächentexte ohne PWA-Schlüssel (E-39), und
+das Tutorial-Overlay unter `lib/app/onboarding/` mit neun Schritten.
 
-**Kennzahlen:** 640 Tests grün, alle vier Gates auf Exit-Code 0, und
-`flutter build apk --debug` läuft.
+**Kennzahlen:** 761 Tests grün, alle vier Gates auf Exit-Code 0,
+`dart run tool/generate_i18n.dart --check` auf Exit-Code 0.
 
 **Neu und projektweit nützlich:** `test/support/app_fonts.dart` lädt die echten
 Schriften in Widget-Tests. Ohne das zeichnet `flutter test` jede Glyphe als
@@ -57,36 +56,67 @@ gelaufen.
 
 ## Als Nächstes
 
-1. **Den Gerätelauf wiederholen.** E-38 ist umgesetzt, damit ist jede
-   Beschriftung ohne eigene Laufweite schmaler geworden. Kein Test meldet
-   Überlauf oder Umbruch, aber die optische Prüfung von Splash, Anmeldung und
-   Registrierung ist formal wieder offen.
-2. **Schritt 11, Tutorial-Overlay.** Entsteht unter `lib/app/onboarding/`
-   (E-26), die Anker-Registry unter `lib/core/anchors/` (E-27, am 27.08.2026
-   entschieden). Neun Schritte, zwei davon Vollbild. **Vier sind heute voll
-   baubar, fünf degradieren** paritätstreu, weil ihre Anker auf dem
-   Kartenbildschirm liegen und der noch ein Platzhalter ist. Die frühere Zahl
-   6/3 war falsch, siehe Korrektur 13 in `REBUILD_STATUS.md`. Ein fehlender
-   Anker darf weder abstürzen noch den Schritt überspringen: die Quelle setzt
-   das Rechteck auf `null` und zeichnet den Schritt ohne Pfeil und Ring weiter.
-3. **Unabhängige Review von Schritt 11**, wenn er steht. Schritt 9 und 10 sind
-   am 28.08.2026 geprüft, die Funde sind behoben.
-4. **Entschieden am 27.08.2026:** die vier Deep-Link-Pfade bleiben `/map`,
-   `/collection`, `/challenges`, `/profile`, also die Domänennamen statt der
-   PWA-Bezeichner. Splash, Login und Signup sind **eigene Routen** `/splash`,
-   `/login`, `/signup` mit zentraler Redirect-Weiche. Damit ist E-25 in
-   `REBUILD_STATUS.md` geschlossen und der Vertrag um drei Pfade gewachsen.
-
-Vor Phase 2 (Karte) ist eine Entscheidung fällig: **wie Discovery, Tours,
-Challenges und Collection eine Karte teilen**, ohne dass ein Feature die
-Presentation eines anderen importiert. Der Vorschlag steht in
-`lib/features/README.md` unter „Was bewusst kein Feature ist".
+1. **Den Gerätelauf wiederholen.** Steht seit E-38 aus. Zwei Schritte
+   Bildmaterial sind seither dazugekommen (Anker-Registry unsichtbar, Tutorial
+   sichtbar), die optische Prüfung von Splash, Anmeldung, Registrierung und
+   jetzt auch dem Tutorial ist formal offen.
+2. **Phase 2, Map-Kern (Schritte 12 bis 20).** Vor dem ersten Schritt steht
+   eine Entscheidung: wie sich Discovery, Tours, Challenges und Collection eine
+   Karte teilen, ohne dass ein Feature die Presentation eines anderen
+   importiert. Vorschlag in `lib/features/README.md` unter „Was bewusst kein
+   Feature ist". Blockiert außerdem an E-10 (3D-Avatar, WebView oder Flutter)
+   und E-07/E-23 (Distanzprüfung beim Sammeln umgehbar, geteiltes Backend).
+3. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` listet
+   `balloon`, `user-marker`, `coins`, `mode-tour`, `compass` bereits als
+   Kennungen. Sobald die Kartenwidgets entstehen, hüllt sie `AnchorTarget` ein
+   und die fünf degradierenden Tutorial-Schritte werden voll baubar, ohne dass
+   `lib/app/onboarding/` sich ändert.
+4. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
+   technische Sperre ist seit E-39 weg. Vorschlag DE/EN liegt in
+   `REBUILD_STATUS.md` bei E-28, hergeleitet und nicht freigegeben.
 
 ---
 
 ## Protokoll
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
+
+### 28.08.2026, Schritt 11: Tutorial-Overlay, Phase 1 abgeschlossen
+
+Neun Schritte unter `lib/app/onboarding/`, ohne eigene Route: das Overlay hängt
+über der ganzen `AppShell`, ein Tipp auf einen fremden Tab-Knopf schaltet den
+Tutorial-Schritt weiter statt den Zweig zu wechseln, genau wie die PWA es per
+Portal mit hohem `zIndex` löst. Vier Schritte sind heute voll baubar, fünf
+degradieren ohne Pfeil und Ring, weil ihre Anker auf dem noch platzhalterhaften
+Kartenbildschirm liegen.
+
+Der teuerste Fund kam nicht aus einem Layout-Test, sondern aus einem `assert`
+der Anker-Registry: die naheliegende Fassung `if (shown) return child;` hätte
+beim Tourende den Elterntyp der Shell wechseln lassen und damit **die ganze
+Shell samt aller vier Navigationsstapel neu gebaut**. Bemerkt, weil die neue
+Tab-Leiste ihre Anker anmeldete, bevor die alte entsorgt war, und die Registry
+das laut meldet. Ein Sicherheitsmechanismus aus Block 1 hat damit einen Fehler
+in Block 2 gefangen, für den kein Test dieser Art vorgesehen war.
+
+Zweiter Fund, aus der unabhängigen Review danach: `TourBubble` clippte Text bei
+Systemschrift 2.0 auf kleinen Geräten lautlos, weil `Stack` clippt statt einen
+Überlauf zu melden. Derselbe Fehlertyp wie zweimal zuvor in dieser Woche, und
+diesmal hatte der Code die richtige Lösung schon zweimal im selben Ordner
+liegen, `TourHeroView` und das Testmuster aus `signup_page_test.dart`, nur bei
+der Blase fehlte sie.
+
+Vorausgegangen, am selben Tag: die Anker-Registry in `lib/core/anchors/`
+(E-27), mit einem Sichtbarkeitslauf, der einen Anker in einem inaktiven
+Shell-Zweig zuverlässig erkennt, obwohl `IndexedStack` allein das nicht
+verrät, nur das zusätzliche `Offstage` von go_router tut es. Und eine
+Ergänzungs-Map für Oberflächentexte, die die PWA anzeigt, aber nicht als
+Schlüssel führt (E-39), am ersten Fall genutzt (Schrittanzeige des Tutorials)
+und am zweiten (die zwei goldenen Meta-Zeilen der Hero-Schritte) noch am
+selben Tag nachgezogen, wortwörtlich aus der Quelle, nichts erfunden.
+
+**605 → 761 Tests an diesem Tag**, in sechs geprüften Blöcken: E-38, zehn
+Review-Lücken aus Schritt 9/10, die Anker-Registry, die i18n-Ergänzung, das
+Overlay, zwei weitere Review-Funde.
 
 ### 28.08.2026, Review der Schritte 9 und 10, zehn Lücken geschlossen
 
