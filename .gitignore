@@ -1,6 +1,12 @@
 # === Secrets ===
 *.env
 .env.*
+# Die Datei fuer `--dart-define-from-file`. `HANDOFF.md` und
+# `lib/services/supabase/supabase_config.dart` sagen beide, sie gehoere nicht
+# ins Repository, aber die zwei Muster darueber decken sie **nicht** ab:
+# `*.env` und `.env.*` treffen `env.json` nicht. Am 28.08.2026 aufgefallen,
+# als die Datei zum ersten Mal wirklich angelegt wurde.
+env.json
 secrets/
 *.jks
 *.keystore

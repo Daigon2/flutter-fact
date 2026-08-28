@@ -610,6 +610,44 @@ void main() {
     });
   });
 
+  group('Textstil', () {
+    // Am 28.08.2026 auf dem Emulator gesehen, nicht im Test: **jeder** Text
+    // des Overlays trug eine gelbe Doppellinie. Das ist Flutters Notsignal
+    // fuer Text ohne `Material`-Vorfahren. Der `AppShell` daneben bringt sein
+    // eigenes ueber sein `Scaffold` mit, das Geschwisterkind im `Stack` des
+    // `OnboardingHost` erbt davon nichts.
+    //
+    // Warum 806 Zusicherungen das nicht gesehen haben: sie pruefen Text,
+    // Rechtecke, Treffer und Umbrueche, aber keine einzige je die Dekoration.
+    // `find.text` vergleicht Zeichenketten und interessiert sich nicht dafuer,
+    // wie sie gemalt werden. Genau dieselbe Klasse Luecke wie "ein
+    // Zeilenumbruch ist kein Overflow".
+    for (final step in <int>[1, 2, 9]) {
+      testWidgets('Schritt $step malt keinen Text mit Dekoration', (
+        tester,
+      ) async {
+        await pumpApp(tester);
+        await goToStep(tester, step);
+
+        final paragraphs = tester
+            .renderObjectList<RenderParagraph>(find.byType(RichText))
+            .toList();
+        expect(paragraphs, isNotEmpty, reason: 'nichts gemessen');
+
+        for (final paragraph in paragraphs) {
+          final decoration = paragraph.text.style?.decoration;
+          expect(
+            decoration == null || decoration == TextDecoration.none,
+            isTrue,
+            reason:
+                'Text "${paragraph.text.toPlainText()}" traegt '
+                '$decoration. Fehlt ein Material-Vorfahren?',
+          );
+        }
+      });
+    }
+  });
+
   group('Maße', () {
     // Fund 1 der Review von Schritt 11: `TourBubble` wuchs bei großer
     // Systemschrift auf einem kleinen Gerät lautlos unter den Bildschirmrand,

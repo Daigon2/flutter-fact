@@ -86,19 +86,36 @@ class OnboardingHost extends ConsumerWidget {
       children: <Widget>[
         child,
         if (!shown)
-          TourOverlay(
-            // Der Zustand liegt im Provider und nicht im Overlay: verschwinden
-            // soll es, weil die Merkung gesetzt ist, nicht weil es sich selbst
-            // ausblendet. Sonst gäbe es zwei Wahrheiten darüber, ob das Tutorial
-            // erledigt ist.
-            //
-            // `reportDetached` und nicht `unawaited`, weil ENG-FLUTTER §7 zum
-            // Helfer auch eine Fehlermeldung verlangt: scheitert das Speichern,
-            // ist der Zustand im Speicher richtig und auf der Platte falsch, und
-            // ohne Meldung merkt das niemand bis zum nächsten Start.
-            onFinished: () => reportDetached(
-              ref.read(tourShownProvider.notifier).markSeen(),
-              origin: 'app.onboarding.tour_shown',
+          // `Material` mit `transparency`, und das ist keine Kosmetik: ohne
+          // einen `Material`-Vorfahren zeichnet Flutter unter **jeden** Text
+          // die gelbe Doppellinie, mit der es fehlenden Textstil meldet. Der
+          // `child` daneben bringt sein eigenes über sein `Scaffold` mit, das
+          // Geschwisterkind im `Stack` erbt davon nichts.
+          //
+          // Am 28.08.2026 auf dem Emulator gesehen, nicht im Test: die 806
+          // Zusicherungen prüfen Text, Rechtecke und Treffer, aber keine
+          // einzige je `TextStyle.decoration`. `tour_overlay_test.dart` hält
+          // das seitdem fest.
+          //
+          // `transparency` und nicht `canvas`: die Ebene soll keine Fläche
+          // malen, der Verdunkler des Overlays macht das selbst und wäre sonst
+          // doppelt.
+          Material(
+            type: MaterialType.transparency,
+            child: TourOverlay(
+              // Der Zustand liegt im Provider und nicht im Overlay: verschwinden
+              // soll es, weil die Merkung gesetzt ist, nicht weil es sich selbst
+              // ausblendet. Sonst gäbe es zwei Wahrheiten darüber, ob das Tutorial
+              // erledigt ist.
+              //
+              // `reportDetached` und nicht `unawaited`, weil ENG-FLUTTER §7 zum
+              // Helfer auch eine Fehlermeldung verlangt: scheitert das Speichern,
+              // ist der Zustand im Speicher richtig und auf der Platte falsch, und
+              // ohne Meldung merkt das niemand bis zum nächsten Start.
+              onFinished: () => reportDetached(
+                ref.read(tourShownProvider.notifier).markSeen(),
+                origin: 'app.onboarding.tour_shown',
+              ),
             ),
           ),
       ],
