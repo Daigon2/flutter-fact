@@ -35,12 +35,15 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau den einen belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die drei belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
-      // gehört in die Quelle.
+      // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
+      // dem Tutorial-Overlay dazu, `tour_steps.dart`.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
         'tour.stepCounter',
+        'tour.step1.meta',
+        'tour.step9.meta',
       });
     });
 

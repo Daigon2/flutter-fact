@@ -42,6 +42,7 @@ library;
 
 import 'dart:async';
 
+import 'package:fact_app/app/onboarding/onboarding_host.dart';
 import 'package:fact_app/app/shell/app_shell.dart';
 import 'package:fact_app/features/challenges/presentation/pages/challenges_page.dart';
 import 'package:fact_app/features/collection/presentation/pages/collection_page.dart';
@@ -88,13 +89,23 @@ class AppShellRoute extends StatefulShellRouteData {
   /// Erzeugt den Shell-Zweig des Routenbaums.
   const AppShellRoute();
 
+  /// Baut die Shell und legt bei Bedarf das Tutorial darüber.
+  ///
+  /// Das Overlay gehört **über** die Shell und nicht in eine eigene Route: es
+  /// zeigt in Schritt 5 und 7 auf Knöpfe der Tab-Leiste, und außerhalb der
+  /// Shell wäre die Leiste nicht im Baum, ihre Anker also nicht angemeldet
+  /// (E-25, E-26). Das ist dieselbe Kompositionsstelle, an der weiter unten
+  /// schon `identity` und `settings` über [SplashRoute] zusammenfinden.
+  ///
+  /// [OnboardingHost] entscheidet selbst, ob überhaupt etwas entsteht; ist die
+  /// Tour erledigt, gibt er die Shell unverändert zurück.
   @override
   Widget builder(
     BuildContext context,
     GoRouterState state,
     StatefulNavigationShell navigationShell,
   ) {
-    return AppShell(navigationShell: navigationShell);
+    return OnboardingHost(child: AppShell(navigationShell: navigationShell));
   }
 }
 

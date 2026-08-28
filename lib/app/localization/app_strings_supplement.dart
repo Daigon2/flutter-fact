@@ -61,9 +61,22 @@ const Map<AppLanguage, Map<String, String>> supplementTextsByLanguage =
         // im selben Wörterbuch irreführend. `stepCounter` folgt dem
         // camelCase-Schema der Quelle (`tapHint`, `stopsSuffix`, `customTime`).
         'tour.stepCounter': 'SCHRITT {step} VON {total}',
+
+        // Die goldene Zeile der beiden Hero-Schritte, `screen-tour.jsx:141`
+        // und `:168`. Wie die Schrittanzeige kein `t()`-Aufruf, sondern ein
+        // wörtlicher Wert im `STEPS`-Array, und deshalb ohne Schlüssel in der
+        // PWA. Freigegeben am 28.08.2026, wortwörtlich übernommen, nichts
+        // erfunden.
+        'tour.step1.meta': '— GOETHE',
+        // Auch im englischen Modus deutsch: das `STEPS`-Array existiert nur
+        // einmal und wird nicht pro Sprache gebaut. Deshalb derselbe Wert in
+        // beiden Sprachkarten, keine Übersetzung.
+        'tour.step9.meta': 'PUSH AUS DER HOSENTASCHE',
       },
       AppLanguage.en: <String, String>{
         'tour.stepCounter': 'STEP {step} OF {total}',
+        'tour.step1.meta': '— GOETHE',
+        'tour.step9.meta': 'PUSH AUS DER HOSENTASCHE',
       },
     };
 

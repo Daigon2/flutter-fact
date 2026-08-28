@@ -2,6 +2,8 @@ import 'package:fact_app/app/app.dart';
 import 'package:fact_app/app/localization/app_language.dart';
 import 'package:fact_app/app/localization/language_preference_store.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
+import 'package:fact_app/app/onboarding/onboarding_providers.dart';
+import 'package:fact_app/app/onboarding/tour_store.dart';
 import 'package:fact_app/app/shell/floating_tab_bar.dart';
 import 'package:fact_app/app/shell/shell_tab.dart';
 import 'package:fact_app/core/anchors/anchor_id.dart';
@@ -40,6 +42,13 @@ void main() {
           // und die Tab-Leiste existierte gar nicht.
           firstLaunchStoreProvider.overrideWithValue(
             InMemoryFirstLaunchStore(hasLaunched: true),
+          ),
+          // Vorbedingung, keine Erwartung: ohne diese Überschreibung
+          // liegt das Tutorial-Overlay über der Shell und verschluckt jeden
+          // Tipp auf die Tab-Leiste. Das Flag ist von `fact_has_launched`
+          // unabhängig, ein zweites Override reicht also nicht.
+          tourStoreProvider.overrideWithValue(
+            InMemoryTourStore(hasSeenTour: true),
           ),
         ],
         child: const FactApp(),
