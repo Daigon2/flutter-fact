@@ -781,11 +781,28 @@ CI, die vorher `build_runner` ausführt, ließe sich ein frischer Klon nicht
 kompilieren. Das ist eine bewusste Entscheidung, nachzulesen im Kommentar in
 `.gitignore`.
 
-### Drift der Sprachdateien prüfen
+### Drift der erzeugten Dateien prüfen
+
+Zwei Werkzeuge, beide mit `--check`, beide müssen auf 0 stehen:
 
 ```
 dart run tool/generate_i18n.dart --check
+dart run tool/bake_map_style.dart --check
 ```
+
+Das zweite gibt es seit Schritt 12: der Kartenstil wird **gebacken**, nicht zur
+Laufzeit umgefärbt. Der Grund ist gemessen und nicht gewählt. `maplibre_gl
+0.26.2` hat weder `setPaintProperty` noch `setLayoutProperty`; was es hat, ist
+`setLayerProperties`, und dessen eigene Doku sagt, dass unbelegte
+Eigenschaften auf den Standard zurückfallen. Die PWA ändert je Layer genau
+eine Eigenschaft und lässt den Rest stehen. Das nachzubauen hieße, für jeden
+der 111 Layer den vollständigen Eigenschaftssatz zurückzulesen und über den
+Plattformkanal zurückzuschieben.
+
+Der Ausgangsstil ist deshalb eingecheckt (`tool/map_style/liberty_upstream.json`)
+und wird **nicht** bei jedem Lauf aus dem Netz geholt. Ein Werkzeug, das lädt,
+erzeugt still bei jedem Lauf ein anderes Ergebnis, und niemand sieht, wann sich
+der Anbieter geändert hat.
 
 ---
 
