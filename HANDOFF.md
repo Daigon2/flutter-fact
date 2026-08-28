@@ -17,7 +17,7 @@ Für Details nicht hier suchen, sondern:
 
 ## Stand
 
-**Zuletzt aktualisiert:** 27.08.2026
+**Zuletzt aktualisiert:** 28.08.2026
 
 **Phase 0 abgeschlossen. Phase 1 läuft, Schritte 7 bis 10 von 50 fertig. Die App
 ist erstmals auf einem Gerät gelaufen.**
@@ -28,12 +28,8 @@ Architektur-Prüfskript mit eigener Testsuite, der Startbildschirm mit zentraler
 Router-Weiche für Erstlauf und Sitzung, der Audio-Aktivierungsdialog und die
 Anmeldung samt Supabase-Anbindung.
 
-**Kennzahlen:** 614 Tests grün, alle vier Gates auf Exit-Code 0, und
+**Kennzahlen:** 640 Tests grün, alle vier Gates auf Exit-Code 0, und
 `flutter build apk --debug` läuft.
-
-**Wo die Arbeit liegt:** die Schritte 7 bis 10 lagen bis zum 27.08.2026 nur auf
-`claude/fact-flutter-splash-screen-a2bfc9` und waren **nie nach `main` gemerged**.
-Wer von `main` aus anfängt, bekommt Schritt 6. Der Merge steht weiterhin aus.
 
 **Neu und projektweit nützlich:** `test/support/app_fonts.dart` lädt die echten
 Schriften in Widget-Tests. Ohne das zeichnet `flutter test` jede Glyphe als
@@ -73,9 +69,8 @@ gelaufen.
    6/3 war falsch, siehe Korrektur 13 in `REBUILD_STATUS.md`. Ein fehlender
    Anker darf weder abstürzen noch den Schritt überspringen: die Quelle setzt
    das Rechteck auf `null` und zeichnet den Schritt ohne Pfeil und Ring weiter.
-3. **Unabhängige Review der Schritte 9, 10 und 11.** Schritt 9 und 10 sind
-   committet und **nicht** geprüft. Die Reviews haben in dieser Sitzung jedes Mal
-   echte Fehler gefunden, insgesamt zehn Mutationen, die die Suite überlebten.
+3. **Unabhängige Review von Schritt 11**, wenn er steht. Schritt 9 und 10 sind
+   am 28.08.2026 geprüft, die Funde sind behoben.
 4. **Entschieden am 27.08.2026:** die vier Deep-Link-Pfade bleiben `/map`,
    `/collection`, `/challenges`, `/profile`, also die Domänennamen statt der
    PWA-Bezeichner. Splash, Login und Signup sind **eigene Routen** `/splash`,
@@ -92,6 +87,63 @@ Presentation eines anderen importiert. Der Vorschlag steht in
 ## Protokoll
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
+
+### 28.08.2026, Review der Schritte 9 und 10, zehn Lücken geschlossen
+
+Eine unabhängige Review hat 47 Mutationen gesetzt, 13 haben die Suite überlebt.
+**Kein blockierender Fund**, der Code war bis auf eine Stelle richtig. Was fehlte,
+war die Zusicherung, und der teuerste Fall wäre unsichtbar geblieben: die
+Anmeldung hätte E-Mail und Passwort vertauschen können, und alle 614 Tests wären
+grün geblieben. Der Fake trägt `lastEmail`, aber nur der Notifier-Test las es,
+nie der Seiten-Test. Die Registrierung war an derselben Stelle dicht. Zwei
+Bildschirme, gleiches Muster, nur einer geprüft: **das ist die Stelle, an der man
+in diesem Projekt suchen muss.**
+
+Der eine echte Defekt kam aus einer Richtung, gegen die es hier schon einmal
+einen Fund gab. Die Fremdanmeldungs-Knöpfe standen auf Flutters Standard
+`center`, CSS steht auf `align-items: stretch`. Bei Systemschrift 2.0 waren sie
+64 und 104 Pixel hoch. Gesehen hat es keiner der vier Skalierungstests, weil die
+nur `takeException()` prüfen: **ein Umbruch ist kein Überlauf**, derselbe blinde
+Fleck wie am 27.08., nur an anderer Stelle. Ein Test, der Rechtecke misst,
+findet ihn sofort.
+
+`CrossAxisAlignment.stretch` allein wirft übrigens, weil beide Bildschirme die
+Zeile in ein `SingleChildScrollView` stellen und die Höhe dort unbeschränkt ist:
+`BoxConstraints forces an infinite height`. Es braucht `IntrinsicHeight` darum.
+Und ehrlich mitgeschrieben: tragend ist dabei das `IntrinsicHeight`, nicht das
+`stretch`, weil der `Container` seinen Inhalt ohnehin zentriert. Wer nur
+`stretch` entfernt, bricht heute nichts.
+
+Zwei Wertobjekt-Tests aus Schritt 5 lagen noch in der const-Falle:
+`expect(const FactId(7), const FactId(7))` prüft nichts, Dart kanonisiert beide
+zu demselben Objekt. Beide Male überlebte eine Mutation, die `==` auf
+`identical` reduziert. Das richtige Muster stand seit Schritt 10 in
+`auth_city_test.dart:59` und war nur nicht zurückportiert.
+
+Nebenbefund für die Werkzeugkiste: `pumpEventQueue()` hängt im Rumpf von
+`testWidgets` bis zur Zeitüberschreitung, genauso wie `loadAppFonts()`.
+
+### 28.08.2026, E-27 entschieden
+
+Die Anker-Registry entsteht unter `lib/core/anchors/`, die Kennungen bleiben bei
+der Oberfläche, die sie besitzt. Ausschlaggebend war nicht „ist das allgemein
+genug für `core`", sondern die **Importrichtung**: ab Phase 2 registrieren sich
+Widgets aus `features/*/presentation/`, und für die lässt `dependency-rules.md:20`
+nur Application, Domain und eng abgegrenztes Core zu. Von den beiden Kandidaten
+ist `core` damit der einzige legale Ort.
+
+Wichtiger als die Entscheidung ist, was sie **nicht** absichert: Regel 11 des
+Prüfskripts zerlegt nur Pfade und sieht den Dateiinhalt nie. `anchor_ids.dart`
+mit Fachkennungen darin passiert das Gate und verletzt trotzdem genau das, was
+E-27 verhindern soll. Umgekehrt ist `tour_anchor.dart` verboten, obwohl es
+harmlos wäre, und das ist ausgerechnet der Name, den die Quelle nahelegt
+(`data-tour-anchor`). Die Regel schützt hier nicht, sie täuscht Schutz vor.
+
+Dabei fiel auf, dass die Anker-Bilanz in dieser Datei falsch war: nicht sechs
+baubare und drei degradierende Schritte, sondern **vier und fünf**. Neun
+Schritte, zwei ohne Anker, sieben mit, davon fünf auf dem Kartenbildschirm, der
+heute ein Platzhalter ist. Nachgezählt in `screen-tour.jsx:140-169`, nicht aus
+den Vorlagen übernommen.
 
 ### 27.08.2026, E-38: Materials Laufweite raus
 
