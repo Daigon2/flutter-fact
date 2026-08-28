@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Das adaptive Launcher-Symbol, ab Android 8 (API 26).
+
+  Zwei Ebenen, weil das System die Form selbst maskiert: rund, quadratisch,
+  Squircle, je nach Hersteller. Runde Ecken im Bild waeren deshalb doppelt.
+  Der Hintergrund traegt den randlosen Verlauf, der Vordergrund nur das weisse
+  Ausrufezeichen mit Transparenz.
+
+  Beide Ebenen erzeugt `tool/generate_launcher_icon.py` aus denselben Tokens,
+  aus denen `auth_header.dart` die Kachel im Kopf der App zeichnet. Wer die
+  Marke aendert, aendert dort und laesst das Skript erneut laufen.
+
+  `mipmap-*/ic_launcher.png` bleibt daneben bestehen: Android 7 und aelter
+  kennt keine adaptiven Symbole und nimmt das fertige Bild mit runden Ecken.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

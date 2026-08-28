@@ -27,8 +27,14 @@ Steht zusätzlich seit dem Vormittag: die Anker-Registry in `lib/core/anchors/`
 (E-27), eine Ergänzungs-Map für Oberflächentexte ohne PWA-Schlüssel (E-39), und
 das Tutorial-Overlay unter `lib/app/onboarding/` mit neun Schritten.
 
-**Kennzahlen:** 761 Tests grün, alle vier Gates auf Exit-Code 0,
+**Kennzahlen:** 824 Tests grün, alle vier Gates auf Exit-Code 0,
 `dart run tool/generate_i18n.dart --check` auf Exit-Code 0.
+
+**Zusätzlich fertig, außer der Reihe:** Schritt 19, das Top-Chrome des
+Kartenbildschirms. Vorgezogen, weil Schritt 12 an einer Architekturentscheidung
+hing und das Chrome über der Karte davon nicht abhängt. Damit sind **sieben von
+neun Tutorial-Schritten** voll baubar statt vier. Dazu vier neue Regeln im
+Prüfskript, die `lib/map/` bewachen, bevor es entsteht.
 
 **Neu und projektweit nützlich:** `test/support/app_fonts.dart` lädt die echten
 Schriften in Widget-Tests. Ohne das zeichnet `flutter test` jede Glyphe als
@@ -717,6 +723,30 @@ schicken, jede einzelne verzögert den Prozess spürbar. Deshalb gilt beides
 zugleich. Kleinkram wird **nicht** eskaliert, sondern selbst entschieden und
 dokumentiert. Was das Ergebnis wirklich prägt, darf umgekehrt nicht
 unterschlagen werden, nur weil Fragen unbequem sind.
+
+**Gefundene Fehler werden behoben, nicht mitportiert.** Angewiesen am
+28.08.2026: wer beim Bauen einen Fehler im bestehenden System findet, behebt
+ihn, und zwar **bevor** der nächste Schritt beginnt. Ein Fehler, der bewusst
+nachgebaut wird, ist ab jetzt die begründungspflichtige Ausnahme, nicht der
+Normalfall.
+
+Zwei Abgrenzungen gehören dazu, sonst wird die Anweisung falsch angewendet:
+
+*Nicht jede Abweichung von der Erwartung ist ein Fehler.* Die PWA ist die
+Verhaltensquelle. Wo sie etwas absichtlich anders macht, ist das Parität und
+kein Defekt. Der Unterschied ist nachweisbar: ein Defekt ist etwas, das der
+Quelle selbst schadet und das niemand so gewollt hat, wie das unlösbare
+Kompass-Rätsel auf Englisch (E-08) oder ein Kästchen, das nichts tut (E-33).
+
+*Manche Fehler liegen nicht hier.* Die drei Sicherheitslücken im geteilten
+Supabase und die Fehler der PWA selbst liegen im anderen Repository, und
+`CLAUDE.md` verbietet, es von hier aus zu ändern. Dort heißt "beheben":
+belegen, Migration oder Auftrag schreiben, übergeben. Siehe
+`docs/operations/backend-security-fixes.md`.
+
+*Ändert eine Behebung, was der Nutzer sieht*, wird sie trotzdem gemacht, aber
+Janek erfährt davon. Er ist Product Owner, und eine stillschweigende
+Verhaltensänderung ist auch dann eine Überraschung, wenn sie richtig ist.
 
 **Spezialisten arbeiten, die Hauptsitzung orchestriert.** Die Agenten aus
 `.claude/agents/` erledigen die Umsetzung, die Hauptsitzung schreibt die
