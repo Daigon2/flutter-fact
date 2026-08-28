@@ -7,9 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Der Karten-Bildschirm (`02_Frontend/app/screen-map.jsx`).
 ///
 /// **Die Karte selbst fehlt noch.** Wo der Karten-Host lebt und wem die Kamera
-/// gehört, ist eine offene Entscheidung; bis sie fällt, liegt unter dem
-/// Top-Chrome eine einfarbige Fläche in der Kartenfarbe des Themes. Das
-/// Top-Chrome hängt an dieser Entscheidung nicht, siehe [MapTopChrome].
+/// gehört, ist seit dem 28.08.2026 entschieden: der Host liegt unter
+/// `lib/map/`, ihm gehört die Kamera, und dieses Feature gibt ihm über
+/// `map/domain/` Absichten. Gebaut ist davon noch nichts, deshalb liegt unter
+/// dem Top-Chrome weiter eine einfarbige Fläche in der Kartenfarbe des Themes.
+/// Das Top-Chrome hängt am Host nicht, siehe [MapTopChrome].
 ///
 /// ## Die Platzhalterwerte, und warum sie so und nicht anders lauten
 ///
@@ -69,8 +71,9 @@ class MapPage extends ConsumerWidget {
           onModeSelected: ref.read(mapModeProvider.notifier).select,
           // Alle drei Rückrufe der Quelle bewegen die Kamera: `recenter` an
           // der Stadt-Pille (`screen-map.jsx:3105`), Neuzentrieren und harter
-          // Reset am Kompass (`:3155-3186`). Ohne Karten-Host gibt es nichts
-          // zu bewegen, deshalb bleiben sie `null` und die Elemente reagieren
+          // Reset am Kompass (`:3155-3186`). Solange es keinen Karten-Host
+          // gibt, ist nichts zu bewegen: sie bleiben `null` und die Elemente
+          // reagieren
           // nicht auf einen Tipp. Sichtbar sind sie trotzdem, und sie melden
           // ihre Anker an: das Tutorial zeigt auf den Kompass (Schritt 8).
           //

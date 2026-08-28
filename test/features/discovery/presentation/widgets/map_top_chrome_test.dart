@@ -20,8 +20,8 @@ import '../../../../support/app_fonts.dart';
 /// ## Gebaut wird über einem beliebigen Untergrund
 ///
 /// Unter dem Chrome liegt hier eine einfarbige Fläche und keine Karte. Das ist
-/// nicht Bequemlichkeit, sondern die Zusicherung: das Chrome darf von einem
-/// Karten-Host nichts wissen, weil die Entscheidung darüber noch offen ist.
+/// nicht Bequemlichkeit, sondern die Zusicherung: das Chrome darf vom
+/// Karten-Host nichts wissen, das ist seit dem 28.08.2026 auch Regel 18.
 /// Läuft dieser Test, ist bewiesen, dass es ohne Karte baut und misst.
 ///
 /// ## Gemessen wird an Rechtecken, nicht an Ausnahmen

@@ -51,6 +51,11 @@ lib/
 │   ├── deep_links/
 │   └── background_tasks/
 │
+├── map/
+│   ├── domain/
+│   └── presentation/
+│       └── avatar/
+│
 └── features/
     ├── identity/
     ├── city/
@@ -70,7 +75,8 @@ code names differently, which is worse than a gap: `app/bootstrap.dart` is a
 file and not a folder, the root widget lives in `app/app.dart` and not in
 `app/fact_app.dart`, and `core/async/`, `core/diagnostics/` and
 `services/supabase/` are built and were missing here. `app/onboarding/` and
-`core/anchors/` come from E-26 and E-27 in `REBUILD_STATUS.md`.
+`core/anchors/` come from E-26 and E-27 in `REBUILD_STATUS.md`. `map/` was added
+on 2026-08-28 with the map host decision and is empty at the time of writing.
 
 ## Large feature template
 
@@ -130,7 +136,25 @@ features/settings/
   a `lib/core/anchors/anchor_ids.dart` full of domain identifiers would pass the
   gate. Review enforces this rule, not the machine.
 
-- Riverpod providers that construct data/application dependencies live near the implementation they expose.
+- `map/` is the map host: app and UI infrastructure that belongs to no business
+  domain. It owns the map surface and the camera. Features hand it intentions
+  through `map/domain` and never import `map/presentation` or `map/data`
+  (rule 18 in `dependency-rules.md`). The 3D avatar stays behind
+  `map/presentation/avatar/`, and `webview_flutter` may appear nowhere else
+  (rule 19). Unlike `core/anchors/` above, both rules are machine-enforced.
+
+- Riverpod providers that construct a `data` or `application` implementation
+  live next to that implementation, and **only app composition reads them**.
+  They are not an access path for higher layers and cannot become one:
+  `presentation` must not import `data` (rule 17), so a provider declared in
+  `data` is unreachable from the UI by construction. Higher layers read a
+  provider typed on the **domain contract**, placed with the contract or in
+  `presentation`, with a safe default and an override from `app/bootstrap.dart`.
+  The sentence used to read "live near the implementation they expose", which
+  both readings satisfied, and both are in the code. Resolved on 2026-08-28 as
+  E-32; the worked example and the two code sites are in `dependency-rules.md`,
+  section "Providers that construct dependencies".
+
 - Feature UI providers live in `presentation`.
 - Repository interfaces live in `domain/repositories`.
 - Repository implementations live in `data/repositories`.

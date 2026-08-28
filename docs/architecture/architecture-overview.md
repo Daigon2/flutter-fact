@@ -114,6 +114,10 @@ Flutter application
 │   ├── feature flags
 │   └── background work
 │
+├── map/
+│   ├── domain (intentions, camera contract)
+│   └── presentation (map surface, avatar)
+│
 └── features/
     ├── identity
     ├── city
@@ -128,6 +132,14 @@ Flutter application
 ```
 
 `services/` contains application-wide technical capabilities. Business services remain inside their owning feature.
+
+`map/` is the map host, added on 2026-08-28. Four features draw on the same map,
+and putting the host inside one of them would force the other three to import
+that feature's presentation, which rule 8 forbids. The host therefore belongs to
+no business domain: it owns the map surface and the camera, features hand it
+intentions through `map/domain`, and `map/presentation` and `map/data` are
+internal. `domain-map.md` §7 is unaffected, `map` is still not a business
+domain. Rules 18 and 19 in `dependency-rules.md` enforce the boundary.
 
 ## 6. Feature architecture
 

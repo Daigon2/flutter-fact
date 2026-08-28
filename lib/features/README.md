@@ -36,10 +36,14 @@ auf Bestätigung.
 ## Was bewusst kein Feature ist
 
 - **`map`**: Domain-Map §7 sagt ausdrücklich, dass Karte in v1 keine
-  Geschäftsdomäne ist. Der MapLibre-Host liegt in `services/map` und trägt
-  keine fachliche Bedeutung. `discovery` bettet ihn ein und füllt die
-  Fakten-Ebenen. `tours` und `challenges` liefern ihre Overlays über
-  App-Komposition, nicht durch Zugriff auf `discovery`.
+  Geschäftsdomäne ist. Seit dem 28.08.2026 liegt der MapLibre-Host in
+  **`lib/map/`** und nicht, wie hier vorher stand, unter `services/map`: er
+  bringt eine eigene Oberfläche mit, und `services/` ist für Vendor-Adapter
+  ohne Oberfläche gedacht. Der Host besitzt Kamera und Kartenfläche.
+  `discovery` sagt, was auf der Karte zu sehen ist, `tours` und `challenges`
+  liefern ihre Overlays über App-Komposition. Alle vier reden mit dem Host
+  ausschließlich über `map/domain`; `map/presentation` und `map/data` sind
+  intern, das prüft Regel 18 in `dependency-rules.md`.
 - **`audio`**: TTS und Wiedergabe sind Transport und liegen später unter
   `services`. Wann welcher Fakt vorgelesen wird, ist eine Regel von
   `discovery` beziehungsweise `tours`.

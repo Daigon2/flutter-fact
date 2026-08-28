@@ -72,18 +72,42 @@ back and delete this section.
 
 A repository script, kept simple and deterministic, fails CI for:
 
-1. `supabase_flutter` imports below `features/**/presentation`.
-2. Flutter imports below `features/**/domain`.
-3. Riverpod imports below `features/**/domain`.
-4. Imports of another feature's `/presentation/`.
-5. Imports of another feature's `/data/`.
+1. `supabase_flutter` imports below any `presentation/`.
+2. Flutter imports below any `domain/`.
+3. Riverpod imports below any `domain/`.
+4. Imports of a feature's `/presentation/` from outside that feature.
+5. Imports of a feature's `/data/` from outside that feature.
 6. Feature-domain imports from `core`.
 7. direct `GetIt` or `injectable` dependencies.
 8. raw `context.go('/...')` patterns outside routing infrastructure.
 9. production `print()` calls.
+10. `presentation` importing a `data` directory, including its own feature's.
+11. a feature importing `map/presentation` or `map/data`.
+12. `webview_flutter` outside `lib/map/presentation/avatar/`.
 
-`tool/check_architecture.dart` implements these checks. A later custom lint
-package is justified only if scripts become too weak.
+Checks 1 to 3 read "below `features/**/...`" until 2026-08-28. They now apply to
+every `presentation`, `domain`, `application` and `data` segment below `lib/`.
+The old wording was not a shortening: three of the four layer patterns literally
+required `lib/features/`, and a file `lib/map/domain/x.dart` importing Flutter,
+Riverpod and Supabase passed the gate, measured on throwaway files. The same
+asymmetry hit checks 4 and 5, which were skipped entirely for files outside
+`lib/features/`.
+
+Check 4 and 5 exempt `lib/app/`, because the dependency table gives app
+composition "All public feature entry points and services". They also exempt
+`lib/core/`, where the wider ban in rule 11 already reports the same import with
+a more precise message.
+
+Check 12 has no trigger today: `webview_flutter` is not a dependency of this
+project and needs a separate approval (E-10). The rule exists ahead of the
+package on purpose, because "encapsulate behind a clear interface" without an
+enforced line is an intention, not a boundary.
+
+`tool/check_architecture.dart` implements these checks. Its own black-box suite
+is `test/tool/check_architecture_test.dart`: every check has a probe that must
+be reported and, where a too-wide implementation would report correct code, a
+counter-probe that must stay silent. A later custom lint package is justified
+only if scripts become too weak.
 
 ## CI gates
 

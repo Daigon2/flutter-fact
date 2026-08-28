@@ -27,8 +27,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// in der Quelle aus der Karte kommt, kommt hier als Parameter herein:
 /// [cityName] (dort `detectCity(mapCenter)`, `:3006`), [bearingDegrees] (dort
 /// `map.getBearing()`, `:1792`) und die drei Rückrufe. Das ist keine
-/// Vorsichtsmaßnahme, sondern die Bedingung, unter der dieser Schritt vor der
-/// offenen Entscheidung über den Karten-Host gebaut werden konnte.
+/// Vorsichtsmaßnahme, sondern die Bedingung, unter der dieser Schritt gebaut
+/// werden konnte, bevor es den Karten-Host gab. Sie gilt weiter: der Host lebt
+/// seit dem 28.08.2026 unter `lib/map/`, und ein Feature sieht davon nur
+/// `map/domain/` (Regel 18).
 ///
 /// ## Bezugskante ist die sichere Fläche, nicht der Bildschirmrand
 ///

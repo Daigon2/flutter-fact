@@ -461,6 +461,66 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class GeteilteSeite {}
 ''',
+  // Ä7: domain, application und data gelten überall unterhalb von lib/, nicht
+  // nur unter lib/features/. Vorher passierte genau diese Datei das Gate.
+  'lib/map/domain/karten_technik.dart': r'''
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
+
+class KartenTechnik {}
+''',
+  // Ä7: die Erlaubnisliste greift im Modul genauso. Ein fremdes Paket und
+  // eine fremde Feature-Domäne fallen beide durch.
+  'lib/map/domain/fremde_importe.dart': r'''
+import 'package:http/http.dart';
+import 'package:fact_app/features/tours/domain/entities/tour.dart';
+
+class FremdeImporte {}
+''',
+  // Ä8: Regel 8 und 9 hängen nicht mehr am eigenen Feature. Derselbe Import
+  // war unter lib/features/ ein Verstoß und hier stillschweigend erlaubt.
+  'lib/map/presentation/karten_host.dart': r'''
+import 'package:fact_app/features/tours/presentation/pages/tour_page.dart';
+import 'package:fact_app/features/challenges/data/challenge_dto.dart';
+
+class KartenHost {}
+''',
+  // Ä8: dasselbe außerhalb von lib/map/, damit die Regel nicht als
+  // Sonderfall des Karten-Hosts gelesen wird.
+  'lib/services/karten_adapter.dart': r'''
+import 'package:fact_app/features/tours/presentation/pages/tour_page.dart';
+
+class KartenAdapter {}
+''',
+  // Ä9: Features sehen vom Karten-Host nur map/domain/.
+  'lib/features/discovery/presentation/karten_zugriff.dart': r'''
+import 'package:fact_app/map/presentation/map_host.dart';
+import 'package:fact_app/map/data/tile_cache.dart';
+
+class KartenZugriff {}
+''',
+  // Ä10: webview_flutter ist auf lib/map/presentation/avatar/ beschränkt.
+  'lib/features/discovery/presentation/avatar_versuch.dart': r'''
+import 'package:webview_flutter/webview_flutter.dart';
+
+class AvatarVersuch {}
+''',
+  // Ä10: auch lib/map/presentation/ selbst reicht nicht. Nur der
+  // Avatar-Ordner darf.
+  'lib/map/presentation/webview_daneben.dart': r'''
+import 'package:webview_flutter/webview_flutter.dart';
+
+class WebviewDaneben {}
+''',
+  // Ä8: core importiert eine Feature-Presentation. Regel 11 verbietet das
+  // schon, deshalb muss hier genau eine Meldung stehen und nicht zwei.
+  'lib/core/greift_auf_feature.dart': r'''
+import 'package:fact_app/features/tours/presentation/pages/tour_page.dart';
+
+class GreiftAufFeature {}
+''',
 };
 
 /// Baum 2: alles, was still bleiben muss. Enthält die Gegenproben und die
@@ -578,6 +638,48 @@ class RouteVariable {
 import 'package:fact_app/features/challenges/domain/entities/challenge.dart';
 
 class LueckeFremdeDomain {}
+''',
+  // Ä7 Gegenprobe: die Domäne eines Moduls außerhalb von features/ darf sich
+  // selbst importieren, absolut und relativ. Ohne die Modulwurzel meldet die
+  // Erlaubnisliste hier zwei Verstöße, und die Verallgemeinerung der
+  // Schichtmuster wäre unbenutzbar.
+  'lib/map/domain/saubere_absicht.dart': r'''
+import 'dart:math';
+
+import 'package:fact_app/map/domain/kamera_absicht.dart';
+import 'value_objects/zoomstufe.dart';
+
+class SaubereAbsicht {}
+''',
+  // Ä8 Gegenprobe: die App-Komposition darf alles, was die Tabelle in
+  // dependency-rules.md ihr zugesteht. Fällt diese Ausnahme, ist der Router
+  // rot.
+  'lib/app/komposition.dart': r'''
+import 'package:fact_app/features/tours/presentation/pages/tour_page.dart';
+import 'package:fact_app/features/challenges/data/challenge_dto.dart';
+import 'package:fact_app/map/presentation/map_host.dart';
+
+class Komposition {}
+''',
+  // Ä9 Gegenprobe: map/domain/ ist genau das, was ein Feature sehen darf.
+  'lib/features/discovery/presentation/karten_absicht.dart': r'''
+import 'package:fact_app/map/domain/kamera_absicht.dart';
+
+class KartenAbsicht {}
+''',
+  // Ä10 Gegenprobe: im Avatar-Ordner ist die WebView erlaubt, sonst wäre die
+  // Regel ein Verbot statt einer Kapselung.
+  'lib/map/presentation/avatar/avatar_view.dart': r'''
+import 'package:webview_flutter/webview_flutter.dart';
+
+class AvatarView {}
+''',
+  // Gemessene, noch nicht geschlossene Lücke: Regel 17 hängt weiter an
+  // lib/features/. Siehe die Gruppe unten.
+  'lib/map/presentation/luecke_eigenes_data.dart': r'''
+import 'package:fact_app/map/data/tile_cache.dart';
+
+class LueckeEigenesData {}
 ''',
 };
 
@@ -751,6 +853,14 @@ void main() {
         'lib/features/tours/presentation/widgets/ausgabe.dart',
         'lib/features/tours/presentation/widgets/instanziierung.dart',
         'lib/features/tours/presentation/widgets/literale.dart',
+        'lib/map/domain/karten_technik.dart',
+        'lib/map/domain/fremde_importe.dart',
+        'lib/map/presentation/karten_host.dart',
+        'lib/map/presentation/webview_daneben.dart',
+        'lib/services/karten_adapter.dart',
+        'lib/features/discovery/presentation/karten_zugriff.dart',
+        'lib/features/discovery/presentation/avatar_versuch.dart',
+        'lib/core/greift_auf_feature.dart',
       }, reason: verstoss.bericht);
     });
   });
@@ -812,8 +922,8 @@ void main() {
         verstoss,
         'lib/features/tours/presentation/pages/fremdes_feature_paket.dart',
         <(int, String)>[
-          (1, 'Regel 8: Feature darf presentation von "challenges" nicht'),
-          (2, 'Regel 9: Feature darf data von "challenges" nicht importieren'),
+          (1, 'Regel 8: presentation von "challenges" darf nur dieses Feature'),
+          (2, 'Regel 9: data von "challenges" darf nur dieses Feature'),
         ],
       );
     });
@@ -823,8 +933,8 @@ void main() {
         verstoss,
         'lib/features/tours/presentation/pages/fremdes_feature_relativ.dart',
         <(int, String)>[
-          (1, 'Regel 8: Feature darf presentation von "challenges" nicht'),
-          (2, 'Regel 9: Feature darf data von "challenges" nicht importieren'),
+          (1, 'Regel 8: presentation von "challenges" darf nur dieses Feature'),
+          (2, 'Regel 9: data von "challenges" darf nur dieses Feature'),
         ],
       );
       final funde = verstoss.fuer(
@@ -1276,13 +1386,152 @@ void main() {
     });
   });
 
+  // Ä7 bis Ä10: die drei gemessenen blinden Flecken vom 28.08.2026 und die
+  // Regel, die den Karten-Host trägt. Alle vier hängen an einer einzigen
+  // Frage: gilt eine Schichtregel nur unter `lib/features/` oder überall
+  // unter `lib/`? Bis hierher galt sie an drei von vier Stellen nur dort,
+  // und derselbe Import war je nach Ordner Verstoß oder erlaubt.
+  group('Modulgrenzen und Karten-Host', () {
+    test('Ä7: Schichtverbote gelten überall unter lib/, nicht nur in '
+        'features/', () {
+      erwarteFunde(
+        verstoss,
+        'lib/map/domain/karten_technik.dart',
+        <(int, String)>[
+          (1, 'Regel 1: Domain darf Flutter nicht importieren'),
+          (2, 'Regel 1: Domain darf Flutter nicht importieren'),
+          (3, 'Regel 3: Domain darf Supabase nicht importieren'),
+          (4, 'Regel 4: Domain darf keine Karten-SDK importieren'),
+        ],
+      );
+    });
+
+    test('Ä7: die Erlaubnisliste greift auch in einem Modul ohne Feature', () {
+      erwarteFunde(
+        verstoss,
+        'lib/map/domain/fremde_importe.dart',
+        <(int, String)>[
+          (1, 'Domain-Erlaubnisliste'),
+          (2, 'Domain-Erlaubnisliste'),
+        ],
+      );
+    });
+
+    test('Ä7 Gegenprobe: die Domäne eines Moduls darf sich selbst '
+        'importieren', () {
+      expect(
+        still.fuer('lib/map/domain/saubere_absicht.dart'),
+        isEmpty,
+        reason:
+            'Die Modulwurzel fehlt oder ist falsch abgeleitet. Ohne sie meldet '
+            'die Erlaubnisliste jeden modulinternen Import, und die '
+            'Verallgemeinerung der Schichtmuster ist unbenutzbar.\n'
+            '${still.bericht}',
+      );
+    });
+
+    test('Ä8: fremdes presentation und data auch außerhalb von features/', () {
+      erwarteFunde(
+        verstoss,
+        'lib/map/presentation/karten_host.dart',
+        <(int, String)>[
+          (1, 'Regel 8: presentation von "tours" darf nur dieses Feature'),
+          (2, 'Regel 9: data von "challenges" darf nur dieses Feature'),
+        ],
+      );
+      erwarteFunde(
+        verstoss,
+        'lib/services/karten_adapter.dart',
+        <(int, String)>[
+          (1, 'Regel 8: presentation von "tours" darf nur dieses Feature'),
+        ],
+      );
+    });
+
+    test('Ä8 Gegenprobe: die App-Komposition ist ausgenommen', () {
+      expect(
+        still.fuer('lib/app/komposition.dart'),
+        isEmpty,
+        reason:
+            'dependency-rules.md gibt der App-Komposition "All public feature '
+            'entry points and services". Fällt diese Ausnahme, sind '
+            'app_routes.dart, app.dart, bootstrap.dart und tour_steps.dart '
+            'rot.\n${still.bericht}',
+      );
+    });
+
+    test('Ä8: core bekommt eine Meldung, nicht zwei', () {
+      // _coreBans verbietet package:fact_app/features/ schon pauschal und
+      // nennt dabei die genauere Regel 11. Ohne die Ausnahme für core stünden
+      // hier zwei Sätze für denselben Import.
+      final funde = verstoss.fuer('lib/core/greift_auf_feature.dart');
+      expect(funde, hasLength(1), reason: verstoss.bericht);
+      expect(
+        funde.single.regel,
+        contains('Regel 11'),
+        reason: verstoss.bericht,
+      );
+    });
+
+    test('Ä9: ein Feature sieht vom Karten-Host nur map/domain/', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/karten_zugriff.dart',
+        <(int, String)>[
+          (1, 'Regel 18: Features sehen vom Karten-Host nur map/domain/'),
+          (2, 'Regel 18: Features sehen vom Karten-Host nur map/domain/'),
+        ],
+      );
+    });
+
+    test('Ä9 Gegenprobe: map/domain/ bleibt für Features offen', () {
+      expect(
+        still.fuer('lib/features/discovery/presentation/karten_absicht.dart'),
+        isEmpty,
+        reason:
+            'Ein Feature muss seine Absicht abgeben können. Wird das hier '
+            'gemeldet, ist der Host von außen gar nicht mehr ansprechbar.\n'
+            '${still.bericht}',
+      );
+    });
+
+    test('Ä10: webview_flutter außerhalb des Avatar-Ordners', () {
+      // Das Paket steht heute nicht in pubspec.yaml. Die Regel entsteht
+      // trotzdem jetzt, damit sie da ist, wenn E-10 es freigibt.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/avatar_versuch.dart',
+        <(int, String)>[(1, 'Regel 19: webview_flutter ist auf')],
+      );
+      erwarteFunde(
+        verstoss,
+        'lib/map/presentation/webview_daneben.dart',
+        <(int, String)>[(1, 'Regel 19: webview_flutter ist auf')],
+      );
+    });
+
+    test('Ä10 Gegenprobe: im Avatar-Ordner ist die WebView erlaubt', () {
+      expect(
+        still.fuer('lib/map/presentation/avatar/avatar_view.dart'),
+        isEmpty,
+        reason:
+            'Sonst ist die Regel ein Verbot statt einer Kapselung, und der '
+            'Avatar hat keinen Ort mehr.\n${still.bericht}',
+      );
+    });
+  });
+
   // Diese Gruppe hält den heutigen Zustand fest. Jeder Test hier ist grün,
-  // weil das Skript nichts meldet, und das ist bei diesen vier Fällen so
-  // gewollt: die Begründung steht im Kopfkommentar von
-  // tool/check_architecture.dart unter "Bewusst offene Lücken". Wer eine
-  // dieser Lücken schließen will, muss zuerst die dortige Begründung
-  // widerlegen.
-  group('Bewusst offene Lücken (Entscheidung, nicht Versehen)', () {
+  // weil das Skript nichts meldet.
+  //
+  // Bei den vier Lücken 1 bis 4 ist das gewollt, die Begründung steht im
+  // Kopfkommentar von tool/check_architecture.dart unter "Bewusst offene
+  // Lücken". Wer eine davon schließen will, muss zuerst die dortige
+  // Begründung widerlegen.
+  //
+  // Der fünfte Test ist anders gelagert: dort ist nichts entschieden, die
+  // Lücke ist gemessen und offen. Er steht hier, damit sie sichtbar bleibt.
+  group('Offene Lücken', () {
     test('Lücke 1: benannte Konstruktoren umgehen Regel 7', () {
       expect(
         still.fuer(
@@ -1320,6 +1569,20 @@ void main() {
             'context.go(ziel) ist genau die Form, die eine typisierte Route '
             'erzeugt. Ein Verbot würde überwiegend korrekten Code melden.\n'
             '${still.bericht}',
+      );
+    });
+
+    test('Gemessene, noch offene Lücke: Regel 17 gilt nur unter '
+        'lib/features/', () {
+      expect(
+        still.fuer('lib/map/presentation/luecke_eigenes_data.dart'),
+        isEmpty,
+        reason:
+            'Anders als die vier Lücken darüber ist das keine Entscheidung, '
+            'sondern der Rest der Asymmetrie, die bei den Schichtmustern und '
+            'bei Regel 8 und 9 geschlossen wurde. Regel 17 hängt weiter an '
+            '_pointsIntoOwnFeatureLayer. Wer sie über _modulwurzel ableitet, '
+            'dreht diesen Test um.\n${still.bericht}',
       );
     });
 

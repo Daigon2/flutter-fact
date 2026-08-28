@@ -1,6 +1,6 @@
 // Architektur-Grenzen maschinell prüfen.
 //
-// Deckt die neun Prüfungen aus docs/engineering/quality-gates.md, Abschnitt
+// Deckt die zwölf Prüfungen aus docs/engineering/quality-gates.md, Abschnitt
 // "Custom boundary checks", und die harten Regeln aus
 // docs/architecture/dependency-rules.md ab.
 //
@@ -55,6 +55,18 @@
 //     Vertrag selbst sein oder dessen Umgehung, und beides sieht im Quelltext
 //     gleich aus. Textuell ist das nicht unterscheidbar, deshalb prüft das
 //     Skript nur fremdes `presentation/` und `data/` (Regel 8 und 9).
+//
+// Gemessene, noch nicht geschlossene Lücke
+// ----------------------------------------
+// Regel 17 (`presentation` zeigt nicht auf `data`, auch nicht auf das eigene)
+// hängt weiter an `_pointsIntoOwnFeatureLayer` und damit an `lib/features/`.
+// In einem Modul außerhalb davon, etwa `lib/map/presentation/` auf
+// `lib/map/data/`, meldet sie nichts. Das ist kein Entwurf, sondern der Rest
+// derselben Asymmetrie, die bei den Schichtmustern und bei Regel 8 und 9
+// geschlossen wurde; es fehlt dieselbe Ableitung über [_modulwurzel]. Der Fall
+// ist heute nicht auslösbar, weil es außerhalb von `lib/features/` kein
+// `data/` gibt. Ein Test hält den Zustand fest, damit er nicht unbemerkt
+// bleibt.
 
 import 'dart:io';
 
@@ -215,11 +227,38 @@ const _coreBans = <Ban>[
 /// Deshalb Hinweis statt Verstoß: die Meldung erinnert an den Vertrag,
 /// blockiert aber keinen Merge, für den es keine dokumentierte Regel gibt.
 const _featureBans = <Ban>[
+  // Regel 18: der Karten-Host unter `lib/map/` ist App- und
+  // UI-Infrastruktur, keine Geschäftsdomäne. Features geben Absichten ab,
+  // statt die Karte zu steuern, und sehen deshalb nur `map/domain/`. Ohne
+  // diese Zeile ist das eine Bitte: Kamera, Marker und Avatar wären für jedes
+  // Feature direkt erreichbar, und die Trennung wäre binnen eines Schrittes
+  // aufgebraucht.
+  Ban(
+    r'^package:fact_app/map/(?:presentation|data)/',
+    'Regel 18: Features sehen vom Karten-Host nur map/domain/. Die Kamera '
+        'gehört dem Host, ein Feature gibt eine Absicht ab',
+  ),
   Ban(
     r'^dart:developer',
     'Logging-Vertrag: dart:developer umgeht die Logging-Schnittstelle aus '
         'core. Wenn das bleiben soll, gehört es in einen ADR',
     severity: Severity.hinweis,
+  ),
+];
+
+/// Regel 19: der 3D-Avatar bleibt vorerst WebView (E-10), aber hinter einer
+/// Schnittstelle, die der Rest des Codes nicht kennt.
+///
+/// `webview_flutter` steht heute **nicht** in pubspec.yaml und wird erst mit
+/// E-10 freigegeben. Die Regel entsteht trotzdem jetzt: „hinter einer klaren
+/// Schnittstelle kapseln" ist ohne eine Zeile wie diese eine
+/// Absichtserklärung, und der erste Import kommt erfahrungsgemäß in dem
+/// Schritt, in dem niemand mehr an die Absicht denkt.
+const _webViewBans = <Ban>[
+  Ban(
+    r'^package:webview_flutter',
+    'Regel 19: webview_flutter ist auf $_avatarHome beschränkt. Der Rest der '
+        'App kennt nur die Schnittstelle des Avatars, nicht die WebView',
   ),
 ];
 
@@ -232,26 +271,36 @@ const _globalBans = <Ban>[
 // Schichtmuster
 // -------------
 // Eine Schicht wird an einem Pfadsegment erkannt, das genau `domain`,
-// `application`, `presentation` oder `data` heißt. Zwischen dem Feature und
-// der Schicht darf beliebige Struktur liegen, deshalb `(?:[^/]+/)*`:
-// `lib/features/tours/karte/domain/entities/x.dart` ist Domäne des Features
-// `tours`. Vorher verlangten die Muster die Schicht direkt unter dem Feature,
-// womit eine Unterstruktur aus allen Mustern fiel und Gate 2, 3 und 6 dort
-// wirkungslos waren.
+// `application`, `presentation` oder `data` heißt. Zwischen `lib/` und der
+// Schicht darf beliebige Struktur liegen, deshalb `(?:[^/]+/)*`:
+// `lib/features/tours/karte/domain/entities/x.dart` ist Domäne, und
+// `lib/map/domain/kamera_absicht.dart` ist es genauso.
+//
+// Bewusst nicht an `lib/features/` gebunden. Eine Schicht ist eine Schicht,
+// gleich in welchem Modul sie liegt. Vorher verlangten drei der vier Muster
+// das Literal `lib/features/`, und eine Datei `lib/map/domain/x.dart` mit
+// Flutter-, Riverpod- und Supabase-Import passierte das Gate lautlos, während
+// dieselben Importe unter `lib/features/` gemeldet wurden. Nur
+// `_presentationPath` war schon allgemein, deshalb fiel die Asymmetrie
+// überhaupt auf.
+//
+// Untrennbar dazu gehört [_modulwurzel]. Die Erlaubnisliste der Domäne kannte
+// nur „eigenes Feature"; ohne die Modulwurzel würde sie in einem Modul
+// außerhalb von `features/` jeden modulinternen Import als Verstoß melden.
 //
 // Weil `[^/]+` kein `/` überqueren kann, steht die Position vor `domain/`
 // immer direkt hinter einem Schrägstrich. Das Segment muss also exakt `domain`
 // lauten: `presentation/domain_helpers/` und `tours/subdomain/` treffen
 // bewusst nicht.
 
-/// Domäne eines Features, auch unterhalb einer Unterstruktur.
-final _domainPath = RegExp(r'^lib/features/[^/]+/(?:[^/]+/)*domain/');
+/// Domäne, überall unterhalb von `lib/`.
+final _domainPath = RegExp(r'^lib/(?:[^/]+/)*domain/');
 
-/// Application-Schicht eines Features, auch unterhalb einer Unterstruktur.
-final _applicationPath = RegExp(r'^lib/features/[^/]+/(?:[^/]+/)*application/');
+/// Application-Schicht, überall unterhalb von `lib/`.
+final _applicationPath = RegExp(r'^lib/(?:[^/]+/)*application/');
 
-/// Data-Schicht eines Features, auch unterhalb einer Unterstruktur.
-final _dataPath = RegExp(r'^lib/features/[^/]+/(?:[^/]+/)*data/');
+/// Data-Schicht, überall unterhalb von `lib/`.
+final _dataPath = RegExp(r'^lib/(?:[^/]+/)*data/');
 
 final _layers = <LayerRule>[
   LayerRule(name: 'domain', pathMatch: _domainPath, bans: _domainBans),
@@ -271,6 +320,11 @@ final _layers = <LayerRule>[
     name: 'features',
     pathMatch: RegExp(r'^lib/features/'),
     bans: _featureBans,
+  ),
+  LayerRule(
+    name: 'avatar-kapselung',
+    pathMatch: _ausserhalbAvatarHome,
+    bans: _webViewBans,
   ),
   // Gate 7 gilt projektweit, nicht nur im Produktionscode. Ein GetIt-Container
   // in einem Test, einem Integrationstest oder einem Werkzeugskript ist
@@ -312,12 +366,28 @@ const _forbiddenCoreConcepts = <String>[
 /// (ADR-004: Routing-Infrastruktur).
 const _routingHome = 'lib/app/routing/';
 
+/// App-Komposition. Die Tabelle in docs/architecture/dependency-rules.md gibt
+/// ihr "All public feature entry points and services", und nur ihr. Deshalb
+/// ist sie von Regel 8 und 9 ausgenommen.
+const _appComposition = 'lib/app/';
+
+/// Der einzige Ort, an dem `webview_flutter` vorkommen darf.
+const _avatarHome = 'lib/map/presentation/avatar/';
+
+/// Alles unterhalb von `lib/`, außer [_avatarHome].
+///
+/// Die Ausnahme steht als negative Vorausschau im Pfadmuster, weil eine
+/// Verbotsliste keine Ausnahme kennt. Aus [_avatarHome] abgeleitet, damit die
+/// Regel und ihr einziger erlaubter Ort nicht auseinanderlaufen können.
+final _ausserhalbAvatarHome = RegExp(
+  '^lib/(?!${_avatarHome.substring('lib/'.length)})',
+);
+
 /// Presentation-Schicht, überall unterhalb von `lib/`.
 ///
-/// Bewusst nicht an `features/` gebunden: `lib/shared/presentation/` ist
-/// dieselbe Schicht, und Gate 1 dort nicht greifen zu lassen wäre eine Lücke,
-/// die keine Regel deckt. Wie bei den übrigen Schichtmustern zählt ein Segment,
-/// das exakt `presentation` heißt.
+/// `lib/shared/presentation/` und `lib/map/presentation/` sind dieselbe
+/// Schicht mit derselben Regel. Wie bei den übrigen Schichtmustern zählt ein
+/// Segment, das exakt `presentation` heißt.
 final _presentationPath = RegExp(r'^lib/(?:[^/]+/)*presentation/');
 
 /// Gate 8: rohe Navigation mit einem Route-String.
@@ -828,7 +898,31 @@ bool _pointsIntoOwnFeatureLayer(
   return _hasSegment(resolved.substring(prefix.length), layer);
 }
 
-/// Darf die Domäne des Features [ownFeature] den Import [resolved] haben?
+/// Wurzel des Moduls, in dem eine Datei der Schicht [schicht] liegt: der Pfad
+/// bis vor das Schichtsegment, als `package:`-Präfix geschrieben.
+///
+/// Für `lib/map/domain/kamera_absicht.dart` ist das `package:fact_app/map/`.
+///
+/// Gebraucht, seit die Schichtmuster nicht mehr an `lib/features/` hängen. Die
+/// Erlaubnisliste der Domäne kannte bis dahin nur „eigenes Feature"; ohne
+/// diese Wurzel würde sie in einem Modul außerhalb von `features/` jeden
+/// modulinternen Import melden, also genau den Import, der dort richtig ist.
+///
+/// Eine Schicht direkt unter `lib/` gibt bewusst `null`. Die Wurzel wäre dann
+/// das ganze Paket, und eine Erlaubnisliste, die alles erlaubt, ist keine.
+String? _modulwurzel(String posixPath, String schicht) {
+  final treffer = RegExp('^lib/(?:[^/]+/)*$schicht/').firstMatch(posixPath);
+  if (treffer == null) {
+    return null;
+  }
+  final bisSchicht = posixPath.substring(0, treffer.end - schicht.length - 1);
+  if (bisSchicht == 'lib/') {
+    return null;
+  }
+  return 'package:$_packageName/${bisSchicht.substring('lib/'.length)}';
+}
+
+/// Darf die Domäne den Import [resolved] haben?
 ///
 /// Erlaubt ist genau das, was die Tabelle in
 /// docs/architecture/dependency-rules.md der Domäne zugesteht:
@@ -836,16 +930,28 @@ bool _pointsIntoOwnFeatureLayer(
 ///  * `dart:`-Importe, also das Dart-SDK;
 ///  * die eigene Feature-Domäne, egal ob absolut oder relativ geschrieben
 ///    (relative Importe sind hier schon zu ihrer `package:`-Form aufgelöst);
+///  * die Domäne des eigenen Moduls, wenn die Datei außerhalb von `features/`
+///    liegt: `lib/map/domain/` darf `package:fact_app/map/.../domain/...`
+///    importieren, siehe [_modulwurzel];
 ///  * die geprüften reinen Dart-Pakete aus [_domainAllowedPackages].
 ///
 /// Alles andere ist ein Verstoß. Erlaubnisliste statt Verbotsliste, weil eine
 /// Verbotsliste diese Tabellenzeile strukturell nicht abbilden kann.
-bool _isAllowedDomainImport(String? ownFeature, String resolved) {
+bool _isAllowedDomainImport(
+  String? ownFeature,
+  String? modulwurzel,
+  String resolved,
+) {
   if (resolved.startsWith('dart:')) {
     return true;
   }
   if (ownFeature != null &&
       _pointsIntoOwnFeatureLayer(ownFeature, resolved, 'domain')) {
+    return true;
+  }
+  if (modulwurzel != null &&
+      resolved.startsWith(modulwurzel) &&
+      _hasSegment(resolved.substring(modulwurzel.length), 'domain')) {
     return true;
   }
   for (final package in _domainAllowedPackages) {
@@ -868,6 +974,20 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
       .toList();
   final istDomaene = _domainPath.hasMatch(posixPath);
   final istPresentation = _presentationPath.hasMatch(posixPath);
+  final domaenenModul = _modulwurzel(posixPath, 'domain');
+  // Regel 8 und 9 gelten für alles unter `lib/`, nicht nur innerhalb von
+  // `features/`. Zwei Ausnahmen, beide mit Grund:
+  //
+  //  * `lib/app/`: die Tabelle in dependency-rules.md gibt der
+  //    App-Komposition "All public feature entry points and services". Der
+  //    Router, `app.dart`, `bootstrap.dart` und das Tutorial leben davon.
+  //  * `lib/core/`: [_coreBans] verbietet `package:fact_app/features/` schon
+  //    pauschal und nennt dabei die genauere Regel 11. Ohne diese Ausnahme
+  //    stünden für denselben Import zwei Sätze im Bericht.
+  final pruefeFremdeFeatureSchichten =
+      posixPath.startsWith('lib/') &&
+      !posixPath.startsWith(_appComposition) &&
+      !posixPath.startsWith('lib/core/');
 
   for (final directive in view.directives) {
     for (final uri in directive.uris) {
@@ -902,7 +1022,7 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
       // `package:fact_app/app/` und `package:fact_app/services/`.
       if (istDomaene &&
           !domaeneSchonGemeldet &&
-          !_isAllowedDomainImport(ownFeature, resolved)) {
+          !_isAllowedDomainImport(ownFeature, domaenenModul, resolved)) {
         found.add(
           Violation(
             file: posixPath,
@@ -910,20 +1030,23 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
             detail: detail,
             rule:
                 '[domain] Domain-Erlaubnisliste: die Domäne darf nur das '
-                'Dart-SDK, die eigene Feature-Domäne und geprüfte reine '
-                'Dart-Pakete importieren (dependency-rules.md, Tabelle '
+                'Dart-SDK, die Domäne des eigenen Features bzw. Moduls und '
+                'geprüfte reine Dart-Pakete importieren '
+                '(dependency-rules.md, Tabelle '
                 '"Allowed layer dependencies"). Technik gehört hinter einen '
                 'Domain-Vertrag, also nach data oder services',
           ),
         );
       }
 
-      if (ownFeature == null) {
-        continue;
-      }
-      // Gate 4 und 5: fremdes presentation oder data.
+      // Gate 4 und 5: das presentation oder data eines Features, gelesen von
+      // außerhalb dieses Features. Hier hing die Prüfung früher an
+      // `ownFeature`, und wer null war, wurde übersprungen: derselbe Import
+      // war unter `lib/features/` ein Verstoß und unter `lib/map/` erlaubt.
       final cross = _crossFeaturePattern.firstMatch(resolved);
-      if (cross != null && cross.group(1) != ownFeature) {
+      if (pruefeFremdeFeatureSchichten &&
+          cross != null &&
+          cross.group(1) != ownFeature) {
         final target = cross.group(1);
         final layer = cross.group(2);
         found.add(
@@ -932,18 +1055,27 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
             line: lineNo,
             detail: detail,
             rule: layer == 'presentation'
-                ? 'Regel 8: Feature darf presentation von "$target" nicht '
-                      'importieren'
-                : 'Regel 9: Feature darf data von "$target" nicht importieren',
+                ? 'Regel 8: presentation von "$target" darf nur dieses Feature '
+                      'selbst importieren, außerhalb davon nur die '
+                      'App-Komposition unter $_appComposition'
+                : 'Regel 9: data von "$target" darf nur dieses Feature selbst '
+                      'importieren, außerhalb davon nur die App-Komposition '
+                      'unter $_appComposition',
           ),
         );
       }
 
-      // Die Tabelle erlaubt Presentation nur Application, Domain und eng
-      // abgegrenztes Core. Das eigene `data/` steht nicht in der Zeile.
-      // Geprüft wird nur das eigene Feature: fremdes `data/` meldet schon
-      // Regel 9, und zwei Meldungen für denselben Import helfen niemandem.
+      // Regel 17: die Tabelle erlaubt Presentation nur Application, Domain
+      // und eng abgegrenztes Core. Das eigene `data/` steht nicht in der
+      // Zeile. Geprüft wird nur das eigene Feature: fremdes `data/` meldet
+      // schon Regel 9, und zwei Meldungen für denselben Import helfen
+      // niemandem.
+      //
+      // Bekannte, gemessene Lücke: außerhalb von `lib/features/` greift diese
+      // Prüfung nicht, siehe den Kopfkommentar unter "Gemessene, noch nicht
+      // geschlossene Lücke".
       if (istPresentation &&
+          ownFeature != null &&
           _pointsIntoOwnFeatureLayer(ownFeature, resolved, 'data')) {
         found.add(
           Violation(
@@ -951,7 +1083,7 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
             line: lineNo,
             detail: detail,
             rule:
-                'Import-Policy: presentation darf nicht auf data zeigen, auch '
+                'Regel 17: presentation darf nicht auf data zeigen, auch '
                 'nicht auf das eigene. Zugriff läuft über Application oder '
                 'einen Domain-Vertrag',
           ),

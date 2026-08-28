@@ -144,6 +144,11 @@ durch eine offene Entscheidung
 
 ## Phase 2, Map-Kern
 
+**Die Strukturfrage vor Schritt 12 ist am 28.08.2026 entschieden**, siehe unten
+unter „Offene Entscheidungen". Der Karten-Host entsteht unter `lib/map/`, die
+Bewachung dazu steht seit demselben Tag im Prüfskript. Code liegt dort noch
+keiner.
+
 - [ ] 12. MapLibre mit gebackenem Style · [ ] 13. Kamera-Verhalten
 - [ ] 14. Kompass-Rotation · [ ] 15. Cluster-Layer · [ ] 16. Einzel-Marker
 - [ ] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
@@ -232,15 +237,16 @@ Nicht im REBUILD_PLAN, aber notwendig:
   `lib/features/facts/data/repositories/supabase_fact_repository.dart`
   deklariert `factRepositoryProvider` neben der Implementierung und schreibt
   dazu, Widgets und Notifier lesten „diesen Provider". Genau das können sie
-  nicht: `presentation → data` wird von `tool/check_architecture.dart` um Zeile
-  946 als Verstoß gemeldet. Dasselbe gilt für `factRemoteDataSourceProvider`.
+  nicht: `presentation → data` wird von `tool/check_architecture.dart` als
+  Regel 17 gemeldet. Dasselbe gilt für `factRemoteDataSourceProvider`.
   Es ist **kein** Regelverstoß, weil es heute nur die App-Komposition liest,
   aber es ist ein Kopiervorbild mit falscher Begründung. Der Weg, der
   funktioniert, steht seit Schritt 9 in `lib/features/identity/`: Vertrag in
   `domain/repositories/`, Provider auf den Vertrag typisiert in
   `presentation/notifiers/`, Implementierung per Override aus `bootstrap.dart`.
   Behebung gehört zu dem Schritt, der `facts` an die Karte hängt, nicht
-  hierher. Siehe E-32.
+  hierher. Die Regel dahinter ist mit E-32 seit dem 28.08.2026 geklärt, siehe
+  unten; offen ist nur noch diese Fundstelle.
 - [ ] **Quellprüfung im i18n-Generator für unbekannte Schlüssel.** `t('...')`
   im JSX ohne Eintrag im Wörterbuch ist für `tool/generate_i18n.dart` heute
   unsichtbar; die Prüfung liest nur die beiden Wörterbuchdateien. Genau diese
@@ -254,12 +260,44 @@ Nicht im REBUILD_PLAN, aber notwendig:
   veralteter `*.g.dart`-Stand fällt heute nur auf, wenn jemand zufällig
   `build_runner` startet. Am 27.08.2026 einmal von Hand geprüft: ein frischer
   Lauf erzeugt `app_routes.g.dart` byteidentisch.
-- [ ] **Zwei verbleibende Asymmetrien im Architektur-Check.** Erstens ist die
+- [ ] **Drei verbleibende Asymmetrien im Architektur-Check.** Erstens ist die
   Cross-Feature-Prüfung flach: ein fremdes `features/x/unterstruktur/data/`
   entkommt den Regeln 8 und 9, während dieselbe Verschachtelung für die
   eigenen Schichten geschlossen ist. Zweitens hat `application` weiter nur
   eine Verbotsliste. Letzteres setzt eine Aussage voraus, was „narrowly
   scoped Core" konkret bedeutet, und die fehlt in `dependency-rules.md`.
+  Drittens hängt **Regel 17** (`presentation` zeigt nicht auf `data`, auch
+  nicht auf das eigene) weiter an `_pointsIntoOwnFeatureLayer` und damit an
+  `lib/features/`: ein `lib/map/presentation/` auf `lib/map/data/` wird nicht
+  gemeldet, am 28.08.2026 mit einer Wegwerf-Probe gemessen. Heute nicht
+  auslösbar, weil es außerhalb von `lib/features/` kein `data/` gibt, und
+  spätestens fällig, wenn der Karten-Host eines bekommt. Die Behebung ist
+  dieselbe Ableitung über `_modulwurzel`, die für die Domäne schon dasteht;
+  bewusst nicht mitgemacht, weil der Auftrag vom 28.08.2026 vier benannte
+  Regeln umfasste und diese nicht.
+- [x] **Zwei gemessene blinde Flecken im Architektur-Check geschlossen**
+  (28.08.2026). `_domainPath`, `_applicationPath` und `_dataPath` verlangten
+  das Literal `lib/features/`, nur `_presentationPath` war allgemein: eine
+  Datei `lib/map/domain/x.dart` mit Flutter-, Riverpod- und Supabase-Import
+  passierte das Gate, dieselben Importe unter `lib/features/` wurden gemeldet.
+  Und die Regeln 8 und 9 brachen bei `if (ownFeature == null) continue;` ab,
+  womit jedes Modul außerhalb von `features/` auf fremde Presentation und
+  fremdes Data zugreifen durfte. Beides am 28.08.2026 an Wegwerf-Dateien
+  gemessen, nicht vermutet. **Dazu gehört untrennbar `_modulwurzel`:** ohne
+  sie meldet die Erlaubnisliste der Domäne, die nur „eigenes Feature" kannte,
+  in einem Modul außerhalb von `features/` jeden modulinternen Import als
+  Verstoß.
+- [ ] **Der dritte gemessene blinde Fleck ist offen: die Karten-SDK ist
+  außerhalb des Hosts frei.** `import 'package:maplibre_gl/maplibre_gl.dart'`
+  in `lib/features/discovery/presentation/` passiert das Gate mit Exit-Code 0,
+  am 28.08.2026 **nach** allen Regeländerungen desselben Tages erneut
+  gemessen. Das Verbot bei den Domänen-Bans gilt nur der Domäne. Regel 18
+  schließt die Lücke nicht: sie hält Features aus `map/presentation/` heraus,
+  nicht aus dem Paket. Die Behebung hätte genau die Form von Regel 19,
+  nämlich `maplibre_gl` nur unterhalb `lib/map/`, und wäre heute risikofrei,
+  weil das Paket in `lib/` an keiner Stelle importiert wird. Nicht gebaut,
+  weil der Auftrag vier benannte Regeln umfasste und diese nicht; das ist
+  eine Entscheidung, keine Auslassung aus Versehen.
 - [ ] **Vier bewusst offene Lücken**, je mit Begründung im Skript und einem
   Test, der den heutigen Zustand festhält: benannte Konstruktoren umgehen
   Regel 7, Direktiven werden nur am Zeilenanfang erkannt, `.go(variable)`
@@ -402,6 +440,54 @@ Tour-Planer. Der Stamm `step` ist innerhalb von `tour.` aber eindeutig das
 Tutorial, der Planer zählt in `stops`. Nicht `tour.stepOf` genannt, weil
 `challenge.stepOf` schon existiert und dort nur das Bindewort „von" trägt.
 
+**Der Karten-Host ist am 28.08.2026 entschieden.** Er gehört keiner
+Geschäftsdomäne, sondern entsteht als eigene App- und UI-Infrastruktur unter
+**`lib/map/`**, mit `presentation/` und `domain/`. Die Kamera gehört dem Host;
+Features geben Absichten ab, statt die Karte zu steuern, und sehen vom Host nur
+`map/domain/`. Der 3D-Avatar bleibt vorerst WebView, aber hinter einer
+Schnittstelle, die der Rest des Codes nicht kennt, unterhalb
+`lib/map/presentation/avatar/`.
+
+Ausschlaggebend war dieselbe Frage wie bei E-27, die Importrichtung: vier
+Features teilen sich eine Karte, und läge der Host in einem davon, müssten die
+anderen drei dessen Presentation importieren. Genau das verbietet Regel 8. Die
+frühere Angabe `services/map` in `lib/features/README.md` trägt nicht, weil der
+Host eine Oberfläche mitbringt und `services/` für Vendor-Adapter ohne
+Oberfläche gedacht ist. `domain-map.md` §7 bleibt wörtlich stehen: die Karte ist
+weiterhin keine eigenständige Geschäftsdomäne. Eingetreten ist der `unless`-
+Nebensatz in §3.
+
+**Was daran neu maschinell geprüft wird**, seit demselben Tag und jeweils mit
+einer Wegwerf-Probe belegt: Regel 18 (ein Feature sieht vom Host nur
+`map/domain/`) und Regel 19 (`webview_flutter` nur unterhalb
+`lib/map/presentation/avatar/`). Regel 19 ist heute nicht auslösbar, weil das
+Paket noch nicht im Projekt ist; sie steht trotzdem schon da, damit sie wirkt,
+wenn E-10 es freigibt. **E-10 bleibt offen**: entschieden ist die Kapselung,
+nicht die endgültige Wahl zwischen WebView und einem Flutter-Nachbau.
+
+**E-31 und E-32 sind am 28.08.2026 geschlossen**, beide durch einen Edit an
+akzeptierten Architekturdokumenten.
+
+*E-31:* `presentation → data` steht jetzt wörtlich in der Forbidden-Liste von
+`dependency-rules.md`, einschließlich des eigenen `data/`, und zusätzlich als
+harte Regel 17. Das Skript setzt sie seit Schritt 9 durch, das Dokument leitete
+sie nur aus der Weißliste der Tabelle ab.
+
+*E-32:* der zweideutige Satz in `project-structure.md` ist ersetzt. Ein
+Provider, der eine `data`- oder `application`-Implementierung baut, steht neben
+dieser Implementierung und wird **ausschließlich von der App-Komposition**
+gelesen. Höhere Schichten lesen einen Provider, der auf dem Domänenvertrag
+typisiert ist, neben dem Vertrag oder in `presentation`, mit sicherem Standard
+und Override aus `bootstrap.dart`. Am Code nachgeprüft, und beide Vorbildstellen
+sind danach richtig eingeordnet: `authRepositoryProvider` (Vertrag,
+`presentation/notifiers/`, Override im Bootstrap) ist das Muster zum Kopieren,
+`diagnosticSinkProvider` steht neben seinem Vertrag in `core` und ist deshalb
+für `presentation` lesbar, `factRepositoryProvider` steht neben der
+Implementierung und ist damit nur für die App-Komposition erreichbar. **Der
+falsche Kommentar an `factRepositoryProvider` bleibt offen** und steht weiter
+oben unter „Arbeit außerhalb der 50 Schritte"; E-32 klärt die Regel, nicht die
+eine Fundstelle.
+
 | Nr | Entscheidung | Level | Fällig vor |
 |---|---|---|---|
 | E-06 | **Reward-Ledger.** `increment_coins(uid, amount)` im geteilten Backend ist `security definer` und prüft den Betrag nicht. Der Client bestimmt, wie viele Coins er bekommt. Die gesamte Rätsel-Ökonomie hängt daran. Zusätzlich widersprechen sich die Zahlen der Quelle: Server bucht 10 beim Sammeln, die Map-Animation zeigt „+12", das Fact-Detail „+10 und ⭐+50", das Puzzle Basis 50. | **4** | Phase 4 |
@@ -422,9 +508,7 @@ Tutorial, der Planer zählt in `stops`. Nicht `tour.stepOf` genannt, weil
 | E-21 | **`start_group_session` ist doppelt definiert**, in `2026-06-04_group_sessions.sql:193` und erneut in `2026-06-05_team_sessions.sql:473`. Welche Version produktiv läuft, hängt an der Ausführungsreihenfolge im SQL-Editor. Backend-Frage, aber der Client hängt daran. | 3, im anderen Repo | Phase 5 |
 | E-28 | **Text für `audio.dialog.volumeHint`.** Der Schlüssel wird in `screen-auth.jsx:251` benutzt und existiert **in der PWA nicht**; sie zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Beide Vorlagen beschreiben den Kasten, als hätte er Text. **Die technische Sperre ist seit E-39 weg:** ein handgeschriebener Schlüssel überlebt den Generator jetzt, die Ergänzungs-Map ist der vorgesehene Ort dafür. Offen ist nur noch der Wortlaut, je ein Satz DE und EN. Solange er fehlt, entfällt der Kasten im Neubau weiter, denn erfundener Nutzertext ist keine Lösung. Die bessere Behebung bleibt ein Schlüssel in der PWA; dann räumt die Gegenprüfung des Generators den lokalen Eintrag von selbst wieder ab.<br><br>**Vorschlag, am 28.08.2026 hergeleitet, nicht freigegeben:** DE „Dreh die Lautstärke vorher auf. Der Guide spricht laut los, sobald du in der Nähe einer Sehenswürdigkeit bist.", EN „Turn your volume up first. The guide speaks out loud when you approach a landmark." Bewusst ohne Stummschalter-Hinweis: das ist ein iOS-Begriff und steuert auf keiner der beiden Plattformen die Medienlautstärke, ein Hinweis darauf wäre für die halbe Zielgruppe falsch. Das 🔊-Symbol rendert die PWA außerhalb des Strings, gehört also nicht in den Wert. | 2 | vor Auslieferung |
 | E-29 | **DM Sans Kursiv und 700 fehlen als Asset.** Das Goethe-Zitat auf dem Startbildschirm ist kursiv, das letzte Wort fett. `assets/fonts/` hat nur 400, 500 und 600, alle aufrecht. Die PWA hat dasselbe Loch (`styles.css:3` lädt weder Italic noch 700) und lässt den Browser synthetisieren; Flutter tut das für Asset-Schriften nicht. `fontStyle: italic` und `w700` stehen im Code, damit die Absicht stimmt, sobald die Dateien da sind. | 2 | vor Auslieferung |
-| E-30 | **`reference-features/settings.md` widerspricht `dependency-rules.md`.** `settings.md:19-27` zeigt einen Notifier in `presentation/notifiers/` neben einem `data/settings_store.dart`, Zeile 33-38 sagt „persists through `SettingsStore`", Zeile 42-44 begründet ausdrücklich, dass es **keine** Domänenschicht gibt. Es gibt keine Verdrahtung, die das erfüllt: den direkten Import meldet `tool/check_architecture.dart` um Zeile 946, und ohne Domänenschicht gibt es keinen Ort für den Vertrag. Der gebaute Code weicht deshalb ab und legt den Vertrag nach `lib/features/settings/domain/audio_mode_store.dart`. Zu entscheiden: `settings.md` korrigieren, oder die Ausnahme im Abschnitt „Exceptions" der `dependency-rules.md` schriftlich fassen. | 3 | vor dem Ausbau von `features/settings` |
-| E-31 | **Die strengste Regel des Projekts steht nur im Prüfskript.** Der Block „Forbidden" in `dependency-rules.md` listet `domain → data`, `domain → presentation`, `data → presentation`, `feature A presentation → feature B presentation` und `core → any feature`. **`presentation → eigenes data` steht dort nicht.** Das Verbot ist eine Ableitung aus der Weißliste der Tabelle „Allowed layer dependencies", und das Skript begründet es auch so. Eine Regel, die Schritt 9, Schritt 10 und danach jedes Feature mit Repository formt, sollte wörtlich dastehen. | 3 | bald, es kostet eine Zeile |
-| E-32 | **`project-structure.md:115` ist zweideutig, und beide Lesarten sind im Code umgesetzt.** Der Satz lautet „Riverpod providers that construct data/application dependencies live near the implementation they expose". `lib/features/facts/data/repositories/supabase_fact_repository.dart` liest ihn als „neben der Implementierung" und wird damit für `presentation` unerreichbar; `lib/core/diagnostics/diagnostics_providers.dart` zitiert dieselbe Regel für „neben dem **Vertrag**". Solange der Satz offen ist, entscheidet der Zufall, welche Vorbildstelle jemand zuerst liest. Vorschlag: ergänzen, dass solche Provider ausschließlich von der App-Komposition gelesen werden und höhere Schichten über einen vertragsseitigen Provider plus Override zugreifen. | 3 | vor Phase 2 |
+| E-30 | **`reference-features/settings.md` widerspricht `dependency-rules.md`.** `settings.md:19-27` zeigt einen Notifier in `presentation/notifiers/` neben einem `data/settings_store.dart`, Zeile 33-38 sagt „persists through `SettingsStore`", Zeile 42-44 begründet ausdrücklich, dass es **keine** Domänenschicht gibt. Es gibt keine Verdrahtung, die das erfüllt: den direkten Import meldet `tool/check_architecture.dart` als Regel 17, und ohne Domänenschicht gibt es keinen Ort für den Vertrag. Der gebaute Code weicht deshalb ab und legt den Vertrag nach `lib/features/settings/domain/audio_mode_store.dart`. Zu entscheiden: `settings.md` korrigieren, oder die Ausnahme im Abschnitt „Exceptions" der `dependency-rules.md` schriftlich fassen. | 3 | vor dem Ausbau von `features/settings` |
 | E-33 | **„Angemeldet bleiben" ist wirkungslos.** In der PWA wird `stayIn` gesetzt und **nirgends gelesen**, `persistSession` kommt dort nicht vor. Das Kästchen ist im Neubau nachgebaut, die Semantik nicht: Sitzungspersistenz wäre eine Auth-Verhaltensänderung. Zu entscheiden: implementieren, oder das Kästchen entfernen. Ein Haken, der nichts tut, ist gegenüber dem Nutzer eine Unwahrheit. | 3 | vor Auslieferung |
 | E-34 | **Passwort-Reset ist nicht angeboten.** `supabase_flutter 2.17.2` fährt standardmäßig `AuthFlowType.pkce`, und `resetPasswordForEmail` legt den Code-Verifier **auf dem Gerät** ab. Ohne `redirectTo` ginge der Link an die Site-URL, also in die PWA, die den Verifier nicht hat: der Tausch scheitert. Eine Mail zu schicken, deren Link niemand einlösen kann, ist schlechter als kein Angebot. Der Nutzer sieht deshalb kein „Vergessen?" über dem Passwortfeld, Zurücksetzen läuft über die PWA. Die Behebung braucht ein Deep-Link-Ziel und damit eine **neue öffentliche Vertragsfläche**. | 3 | vor Auslieferung |
 | E-35 | **`FactButton` kann nicht nach `core/widgets`.** Sein eigener Kommentar verlangt den Umzug, sobald ein zweiter Aufrufer existiert; der existiert seit Schritt 9. Regel 11 des Prüfskripts zerlegt aber den Pfad und meldet, dass `core` das Konzept `fact` nicht besitzen darf, nachgewiesen mit einer Wegwerf-Probe. Zu entscheiden: bei `identity` lassen, oder unter einem Namen ohne Fachbegriff umziehen. | 2 | wenn ein drittes Feature ihn braucht |

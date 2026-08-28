@@ -161,7 +161,7 @@ The following are not business domains:
 - Supabase client;
 - image loading.
 
-Map rendering belongs to Discovery presentation unless a future map platform grows into a broader technical module.
+Map rendering was assigned to Discovery presentation, with the reservation that a broader technical module could take it over. That reservation took effect on 2026-08-28: the map host lives in `lib/map/` as app and UI infrastructure, owns the camera and the map surface, and exposes `map/domain` to features. Discovery still owns what is shown on the map and why; it no longer owns the host. §7 below is unchanged by this: the map host is a technical capability, not an independent business domain.
 
 ## 4. Relationships
 
