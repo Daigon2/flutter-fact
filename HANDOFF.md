@@ -705,6 +705,19 @@ weggedriftet ist.
 
 Bewährt hat sich, was nicht im Code steht und deshalb hier festgehalten wird.
 
+**Zwei Entscheidungswege, und sie werden nicht vermischt.** Janek ist Product
+Owner, hat die App gebaut und sich alles ausgedacht: Design, Schriften,
+Features, Namen, Aufbau, Inhalt gehen an ihn und dürfen jederzeit direkt
+gefragt werden. **Technische Fragen, vor allem Architekturfragen, gehen an
+Dairen**, werden aber **gesammelt** und am Anfang oder Ende einer Sitzung als
+Block ausgegeben, ausdrücklich als Fragen an Dairen gekennzeichnet.
+
+Der Grund steht nicht im Code: Janek muss für jede Dairen-Frage eine WhatsApp
+schicken, jede einzelne verzögert den Prozess spürbar. Deshalb gilt beides
+zugleich. Kleinkram wird **nicht** eskaliert, sondern selbst entschieden und
+dokumentiert. Was das Ergebnis wirklich prägt, darf umgekehrt nicht
+unterschlagen werden, nur weil Fragen unbequem sind.
+
 **Spezialisten arbeiten, die Hauptsitzung orchestriert.** Die Agenten aus
 `.claude/agents/` erledigen die Umsetzung, die Hauptsitzung schreibt die
 Aufträge, entscheidet und führt widersprüchliche Ergebnisse zusammen. Das
