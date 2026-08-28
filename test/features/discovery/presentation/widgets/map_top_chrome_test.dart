@@ -1,6 +1,7 @@
 import 'package:fact_app/app/localization/app_language.dart';
 import 'package:fact_app/app/localization/language_preference_store.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
+import 'package:fact_app/app/theme/fact_theme.dart';
 import 'package:fact_app/core/anchors/anchor_id.dart';
 import 'package:fact_app/core/anchors/anchor_registry.dart';
 import 'package:fact_app/core/anchors/anchor_scope.dart';
@@ -102,19 +103,35 @@ void main() {
           ),
         ],
         child: MaterialApp(
-          home: Stack(
-            fit: StackFit.expand,
-            children: <Widget>[
-              // Ein beliebiger Untergrund, ausdrücklich keine Karte.
-              const ColoredBox(color: Color(0xFF445566)),
-              if (withAnchorScope)
-                AnchorScope(
-                  knownMissingAnchors: DiscoveryAnchors.knownMissing,
-                  child: chrome,
-                )
-              else
-                chrome,
-            ],
+          // Das echte Theme und ein `Material` darüber, und beides ist Teil
+          // des Prüfgegenstands. Am 29.08.2026 gemessen: ohne sie erbt jeder
+          // Text hier Flutters `_errorTextStyle` aus `WidgetsApp`, in der App
+          // dagegen `theme.textTheme.bodyMedium` über das `Material` des
+          // `Scaffold`. Die beiden Basisstile unterschieden sich in der
+          // Zeilenhöhe (`null` gegen 1.43), und weil die Höhe einer Pille
+          // Innenabstand plus Zeilenkasten ist, maß diese Datei etwas anderes
+          // als der Nutzer sah. Seit die Zeilenhöhe app-weit aus
+          // `ThemeData.typography` heraus ist, sind beide Wege gleich, und
+          // diese zwei Zeilen halten das fest.
+          theme: FactTheme.light(),
+          home: Material(
+            // `transparency`, damit die Fläche darunter sichtbar bleibt und
+            // dieses `Material` nichts malt.
+            type: MaterialType.transparency,
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                // Ein beliebiger Untergrund, ausdrücklich keine Karte.
+                const ColoredBox(color: Color(0xFF445566)),
+                if (withAnchorScope)
+                  AnchorScope(
+                    knownMissingAnchors: DiscoveryAnchors.knownMissing,
+                    child: chrome,
+                  )
+                else
+                  chrome,
+              ],
+            ),
           ),
         ),
       ),

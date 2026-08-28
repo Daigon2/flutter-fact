@@ -451,6 +451,26 @@ Nicht im REBUILD_PLAN, aber notwendig:
 Dokumente beschreiben derzeit einen unerreichbaren Zustand und werden mit
 Begründung und Wiederaufnahme-Bedingung angepasst.
 
+### `maplibre_gl` ist eine Zeitbombe im Build, mit Ansage
+
+Der erste Gerätebuild **mit verdrahteter Karte** lief am 29.08.2026 auf
+Exit-Code 0, und er meldet dabei wörtlich:
+
+> Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP):
+> maplibre_gl. **Future versions of Flutter will fail to build** if your app
+> uses plugins that apply KGP.
+
+Das ist dieselbe Bruchstelle wie beim Paketkonflikt vom 27.08.2026, nur von der
+anderen Seite gesehen. `0.27.0` braucht `android.builtInKotlin=true`,
+`app_links` braucht `false`, und `0.26.2` wendet KGP an, was künftige
+Flutter-Versionen ablehnen. **Ein Flutter-Update bricht den Build absehbar**,
+nicht diffus irgendwann.
+
+Zu tun ist heute nichts, aber wer Flutter aktualisiert, muss zuerst hier
+nachsehen. Der Ausweg wird sein, dass `maplibre_gl` eine Fassung mit
+Built-in-Kotlin bekommt; dann ist zu prüfen, ob der `app_links`-Konflikt
+dabei mit verschwindet.
+
 ## Offene Entscheidungen
 
 > **Hinweis zur Öffentlichkeit dieses Dokuments.** Das Repository ist öffentlich.

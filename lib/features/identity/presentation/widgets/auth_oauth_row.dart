@@ -68,6 +68,11 @@ class AuthOAuthRow extends StatelessWidget {
         // "Mit Apple" 64 Pixel hoch, "Mit Google" 104. Bei Skalierung 1.0
         // ändert das hier nichts, dort sind beide 44.
         //
+        // Die vier Zahlen sind vom 28.08.2026 und damit von vor der
+        // Zeilenhöhen-Korrektur im Theme. Heute misst der Test bei Skalierung
+        // 2.0 100 statt 104 und bei 1.0 43 statt 44; die Aussage bleibt
+        // dieselbe. Herleitung in `auth_oauth_row_test.dart`.
+        //
         // `IntrinsicHeight` ist dabei **nicht** optional. Beide Bildschirme
         // stellen diese Zeile in ein `SingleChildScrollView`, die Höhe ist dort
         // also unbeschränkt. `CrossAxisAlignment.stretch` gibt seinen Kindern

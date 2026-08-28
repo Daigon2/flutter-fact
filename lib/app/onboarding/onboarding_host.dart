@@ -87,6 +87,13 @@ class OnboardingHost extends ConsumerWidget {
   /// "Überspringen" und "Tipp irgendwo für weiter" eine Zeilenhöhe von 1.43,
   /// die `screen-tour.jsx` an keiner der vier Stellen angibt.
   ///
+  /// **Seit dem 29.08.2026 ist das nicht mehr die einzige Sperre.** Die
+  /// Zeilenhöhe hat den Weg genommen, den E-38 für die Laufweite beschreibt,
+  /// und ist deshalb aus `ThemeData.typography` heraus, siehe
+  /// `FactTheme._withoutTrackingAndLineHeight`. Diese Zeile bleibt trotzdem
+  /// stehen, denn sie setzt mit Familie und Gewicht etwas, das aus der Quelle
+  /// kommt und nicht aus Material.
+  ///
   /// Gesetzt ist deshalb nur, was FACT selbst vorgibt:
   ///
   /// - Familie und Gewicht aus [FactTypography.bodyText], also `body` aus
@@ -145,9 +152,9 @@ class OnboardingHost extends ConsumerWidget {
           // malen, der Verdunkler des Overlays macht das selbst und wäre sonst
           // doppelt.
           //
-          // Und der Basisstil ausdrücklich, sonst reicht dieses `Material`
-          // Materials eigene Typografie an jeden Text des Tutorials weiter.
-          // Die Begründung samt Messung steht bei [overlayTextStyle].
+          // Und der Basisstil ausdrücklich, damit dieses `Material` die
+          // Schrift der Quelle weiterreicht statt Materials eigener. Die
+          // Begründung samt Messung steht bei [overlayTextStyle].
           Material(
             type: MaterialType.transparency,
             textStyle: overlayTextStyle,

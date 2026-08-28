@@ -102,6 +102,42 @@ gelaufen.
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
 
+### 29.08.2026, E-40: Materials Zeilenhöhe raus, wie E-38 eine Ebene tiefer
+
+Die Suche nach der Ursache im Tutorial führte auf einen app-weiten Fehler.
+**46 Absätze** erbten `height: 1.43` aus Materials `bodyMedium`, dazu
+**sieben Eingabefelder** ein `height: 1.5` aus `bodyLarge`, einer zweiten
+Quelle, die niemand auf dem Zettel hatte. `styles.css` enthält `line-height`
+**null Mal**; die PWA setzt sie ausschließlich inline, 40 Mal über vier
+Bildschirme. Wo sie keine setzt, rendert der Browser mit den Schriftmetriken.
+
+Behoben an derselben Stelle wie E-38, in `ThemeData.typography`, weil der Wert
+dort und nicht im `textTheme` sitzt, das `FactTheme` zusammenbaut. Für jeden
+der 46 Absätze wurde die Quelle nachgeschlagen: nirgends steht dort eine
+Zeilenhöhe, und jeder Text, für den die Quelle eine angibt, trug sie vorher
+wie nachher.
+
+**Der lehrreichste Fund des Abends ist aber der Testrahmen.**
+`map_top_chrome_test.dart` pumpte ein nacktes `MaterialApp` **ohne**
+`FactTheme` und **ohne** `Material`. Dort erbten die Chrome-Texte Flutters
+`_errorTextStyle` aus `WidgetsApp`, und der trägt `height: null`. Der Test hat
+die Maße also die ganze Zeit **richtig** gemessen, während die App sie falsch
+zeichnete: **die Zahlen waren belegt, grün und trotzdem nicht das, was der
+Nutzer sah.** Ein Testrahmen, der die Vorfahrenkette der App nicht abbildet,
+kann über die falsche Sache recht haben. Der Rahmen steht jetzt auf
+`FactTheme.light()` plus `Material`, und keine einzige Maßzahl hat sich
+dadurch geändert.
+
+Zweiter Fund derselben Sorte: `SelectableText` und `EditableText` tauchen in
+`find.byType(RichText)` **gar nicht** auf. Wer Textstile über Finder einsammelt
+statt über einen Durchlauf des Renderbaums, übersieht jedes Eingabefeld. So ist
+die zweite Quelle `bodyLarge` bis heute unbemerkt geblieben.
+
+Sichtbar wird es als ein bis drei Pixel je Bauteil: Eingabefelder 83 → 80,
+Stadt-Pille 52 → 51, Modus-Umschalter 43 → 42. **Am deutlichsten bei doppelter
+Systemschrift**, dort schrumpfen die Fremdanmeldungs-Knöpfe von 104 auf 100,
+und auf einem 360er Gerät sind vier Pixel im knappen Formular ein Unterschied.
+
 ### 29.08.2026, Der Stil einmal wirklich gesehen, und zwei Fehler dabei gefunden
 
 Nach Schritt 12 lief zum ersten Mal ein Gerätebuild **mit verdrahteter Karte**.

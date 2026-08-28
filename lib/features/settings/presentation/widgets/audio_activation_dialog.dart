@@ -236,13 +236,16 @@ class AudioActivationDialog extends ConsumerWidget {
               // `transparency`: die Fläche malt der `DecoratedBox` darüber
               // samt Radius und Schatten, ein `canvas` wäre sie doppelt.
               //
-              // Der Basisstil ausdrücklich und nicht Materials Vorgabe. Sonst
-              // erbten Titel, Fließtext und Knöpfe aus
-              // `theme.textTheme.bodyMedium` eine Zeilenhöhe, die die Quelle
-              // nicht kennt, und die Knopfzeile würde höher. Gesetzt ist genau
-              // das, was `screen-auth.jsx:226` am Kasten stehen hat:
-              // `fontFamily: 'Nunito, sans-serif'`, sonst nichts. Größe,
-              // Gewicht und Farbe setzt jeder Text selbst.
+              // Der Basisstil ausdrücklich und nicht Materials Vorgabe.
+              // Gesetzt ist genau das, was `screen-auth.jsx:226` am Kasten
+              // stehen hat: `fontFamily: 'Nunito, sans-serif'`, sonst nichts.
+              // Größe, Gewicht und Farbe setzt jeder Text selbst.
+              //
+              // Bis zum 29.08.2026 war das zugleich die einzige Sperre gegen
+              // die Zeilenhöhe aus `theme.textTheme.bodyMedium`, die die
+              // Quelle nicht kennt. Die sitzt jetzt app-weit in
+              // `FactTheme._withoutTrackingAndLineHeight`; hier bleibt der
+              // Familienwert stehen, weil er aus der Quelle kommt.
               child: Material(
                 type: MaterialType.transparency,
                 textStyle: const TextStyle(fontFamily: FactFont.display),
