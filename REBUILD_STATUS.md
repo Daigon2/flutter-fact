@@ -228,6 +228,9 @@ Nicht im REBUILD_PLAN, aber notwendig:
   unsichtbar; die Prüfung liest nur die beiden Wörterbuchdateien. Genau diese
   Lücke hat `audio.dialog.volumeHint` (E-28) durchgelassen, gefunden wurde er
   von Hand. Eine Prüfung wäre billig und deckt die ganze Fehlerklasse ab.
+  **Nicht mit E-39 erledigt:** die dort ergänzte Gegenprüfung läuft in die
+  andere Richtung, sie meldet Ergänzungs-Schlüssel, die es in der PWA
+  inzwischen gibt. Ein `t('...')` ohne Wörterbucheintrag sieht sie nicht.
 - [ ] **Gate für generierten Code fehlt.** `docs/engineering/quality-gates.md`
   nennt `tool/check_generated_code.dart`, das Skript existiert nicht. Ein
   veralteter `*.g.dart`-Stand fällt heute nur auf, wenn jemand zufällig
@@ -355,6 +358,32 @@ zentraler Redirect-Weiche, nicht zustandsgesteuerte Overlays. Der öffentliche
 Vertrag umfasst damit sieben Pfade statt vier. Ab jetzt kostet ein Umbenennen
 eine Migration, vorher eine Zeile.
 
+**E-39 ist am 28.08.2026 entschieden.** Oberflächentexte, die die PWA sichtbar
+anzeigt, **ohne sie als Schlüssel zu führen**, kommen aus einer handgepflegten
+Ergänzungs-Map in `lib/app/localization/app_strings_supplement.dart`. Sie liegt
+außerhalb von `generated/`, damit `tool/generate_i18n.dart` sie nie
+überschreibt. Der Generator prüft sie in **beiden** Betriebsarten gegen: jeder
+Ergänzungs-Schlüssel muss in der PWA fehlen, sonst Exit-Code 1 mit dem Namen
+des Schlüssels und dem Hinweis, den lokalen Eintrag zu löschen. Die Prüfung
+sitzt bewusst dort und nicht in einem Test: `flutter test` muss ohne Zugang zum
+Lese-Repo durchlaufen.
+
+`AppStrings` sucht in der Reihenfolge erzeugt/gewählte Sprache, Ergänzung/
+gewählte Sprache, erzeugt/Fallback, Ergänzung/Fallback. Der erzeugte Wert
+gewinnt gegen den gleichnamigen Ergänzungs-Wert, damit ein Schlüssel, den die
+PWA nachträglich bekommt, sofort aus der Quelle kommt und nicht aus der lokalen
+Kopie. Nachgewiesen wird das über `AppStrings.debugResolve`, weil in echten
+Daten per Konstruktion nie eine Überlappung entsteht.
+
+Erster und bisher einziger Eintrag ist `tour.stepCounter`, die Schrittanzeige
+des Tutorials. `screen-tour.jsx:483` baut sie als hartcodierten Ternär
+(`SCHRITT {step} VON {total}` / `STEP {step} OF {total}`, Großschreibung aus der
+Quelle) und hat dafür keinen Schlüssel. **Zum Namen:** der Präfix `tour.` trägt
+in den erzeugten Tabellen zwei Bildschirme, ab `tour.planTitle` gehört alles dem
+Tour-Planer. Der Stamm `step` ist innerhalb von `tour.` aber eindeutig das
+Tutorial, der Planer zählt in `stops`. Nicht `tour.stepOf` genannt, weil
+`challenge.stepOf` schon existiert und dort nur das Bindewort „von" trägt.
+
 | Nr | Entscheidung | Level | Fällig vor |
 |---|---|---|---|
 | E-06 | **Reward-Ledger.** `increment_coins(uid, amount)` im geteilten Backend ist `security definer` und prüft den Betrag nicht. Der Client bestimmt, wie viele Coins er bekommt. Die gesamte Rätsel-Ökonomie hängt daran. Zusätzlich widersprechen sich die Zahlen der Quelle: Server bucht 10 beim Sammeln, die Map-Animation zeigt „+12", das Fact-Detail „+10 und ⭐+50", das Puzzle Basis 50. | **4** | Phase 4 |
@@ -373,7 +402,7 @@ eine Migration, vorher eine Zeile.
 | E-23 | **Die Distanzprüfung beim Sammeln ist nicht nur umgehbar, sie ist optional.** Die Policy `create policy "own collected" on public.collected_facts for all using (auth.uid() = user_id)` erlaubt dem Client, direkt in `collected_facts` einzufügen. Damit entfällt `collect_fact_validated` samt der 150-Meter-Prüfung vollständig, und der Trigger `handle_fact_collected` bucht danach Punkte, Stadtwertung und Trophäen. E-07 beschreibt nur, dass die Positionsangabe fälschbar ist; hier braucht man gar keine. | **4** | Phase 2 |
 | E-24 | **Coins und Punktestand sind direkt setzbar.** Die Policy `create policy "own profile" on public.profiles for all using (auth.uid() = id)` hat kein `WITH CHECK`. Der Client kann seine eigene Profilzeile aktualisieren, einschließlich `coins` und `score_total`. **Wichtig für die Reihenfolge der Behebung:** wer E-06 behebt, also `increment_coins` absichert, hat damit nichts gewonnen, solange E-24 offen ist. Die Funktion ist dann nur der bequemere von zwei Wegen. | **4** | Phase 2 |
 | E-21 | **`start_group_session` ist doppelt definiert**, in `2026-06-04_group_sessions.sql:193` und erneut in `2026-06-05_team_sessions.sql:473`. Welche Version produktiv läuft, hängt an der Ausführungsreihenfolge im SQL-Editor. Backend-Frage, aber der Client hängt daran. | 3, im anderen Repo | Phase 5 |
-| E-28 | **Text für `audio.dialog.volumeHint`.** Der Schlüssel wird in `screen-auth.jsx:251` benutzt und existiert **in der PWA nicht**; sie zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Beide Vorlagen beschreiben den Kasten, als hätte er Text. Im Neubau entfällt er, weil ein handgeschriebener Schlüssel beim nächsten Lauf von `tool/generate_i18n.dart` verschwindet und `--check` rot macht. Nötig ist ein DE- und EN-Text, und die Behebung gehört in die PWA, nicht hierher. | 2 | vor Auslieferung |
+| E-28 | **Text für `audio.dialog.volumeHint`.** Der Schlüssel wird in `screen-auth.jsx:251` benutzt und existiert **in der PWA nicht**; sie zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Beide Vorlagen beschreiben den Kasten, als hätte er Text. **Die technische Sperre ist seit E-39 weg:** ein handgeschriebener Schlüssel überlebt den Generator jetzt, die Ergänzungs-Map ist der vorgesehene Ort dafür. Offen ist nur noch der Wortlaut, je ein Satz DE und EN. Solange er fehlt, entfällt der Kasten im Neubau weiter, denn erfundener Nutzertext ist keine Lösung. Die bessere Behebung bleibt ein Schlüssel in der PWA; dann räumt die Gegenprüfung des Generators den lokalen Eintrag von selbst wieder ab. | 2 | vor Auslieferung |
 | E-29 | **DM Sans Kursiv und 700 fehlen als Asset.** Das Goethe-Zitat auf dem Startbildschirm ist kursiv, das letzte Wort fett. `assets/fonts/` hat nur 400, 500 und 600, alle aufrecht. Die PWA hat dasselbe Loch (`styles.css:3` lädt weder Italic noch 700) und lässt den Browser synthetisieren; Flutter tut das für Asset-Schriften nicht. `fontStyle: italic` und `w700` stehen im Code, damit die Absicht stimmt, sobald die Dateien da sind. | 2 | vor Auslieferung |
 | E-30 | **`reference-features/settings.md` widerspricht `dependency-rules.md`.** `settings.md:19-27` zeigt einen Notifier in `presentation/notifiers/` neben einem `data/settings_store.dart`, Zeile 33-38 sagt „persists through `SettingsStore`", Zeile 42-44 begründet ausdrücklich, dass es **keine** Domänenschicht gibt. Es gibt keine Verdrahtung, die das erfüllt: den direkten Import meldet `tool/check_architecture.dart` um Zeile 946, und ohne Domänenschicht gibt es keinen Ort für den Vertrag. Der gebaute Code weicht deshalb ab und legt den Vertrag nach `lib/features/settings/domain/audio_mode_store.dart`. Zu entscheiden: `settings.md` korrigieren, oder die Ausnahme im Abschnitt „Exceptions" der `dependency-rules.md` schriftlich fassen. | 3 | vor dem Ausbau von `features/settings` |
 | E-31 | **Die strengste Regel des Projekts steht nur im Prüfskript.** Der Block „Forbidden" in `dependency-rules.md` listet `domain → data`, `domain → presentation`, `data → presentation`, `feature A presentation → feature B presentation` und `core → any feature`. **`presentation → eigenes data` steht dort nicht.** Das Verbot ist eine Ableitung aus der Weißliste der Tabelle „Allowed layer dependencies", und das Skript begründet es auch so. Eine Regel, die Schritt 9, Schritt 10 und danach jedes Feature mit Repository formt, sollte wörtlich dastehen. | 3 | bald, es kostet eine Zeile |

@@ -13,6 +13,11 @@
 // `--check` schreibt nichts und endet mit Exit-Code 1, sobald die Dateien im
 // Repository von der Quelle abweichen.
 //
+// Zusätzlich prüft das Skript in **beiden** Betriebsarten die handgepflegte
+// Ergänzung `lib/app/localization/app_strings_supplement.dart` gegen: jeder
+// Schlüssel dort muss in der PWA fehlen. Bekommt die Quelle einen davon, endet
+// das Skript mit Exit-Code 1 und nennt ihn. Siehe E-39 in REBUILD_STATUS.md.
+//
 // Der Quellpfad wird in dieser Reihenfolge bestimmt:
 //   1. `--source`
 //   2. Umgebungsvariable FACT_PWA_APP_DIR
@@ -30,6 +35,12 @@ const _defaultSourceDir =
 
 /// Zielverzeichnis der erzeugten Dateien, relativ zur Projektwurzel.
 const _outputDir = 'lib/app/localization/generated';
+
+/// Handgepflegte Ergänzungs-Map, siehe E-39 in REBUILD_STATUS.md.
+///
+/// Sie liegt bewusst **außerhalb** von [_outputDir]: dieses Skript schreibt
+/// sie nie, es prüft sie nur gegen.
+const _supplementFile = 'lib/app/localization/app_strings_supplement.dart';
 
 /// Zwei Schlüssel der PWA tragen eine Liste statt eines Textes. Sie landen in
 /// einer eigenen Map, damit die Text-Map typisiert `Map<String, String>` bleibt.
@@ -57,6 +68,9 @@ void main(List<String> args) {
   final tables = _readTables(sourceDir, config, report);
 
   _checkParity(tables, report);
+  // Vor beiden Betriebsarten, nicht nur vor dem Schreiben: sonst merkt der
+  // überflüssig gewordene Ergänzungs-Eintrag nur, wer gerade neu erzeugt.
+  _checkSupplement(tables);
 
   final files = _renderFiles(tables, config);
 
@@ -379,6 +393,116 @@ Set<String> _placeholders(String value) =>
 
 bool _sameSet(Set<String> a, Set<String> b) =>
     a.length == b.length && a.containsAll(b);
+
+// ── Gegenprüfung der handgepflegten Ergänzung ────────────────────────────────
+
+/// Marker, ab dem in [_supplementFile] nach Schlüsseln gesucht wird.
+const _supplementMarker = 'supplementTextsByLanguage =';
+
+/// Ein Schlüssel der PWA trägt immer einen Namensraum mit Punkt, etwa
+/// `tour.stepCounter`. Erkannt wird ein solcher String, auf den ein Doppelpunkt
+/// folgt, also genau eine Map-Zeile.
+final _supplementKeyPattern = RegExp(
+  r"'([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)'\s*:",
+);
+
+/// Jeder String, auf den ein Doppelpunkt folgt. Dient nur der Gegenprobe zu
+/// [_supplementKeyPattern]: ein Schlüssel ohne Punkt würde sonst still durch
+/// die Prüfung fallen und die Ergänzung ungeprüft lassen.
+final _supplementAnyKeyPattern = RegExp(r"'([^']*)'\s*:");
+
+/// Stellt sicher, dass jeder Ergänzungs-Schlüssel in der PWA **fehlt**.
+///
+/// Die Ergänzung ist eine Notlösung für Texte, die die PWA anzeigt, ohne sie
+/// als Schlüssel zu führen. Sobald die Quelle einen davon bekommt, ist der
+/// lokale Eintrag überflüssig und wird zur zweiten Wahrheit. Deshalb endet das
+/// Skript hier hart statt still.
+void _checkSupplement(Map<String, _LanguageTable> tables) {
+  final keys = _readSupplementKeys();
+
+  final found = <String, List<String>>{};
+  for (final key in keys) {
+    for (final table in tables.values) {
+      if (table.texts.containsKey(key) || table.lists.containsKey(key)) {
+        (found[key] ??= <String>[]).add(table.code);
+      }
+    }
+  }
+
+  if (found.isEmpty) {
+    stdout.writeln(
+      'Ergänzung: ${keys.length} Schlüssel in $_supplementFile, '
+      'keiner davon in der PWA.',
+    );
+    return;
+  }
+
+  stderr.writeln(
+    'Ergänzung: ${found.length} Schlüssel steht bzw. stehen jetzt in der PWA '
+    'und kommt damit aus der Quelle:',
+  );
+  for (final entry in found.entries) {
+    stderr.writeln('  ${entry.key} (Sprache ${entry.value.join(', ')})');
+  }
+  stderr.writeln(
+    'Diesen Eintrag bzw. diese Einträge in $_supplementFile löschen. '
+    'AppStrings zieht den erzeugten Wert ohnehin vor, der Text stimmt also '
+    'schon jetzt; die Ergänzung ist nur noch tote Doppelung.',
+  );
+  exit(1);
+}
+
+/// Liest die Schlüssel aus [_supplementFile].
+///
+/// Kein Parser, sondern ein Muster über den Quelltext ab [_supplementMarker].
+/// Das reicht, weil die Datei nur Map-Literale enthält, und es hält den
+/// Generator frei von einer Abhängigkeit auf den Analyzer. Ganzzeilige
+/// Kommentare fallen vorher weg, damit ein im Kommentar genannter Schlüssel
+/// keine falsche Meldung auslöst.
+Set<String> _readSupplementKeys() {
+  final file = File(_supplementFile);
+  if (!file.existsSync()) {
+    _fail(
+      'Ergänzungsdatei nicht gefunden: $_supplementFile. Sie gehört zum '
+      'Projekt, siehe E-39 in REBUILD_STATUS.md.',
+    );
+  }
+
+  final source = file
+      .readAsLinesSync()
+      .where((line) => !line.trimLeft().startsWith('//'))
+      .join('\n');
+
+  final start = source.indexOf(_supplementMarker);
+  if (start == -1) {
+    _fail(
+      '$_supplementFile: "$_supplementMarker" nicht gefunden. Ohne diesen '
+      'Anker weiß der Generator nicht, welche Schlüssel er gegen die PWA '
+      'prüfen soll, und würde eine leere Ergänzung vortäuschen.',
+    );
+  }
+  final body = source.substring(start);
+
+  final all = _supplementAnyKeyPattern
+      .allMatches(body)
+      .map((m) => m.group(1)!)
+      .toSet();
+  final keys = _supplementKeyPattern
+      .allMatches(body)
+      .map((m) => m.group(1)!)
+      .toSet();
+
+  final unexpected = all.difference(keys);
+  if (unexpected.isNotEmpty) {
+    _fail(
+      '$_supplementFile: ${unexpected.map((k) => '"$k"').join(', ')} sieht '
+      'nicht wie ein PWA-Schlüssel aus. Die tragen immer einen Namensraum mit '
+      'Punkt. Ungeprüft stehen lassen kommt nicht in Frage, deshalb Abbruch.',
+    );
+  }
+
+  return keys;
+}
 
 // ── Dart-Dateien erzeugen ────────────────────────────────────────────────────
 
