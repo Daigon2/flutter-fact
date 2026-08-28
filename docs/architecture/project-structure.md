@@ -16,10 +16,9 @@ load_when:
 lib/
 ├── main.dart
 ├── app/
-│   ├── bootstrap/
-│   │   ├── bootstrap.dart
-│   │   ├── app_environment.dart
-│   │   └── provider_observers.dart
+│   ├── bootstrap.dart
+│   ├── app.dart
+│   ├── onboarding/
 │   ├── routing/
 │   │   ├── app_router.dart
 │   │   ├── route_guards.dart
@@ -27,10 +26,12 @@ lib/
 │   │   └── routes/
 │   ├── shell/
 │   ├── theme/
-│   ├── localization/
-│   └── fact_app.dart
+│   └── localization/
 │
 ├── core/
+│   ├── anchors/
+│   ├── async/
+│   ├── diagnostics/
 │   ├── error/
 │   ├── result/
 │   ├── logging/
@@ -40,6 +41,7 @@ lib/
 │   └── widgets/
 │
 ├── services/
+│   ├── supabase/
 │   ├── analytics/
 │   ├── crash_reporting/
 │   ├── feature_flags/
@@ -61,6 +63,14 @@ lib/
     ├── profile/
     └── settings/
 ```
+
+This tree is the target, not an inventory. Most entries do not exist yet. Four
+entries were corrected on 2026-08-28 because the document named something the
+code names differently, which is worse than a gap: `app/bootstrap.dart` is a
+file and not a folder, the root widget lives in `app/app.dart` and not in
+`app/fact_app.dart`, and `core/async/`, `core/diagnostics/` and
+`services/supabase/` are built and were missing here. `app/onboarding/` and
+`core/anchors/` come from E-26 and E-27 in `REBUILD_STATUS.md`.
 
 ## Large feature template
 
@@ -111,6 +121,14 @@ features/settings/
   the sense of `architecture-overview.md` §5, not routing infrastructure, so it
   does not belong under `app/routing/`. It contains no business rules and no
   feature imports; feature pages are supplied through the router.
+
+- `core/anchors/` owns the anchor mechanism only. Anchor identifiers belong to
+  the surface that draws the widget, never to `core`: tab anchors live in
+  `app/shell/`, map anchors in `features/discovery/presentation/`. This is E-27
+  in `REBUILD_STATUS.md`. The check script cannot enforce it: `_checkCoreConcepts`
+  in `tool/check_architecture.dart` splits the path and never reads the file, so
+  a `lib/core/anchors/anchor_ids.dart` full of domain identifiers would pass the
+  gate. Review enforces this rule, not the machine.
 
 - Riverpod providers that construct data/application dependencies live near the implementation they expose.
 - Feature UI providers live in `presentation`.

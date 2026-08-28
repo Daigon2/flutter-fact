@@ -6,6 +6,7 @@ import 'package:fact_app/app/shell/shell_tab.dart';
 import 'package:fact_app/app/shell/shell_tab_icon.dart';
 import 'package:fact_app/app/theme/fact_colors.dart';
 import 'package:fact_app/app/theme/fact_typography.dart';
+import 'package:fact_app/core/anchors/anchor_target.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -152,52 +153,60 @@ class _TabButton extends StatelessWidget {
         ? colors.red
         : (isDark ? _inactiveDark : _inactiveLight);
 
-    return Semantics(
-      button: true,
-      selected: isActive,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Padding(
-          // `padding: '2px 0'`, chrome.jsx:92.
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                // 42x30, Radius 12, chrome.jsx:96.
-                width: 42,
-                height: 30,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  // `--stamp-soft`, chrome.jsx:97. In `FactColors` heißt das
-                  // Feld `redSoft` und trägt genau diesen Wert.
-                  color: isActive ? colors.redSoft : const Color(0x00000000),
-                  borderRadius: const BorderRadius.all(Radius.circular(12)),
+    // Der Anker sitzt ganz außen, damit sein Rechteck dem `<button>` der Quelle
+    // entspricht: `chrome.jsx:88` hängt `data-tour-anchor` an den Knopf selbst,
+    // und der hat `flex: 1`, füllt also die volle Spaltenbreite. Weiter innen
+    // gesetzt, käme nur die Höhe des Inhalts heraus und der Leuchtring säße zu
+    // schmal.
+    return AnchorTarget(
+      anchorId: tab.anchorId,
+      child: Semantics(
+        button: true,
+        selected: isActive,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Padding(
+            // `padding: '2px 0'`, chrome.jsx:92.
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(
+                  // 42x30, Radius 12, chrome.jsx:96.
+                  width: 42,
+                  height: 30,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    // `--stamp-soft`, chrome.jsx:97. In `FactColors` heißt das
+                    // Feld `redSoft` und trägt genau diesen Wert.
+                    color: isActive ? colors.redSoft : const Color(0x00000000),
+                    borderRadius: const BorderRadius.all(Radius.circular(12)),
+                  ),
+                  child: ShellTabIcon(
+                    tab: tab,
+                    isActive: isActive,
+                    color: foreground,
+                  ),
                 ),
-                child: ShellTabIcon(
-                  tab: tab,
-                  isActive: isActive,
-                  color: foreground,
+                // `gap: 2`, chrome.jsx:91.
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  // `fontFamily: 'Nunito'`, Gewicht 800 aktiv und 600 inaktiv,
+                  // `fontSize: 10`, `lineHeight: 1` (chrome.jsx:114-117).
+                  // Gewicht 600 hat in `FactTypography` keine eigene Rolle, weil
+                  // `styles.css` dafür keine Klasse führt: die PWA setzt es
+                  // inline. Deshalb die Ableitung aus `heading` (Nunito 800).
+                  style: FactTypography.heading.copyWith(
+                    fontSize: 10,
+                    height: 1,
+                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                    color: foreground,
+                  ),
                 ),
-              ),
-              // `gap: 2`, chrome.jsx:91.
-              const SizedBox(height: 2),
-              Text(
-                label,
-                // `fontFamily: 'Nunito'`, Gewicht 800 aktiv und 600 inaktiv,
-                // `fontSize: 10`, `lineHeight: 1` (chrome.jsx:114-117).
-                // Gewicht 600 hat in `FactTypography` keine eigene Rolle, weil
-                // `styles.css` dafür keine Klasse führt: die PWA setzt es
-                // inline. Deshalb die Ableitung aus `heading` (Nunito 800).
-                style: FactTypography.heading.copyWith(
-                  fontSize: 10,
-                  height: 1,
-                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                  color: foreground,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
