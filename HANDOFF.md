@@ -724,6 +724,13 @@ zugleich. Kleinkram wird **nicht** eskaliert, sondern selbst entschieden und
 dokumentiert. Was das Ergebnis wirklich prägt, darf umgekehrt nicht
 unterschlagen werden, nur weil Fragen unbequem sind.
 
+**Grün heißt hochladen.** Angewiesen am 28.08.2026, ersetzt die frühere Regel
+„pushen nur mit Freigabe": sind die Gates gelaufen und grün und steht keine
+wichtige Frage offen, wird committet, nach `main` gemerged und gepusht, ohne
+zu fragen. Die Bedingung ist wörtlich zu nehmen: **gelaufen**, nicht vermutet.
+Ein Gate, dessen Exit-Code niemand angesehen hat, zählt nicht, und eine offene
+Entscheidung, die den Stand prägt, ist ein Grund zu warten.
+
 **Gefundene Fehler werden behoben, nicht mitportiert.** Angewiesen am
 28.08.2026: wer beim Bauen einen Fehler im bestehenden System findet, behebt
 ihn, und zwar **bevor** der nächste Schritt beginnt. Ein Fehler, der bewusst
