@@ -12,6 +12,7 @@ import 'package:fact_app/features/settings/domain/audio_mode_store.dart';
 import 'package:fact_app/features/settings/presentation/notifiers/audio_mode_providers.dart';
 import 'package:fact_app/features/settings/presentation/widgets/audio_activation_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -639,6 +640,44 @@ void main() {
         expect(dialog(), findsOneWidget, reason: '$size');
         await tester.tap(find.text(de.text('audio.dialog.cancel')));
         await tester.pumpAndSettle();
+      }
+    });
+  });
+
+  group('Textstil', () {
+    testWidgets('kein Text des Dialogs trägt eine Dekoration', (tester) async {
+      // Dieselbe Falle wie beim Tutorial-Overlay und beim Startabbruch: ohne
+      // `Material`-Vorfahren malt Flutter unter jeden Text die gelbe
+      // Doppellinie seines `_errorTextStyle` (`material/app.dart:45`). Der
+      // Dialog liegt als eigene Route im Overlay des Navigators, das
+      // `Scaffold` des Startbildschirms daneben nützt ihm nichts, und
+      // `DialogRoute` bringt von sich aus **kein** `Material` mit
+      // (`material/dialog.dart:1837-1851`): das tun sonst die Widgets `Dialog`
+      // und `AlertDialog`, und dieser Kasten ist keines von beiden, weil sein
+      // Aussehen aus `screen-auth.jsx` kommt.
+      //
+      // Der Test prüft keine Ausnahme, weil es keine gibt. Er misst die
+      // Dekoration des wirksamen Stils.
+      await pumpSplash(tester);
+      await tapAudioGuide(tester);
+
+      final paragraphs = tester
+          .renderObjectList<RenderParagraph>(
+            find.descendant(of: dialog(), matching: find.byType(RichText)),
+          )
+          .toList();
+      // Titel, Fließtext und zwei Knöpfe.
+      expect(paragraphs, hasLength(4), reason: 'nichts oder zu wenig gemessen');
+
+      for (final paragraph in paragraphs) {
+        final decoration = paragraph.text.style?.decoration;
+        expect(
+          decoration == null || decoration == TextDecoration.none,
+          isTrue,
+          reason:
+              'Text "${paragraph.text.toPlainText()}" trägt $decoration. '
+              'Fehlt ein Material-Vorfahren?',
+        );
       }
     });
   });

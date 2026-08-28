@@ -102,6 +102,50 @@ gelaufen.
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
 
+### 29.08.2026, Der Stil einmal wirklich gesehen, und zwei Fehler dabei gefunden
+
+Nach Schritt 12 lief zum ersten Mal ein Gerätebuild **mit verdrahteter Karte**.
+Das war nicht selbstverständlich: `maplibre_gl` ist ab diesem Commit zum ersten
+Mal in `lib/` wirklich importiert, und genau dieses Paket hat im Juli den
+Android-Build zerlegt. Er läuft, Exit-Code 0.
+
+**Er liefert aber eine Warnung, die eine Zeitbombe ist:** „Your app uses the
+following plugins that apply Kotlin Gradle Plugin (KGP): maplibre_gl. **Future
+versions of Flutter will fail to build**". Das ist dieselbe Bruchstelle wie im
+Juli, von der anderen Seite: `0.27.0` verlangt `android.builtInKotlin=true`,
+`app_links` verlangt `false`, und `0.26.2` wendet KGP an. Ein Flutter-Update
+bricht den Build absehbar, nicht diffus.
+
+**Die Karte selbst ist am Emulator gesehen**, über eine Wegwerf-Probe, die nur
+die Kartenfläche mountet, ohne Supabase und ohne Anmeldung. Der gebackene Stil
+trifft: grüne Grundfläche, sattere Parks, fast weiße Fahrbahnen mit sandfarbenem
+Saum, flache Klötzchen-Häuser mit Umriss, keine einzige Beschriftung. Der
+**Attributions-Knopf** unten rechts ist da und lässt sich mit
+`maplibre_gl 0.26.2` nicht abschalten.
+
+**Der Gerätelauf der App selbst bleibt blockiert**, und zwar nicht technisch:
+URL und Schlüssel für Supabase kommen über `--dart-define` und stehen bewusst
+nicht im Repository. Ohne sie zeigt die App die Startfehler-Seite.
+
+**Und genau die hat den Fehler offenbart.** Ihr Text trug **gelbe
+Doppellinien**, die dritte der drei Fallen dieser Woche. `MaterialApp(home:
+ColoredBox(...))` hat keinen Material-Vorfahren, und beide Textstile setzen
+Farbe und Größe, aber keine `decoration`, also überlebt die der Ersatzschrift
+den Merge. Kein Test hat es gefunden, weil `takeException()` leer bleibt: es
+ist kein Fehler, es ist Flutters absichtlich grelle Ersatzschrift.
+
+Der Rundgang danach fand **eine zweite Stelle, und die ist für Nutzer
+sichtbar**: der Audio-Aktivierungsdialog. Er ist eine eigene Route im Overlay,
+das `Scaffold` des Startbildschirms steht daneben und nützt ihm nichts, und
+`DialogRoute` bringt selbst kein `Material` mit.
+
+**Der Nebeneffekt der Behebung ist der eigentliche Merksatz:** ein `Material`
+ohne eigenen `textStyle` vererbt `theme.textTheme.bodyMedium`, also
+`letterSpacing: 0.25` und Zeilenhöhe 1.43. Das ist genau die Laufweite, die
+E-38 mühsam aus FACT-Text herausgenommen hat. Wer ein `Material` einzieht, um
+die Doppellinie loszuwerden, holt sich Materials Typografie ins Haus, wenn er
+den Basisstil nicht ausdrücklich hinschreibt.
+
 ### 29.08.2026, Schritt 12: MapLibre-Host mit gebackenem Stil
 
 Die Karte ist echt. Zwei Hälften: der gebackene Stil, und der Host darunter.

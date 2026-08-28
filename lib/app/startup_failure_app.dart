@@ -33,8 +33,37 @@ class StartupFailureApp extends StatelessWidget {
     // läuft, soll von möglichst wenig abhängen, das selbst kaputt sein könnte.
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: ColoredBox(
+      // `Material` und nicht `ColoredBox`, und das ist keine Kosmetik. Am
+      // 28.08.2026 auf dem Emulator gesehen, nicht im Test: beide Texte trugen
+      // eine gelbe Doppellinie. Das ist Flutters Notsignal für Text ohne
+      // `Material`-Vorfahren. `MaterialApp` legt unter der App einen
+      // `DefaultTextStyle` mit genau dieser Dekoration (`_errorTextStyle` in
+      // `material/app.dart`); erst ein `Material` ersetzt ihn durch den
+      // Textstil des Themes. Ein `ColoredBox` tut das nicht. Die beiden Stile
+      // unten setzen Farbe und Größe, aber keine `decoration`, deshalb
+      // überlebt sie den Merge.
+      //
+      // Warum nicht `Scaffold`: der bringt eine ganze Maschinerie mit, die
+      // selbst scheitern kann (ScaffoldMessenger, Drawer-Controller, Geometrie
+      // für AppBar, FAB und BottomSheet), und genau das will der Kopfkommentar
+      // hier vermeiden. Außerdem nähme er seine Fläche aus
+      // `Theme.of(context).scaffoldBackgroundColor`, also aus dem hellen
+      // Standard-Theme, weil diese `MaterialApp` bewusst kein `FactTheme`
+      // installiert. `Material` ist das kleinste Widget, das beides zugleich
+      // ist: Material-Vorfahre und Hintergrundfläche.
+      home: Material(
         color: FactColors.dark.bg,
+        // Der Basisstil ausdrücklich und nicht Materials Vorgabe. Gemessen:
+        // ohne diese Zeile erben beide Texte aus `theme.textTheme.bodyMedium`
+        // ein `letterSpacing: 0.25` und ein `height` von rund 1.43, das sie
+        // vorher nicht hatten. E-38 nimmt genau diese Laufweite aus FACT-Text heraus, und
+        // `FactTheme` tut das auch, aber hier greift es nicht: diese
+        // `MaterialApp` installiert bewusst kein `FactTheme`, also stünde
+        // Materials Standard-Geometrie da. Der Wert selbst überschreibt
+        // nichts, was die beiden Stile unten setzen.
+        textStyle: FactTypography.bodyText.copyWith(
+          color: FactColors.dark.ink2,
+        ),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),

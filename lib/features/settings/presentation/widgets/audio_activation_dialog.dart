@@ -223,31 +223,55 @@ class AudioActivationDialog extends ConsumerWidget {
                 borderRadius: BorderRadius.all(Radius.circular(cornerRadius)),
                 boxShadow: <BoxShadow>[boxShadow],
               ),
-              child: Padding(
-                padding: boxPadding,
-                child: Column(
-                  // Der Kasten ist so hoch wie sein Inhalt, `Center` gibt ihm
-                  // lose Zusicherungen.
-                  mainAxisSize: MainAxisSize.min,
-                  // `stretch` zwingt den Kasten auf die eingehende Breite, also
-                  // auf `min(Bildschirm - 40, 360)`. In CSS ist er `width: auto`,
-                  // also `fit-content` bis `max-width: 360`, und würde bei
-                  // kurzem Inhalt schmaler. Beim mehrzeiligen Fließtext dieses
-                  // Dialogs greift in beiden Welten die Deckelung, der
-                  // Unterschied ist heute also nicht zu sehen. Wer den Kasten
-                  // je mit kurzem Text zeigt, sieht ihn.
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    _title(strings),
-                    const SizedBox(height: titleGap),
-                    // `Flexible` und nicht `Expanded`: bei kurzem Text soll der
-                    // Kasten nicht auf die volle Höhe wachsen.
-                    Flexible(
-                      child: SingleChildScrollView(child: _body(strings)),
-                    ),
-                    const SizedBox(height: bodyGap),
-                    _buttons(context, ref, strings),
-                  ],
+              // Ohne `Material`-Vorfahren malt Flutter unter **jeden** Text
+              // die gelbe Doppellinie, mit der es fehlenden Textstil meldet.
+              // Der Dialog ist eine Route und liegt im Overlay des Navigators;
+              // das `Scaffold` des Startbildschirms steht daneben und nützt
+              // ihm nichts, und `DialogRoute` bringt selbst keines mit
+              // (`material/dialog.dart:1837-1851`). Das täten `Dialog` und
+              // `AlertDialog`, und dieser Kasten ist keines von beiden, weil
+              // sein Aussehen aus `screen-auth.jsx` kommt. Dieselbe Falle wie
+              // im `OnboardingHost` und in `app/startup_failure_app.dart`.
+              //
+              // `transparency`: die Fläche malt der `DecoratedBox` darüber
+              // samt Radius und Schatten, ein `canvas` wäre sie doppelt.
+              //
+              // Der Basisstil ausdrücklich und nicht Materials Vorgabe. Sonst
+              // erbten Titel, Fließtext und Knöpfe aus
+              // `theme.textTheme.bodyMedium` eine Zeilenhöhe, die die Quelle
+              // nicht kennt, und die Knopfzeile würde höher. Gesetzt ist genau
+              // das, was `screen-auth.jsx:226` am Kasten stehen hat:
+              // `fontFamily: 'Nunito, sans-serif'`, sonst nichts. Größe,
+              // Gewicht und Farbe setzt jeder Text selbst.
+              child: Material(
+                type: MaterialType.transparency,
+                textStyle: const TextStyle(fontFamily: FactFont.display),
+                child: Padding(
+                  padding: boxPadding,
+                  child: Column(
+                    // Der Kasten ist so hoch wie sein Inhalt, `Center` gibt ihm
+                    // lose Zusicherungen.
+                    mainAxisSize: MainAxisSize.min,
+                    // `stretch` zwingt den Kasten auf die eingehende Breite, also
+                    // auf `min(Bildschirm - 40, 360)`. In CSS ist er `width: auto`,
+                    // also `fit-content` bis `max-width: 360`, und würde bei
+                    // kurzem Inhalt schmaler. Beim mehrzeiligen Fließtext dieses
+                    // Dialogs greift in beiden Welten die Deckelung, der
+                    // Unterschied ist heute also nicht zu sehen. Wer den Kasten
+                    // je mit kurzem Text zeigt, sieht ihn.
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      _title(strings),
+                      const SizedBox(height: titleGap),
+                      // `Flexible` und nicht `Expanded`: bei kurzem Text soll der
+                      // Kasten nicht auf die volle Höhe wachsen.
+                      Flexible(
+                        child: SingleChildScrollView(child: _body(strings)),
+                      ),
+                      const SizedBox(height: bodyGap),
+                      _buttons(context, ref, strings),
+                    ],
+                  ),
                 ),
               ),
             ),
