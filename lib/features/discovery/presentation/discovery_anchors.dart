@@ -21,14 +21,15 @@ import 'package:fact_app/core/anchors/anchor_id.dart';
 /// Oberfläche gerade ihre Zahl hinlegt, und das ist ein Vertrag, den niemand
 /// haben will.
 ///
-/// ## Heute meldet keines dieser Widgets einen Anker an
+/// ## Vier der sechs Anker sind gebaut
 ///
-/// Der Kartenbildschirm ist ein Platzhalter (`presentation/pages/map_page.dart`).
-/// Die Kennungen stehen trotzdem schon hier, weil das Tutorial sie abfragt und
-/// paritätstreu ohne Pfeil und Ring weiterzeichnen muss, statt den Schritt zu
-/// überspringen (`screen-tour.jsx:244-255`). Siehe [knownMissing].
+/// Seit dem Top-Chrome des Kartenbildschirms melden [coins], [modeFactFinder],
+/// [modeTour] und [compass] sich über `AnchorTarget` an
+/// (`presentation/widgets/map_top_chrome.dart`). Übrig bleiben [balloon] und
+/// [userMarker]; beide hängen an der Kartenschicht selbst, siehe
+/// [knownMissing].
 ///
-/// Wer in Phase 2 einen dieser Anker baut, umschließt das Widget mit
+/// Wer in Phase 2 einen der beiden baut, umschließt das Widget mit
 /// `AnchorTarget` **und** streicht die Kennung aus [knownMissing]. Der Test
 /// `test/features/discovery/presentation/discovery_anchors_test.dart` nagelt
 /// die Liste fest und schlägt dabei an.
@@ -53,20 +54,35 @@ abstract final class DiscoveryAnchors {
   /// Die Coin-Anzeige, `screen-map.jsx:708`.
   static const AnchorId coins = AnchorId('coins');
 
+  /// Der Knopf "Fact Finder" im Modus-Umschalter, `screen-map.jsx:3216-3217`.
+  ///
+  /// Das Tutorial fragt ihn **nicht** ab. Er wird trotzdem angemeldet, aus
+  /// demselben Grund wie die vier Tab-Anker in `ShellTab`: der Umschalter
+  /// zeichnet beide Knöpfe gleich, und eine Ausnahme für einen von zweien wäre
+  /// eine Sonderregel ohne Nutzen.
+  static const AnchorId modeFactFinder = AnchorId('mode-fact-finder');
+
   /// Der Knopf "Tour" im Modus-Umschalter.
   ///
   /// Die Quelle baut den Namen aus der Knopfkennung zusammen,
-  /// `'mode-' + modeBtn.id` (`screen-map.jsx:3217`).
+  /// `'mode-' + modeBtn.id` (`screen-map.jsx:3217`). Gemeint ist der obere
+  /// Umschalter des Kartenbildschirms, **nicht** `ModeBar` aus
+  /// `chrome.jsx:150-207`; die Unterscheidung steht in `map_mode.dart`.
   static const AnchorId modeTour = AnchorId('mode-tour');
 
   /// Der Kompass-Knopf, `screen-map.jsx:3154`.
   static const AnchorId compass = AnchorId('compass');
 
-  /// Alle fünf Kennungen in der Reihenfolge, in der das Tutorial sie abfragt.
+  /// Alle Kennungen des Kartenbildschirms.
+  ///
+  /// Die Reihenfolge folgt der des Tutorials (`screen-tour.jsx:140-169`);
+  /// [modeFactFinder] steht dort nicht und ist deshalb vor seinem Nachbarn
+  /// [modeTour] eingeschoben, wo der Umschalter ihn zeichnet.
   static const List<AnchorId> values = <AnchorId>[
     balloon,
     userMarker,
     coins,
+    modeFactFinder,
     modeTour,
     compass,
   ];
@@ -79,17 +95,24 @@ abstract final class DiscoveryAnchors {
   /// Ergebnis beide gleich aussehen, nämlich als `null` aus
   /// `AnchorRegistry.rectOf`.
   ///
-  /// Heute sind das alle fünf. Die Menge schrumpft in Phase 2 auf leer.
+  /// Heute sind das noch [balloon] und [userMarker]. Beide sind Sonderfälle,
+  /// die kein Hüllwidget anmelden kann: der Ballon ist der Marker, der der
+  /// Rahmenmitte am nächsten liegt (`screen-tour.jsx:193-224`), der
+  /// Avatar-Marker wird über eine innere CSS-Klasse gesucht (`:226-242`).
+  /// Beide entstehen mit der Kartenschicht.
+  ///
+  /// [coins], [modeFactFinder], [modeTour] und [compass] stehen seit dem
+  /// Top-Chrome nicht mehr hier. Löst einer von ihnen nicht auf, schlägt der
+  /// `assert` in `AnchorRegistry.rectOf` an, und genau das ist gewollt.
   ///
   /// `final` und nicht `const`: eine konstante Menge darf keine Elemente
   /// enthalten, die `==` überschreiben (`const_set_element_not_primitive_
   /// equality`), und genau das tut [AnchorId]. `Set.unmodifiable` ersetzt die
   /// verlorene Unveränderlichkeit.
   ///
-  /// Absichtlich **nicht** aus [values] abgeleitet. Beide Listen sind heute
-  /// gleich und sollen es nicht bleiben: [values] bleibt vollständig, diese
-  /// Menge schrumpft mit jedem gebauten Widget.
+  /// Absichtlich **nicht** aus [values] abgeleitet: [values] bleibt
+  /// vollständig, diese Menge schrumpft mit jedem gebauten Widget.
   static final Set<AnchorId> knownMissing = Set<AnchorId>.unmodifiable(
-    <AnchorId>[balloon, userMarker, coins, modeTour, compass],
+    <AnchorId>[balloon, userMarker],
   );
 }

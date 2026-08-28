@@ -274,7 +274,10 @@ void main() {
       // zweites `pumpWidget` mit demselben Widgettyp behält den Zustand des
       // Overlays, der Schrittzähler liefe also weiter statt von vorn. Genau
       // daran ist die erste Fassung dieses Tests gescheitert.
-      const degrading = <int>[2, 3, 4, 6, 8];
+      // Nur noch Ballon (2) und Avatar-Marker (3). Die Schritte 4, 6 und 8
+      // zeigen auf Coin-Pille, Tour-Knopf und Kompass, und die meldet das
+      // Top-Chrome des Kartenbildschirms seit Schritt 19 an.
+      const degrading = <int>[2, 3];
       const withAnchor = <int>[2, 3, 4, 5, 6, 7, 8];
       await pumpApp(tester);
 
@@ -334,9 +337,25 @@ void main() {
             registryOf(tester).rectOf(const AnchorId('mode-tour-verschrieben')),
         throwsA(isA<AssertionError>()),
       );
-      // Und die fünf bekannten fehlen wirklich, statt zufällig da zu sein.
-      for (final anchor in DiscoveryAnchors.values) {
+      // Und die zwei bekannt fehlenden fehlen wirklich, statt zufällig da zu
+      // sein.
+      for (final anchor in DiscoveryAnchors.knownMissing) {
         expect(registryOf(tester).rectOf(anchor), isNull, reason: anchor.value);
+      }
+      // Die vier gebauten lösen umgekehrt wirklich auf. Ohne diese Zeile
+      // bliebe offen, ob `degrading` oben nur deshalb kurz ist, weil der
+      // Pfeil aus einem anderen Grund gezeichnet wird.
+      for (final anchor in <AnchorId>[
+        DiscoveryAnchors.coins,
+        DiscoveryAnchors.modeFactFinder,
+        DiscoveryAnchors.modeTour,
+        DiscoveryAnchors.compass,
+      ]) {
+        expect(
+          registryOf(tester).rectOf(anchor),
+          isNotNull,
+          reason: anchor.value,
+        );
       }
     });
   });
@@ -354,6 +373,38 @@ void main() {
 
       final tab = tester.getRect(anchorOf(ShellTab.collection.anchorId));
       expect(tester.getRect(find.byType(TourHighlight)), tab.inflate(5));
+    });
+
+    testWidgets('die drei Kartenanker liegen dort, wo ihr Element sichtbar '
+        'ist', (tester) async {
+      // Der eigentliche Gewinn von Schritt 19, und zwar gemessen statt
+      // gezählt: "der Pfeil ist da" wäre auch dann wahr, wenn die Registry
+      // irgendein Rechteck geliefert hätte. Hier deckt der Ring in jedem der
+      // drei Schritte genau das Element ab, das die Quelle nennt.
+      // In **einem** Durchlauf, aus demselben Grund wie beim
+      // Neun-Schritte-Test: ein zweites `pumpWidget` setzt den Schrittzähler
+      // des Overlays nicht zurück.
+      await pumpApp(tester);
+
+      const targets = <int, AnchorId>{
+        4: DiscoveryAnchors.coins,
+        6: DiscoveryAnchors.modeTour,
+        8: DiscoveryAnchors.compass,
+      };
+      var current = 1;
+      for (final number in targets.keys) {
+        for (; current < number; current++) {
+          await tapScrim(tester);
+        }
+        final where = 'Schritt $number, Anker ${targets[number]!.value}';
+        final element = tester.getRect(anchorOf(targets[number]!));
+        expect(
+          tester.getRect(find.byType(TourHighlight)),
+          element.inflate(5),
+          reason: where,
+        );
+        expect(find.byType(TourArrow), findsOneWidget, reason: where);
+      }
     });
 
     testWidgets('Pfeil und Ring folgen einer Größenänderung', (tester) async {

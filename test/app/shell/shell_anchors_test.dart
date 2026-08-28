@@ -63,11 +63,19 @@ void main() {
     ) async {
       await pumpApp(tester);
 
+      // Die vier Kartenanker stehen mit in der Liste, weil der Zweig `/map`
+      // der Startzweig ist und sein Top-Chrome sich beim Aufbau anmeldet.
+      // Absichtlich die vollständige Menge und keine Teilmengenprüfung: eine
+      // unerwartete Anmeldung ist genauso ein Fund wie eine fehlende.
       expect(registryOf(tester).debugRegisteredIds, <AnchorId>{
         const AnchorId('tab-modus'),
         const AnchorId('tab-wallet'),
         const AnchorId('tab-challenge'),
         const AnchorId('tab-profil'),
+        const AnchorId('coins'),
+        const AnchorId('mode-fact-finder'),
+        const AnchorId('mode-tour'),
+        const AnchorId('compass'),
       });
     });
 
@@ -128,21 +136,41 @@ void main() {
   });
 
   group('Degradation in der echten App', () {
-    testWidgets('ein Kartenanker liefert still null, statt anzuschlagen', (
-      tester,
-    ) async {
+    testWidgets('ein noch nicht gebauter Anker liefert still null, statt '
+        'anzuschlagen', (tester) async {
       // Das prüft die Verdrahtung in `lib/app/app.dart`: der Scope bekommt dort
       // `DiscoveryAnchors.knownMissing`. Ohne diese Übergabe schlüge der
-      // `assert` in `AnchorRegistry.rectOf` bei jedem Kartenanker an, und das
-      // Tutorial wäre in Debug nicht benutzbar. Eine Mutationsprobe hat gezeigt,
-      // dass das sonst keine Zusicherung bemerkt.
+      // `assert` in `AnchorRegistry.rectOf` bei jedem ungebauten Anker an, und
+      // das Tutorial wäre in Debug nicht benutzbar. Eine Mutationsprobe hat
+      // gezeigt, dass das sonst keine Zusicherung bemerkt.
       await pumpApp(tester);
 
-      for (final anchor in DiscoveryAnchors.values) {
+      for (final anchor in DiscoveryAnchors.knownMissing) {
         expect(
           registryOf(tester).rectOf(anchor),
           isNull,
           reason: '${anchor.value} ist heute nicht gebaut',
+        );
+      }
+    });
+
+    testWidgets('ein gebauter Kartenanker liefert dagegen ein Rechteck', (
+      tester,
+    ) async {
+      // Die Gegenrichtung: ohne sie bliebe offen, ob der Test darüber nur
+      // deshalb grün ist, weil überhaupt nichts auflöst.
+      await pumpApp(tester);
+
+      for (final anchor in <AnchorId>[
+        DiscoveryAnchors.coins,
+        DiscoveryAnchors.modeFactFinder,
+        DiscoveryAnchors.modeTour,
+        DiscoveryAnchors.compass,
+      ]) {
+        expect(
+          registryOf(tester).rectOf(anchor),
+          isNotNull,
+          reason: '${anchor.value} ist gebaut',
         );
       }
     });
@@ -169,9 +197,11 @@ void main() {
     /// Derselbe Aufbau wie die echte Shell: `StatefulShellRouteData.$route`
     /// erzeugt ein `StatefulShellRoute.indexedStack`
     /// (`go_router/lib/src/route_data.dart:411`). Der Unterschied ist nur, dass
-    /// hier ein Anker **innerhalb** eines Zweiges sitzt. In der echten App gibt
-    /// es das noch nicht: die vier Tab-Anker liegen in der Leiste, und die fünf
-    /// Kartenanker sind noch nicht gebaut.
+    /// hier ein Anker **innerhalb** eines Zweiges sitzt. Seit dem Top-Chrome
+    /// gibt es das auch in der echten App: die vier Tab-Anker liegen in der
+    /// Leiste, die vier Anker des Kartenbildschirms im Zweig `/map`. Dieser
+    /// Aufbau bleibt trotzdem eigenständig, weil er den Zweigwechsel isoliert
+    /// prüft.
     Widget buildShellApp() {
       final router = GoRouter(
         initialLocation: '/zweig-a',

@@ -107,11 +107,12 @@ void main() {
       ]);
     });
 
-    test('vier Schritte sind heute voll baubar, fünf degradieren', () {
-      // Korrektur 13 in `REBUILD_STATUS.md`: die frühere Zahl 6/3 war falsch.
-      // Die Bilanz hängt an `DiscoveryAnchors.knownMissing`, schrumpft also in
-      // Phase 2 von selbst. Bricht dieser Test, ist das kein Defekt, sondern
-      // ein gebauter Kartenanker.
+    test('sieben Schritte sind voll baubar, zwei degradieren', () {
+      // Korrektur 13 in `REBUILD_STATUS.md`: die frühere Zahl 6/3 war falsch,
+      // richtig waren 4/5. Seit dem Top-Chrome des Kartenbildschirms sind es
+      // 7/2. Die Bilanz hängt an `DiscoveryAnchors.knownMissing`, schrumpft
+      // also von selbst. Bricht dieser Test, ist das kein Defekt, sondern ein
+      // gebauter Kartenanker.
       final degrading = anchored()
           .where(
             (step) => DiscoveryAnchors.knownMissing.contains(step.anchorId),
@@ -119,7 +120,9 @@ void main() {
           .map((step) => step.number)
           .toList();
 
-      expect(degrading, <int>[2, 3, 4, 6, 8]);
+      // Übrig sind der Fakt-Ballon und der Avatar-Marker. Beide hängen an der
+      // Kartenschicht und nicht am Chrome darüber.
+      expect(degrading, <int>[2, 3]);
       expect(
         anchored()
             .where(
@@ -127,7 +130,7 @@ void main() {
             )
             .map((step) => step.number)
             .toList(),
-        <int>[5, 7],
+        <int>[4, 5, 6, 7, 8],
       );
     });
   });

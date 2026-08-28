@@ -17,9 +17,18 @@ void main() {
       // Belegt an `screen-tour.jsx:140-169` (`balloon`, `user-marker`,
       // `coins`, `mode-tour`, `compass`), `screen-map.jsx:708` (`coins`),
       // `:3154` (`compass`) und `:3217` (`'mode-' + modeBtn.id`).
+      // `mode-fact-finder` fragt das Tutorial nicht ab; der Umschalter
+      // zeichnet ihn trotzdem, siehe `:3216`.
       expect(
         DiscoveryAnchors.values.map((anchor) => anchor.value).toList(),
-        <String>['balloon', 'user-marker', 'coins', 'mode-tour', 'compass'],
+        <String>[
+          'balloon',
+          'user-marker',
+          'coins',
+          'mode-fact-finder',
+          'mode-tour',
+          'compass',
+        ],
       );
     });
 
@@ -36,7 +45,7 @@ void main() {
   });
 
   group('Bekannt fehlende Anker', () {
-    test('sind heute genau die fünf Kartenanker', () {
+    test('sind nur noch Ballon und Avatar-Marker', () {
       // Wer in Phase 2 einen dieser Anker baut, streicht ihn hier **und** in
       // `DiscoveryAnchors.knownMissing`. Schlägt dieser Test an, ohne dass
       // jemand einen Anker gebaut hat, ist die Liste gewachsen und der `assert`
@@ -44,20 +53,21 @@ void main() {
       expect(DiscoveryAnchors.knownMissing, <AnchorId>{
         const AnchorId('balloon'),
         const AnchorId('user-marker'),
-        const AnchorId('coins'),
-        const AnchorId('mode-tour'),
-        const AnchorId('compass'),
       });
     });
 
-    test('enthalten keinen Tab-Anker', () {
-      // Die vier Tab-Anker sind gebaut. Stünden sie in der Liste, würde ein
-      // vertippter Tab-Anker still durchgehen.
+    test('enthalten keinen gebauten Anker', () {
+      // Vier Tab-Anker und vier Anker des Top-Chrome sind gebaut. Stünde einer
+      // davon in der Liste, würde ein Tippfehler an ihm still durchgehen.
       for (final name in <String>[
         'tab-modus',
         'tab-wallet',
         'tab-challenge',
         'tab-profil',
+        'coins',
+        'mode-fact-finder',
+        'mode-tour',
+        'compass',
       ]) {
         expect(
           DiscoveryAnchors.knownMissing,
