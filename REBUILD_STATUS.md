@@ -146,8 +146,57 @@ durch eine offene Entscheidung
 
 **Die Strukturfrage vor Schritt 12 ist am 28.08.2026 entschieden**, siehe unten
 unter „Offene Entscheidungen". Der Karten-Host entsteht unter `lib/map/`, die
-Bewachung dazu steht seit demselben Tag im Prüfskript. Code liegt dort noch
-keiner.
+Bewachung dazu steht seit demselben Tag im Prüfskript.
+
+**Das Fundament steht seit der Nacht zum 29.08.2026**, gebaut vor Schritt 12,
+weil der Kameravertrag entscheidet, was der Host danach kostet. Fünf reine
+Domänenverträge unter `lib/map/domain/`, 149 Tests:
+
+| Datei | Was darin steht |
+|---|---|
+| `map_position.dart` | Wertobjekt Breite/Länge plus Haversine. Erdradius `6371000` aus `screen-map.jsx:297`, nicht der Lehrbuchwert. |
+| `map_camera.dart` | `MapCameraView` (Ist-Zustand), `MapCameraChange` (`null` heißt unverändert), `MapCameraMotion` (animiert oder sofort, als Typ und nicht über `Duration.zero`). |
+| `map_camera_intent.dart` | Versiegelt: Befehl (Rang 1), Einmal-Absicht (Rang 3), Dauerabsicht (Rang 4), je mit Herkunft. |
+| `map_camera_gate.dart` | Die reine Entscheidung samt Schwellwerten, plus die Einrast-Regel. Keine Uhr, kein Zustand. |
+| `map_host.dart` | `abstract interface class`, die veröffentlichte Fassade. |
+
+**Bewusst nicht gebaut:** Überlagerung und Projektion. Ob es überhaupt eine
+Projektion braucht, hängt daran, ob Cluster und Marker SDK-Layer werden oder
+Flutter-Widgets über der Karte, und das fällt in Schritt 15 bis 18. Der
+Auslöser für `MapProjection` ist der erste geografisch verankerte
+**Flutter**-Aufbau, also Avatar (18) und Münz-Animation (17), nicht Cluster.
+
+**Ebenfalls nicht gebaut, mit benanntem Auslöser:** die Rücknahme einer
+Dauerabsicht. Die Quelle hat dafür heute keinen Aufrufer, der einzige echte
+Abschaltfall ist das Einrasten der Blickrichtung, und das ist Zustand am Gate.
+Gebraucht wird sie beim ersten Feature, das eine Dauerabsicht beendet, also
+beim Tourende in Phase 6.
+
+### Was `maplibre_gl 0.26.2` nicht kann, gemessen im Pub-Cache
+
+Sechs Löcher, keins davon dokumentiert, und alle sechs prägen den Entwurf:
+
+1. **Kein `isEasing()`**, null Treffer im Paket. Vorrangregel 3 hängt genau daran.
+2. **`isCameraMoving` ist kein Ersatz, sondern eine Falle.** Gesetzt über
+   `onCameraMoveStartedPlatform` (`lib/src/controller.dart:185`), gilt für jede
+   Bewegung, auch fürs Ziehen mit dem Finger. `isEasing` meint nur
+   programmgesteuerte Animation.
+3. **`animateCamera` liefert auf iOS immer sofort `null`** (`controller.dart:416`,
+   eigene Doku). Taugt nicht zum Abwarten. Gilt genauso für `moveCamera`.
+4. **Kein `stop()`, kein `cancel()`** am Controller, obwohl Vorrangregel 1
+   „bricht alles ab" heißt. Der harte Reset kann nur überschreiben.
+5. **Kein `onCameraMoveStarted`** als Widget-Rückruf.
+6. **`OnCameraMoveCallback = void Function(CameraPosition)`**, ohne Ursache,
+   ohne `isGesture`.
+
+Folge: der Host führt seinen Animationszustand selbst, und „der Nutzer hat
+angefasst" ist nur als **unerklärte Kamerabewegung** erkennbar.
+
+**Ungemessen und in Schritt 12 zu klären:** ob `moveCamera` eine laufende
+`animateCamera` auf maplibre-native wirklich verwirft. Wenn nicht, springt die
+Kamera beim harten Reset in die Reset-Pose und kriecht danach wieder weg.
+Prüfbar in Minuten: ein `jumpTo` mitten in ein 1500-ms-`flyTo` setzen und
+zusehen.
 
 - [ ] 12. MapLibre mit gebackenem Style · [ ] 13. Kamera-Verhalten
 - [ ] 14. Kompass-Rotation · [ ] 15. Cluster-Layer · [ ] 16. Einzel-Marker
@@ -464,6 +513,86 @@ einer Wegwerf-Probe belegt: Regel 18 (ein Feature sieht vom Host nur
 Paket noch nicht im Projekt ist; sie steht trotzdem schon da, damit sie wirkt,
 wenn E-10 es freigibt. **E-10 bleibt offen**: entschieden ist die Kapselung,
 nicht die endgültige Wahl zwischen WebView und einem Flutter-Nachbau.
+
+**D-5 ist am 28.08.2026 von Dairen entschieden.** Wortlaut: „Chrome bitte als
+geschlossene Einheit wenn möglich, falls Claude es gar nicht schafft dann
+können Teile offen sein, aber nur in zwingend notwendigen Ausnahmen", mit der
+Auflage, vorher nach Architekturverbesserungen zu suchen, weil ein
+Testproblem dieser Art danach riecht.
+
+Die Suche hat die Prämisse der Frage in zwei Punkten gekippt:
+
+- **Die Präzedenz trägt nicht.** `lib/app/onboarding/widgets/tour_chrome.dart`
+  ist nicht „öffentlich für Tests": seine drei Typen werden von
+  `tour_overlay.dart:210-218` im Produktivcode instanziiert, und was dort nur
+  intern gebraucht wird, ist privat (`_Dot`, `:200`). Die Datei ist das
+  Gegenbeispiel, nicht das Vorbild.
+- **Die Messbarkeit hängt heute schon nicht an den öffentlichen Typen.** Vier
+  der sechs gemessenen Bauteile greift der Test bereits über die
+  Anker-Registry ab, nicht über `find.byType`. Coin-Pille, Kompass und beide
+  Modus-Knöpfe liefern exakte Rechtecke ohne öffentlichen Typ.
+
+**Der Ort bleibt.** Ein Umzug nach `lib/map/` wäre nicht nur unnötig, sondern
+illegal: Regel 18 verbietet jedem Feature den Import von `map/presentation`,
+`map_page.dart` könnte das Chrome dann nicht mehr benutzen. Und der Host das
+Chrome zeichnen zu lassen, gäbe ihm Münzstand, Level und Stadtname, also genau
+die Fachlichkeit, die er nicht haben darf. Dass die Bauteile fachlich
+`progression`, `city` und `tours` gehören, ist kein Einwand: dieselbe Frage
+ist für denselben Bildschirm schon beantwortet, `discovery_anchors.dart:14-22`
+sagt „ein Anker gehört der Oberfläche, nicht den Daten darin", mit den Coins
+als Beispiel.
+
+**Das Symptom ist die Datei, nicht die Fläche.** 1096 Zeilen, die mit Abstand
+längste handgeschriebene Datei in `lib/` (nächste: 518), und die einzige, die
+`naming-and-files.md:18` („ein Haupttyp je Datei") um den Faktor zehn reißt.
+
+*Auslöser für eine Neubewertung des Orts, nicht heute:* sobald ein zweites
+Feature eigenes Chrome über dieselbe Karte legt. Dann ist es geteilte
+Oberfläche und gehört unter `lib/app/`, wie das Tutorial-Overlay.
+
+**Neue offene Punkte aus dem Fundament von `lib/map/`.** Alle drei sind
+benannt und keiner blockiert:
+
+- **Der gemeinsame Geo-Typ, zweite Instanz.** `api-and-domain-design.md:38`
+  und `project-structure.md:40` sehen `GeoPoint` beziehungsweise `core/geo/`
+  vor, und Gate 6 verbietet jeder Domäne den `core`-Import. `FactCoordinates`
+  war Umweg eins, `MapPosition` ist Umweg zwei, und Umweg drei steht in
+  Schritt 13: die Nutzerposition fürs GPS-Folgen. Nimmt sie `MapPosition`,
+  besitzt der Karten-Host den Aufenthaltsort des Nutzers, und `collection`
+  importiert für die 150-Meter-Prüfung aus E-07 einen Kartentyp.
+- **Wie ein Feature an den `MapHost` kommt.** Das Muster von E-32 trägt hier
+  **nicht**: `authRepositoryProvider` ist für sein eigenes Feature lesbar,
+  weil ein Feature seine eigene Presentation lesen darf, und `map/presentation`
+  darf **kein** Feature lesen. Dazu ist der Host ein gemountetes Widget, das
+  `bootstrap.dart` nicht überschreiben kann, weil es beim Start nicht
+  existiert. Der Provider wird deshalb eine Registrierung mit untätigem
+  Standard, Vorbild `unavailableAuthRepository`.
+- **Eine Absicht vor gemounteter Karte.** Der Sky-Fall beim ersten GPS-Fix ist
+  einmalig. Kommt der Fix, bevor die Karte steht, fällt er ins Leere und die
+  App startet ohne Eröffnungsanimation im Standardzoom. Fallenlassen,
+  aufheben und nachholen, oder alle aufheben.
+
+**Zwei Abweichungen von der Quelle, bewusst und belegt.** Beide sind
+Verhaltensänderungen und gehören Janek zur Kenntnis:
+
+- **Die Winkel-Totzone misst gegen die echte Kartenausrichtung**, die Quelle
+  gegen ihren eigenen `lastAppliedBearing` (`screen-map.jsx:2836`), der nur im
+  Erfolgszweig fortgeschrieben wird (`:2839`). Folge in der Quelle: nach dem
+  langen Kompassdruck, der `jumpTo({bearing: 0})` setzt (`:3168`) und das
+  Folgen ausdrücklich wieder einschaltet (`:3166`), ist das Kompass-Folgen
+  still tot, bis die Peilung um mehr als 1,5° vom veralteten Wert abweicht.
+  Das ist ein Defekt der Quelle, kein Entwurf, und wird nicht mitportiert.
+- **Der Nachbau rastet nicht ein, wenn der Nutzer dreht, während der Host
+  animiert.** Die Quelle tut es, ihr `rotatestart`-Wächter (`:1692`) fragt
+  `isEasing()` nicht. Ob eine Zwei-Finger-Drehung während einer laufenden
+  Animation bei `maplibre_gl` überhaupt ankommt, ist ohne Gerät nicht messbar
+  und deshalb in Schritt 12 zu prüfen.
+
+**Offen bei Janek:** `manualMoveGrace`, Lesart A oder B. Lesart A ist der
+Standard und die belegte: wer die Karte wegzieht und dann zwölf Meter läuft,
+dem reißt die App die Karte zurück (`:2668` prüft nur `!isEasing()`). Lesart B
+lässt ihn eine wählbare Zeitspanne in Ruhe. Ein Schalter, beide Lesarten sind
+zugesichert.
 
 **E-31 und E-32 sind am 28.08.2026 geschlossen**, beide durch einen Edit an
 akzeptierten Architekturdokumenten.

@@ -17,7 +17,7 @@ Für Details nicht hier suchen, sondern:
 
 ## Stand
 
-**Zuletzt aktualisiert:** 28.08.2026, Abend
+**Zuletzt aktualisiert:** 28.08.2026, Nacht
 
 **Phase 0 und Phase 1 abgeschlossen. Schritte 1 bis 11 von 50 fertig.** Die App
 ist erstmals auf einem Gerät gelaufen, der Gerätelauf ist wegen E-38 seither
@@ -27,7 +27,12 @@ Steht zusätzlich seit dem Vormittag: die Anker-Registry in `lib/core/anchors/`
 (E-27), eine Ergänzungs-Map für Oberflächentexte ohne PWA-Schlüssel (E-39), und
 das Tutorial-Overlay unter `lib/app/onboarding/` mit neun Schritten.
 
-**Kennzahlen:** 824 Tests grün, alle vier Gates auf Exit-Code 0,
+**Seit heute Nacht steht das Fundament von `lib/map/`:** fünf reine
+Domänenverträge des Karten-Hosts, gebaut **vor** Schritt 12, weil der
+Kameravertrag entscheidet, was danach zwei- bis dreitausend Zeilen kostet.
+Details im Protokoll und in `REBUILD_STATUS.md`.
+
+**Kennzahlen:** 987 Tests grün, alle vier Gates auf Exit-Code 0,
 `dart run tool/generate_i18n.dart --check` auf Exit-Code 0.
 
 **Zusätzlich fertig, außer der Reihe:** Schritt 19, das Top-Chrome des
@@ -66,18 +71,25 @@ gelaufen.
    Bildmaterial sind seither dazugekommen (Anker-Registry unsichtbar, Tutorial
    sichtbar), die optische Prüfung von Splash, Anmeldung, Registrierung und
    jetzt auch dem Tutorial ist formal offen.
-2. **Phase 2, Map-Kern (Schritte 12 bis 20).** Vor dem ersten Schritt steht
-   eine Entscheidung: wie sich Discovery, Tours, Challenges und Collection eine
-   Karte teilen, ohne dass ein Feature die Presentation eines anderen
-   importiert. Vorschlag in `lib/features/README.md` unter „Was bewusst kein
-   Feature ist". Blockiert außerdem an E-10 (3D-Avatar, WebView oder Flutter)
-   und E-07/E-23 (Distanzprüfung beim Sammeln umgehbar, geteiltes Backend).
-3. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` listet
+2. **D-5, das Chrome zur geschlossenen Einheit machen.** Entschieden am
+   28.08.2026 von Dairen, und zwar **vor** Schritt 12: der Umbau berührt nur
+   die Innereien, Schritt 12 nur die Aufrufstelle in `map_page.dart`. Danach
+   wird es teurer, weil derselbe Bildschirm dann einen Karten-Host trägt und
+   eine reine Verschiebung nicht mehr für sich reviewbar ist. Plan und
+   Belege in `REBUILD_STATUS.md` unter D-5.
+3. **Schritt 12, MapLibre-Host.** Die Strukturfrage ist seit dem 28.08.2026
+   entschieden, das Fundament steht. Was zuerst zu klären ist: wo der Provider
+   lebt, über den ein Feature an den Host kommt. Das Muster von E-32 (Vertrag
+   in der Domäne, Provider daneben, Override im Bootstrap) **trägt hier
+   nicht**, Begründung in `REBUILD_STATUS.md`. Bleibt blockiert an E-10
+   (3D-Avatar, WebView oder Flutter) und E-07/E-23 (Distanzprüfung beim
+   Sammeln umgehbar, geteiltes Backend).
+4. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` listet
    `balloon`, `user-marker`, `coins`, `mode-tour`, `compass` bereits als
    Kennungen. Sobald die Kartenwidgets entstehen, hüllt sie `AnchorTarget` ein
    und die fünf degradierenden Tutorial-Schritte werden voll baubar, ohne dass
    `lib/app/onboarding/` sich ändert.
-4. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
+5. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
    technische Sperre ist seit E-39 weg. Vorschlag DE/EN liegt in
    `REBUILD_STATUS.md` bei E-28, hergeleitet und nicht freigegeben.
 
@@ -86,6 +98,70 @@ gelaufen.
 ## Protokoll
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
+
+### 28.08.2026, Fundament von `lib/map/`: die Kamera als Vertrag
+
+Fünf reine Domänenverträge unter `lib/map/domain/`, kein Flutter, kein
+Riverpod, kein MapLibre, 149 Tests. Gebaut vor Schritt 12, weil der
+Kameravertrag entscheidet, was der Host danach kostet.
+
+**Der Grund, warum es diese Verträge überhaupt gibt, ist eine Messung am
+Paket, und sie widerlegt drei naheliegende Annahmen auf einmal.**
+`maplibre_gl 0.26.2` hat **kein `isEasing()`**, null Treffer im ganzen Paket,
+und genau daran hängt Vorrangregel 3. `isCameraMoving` ist kein Ersatz,
+sondern eine Falle: es wird über `onCameraMoveStarted` gesetzt und gilt für
+jede Bewegung, auch fürs Ziehen mit dem Finger, während `isEasing` nur
+programmgesteuerte Animation meint. Und `animateCamera` liefert laut eigener
+Doku **auf iOS immer sofort `null`**, taugt also nicht zum Abwarten. Dazu drei
+weitere Löcher, beim Nachsehen gefunden: **kein `stop()`** am Controller,
+obwohl Vorrangregel 1 „bricht alles ab" heißt, kein `onCameraMoveStarted` als
+Widget-Rückruf, und `OnCameraMoveCallback` ist `void Function(CameraPosition)`
+ohne jede Ursachenangabe. Der Host muss seinen Animationszustand deshalb
+selbst führen, und „der Nutzer hat angefasst" ist nur als **unerklärte
+Kamerabewegung** erkennbar.
+
+**Der teuerste Fund kam aus der unabhängigen Review, und er lag in meinem
+eigenen Auftrag.** Vorrangregel 2 heißt „direkte Manipulation schlägt
+Automatik". Ich hatte das auf einen Zeitpunkt reduziert, nämlich eine
+Karenzzeit nach der letzten Nutzerbewegung, mit dem Argument, ein Zeitpunkt
+könne beide Lesarten ausdrücken und ein `bool` nur eine. Das stimmt für das
+GPS-Folgen (`screen-map.jsx:2668` prüft wirklich nur `!isEasing()`) und ist
+für die zweite Dauerabsicht **falsch**: `:2837` prüft zusätzlich
+`!userInteracting`, gesetzt ab `touchstart`, also **bevor** sich die Kamera
+überhaupt bewegt hat. Ein Fenster nach der Bewegung sperrt am Anfang zu spät
+und am Ende zu lange. Schlimmer als die Lücke war, dass der Code die
+Verkürzung als quellentreu dokumentierte: **ein Fehler, der sich als belegt
+ausgibt, wird nicht nachgeprüft.** Der Vertrag hat jetzt zwei Eingänge, weil
+es zwei verschiedene Dinge sind.
+
+Zweiter Fund derselben Review: `MapCameraChange` durfte zwei seiner vier
+Felder aus der Gleichheit fallen lassen, ohne dass ein Test anschlug. Sein
+Zwilling `MapCameraView` hatte den Test, er nicht. **Zwei Typen, gleiches
+Muster, nur einer geprüft**, dasselbe wie heute früh bei Anmeldung und
+Registrierung. Das ist in diesem Projekt die Stelle, an der man suchen muss.
+
+Dritter, und der mit der längsten Reichweite: ein Animationszustand mit Start
+und **ohne** geplantes Ende galt als „läuft ewig" und fror damit jede
+Dauerabsicht dauerhaft ein. Genau dort landet ein Host auf iOS, wo
+`animateCamera` sofort `null` liefert und die Dauer nie zurückmeldet.
+
+Bewusst **nicht** gebaut, gegen den ursprünglichen Zuschnitt: Überlagerung und
+Projektion. Ob es überhaupt eine Projektion braucht, entscheidet sich erst
+daran, ob Cluster und Marker SDK-Layer werden oder Flutter-Widgets über der
+Karte, und das fällt in Schritt 15 bis 18. Ein Vertrag, der davor entsteht,
+rät.
+
+Nebenbefund aus dem Testbau, ehrlich mitgeschrieben: der erste Prüfwert für
+die Haversine-Strecke war **in der Richtung** falsch geraten. Ein Längengrad
+auf 60° Breite ist als Großkreisstrecke nicht länger als der halbe
+Meridiangrad, sondern 0,53 Meter kürzer, weil die kürzeste Linie polwärts
+ausweicht. Der Test fiel, und dass er fiel, belegt, dass er gegen eine
+unabhängige Herleitung prüft und nicht gegen die Implementierung.
+
+Und eine Falle für jeden frischen Worktree: ohne `.dart_tool/` meldet
+`dart analyze` „Target of URI doesn't exist" für **jede** Datei im
+Repository. Erst `flutter pub get` macht die Gates aussagefähig. Wer den
+ersten Lauf für ein Ergebnis hält, sucht den Fehler an der falschen Stelle.
 
 ### 28.08.2026, Schritt 11: Tutorial-Overlay, Phase 1 abgeschlossen
 
