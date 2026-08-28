@@ -81,12 +81,17 @@ gelaufen.
    werden. Zwei offene Messungen gleich mitnehmen: ob `moveCamera` eine
    laufende `animateCamera` verwirft (davon hängt Vorrangregel 1 ab, denn
    `stop()` gibt es nicht), und ob die 200 ms `steeringGrace` tragen.
-2. **Schritt 13, Kamera-Verhalten.** Der Regelkreis steht, es fehlen die
-   Absichten: GPS-Folgen, Sky-Fall, Neuzentrieren. Zwei Dinge sind vorher zu
-   klären, beide in `REBUILD_STATUS.md` beschrieben: wem die **Nutzerposition**
-   gehört (dritter Umweg um dieselbe Geo-Typ-Sperre, und diesmal trifft er mit
-   E-07 eine Sicherheitsprüfung), und ob der Host im **unsichtbaren Tab**
-   weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht, das ist gemessen.
+2. **Schritt 13, Kamera-Verhalten, und er ist blockiert.** Der Regelkreis
+   steht, `geolocator` liegt im `pubspec`, es fehlen nur die Absichten:
+   GPS-Folgen, Sky-Fall, Neuzentrieren. Blockiert ist er an **einer** Frage,
+   und die geht an Dairen: **wem gehört die Nutzerposition?** Das ist die
+   dritte Instanz derselben Geo-Typ-Sperre nach `FactCoordinates` und
+   `MapPosition`, und diesmal trifft sie mit E-07 eine Sicherheitsprüfung.
+   Wer sie mit `MapPosition` beantwortet, gibt dem Karten-Host den
+   Aufenthaltsort des Nutzers.
+   Nicht blockierend, aber vorher zu beantworten: ob der Host im
+   **unsichtbaren Tab** weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht,
+   das ist gemessen; die PWA kennt keine Tabs, es gibt also keine Quelle.
 3. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` listet
    `balloon`, `user-marker`, `coins`, `mode-tour`, `compass` bereits als
    Kennungen. Sobald die Kartenwidgets entstehen, hüllt sie `AnchorTarget` ein

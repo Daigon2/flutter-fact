@@ -690,6 +690,28 @@ dem reißt die App die Karte zurück (`:2668` prüft nur `!isEasing()`). Lesart 
 lässt ihn eine wählbare Zeitspanne in Ruhe. Ein Schalter, beide Lesarten sind
 zugesichert.
 
+**E-40 ist am 29.08.2026 entstanden und im selben Zug geschlossen**, als
+Anwendung von E-38 und nicht als neue Entscheidung. Materials Zeilenhöhe kam
+in der App an: **46 Absätze** erbten `height: 1.43` aus `bodyMedium`, dazu
+**sieben Eingabefelder** ein `height: 1.5` aus `bodyLarge`. `styles.css`
+enthält `line-height` **null Mal**, die Quelle setzt sie ausschließlich inline,
+40 Mal über vier Bildschirme; wo sie keine setzt, rendert der Browser mit den
+Schriftmetriken. Behoben am selben Hebel wie E-38, in `ThemeData.typography`.
+
+Zwei Funde daran betreffen das Testnetz und nicht den Code:
+
+- **`map_top_chrome_test.dart` pumpte ein nacktes `MaterialApp`**, ohne
+  `FactTheme` und ohne `Material`. Dort erbten die Chrome-Texte Flutters
+  `_errorTextStyle`, und der trägt `height: null`. Der Test hat die Maße also
+  richtig gemessen, während die App sie falsch zeichnete. **Die Zahlen waren
+  belegt, grün und trotzdem nicht das, was der Nutzer sah.** Ein Testrahmen,
+  der die Vorfahrenkette der App nicht abbildet, kann über die falsche Sache
+  recht haben.
+- **`SelectableText` und `EditableText` tauchen in `find.byType(RichText)`
+  nicht auf.** Wer Textstile über Finder einsammelt statt über einen Durchlauf
+  des Renderbaums, übersieht jedes Eingabefeld. Deshalb ist die zweite Quelle
+  `bodyLarge` bis dahin unbemerkt geblieben.
+
 **E-31 und E-32 sind am 28.08.2026 geschlossen**, beide durch einen Edit an
 akzeptierten Architekturdokumenten.
 
