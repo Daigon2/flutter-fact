@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:fact_app/app/onboarding/widgets/tour_palette.dart';
@@ -45,6 +46,35 @@ class TourBubble extends StatelessWidget {
 
   /// Der zweite Teil desselben Filters.
   static const double saturation = 1.4;
+
+  /// Wie viel Platz am unteren Rand der Bezugsfläche reserviert bleibt, egal
+  /// wie hoch der Blaseninhalt wird, damit die Blase nie über `TourTapHint`
+  /// oder `TourStepDots` wächst (`bottom: 50` und `bottom: 24`,
+  /// `tour_chrome.dart`).
+  ///
+  /// Kein gemessener Wert: beide liegen als eigene `Positioned`-Ebenen im
+  /// selben `Stack` wie die Blase (`tour_overlay.dart`), eine echte Messung
+  /// ihrer tatsächlichen Höhe bräuchte eine zweite Messphase wie die des
+  /// `TourOverlay` selbst, siehe dessen Kopfkommentar "Wann gemessen wird".
+  /// Stattdessen ein Sicherheitswert: `TourTapHint.bottom` (50) plus die
+  /// doppelte Zeilenhöhe seines Textes bei Skalierung 2.0 (gemessen an "Tipp
+  /// irgendwo für weiter": eine Zeile ist 29 Pixel hoch bei 375×667, das
+  /// Doppelte deckt einen Umbruch bei einer längeren Übersetzung ab) plus
+  /// gut 20 Pixel Luft zur Punktreihe darunter.
+  ///
+  /// Deckt Skalierung bis 2.0 ab, Androids Maximum (siehe
+  /// `test/support/app_fonts.dart`). Bei höherer Skalierung, die iOS erlaubt,
+  /// oder auf einem noch flacheren Bildschirm bleibt für Schritte mit
+  /// `bubbleTop: 380` nur noch wenig Raum. Das ist kein Rückfall in stilles
+  /// Abschneiden, weil die Blase dann scrollt, aber eine gestalterisch
+  /// bessere Lösung (kleinere Schrift, ein anderer `bubbleTop`-Wert je
+  /// Schritt) übersteigt diese Änderung und ist als offene Frage gemeldet,
+  /// nicht stillschweigend entschieden.
+  static const double bottomChromeReserve = 130;
+
+  /// Die Blase darf nie unter diese Höhe gepresst werden, sonst wäre selbst
+  /// die Schrittanzeige nicht mehr lesbar.
+  static const double minHeight = 90;
 
   /// Abstand der Blasenoberkante von der Oberkante der Bezugsfläche.
   final double top;
@@ -98,6 +128,19 @@ class TourBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Bewusste Abweichung von `screen-tour.jsx`: die Quelle kennt kein
+    // Überlaufen, im Browser wächst die Blase im Fließtext einfach weiter.
+    // Flutter positioniert sie stattdessen mit nur `top` gesetzt völlig
+    // unbegrenzt nach unten (`RenderStack.layoutPositionedChild` lässt die
+    // Höhe offen, wenn `bottom` fehlt) und der `Stack` clippt das lautlos,
+    // ohne jede Überlauf-Meldung, siehe den Kopfkommentar von
+    // `TourHeroView` für dasselbe Problem beim Hero-Schritt.
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final maxHeight = math.max(
+      minHeight,
+      screenHeight - top - bottomChromeReserve,
+    );
+
     return Positioned(
       top: top,
       // `left: '50%'` plus `translateX(-50%)` heißt mittig, und `maxWidth`
@@ -107,7 +150,7 @@ class TourBubble extends StatelessWidget {
       right: 0,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: maxWidth),
+          constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
           child: DecoratedBox(
             // Der Schlagschatten liegt außerhalb des Clips, sonst schneidet
             // ihn das `ClipRRect` für den Weichzeichner weg.
@@ -155,47 +198,59 @@ class TourBubble extends StatelessWidget {
                   // Inhalt aber nicht.
                   child: Padding(
                     padding: padding,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          counter,
-                          // Nunito 800, 10, `letterSpacing: '0.18em'`,
-                          // `screen-tour.jsx:478-482`. CSS rechnet `em` gegen
-                          // die Schriftgröße, Flutter erwartet Pixel.
-                          style: FactTypography.heading.copyWith(
-                            fontSize: 10,
-                            letterSpacing: 10 * 0.18,
-                            color: TourPalette.accent,
+                    // `SingleChildScrollView` sitzt anders als `ListView`
+                    // nicht auf der Sliver-Maschinerie: sein Renderobjekt
+                    // legt sein Kind mit unbegrenzter Höhe an und schrumpft
+                    // dann selbst auf `min(Kindhöhe, maxHeight)`
+                    // (`_RenderSingleChildViewport.performLayout`). Solange
+                    // der Inhalt in `maxHeight` passt, bleibt die Blase also
+                    // exakt so hoch wie ihr Inhalt, wie zuvor. Erst wenn er
+                    // nicht mehr passt, deckelt `ConstrainedBox` die Höhe und
+                    // dieser Bereich wird scrollbar, statt lautlos zu
+                    // clippen.
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            counter,
+                            // Nunito 800, 10, `letterSpacing: '0.18em'`,
+                            // `screen-tour.jsx:478-482`. CSS rechnet `em`
+                            // gegen die Schriftgröße, Flutter erwartet Pixel.
+                            style: FactTypography.heading.copyWith(
+                              fontSize: 10,
+                              letterSpacing: 10 * 0.18,
+                              color: TourPalette.accent,
+                            ),
                           ),
-                        ),
-                        // `marginBottom: 5`, `screen-tour.jsx:481`.
-                        const SizedBox(height: 5),
-                        Text(
-                          title,
-                          // Nunito 900, 17, `letterSpacing: '-0.01em'`,
-                          // `lineHeight: 1.15`, `screen-tour.jsx:485-489`.
-                          style: FactTypography.emphasis.copyWith(
-                            fontSize: 17,
-                            height: 1.15,
-                            letterSpacing: 17 * -0.01,
-                            color: TourPalette.bubbleTitle,
+                          // `marginBottom: 5`, `screen-tour.jsx:481`.
+                          const SizedBox(height: 5),
+                          Text(
+                            title,
+                            // Nunito 900, 17, `letterSpacing: '-0.01em'`,
+                            // `lineHeight: 1.15`, `screen-tour.jsx:485-489`.
+                            style: FactTypography.emphasis.copyWith(
+                              fontSize: 17,
+                              height: 1.15,
+                              letterSpacing: 17 * -0.01,
+                              color: TourPalette.bubbleTitle,
+                            ),
                           ),
-                        ),
-                        // `marginBottom: 5`, `screen-tour.jsx:488`.
-                        const SizedBox(height: 5),
-                        Text(
-                          body,
-                          // DM Sans 500, 13, `lineHeight: 1.45`,
-                          // `screen-tour.jsx:496-498`.
-                          style: FactTypography.bodyEmphasis.copyWith(
-                            fontSize: 13,
-                            height: 1.45,
-                            color: TourPalette.bubbleBody,
+                          // `marginBottom: 5`, `screen-tour.jsx:488`.
+                          const SizedBox(height: 5),
+                          Text(
+                            body,
+                            // DM Sans 500, 13, `lineHeight: 1.45`,
+                            // `screen-tour.jsx:496-498`.
+                            style: FactTypography.bodyEmphasis.copyWith(
+                              fontSize: 13,
+                              height: 1.45,
+                              color: TourPalette.bubbleBody,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -80,6 +80,13 @@ void main() {
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
   }
 
+  /// Ebenfalls über den `PlatformDispatcher`, siehe `useReducedMotion`.
+  /// 2.0 ist Androids Maximum, siehe `test/support/app_fonts.dart`.
+  void useTextScale(WidgetTester tester, double scale) {
+    tester.platformDispatcher.textScaleFactorTestValue = scale;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+  }
+
   Widget app({
     AppLanguage language = AppLanguage.de,
     FakeAuthRepository? auth,
@@ -101,8 +108,9 @@ void main() {
     WidgetTester tester, {
     AppLanguage language = AppLanguage.de,
     FakeAuthRepository? auth,
+    Size size = const Size(390, 844),
   }) async {
-    useDeviceSurface(tester);
+    useDeviceSurface(tester, size: size);
     useReducedMotion(tester);
     await tester.pumpWidget(app(language: language, auth: auth));
     await tester.pumpAndSettle();
@@ -549,5 +557,154 @@ void main() {
       // Unabhängige Gegenprobe über die Höhe: zwei Zeilen zu 38 mal 1.05.
       expect(paragraph.size.height, closeTo(2 * 38 * 1.05, 1.5));
     });
+  });
+
+  group('Maße', () {
+    // Fund 1 der Review von Schritt 11: `TourBubble` wuchs bei großer
+    // Systemschrift auf einem kleinen Gerät lautlos unter den Bildschirmrand,
+    // der `Stack` clippt ohne jede Überlauf-Meldung und
+    // `tester.takeException()` blieb `null`. Deshalb hier eine echte
+    // Rechteck- und Erreichbarkeitsprüfung statt nur der Abwesenheit einer
+    // Ausnahme, siehe `test/features/identity/presentation/pages/signup_page_test.dart`,
+    // Gruppe "Maße".
+    const smallDevice = Size(375, 667);
+
+    // Vier eigene Tests und keine Schleife in einem: eine Schleife meldet nur,
+    // dass irgendeine Kombination scheitert, und man sieht nicht welche.
+    for (final scale in <double>[1, 2]) {
+      for (final size in <Size>[smallDevice, Size(360, 640)]) {
+        final label =
+            'Skalierung $scale auf ${size.width.toInt()}x'
+            '${size.height.toInt()}';
+        testWidgets(
+          '$label: keine Blase reicht unter den Bildschirmrand oder über '
+          'den Tipp-Hinweis',
+          (tester) async {
+            useTextScale(tester, scale);
+            await pumpApp(tester, size: size);
+
+            // Schritt 1 ist ein Hero-Schritt ohne Blase, deshalb ungeprüft;
+            // die Schleife tippt sich trotzdem durch alle neun, damit auch
+            // Schritt 9 (ebenfalls Hero) am Ende erreicht wird.
+            for (var number = 1; number <= TourSteps.count; number++) {
+              final bubbleFinder = find.byType(TourBubble);
+              if (bubbleFinder.evaluate().isNotEmpty) {
+                final where = '$label, Schritt $number';
+                final rect = tester.getRect(bubbleFinder);
+                final tapHintTop = tester.getRect(find.byType(TourTapHint)).top;
+
+                expect(
+                  rect.bottom,
+                  lessThanOrEqualTo(size.height),
+                  reason: '$where: unter dem Bildschirmrand',
+                );
+                expect(
+                  rect.bottom,
+                  lessThanOrEqualTo(tapHintTop),
+                  reason: '$where: über dem Tipp-Hinweis',
+                );
+                expect(tester.takeException(), isNull, reason: where);
+              }
+
+              if (number < TourSteps.count) {
+                await tapScrim(tester);
+              }
+            }
+          },
+        );
+      }
+    }
+
+    testWidgets(
+      'bei Skalierung 2.0 auf einem kleinen Gerät bleibt der Fließtext von '
+      'Schritt 3 über Scrollen erreichbar, statt lautlos abgeschnitten zu '
+      'werden',
+      (tester) async {
+        // Wortwörtlich `tour.step3.body` auf Deutsch, dieselbe Kombination
+        // wie in der Sonde der Review.
+        const body =
+            'Die kleine Figur ist dein Avatar — sie schaut dorthin, wo du '
+            'dein Handy hinhältst. Wie ein lebender Kompass.';
+
+        useTextScale(tester, 2.0);
+        await pumpApp(tester, size: smallDevice);
+        await goToStep(tester, 3);
+
+        final bubbleFinder = find.byType(TourBubble);
+        // `skipOffstage: false`, weil der Text nach dem Scrollen außerhalb
+        // des sichtbaren Ausschnitts liegt, aber weiterhin gebaut ist: er
+        // steckt in einem `SingleChildScrollView`, nicht in einem
+        // `Offstage`.
+        final bodyFinder = find.descendant(
+          of: bubbleFinder,
+          matching: find.text(body, skipOffstage: false),
+        );
+        expect(bodyFinder, findsOneWidget);
+
+        final bubbleRect = tester.getRect(bubbleFinder);
+        final paragraph = tester.renderObject<RenderParagraph>(bodyFinder);
+
+        // Das letzte Zeichen des Fließtexts, als Rechteck in Bildschirm-
+        // koordinaten. `getBoxesForSelection` liefert das Rechteck relativ
+        // zum Absatz, `localToGlobal` übersetzt es unter Berücksichtigung des
+        // aktuellen Scrollversatzes.
+        Rect lastCharacterRect() {
+          final boxes = paragraph.getBoxesForSelection(
+            TextSelection(
+              baseOffset: body.length - 1,
+              extentOffset: body.length,
+            ),
+          );
+          final box = boxes.last.toRect();
+          return Rect.fromPoints(
+            paragraph.localToGlobal(box.topLeft),
+            paragraph.localToGlobal(box.bottomRight),
+          );
+        }
+
+        final scrollable = find.descendant(
+          of: bubbleFinder,
+          matching: find.byType(Scrollable),
+        );
+        expect(
+          scrollable,
+          findsOneWidget,
+          reason:
+              'ohne Scrollable wäre der Inhalt bei dieser Kombination wieder '
+              'stillschweigend abgeschnitten',
+        );
+        final position = tester.state<ScrollableState>(scrollable).position;
+        expect(
+          position.maxScrollExtent,
+          greaterThan(0),
+          reason:
+              'Schritt 3 hat bei Skalierung 2.0 auf $smallDevice mehr Inhalt '
+              'als Platz, sonst prüfte dieser Test nichts',
+        );
+
+        // Vor dem Scrollen liegt das letzte Zeichen unterhalb der Blase,
+        // also außerhalb des sichtbaren Bereichs: genau das ist der Defekt
+        // aus Fund 1, hier als Gegenprobe reproduziert.
+        expect(
+          lastCharacterRect().top,
+          greaterThan(bubbleRect.bottom),
+          reason: 'vor dem Scrollen ist das Textende noch nicht erreichbar',
+        );
+
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pump();
+
+        // Nach dem Scrollen liegt es innerhalb der Blase, ist also
+        // tatsächlich erreichbar und nicht nur theoretisch vorhanden.
+        final afterScroll = lastCharacterRect();
+        expect(
+          afterScroll.bottom,
+          lessThanOrEqualTo(bubbleRect.bottom + 0.5),
+          reason: 'nach dem Scrollen muss das Textende sichtbar sein',
+        );
+        expect(afterScroll.top, greaterThanOrEqualTo(bubbleRect.top - 0.5));
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

@@ -108,4 +108,59 @@ void main() {
     expect(innen.debugRegisteredIds, <AnchorId>{wallet});
     expect(aussen.debugRegisteredIds, isEmpty);
   });
+
+  testWidgets('eine Änderung von knownMissingAnchors zur Laufzeit schlägt an', (
+    tester,
+  ) async {
+    // Der `assert` in `AnchorScope.didUpdateWidget` soll genau das
+    // verhindern: die Registry übernimmt die Menge nur einmal beim
+    // Erzeugen, eine spätere Änderung käme also nie an. Ohne diesen Test
+    // blieb der `assert` durch eine Mutationsprobe unbemerkt scharf: sein
+    // Rumpf durch einen Kommentar ersetzt, alle Tests blieben grün.
+    Widget frame(Set<AnchorId> knownMissing) {
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: AnchorScope(
+          knownMissingAnchors: knownMissing,
+          child: const SizedBox(),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(frame(<AnchorId>{wallet}));
+
+    // Zweiter Aufbau ohne eigenen `Key`, an derselben Stelle im Baum: kein
+    // Neuaufbau, sondern ein `didUpdateWidget` auf demselben Element, genau
+    // der Fall, den der `assert` behandelt. Der `assert` sitzt im
+    // Aktualisierungspfad des Frameworks, sein Fehler kommt deshalb nicht als
+    // geworfene Ausnahme aus `pumpWidget` zurück, sondern landet wie jeder
+    // Bau- oder Layoutfehler bei `FlutterError` und damit bei
+    // `tester.takeException()`.
+    await tester.pumpWidget(frame(<AnchorId>{const AnchorId('anderer-anker')}));
+
+    expect(tester.takeException(), isA<AssertionError>());
+  });
+
+  testWidgets('dieselbe Menge in neuer Instanz zur Laufzeit schlägt nicht an', (
+    tester,
+  ) async {
+    // Die Gegenprobe zum Test darüber: der `assert` prüft inhaltliche
+    // Gleichheit (`setEquals`), keine Identität. Zwei verschiedene
+    // `Set`-Instanzen mit demselben Inhalt dürfen nicht anschlagen, sonst
+    // wäre jeder Neuaufbau mit einem frisch erzeugten Literal ein Fehlalarm.
+    Widget frame(Set<AnchorId> knownMissing) {
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: AnchorScope(
+          knownMissingAnchors: knownMissing,
+          child: const SizedBox(),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(frame(<AnchorId>{wallet}));
+    await tester.pumpWidget(frame(<AnchorId>{wallet}));
+
+    expect(tester.takeException(), isNull);
+  });
 }
