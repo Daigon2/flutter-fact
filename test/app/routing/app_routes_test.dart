@@ -1,6 +1,13 @@
+import 'package:fact_app/app/localization/language_preference_store.dart';
+import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/routing/app_router.dart';
 import 'package:fact_app/app/routing/app_routes.dart';
 import 'package:fact_app/app/shell/shell_tab.dart';
+import 'package:fact_app/app/theme/fact_theme.dart';
+import 'package:fact_app/features/discovery/presentation/pages/map_page.dart';
+import 'package:fact_app/map/presentation/map_surface.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -68,6 +75,56 @@ void main() {
     expect(const SplashRoute().location, '/splash');
     expect(const LoginRoute().location, '/login');
     expect(const SignupRoute().location, '/signup');
+  });
+
+  testWidgets('die Karten-Route baut den Bildschirm samt Kartenfläche', (
+    tester,
+  ) async {
+    // **Diese eine Zeile trägt Schritt 12, und sie war vollständig
+    // ungetestet.** `mapSurface:` durch ein `SizedBox.shrink()` zu ersetzen
+    // ließ alle 1084 Tests grün: „die App zeigt gar keine Karte" war nirgends
+    // zugesichert. `MapRoute` kam bisher nur mit `.location` vor.
+    //
+    // Gebaut wird hier wirklich `MapRoute.build`, eingehängt als Bauer einer
+    // eigenen Route. Ein `GoRouterState` von Hand ist nicht herstellbar, seine
+    // Konfiguration ist ein privates Pflichtargument
+    // (`go_router-18.0.0/lib/src/state.dart:19-33`); über einen echten Router
+    // liefert go_router ihn selbst.
+    rootBundle.clear();
+    final container = ProviderContainer(
+      overrides: [
+        languagePreferenceStoreProvider.overrideWithValue(
+          InMemoryLanguagePreferenceStore(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    final router = GoRouter(
+      initialLocation: const MapRoute().location,
+      routes: <RouteBase>[
+        GoRoute(path: '/map', builder: const MapRoute().build),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          theme: FactTheme.light(),
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MapPage), findsOneWidget);
+    final MapSurface surface = tester.widget<MapSurface>(
+      find.byType(MapSurface),
+    );
+    // Und sie startet an der Rückfallposition der Quelle, nicht an einer, die
+    // sich der Karten-Host selbst ausdenkt: Mehrstädtigkeit hängt daran.
+    expect(surface.initialCamera, MapPage.placeholderCamera);
   });
 
   test('der Router startet auf der Karte, wie app.jsx:68-70', () {

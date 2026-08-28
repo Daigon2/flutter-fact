@@ -126,6 +126,20 @@ here (E-32):
   comment nevertheless claims that widgets and notifiers read "this provider",
   and they cannot. Tracked in `REBUILD_STATUS.md`; the fix belongs to the step
   that connects `facts` to the map.
+- `map/application/map_host_providers.dart` declares `mapHostProvider` on the
+  `MapHost` contract and `mapHostRegistryProvider` on the implementation, both
+  returning the same object. This is the **third** case in which neither
+  placement from the sentence above works, and the reason is constructive
+  rather than stylistic: the contract lives in `map/domain/`, where rule 2
+  forbids Riverpod, and `map/presentation/` is unreachable for features under
+  rule 18. `map/application/` is the only remaining place, which is why that
+  folder exists at all.
+
+  Note what carries the boundary here: the **type** of the provider, not its
+  location. `MapHost` has no `attach`, so a feature holding `mapHostProvider`
+  cannot register a host even if it tries. Whenever a provider must be readable
+  by two layers with different rights, split it by type before splitting it by
+  convention.
 
 ## Exceptions
 

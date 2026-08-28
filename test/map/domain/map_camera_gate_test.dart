@@ -89,6 +89,7 @@ MapCameraOneShot autoPitch() => const MapCameraOneShot(
 
 /// Das GPS-Folgen, `screen-map.jsx:2665-2675`.
 MapCameraFollow gpsFollow(MapPosition target) => MapCameraFollow(
+  kind: MapCameraFollowKind.userPosition,
   change: MapCameraChange(center: target),
   motion: const MapCameraAnimated(Duration(milliseconds: 900)),
   origin: MapCameraIntentOrigin.discovery,
@@ -102,6 +103,7 @@ MapCameraFollow gpsFollow(MapPosition target) => MapCameraFollow(
 /// Ohne Mindestpause: von den vier Bedingungen in `:2837` ist keine eine
 /// Pause. Weicht dagegen einer laufenden Geste, das ist dort `!userInteracting`.
 MapCameraFollow bearingFollow(double bearing) => MapCameraFollow(
+  kind: MapCameraFollowKind.compassBearing,
   change: MapCameraChange(bearing: bearing),
   motion: const MapCameraImmediate(),
   origin: MapCameraIntentOrigin.discovery,
@@ -488,6 +490,7 @@ void main() {
       // Grad über der Schwelle und die Absicht liefe durch.
       final MapCameraVerdict verdict = decideMapCameraIntent(
         intent: const MapCameraFollow(
+          kind: MapCameraFollowKind.compassBearing,
           change: MapCameraChange(bearing: 3),
           motion: MapCameraImmediate(),
           origin: MapCameraIntentOrigin.discovery,
@@ -505,6 +508,7 @@ void main() {
       // Mit der Konstanten von 800 ms wäre die Pause längst um.
       final MapCameraVerdict verdict = decideMapCameraIntent(
         intent: MapCameraFollow(
+          kind: MapCameraFollowKind.userPosition,
           change: MapCameraChange(center: northOf(munich, 100)),
           motion: const MapCameraAnimated(Duration(milliseconds: 900)),
           origin: MapCameraIntentOrigin.discovery,
@@ -526,6 +530,7 @@ void main() {
       // Mit der Konstanten von 12 Metern liefe die Absicht durch.
       final MapCameraVerdict verdict = decideMapCameraIntent(
         intent: MapCameraFollow(
+          kind: MapCameraFollowKind.userPosition,
           change: MapCameraChange(center: northOf(munich, 50)),
           motion: const MapCameraAnimated(Duration(milliseconds: 900)),
           origin: MapCameraIntentOrigin.discovery,
@@ -547,6 +552,7 @@ void main() {
   group('Eine Dauerabsicht ohne Schwellen bremst sich nicht selbst', () {
     // Die Tour-Folgeabsicht aus Phase 6 ist genau so eine Absicht.
     MapCameraFollow unthrottled(MapPosition target) => MapCameraFollow(
+      kind: MapCameraFollowKind.userPosition,
       change: MapCameraChange(center: target),
       motion: const MapCameraAnimated(Duration(milliseconds: 600)),
       origin: MapCameraIntentOrigin.tours,
@@ -586,6 +592,7 @@ void main() {
     test('ohne Winkel-Totzone und ohne Pause ebenso', () {
       final MapCameraVerdict verdict = decideMapCameraIntent(
         intent: const MapCameraFollow(
+          kind: MapCameraFollowKind.compassBearing,
           change: MapCameraChange(bearing: 0),
           motion: MapCameraImmediate(),
           origin: MapCameraIntentOrigin.tours,
@@ -614,6 +621,7 @@ void main() {
 
       final MapCameraVerdict verdict = decideMapCameraIntent(
         intent: MapCameraFollow(
+          kind: MapCameraFollowKind.userPosition,
           change: MapCameraChange(center: target),
           motion: const MapCameraAnimated(Duration(milliseconds: 900)),
           origin: MapCameraIntentOrigin.discovery,
@@ -637,6 +645,7 @@ void main() {
 
       final MapCameraVerdict verdict = decideMapCameraIntent(
         intent: MapCameraFollow(
+          kind: MapCameraFollowKind.userPosition,
           change: MapCameraChange(center: target),
           motion: const MapCameraAnimated(Duration(milliseconds: 900)),
           origin: MapCameraIntentOrigin.discovery,
@@ -938,6 +947,7 @@ void main() {
     test('Animation schlägt Einrasten, Karenzzeit und Totzone', () {
       final MapCameraVerdict verdict = decideMapCameraIntent(
         intent: MapCameraFollow(
+          kind: MapCameraFollowKind.compassBearing,
           change: MapCameraChange(center: munich, bearing: 0),
           motion: const MapCameraAnimated(Duration(milliseconds: 900)),
           origin: MapCameraIntentOrigin.discovery,
@@ -998,6 +1008,7 @@ void main() {
     test('die Strecken-Totzone schlägt die Winkel-Totzone', () {
       final MapCameraVerdict verdict = decideMapCameraIntent(
         intent: MapCameraFollow(
+          kind: MapCameraFollowKind.compassBearing,
           change: MapCameraChange(center: northOf(munich, 1), bearing: 0.5),
           motion: const MapCameraAnimated(Duration(milliseconds: 900)),
           origin: MapCameraIntentOrigin.discovery,
@@ -1018,6 +1029,7 @@ void main() {
     test('die Winkel-Totzone schlägt die Mindestpause', () {
       final MapCameraVerdict verdict = decideMapCameraIntent(
         intent: MapCameraFollow(
+          kind: MapCameraFollowKind.compassBearing,
           change: const MapCameraChange(bearing: 0.5),
           motion: const MapCameraImmediate(),
           origin: MapCameraIntentOrigin.discovery,

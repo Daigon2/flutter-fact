@@ -27,13 +27,18 @@ Steht zusätzlich seit dem Vormittag: die Anker-Registry in `lib/core/anchors/`
 (E-27), eine Ergänzungs-Map für Oberflächentexte ohne PWA-Schlüssel (E-39), und
 das Tutorial-Overlay unter `lib/app/onboarding/` mit neun Schritten.
 
-**Seit heute Nacht steht das Fundament von `lib/map/`:** fünf reine
-Domänenverträge des Karten-Hosts, gebaut **vor** Schritt 12, weil der
+**Seit der Nacht zum 29.08.2026: Schritt 12 ist fertig, die Karte ist echt.**
+Unter dem Top-Chrome liegt ein `MapLibreMap` mit gebackenem Stil statt der
+einfarbigen Fläche. Davor entstand das Fundament `lib/map/domain/`, die reinen
+Domänenverträge des Karten-Hosts, **vor** Schritt 12 gebaut, weil der
 Kameravertrag entscheidet, was danach zwei- bis dreitausend Zeilen kostet.
-Details im Protokoll und in `REBUILD_STATUS.md`.
+Dazu D-5, das Karten-Chrome ist jetzt eine geschlossene Einheit.
 
-**Kennzahlen:** 987 Tests grün, alle vier Gates auf Exit-Code 0,
-`dart run tool/generate_i18n.dart --check` auf Exit-Code 0.
+**Damit sind 13 von 50 Schritten fertig** (1 bis 12 plus 19).
+
+**Kennzahlen:** 1084 Tests grün, alle vier Gates auf Exit-Code 0, dazu
+`dart run tool/generate_i18n.dart --check` und
+`dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
 
 **Zusätzlich fertig, außer der Reihe:** Schritt 19, das Top-Chrome des
 Kartenbildschirms. Vorgezogen, weil Schritt 12 an einer Architekturentscheidung
@@ -67,17 +72,21 @@ gelaufen.
 
 ## Als Nächstes
 
-1. **Den Gerätelauf wiederholen.** Steht seit E-38 aus. Zwei Schritte
-   Bildmaterial sind seither dazugekommen (Anker-Registry unsichtbar, Tutorial
-   sichtbar), die optische Prüfung von Splash, Anmeldung, Registrierung und
-   jetzt auch dem Tutorial ist formal offen.
-2. **Schritt 12, MapLibre-Host.** Die Strukturfrage ist seit dem 28.08.2026
-   entschieden, das Fundament steht. Was zuerst zu klären ist: wo der Provider
-   lebt, über den ein Feature an den Host kommt. Das Muster von E-32 (Vertrag
-   in der Domäne, Provider daneben, Override im Bootstrap) **trägt hier
-   nicht**, Begründung in `REBUILD_STATUS.md`. Bleibt blockiert an E-10
-   (3D-Avatar, WebView oder Flutter) und E-07/E-23 (Distanzprüfung beim
-   Sammeln umgehbar, geteiltes Backend).
+1. **Den Gerätelauf nachholen, und er ist dringender geworden.** Steht seit
+   E-38 aus, offen sind Splash, Anmeldung, Registrierung und das Tutorial.
+   Dazu kommt jetzt die Karte, und von ihrer SDK-Verdrahtung ist **nichts**
+   auf einem Gerät gesehen: `onMapCreated`, `onCameraMove` und `onCameraIdle`
+   laufen im Widget-Test nie, weil ohne Plattformkanal gar kein Controller
+   entsteht. Zugesichert ist nur, dass sie richtig und stabil übergeben
+   werden. Zwei offene Messungen gleich mitnehmen: ob `moveCamera` eine
+   laufende `animateCamera` verwirft (davon hängt Vorrangregel 1 ab, denn
+   `stop()` gibt es nicht), und ob die 200 ms `steeringGrace` tragen.
+2. **Schritt 13, Kamera-Verhalten.** Der Regelkreis steht, es fehlen die
+   Absichten: GPS-Folgen, Sky-Fall, Neuzentrieren. Zwei Dinge sind vorher zu
+   klären, beide in `REBUILD_STATUS.md` beschrieben: wem die **Nutzerposition**
+   gehört (dritter Umweg um dieselbe Geo-Typ-Sperre, und diesmal trifft er mit
+   E-07 eine Sicherheitsprüfung), und ob der Host im **unsichtbaren Tab**
+   weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht, das ist gemessen.
 3. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` listet
    `balloon`, `user-marker`, `coins`, `mode-tour`, `compass` bereits als
    Kennungen. Sobald die Kartenwidgets entstehen, hüllt sie `AnchorTarget` ein
@@ -92,6 +101,114 @@ gelaufen.
 ## Protokoll
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
+
+### 29.08.2026, Schritt 12: MapLibre-Host mit gebackenem Stil
+
+Die Karte ist echt. Zwei Hälften: der gebackene Stil, und der Host darunter.
+1017 → 1084 Tests.
+
+**Der wichtigste Fund ist kein Fehler, sondern eine Grenze, die zum ersten Mal
+scharf geworden ist.** `map_page.dart` darf `MapSurface` **nicht**
+importieren, Regel 18 bricht mit Exit-Code 1 ab, gemessen mit einer
+Wegwerf-Probe. Ein Feature kann den Karten-Host also **niemals selbst
+mounten**. Die Kartenfläche kommt als Widget-Parameter herein, gesetzt vom
+Routen-Adapter in `app_routes.dart`, genau wie `onAudioGuidePressed` in
+Schritt 8. Das gilt ab jetzt für jedes weitere Karten-Bauteil, und es ist die
+Sorte Konsequenz, die man beim Entscheiden nicht sieht und beim Bauen sofort.
+Bis heute war `maplibre_gl` in `lib/` an keiner Stelle importiert, die Regeln
+18 und 20 waren also nie erprobt.
+
+**Der Stil wird gebacken, und das ist erzwungen, nicht gewählt.**
+`maplibre_gl 0.26.2` hat weder `setPaintProperty` noch `setLayoutProperty`.
+`setLayerProperties` setzt laut eigener Doku unbelegte Eigenschaften auf den
+Standard zurück, die PWA ändert aber je Layer genau eine und lässt den Rest
+stehen. Nachbauen hieße, für jeden der 111 Layer den vollständigen
+Eigenschaftssatz zurückzulesen und über den Plattformkanal zurückzuschieben.
+
+**Die Falle beim Stil heißt `PLAIN_MAP_LOOK`.** `screen-map.jsx:13` steht auf
+`true`, und der Kommentar darüber liest sich wie „schlichte Karte". Der
+Schalter kippt aber nur vier Dinge, `applyGameStyle` läuft **unbedingt** bei
+jedem `style.load`, und die rund 250 Zeilen Umfärbung gelten immer. **Und die
+Häuser sind sichtbar:** eine unbedingte Liste blendet sie aus, der große
+Durchlauf schaltet sie danach wieder sichtbar. Wer nur die erste Stelle liest,
+backt eine Karte ohne Häuser. Nebenbei ist der Kommentar bei `:1752` veraltet
+und nennt 65 oder 75 Grad, wirksam sind **58**.
+
+**Ein Fallstrick, der auf einem Gerät funktioniert und auf dem anderen
+zerstört:** `animateCamera` liefert auf Android echtes `true`/`false` über
+einen Listener, auf iOS **immer sofort `null`**. Ein
+`if (await animateCamera(...) != true)` wäre auf Android richtig und auf iOS
+fatal, weil der Host seinen Animationszustand nie mehr löschte und danach jede
+Dauerabsicht unterdrückt. Die Regel lautet jetzt: `true` und `false` löschen,
+`null` heißt „keine Auskunft" und lässt stehen.
+
+**Zwei Dinge, die eine unabhängige Prüfung vor dem Bauen verhindert hat.**
+Erstens: ein Host, der seine Buchführung im `State` hält, wäre unprüfbar, denn
+ohne Plattformkanal läuft `onPlatformViewCreated` nie und es entsteht **nie
+ein Controller**. Zweitens: Riverpod verbietet Provider-Mutation in `initState`
+**und** `dispose`, und im Release passiert es still statt zu werfen. Beides
+hätte man erst gemerkt, als es teuer war. Die Registry ist deshalb ein
+gewöhnliches Objekt, wie `AnchorRegistry`, und die Buchführung hängt an keinem
+Widget.
+
+**Die Typgrenze ersetzt eine Prüfregel.** Zwei Provider zeigen auf dasselbe
+Objekt: Features lesen `Provider<MapHost>` und sehen kein `attach`, der Host
+liest `Provider<MapHostRegistry>`. Gemessen: der Versuch bricht `dart analyze`
+mit Exit-Code 3 ab. Dass die Registry selbst `MapHost` ist, erledigt nebenbei
+zwei Dinge, ein Feature hält nie einen veralteten Host, und ein Abonnement auf
+`cameraChanges` überlebt den Wechsel.
+
+**Der teuerste Testfund betraf das Testnetz selbst.** `rootBundle` cacht das
+`Future`. Ein Test, der den Ladevorgang anstößt, ohne ihn abzuwarten, lässt
+ein totes `Future` in seiner `FakeAsync`-Zone zurück, und **jeder folgende
+Test** bekam genau dieses zurück und sah eine Karte, die ewig lädt. Vier Tests
+fielen mit „Bad state: No element", **ohne jede Ausnahme**. `rootBundle.clear()`
+im `setUp` behebt es.
+
+Zwei kleinere aus derselben Ecke: `LatLng` normalisiert den Längengrad
+verlustbehaftet, aus 11.582 wird 11.581999999999994, also mit `closeTo`
+messen. Und Methoden-Tear-offs sind `==`, aber **nicht** `identical`, ein
+Test, der auf `identical` prüft, fällt gegen richtigen Code.
+
+**Aus der unabhängigen Review danach, 25 Mutationen, 11 überlebend.** Der
+teuerste Fund war wieder eine Begründung, die sich als gemessen ausgab. Das
+Steuerfenster von 200 ms, in dem eine Kamerarückmeldung als eigene gilt,
+verlängerte sich bei **jeder** eigenen Bewegung und verkürzte sich nie. Das
+Blickrichtungs-Folgen tickt aber häufiger als alle 200 ms, also stand das
+Fenster dauerhaft offen und **eine echte Zwei-Finger-Drehung rastete nie
+ein**. Der Kommentar beschrieb den Preis als „verschluckt eine Drehung kurz
+danach", tatsächlich war er „gar nicht mehr einrastbar".
+
+Die Behebung ist lehrreich, weil beide naheliegenden Wege nicht tragen: auch
+ein Fenster, das an den **letzten** Aufruf gebunden ist statt verlängert zu
+werden, steht bei 100-ms-Ticks dauerhaft offen. **„Steuert der Host gerade"
+ist als reine Zeitfrage nicht beantwortbar.** Der Host merkt sich jetzt die
+Blickrichtung, die er selbst zuletzt gesetzt hat; weicht die eintreffende
+darüber hinaus ab, hat kein eigener Aufruf sie verursacht.
+
+**Ein Fund am Analyzer, der über diesen Schritt hinaus gilt:**
+`@visibleForTesting` an einem **Feld** bewacht nur das Lesen. Ein
+Konstruktoraufruf `MapSurface(debugCreateHost: …)` aus `lib/` lief anstandslos
+durch, also genau der Missbrauch, um den es geht. Erst die Annotation am
+**Konstruktorparameter** meldet ihn. Wer sich auf die Absicherung aus D-5
+verlässt, muss wissen, wo sie greift und wo nicht.
+
+**Eine Paritätslücke, die die Schritte 15 bis 18 mitbestimmt.**
+`screen-map.jsx:1694` setzt `map.setPadding({ top: 320 })` und schiebt damit
+den wirksamen Kartenmittelpunkt um 320 Pixel nach unten, damit die Figur im
+unteren Drittel steht. **`maplibre_gl 0.26.2` hat kein dauerhaftes
+Kamera-Padding.** `padding` gibt es nur an `CameraUpdate.newLatLngBounds` und
+an `setCameraBounds`, und die zweite grenzt den **erlaubten Ausschnitt** ein:
+wer sie dafür hält, sperrt das Schieben ein, statt die Kamera zu versetzen.
+Derselbe Fundtyp wie das fehlende `setPaintProperty`, und er entscheidet, wo
+Nutzermarker und Avatar landen.
+
+**Zuletzt eine Vertragslücke, die erst in Schritt 13 aufgefallen wäre.**
+`MapCameraSituation` verlangt Zustand *zu dieser* Dauerabsicht, aber
+`MapCameraFollow` trug keine Identität, und nach der Herkunft zu schlüsseln
+ist beweisbar falsch: GPS-Folgen und Blickrichtungs-Folgen sind beide
+`discovery`. Jetzt kostete es ein Feld, in Schritt 13 wäre es eine
+Vertragsänderung gewesen.
 
 ### 29.08.2026, D-5: das Karten-Chrome wird eine geschlossene Einheit
 

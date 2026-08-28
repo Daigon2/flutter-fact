@@ -159,6 +159,10 @@ final class MapCameraThresholds {
 /// `lastCameraPosRef` gehört allein dem GPS-Folgen
 /// (`screen-map.jsx:2661-2670`).
 ///
+/// Der Schlüssel, unter dem der Host diesen Zustand getrennt hält, ist
+/// [MapCameraFollow.kind]. Nach der Herkunft zu schlüsseln wäre falsch: beide
+/// bekannten Dauerabsichten sind [MapCameraIntentOrigin.discovery].
+///
 /// `final class`: der Typ hat zwar kein `==`, aber Unterklassen könnten
 /// [isAnimating] überschreiben, und damit hinge das Urteil des Gates an der
 /// Lage statt an der Regel.
@@ -588,6 +592,16 @@ MapCameraVerdict _decideFollow(
 /// zwischen einem `setBearing` des Hosts und der zugehörigen Rückmeldung von
 /// `OnCameraMoveCallback`, auf Android und auf iOS getrennt. Die Antwort
 /// gehört in den Schritt, der den Host baut, und nicht in diesen Vertrag.
+///
+/// **Beantwortet in Schritt 12, und der Absatz oben ist an einer Stelle
+/// falsch:** „endet es zu spät, verschluckt er eine echte Zwei-Finger-Drehung
+/// kurz danach" klingt nach einem Preis von wenigen hundert Millisekunden. Ein
+/// Fenster, das jeder eigene Aufruf verlängert, schließt sich aber gar nicht
+/// mehr, solange der Kompass schneller tickt, als es lang ist, und dann rastet
+/// **nie** etwas ein. Der Host beantwortet [hostIsSteering] deshalb nicht
+/// allein nach der Zeit, sondern zusätzlich daran, ob die eintreffende
+/// Blickrichtung zu seinem letzten eigenen Aufruf passt; die Zahl selbst steht
+/// als Schätzwert bei `MapCameraHost.steeringGrace`.
 ///
 /// ## Bekannte Abweichung: Drehen während einer Animation
 ///

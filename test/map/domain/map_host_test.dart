@@ -104,6 +104,7 @@ void main() {
 
     host.submitIntent(
       const MapCameraFollow(
+        kind: MapCameraFollowKind.userPosition,
         change: MapCameraChange(center: munich),
         motion: MapCameraAnimated(Duration(milliseconds: 900)),
         origin: MapCameraIntentOrigin.discovery,

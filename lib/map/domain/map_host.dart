@@ -58,6 +58,14 @@ abstract interface class MapHost {
   /// (`02_Frontend/app/screen-map.jsx:310-322`), und der Kommentar dort sagt
   /// warum: wer nach Rom schiebt, soll „Rom" sehen, ohne etwas auszuwählen.
   /// Mehrstädtigkeit hängt also direkt an diesem Strom.
+  ///
+  /// **Vor der Anzeige ist dieser Strom auf einen abgeleiteten Wert zu
+  /// verdichten.** Er meldet jeden Bewegungsschritt, auf Android und iOS also
+  /// bis zu einmal je Bild. Wer ihn direkt in einem Widget beobachtet, baut die
+  /// Stadt-Pille bei jedem Schritt neu, obwohl sich der Stadtname beim Schieben
+  /// über eine Straße nie ändert. Zu verdichten ist auf das, was angezeigt
+  /// wird, also auf die erkannte Stadt, und erst dieser Wert gehört in den
+  /// Aufbau der Oberfläche.
   Stream<MapCameraView> get cameraChanges;
 
   /// Gibt eine Absicht ab.
@@ -76,5 +84,13 @@ abstract interface class MapHost {
   /// oder alle aufheben. Die Quelle löst es für ihren einen Fall mit
   /// „aufheben und nachholen", verallgemeinert das aber nicht. Welche Antwort
   /// gilt, gehört in den Schritt, der den Host baut, nicht in diesen Vertrag.
+  ///
+  /// **Beantwortet in Schritt 12, und zwar mit „fallen lassen":** der Host
+  /// verwirft eine Absicht, die vor der Karte eintrifft, und meldet sie als
+  /// eigenes Diagnose-Ereignis. Der Sky-Fall, der einzige belegte Fall für
+  /// „aufheben und nachholen", entsteht erst in einem späteren Schritt; bis
+  /// dahin wäre die Warteschlange Vorrat, den niemand prüft (ADR-002). Die
+  /// Begründung und der Auslöser für eine Änderung stehen bei
+  /// `MapCameraHost.submitIntent`.
   void submitIntent(MapCameraIntent intent);
 }

@@ -141,6 +141,13 @@ intentions through `map/domain`, and `map/presentation` and `map/data` are
 internal. `domain-map.md` §7 is unaffected, `map` is still not a business
 domain. Rules 18 and 19 in `dependency-rules.md` enforce the boundary.
 
+`map/application/` arrived with step 12 and is the first `application/` folder
+in the repository. It is an exception to the definition in §7 below and says so
+out loud: it holds **composition** for the map host, namely the registry through
+which a feature reaches the host and the two providers over it. There are no use
+cases in it, and there will not be: a use case in the map host would be business
+logic in a place that owns no business domain.
+
 ## 6. Feature architecture
 
 A feature may contain:
@@ -192,6 +199,11 @@ It may depend on application and domain code. It must not use Supabase or local 
 Owns use cases and workflow coordination. It defines transaction-like application actions, coordinates repositories and returns domain-oriented results.
 
 It may depend only on domain code and narrow shared primitives.
+
+One documented exception exists: `map/application/` carries the composition of
+the map host and no use cases, see §5. The map host owns no business domain, so
+it has no workflows to coordinate; what it does have is one object that must be
+reachable from features and from `map/presentation/` at once.
 
 ### Domain
 

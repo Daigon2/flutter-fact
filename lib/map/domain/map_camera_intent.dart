@@ -81,6 +81,28 @@ enum MapCameraIntentOrigin {
   mapHost,
 }
 
+/// Welche Dauerabsicht gemeint ist.
+///
+/// Der Schlüssel, unter dem der Host `lastFollowAt` und `lastFollowCenter`
+/// führt, siehe [MapCameraFollow.kind]. Getrennt von
+/// [MapCameraIntentOrigin], weil die Herkunft sagt, **wer** etwas will, und
+/// diese Aufzählung, **was** gewollt wird. Beide Werte hier sind
+/// [MapCameraIntentOrigin.discovery], daran sieht man den Unterschied.
+///
+/// Hier stehen nur Dauerabsichten, die es in der Verhaltensquelle wirklich
+/// gibt. Die Tour-Folgeabsicht der Phase 6 fehlt deshalb noch.
+enum MapCameraFollowKind {
+  /// Die Karte folgt der Nutzerposition (`screen-map.jsx:2665-2675`).
+  ///
+  /// Totzone 12 m, Mindestpause 800 ms, weicht keiner Geste.
+  userPosition,
+
+  /// Die Blickrichtung folgt dem Kompass (`screen-map.jsx:2834-2839`).
+  ///
+  /// Winkel-Totzone 1,5°, keine Pause, weicht einer Geste.
+  compassBearing,
+}
+
 /// Eine Absicht, die Kamera zu bewegen.
 sealed class MapCameraIntent {
   /// Für Unterklassen.
@@ -206,10 +228,10 @@ final class MapCameraOneShot extends MapCameraIntent {
 /// uneinig. Deshalb trägt jede Absicht ihre eigenen Schwellen mit, statt sie
 /// sich vom Gate geben zu lassen:
 ///
-/// | Dauerabsicht | Totzone | Mindestpause | weicht einer Geste | Fundstelle |
-/// |---|---|---|---|---|
-/// | GPS-Folgen | 12 m | 800 ms | nein | `screen-map.jsx:2665-2675` |
-/// | Blickrichtung folgt Kompass | 1,5° | keine | ja | `screen-map.jsx:2834-2839` |
+/// | Dauerabsicht | [kind] | Totzone | Mindestpause | weicht einer Geste | Fundstelle |
+/// |---|---|---|---|---|---|
+/// | GPS-Folgen | `userPosition` | 12 m | 800 ms | nein | `screen-map.jsx:2665-2675` |
+/// | Blickrichtung folgt Kompass | `compassBearing` | 1,5° | keine | ja | `screen-map.jsx:2834-2839` |
 ///
 /// Die belegten Zahlen selbst stehen als benannte Konstanten in
 /// `MapCameraThresholds`, damit sie nicht in jedem Aufrufer erneut auftauchen.
@@ -220,6 +242,7 @@ final class MapCameraFollow extends MapCameraIntent {
   /// `null`, wird die Absicht ausgeführt, sobald keine Animation läuft. Das
   /// ist erlaubt und heißt „diese Dauerabsicht bremst sich nicht selbst".
   const MapCameraFollow({
+    required this.kind,
     required super.change,
     required super.motion,
     required super.origin,
@@ -228,6 +251,42 @@ final class MapCameraFollow extends MapCameraIntent {
     this.bearingDeadZoneDegrees,
     this.minPause,
   });
+
+  /// Welche Dauerabsicht das ist, und damit ihre Identität.
+  ///
+  /// ## Warum die Herkunft dafür nicht reicht
+  ///
+  /// `MapCameraSituation.lastFollowAt` und `MapCameraSituation.lastFollowCenter`
+  /// gehören laut Vertrag zu **dieser** Dauerabsicht und nicht zu irgendeiner.
+  /// Der Host muss sie also je Dauerabsicht getrennt führen, und dafür braucht
+  /// er einen Schlüssel. Nach [origin] zu schlüsseln ist **beweisbar falsch**:
+  /// das GPS-Folgen (`screen-map.jsx:2665-2675`) und das Folgen der
+  /// Blickrichtung (`:2834-2839`) sind beide [MapCameraIntentOrigin.discovery]
+  /// und teilten sich damit einen Platz. Die Totzone der einen würde die andere
+  /// bremsen, und zwar lautlos.
+  ///
+  /// ## Warum eine geschlossene Aufzählung und keine freie Zeichenkette
+  ///
+  /// Eine Zeichenkette ist ein Schlüssel, den man vertippen kann, und ein
+  /// Tippfehler sieht wie eine neue Dauerabsicht aus: sie hätte einen eigenen,
+  /// immer leeren Zustand und liefe deshalb ohne jede Totzone. Die Aufzählung
+  /// prüft der Übersetzer, und sie zwingt jeden, der eine dritte Dauerabsicht
+  /// hinzunimmt, einmal hierher zu schauen. In Phase 6 kommt die Tour dazu:
+  /// das ist eine Zeile hier, und der Übersetzer zeigt jede Stelle, die darauf
+  /// reagieren muss.
+  ///
+  /// ## Was diese Aufzählung nicht kann
+  ///
+  /// Sie unterscheidet **Sorten**, keine Instanzen. Heute ist das dasselbe: von
+  /// jeder Sorte läuft höchstens eine. Sobald zwei Dauerabsichten derselben
+  /// Sorte gleichzeitig laufen sollen, etwa zwei Touren nebeneinander, muss
+  /// daraus ein Wertobjekt mit Sorte und Instanz werden. Das ist der Auslöser,
+  /// und er steht hier, damit ihn niemand suchen muss.
+  ///
+  /// Absichtlich **ohne Standardwert**: welcher der beiden bekannten Werte der
+  /// Standard sein sollte, ist nicht beantwortbar, und ein falsch geerbter
+  /// Schlüssel ist genau der Fehler, den dieses Feld verhindert.
+  final MapCameraFollowKind kind;
 
   /// Ob diese Dauerabsicht schweigt, solange der Nutzer die Karte anfasst.
   ///

@@ -21,6 +21,7 @@ void main() {
         origin: MapCameraIntentOrigin.discovery,
       );
       const MapCameraFollow follow = MapCameraFollow(
+        kind: MapCameraFollowKind.userPosition,
         change: MapCameraChange(center: munich),
         motion: MapCameraAnimated(Duration(milliseconds: 900)),
         origin: MapCameraIntentOrigin.discovery,
@@ -160,6 +161,7 @@ void main() {
   group('Die Dauerabsicht trägt ihre eigenen Schwellen', () {
     test('ohne Angabe bremst sie sich nicht selbst', () {
       const MapCameraFollow follow = MapCameraFollow(
+        kind: MapCameraFollowKind.userPosition,
         change: MapCameraChange(center: munich),
         motion: MapCameraAnimated(Duration(milliseconds: 900)),
         origin: MapCameraIntentOrigin.discovery,
@@ -176,6 +178,7 @@ void main() {
       // (`screen-map.jsx:2837`), `applyPos` prüft in `:2668` allein
       // `!m.isEasing()`. Ein Standardwert wäre für eine der beiden falsch.
       const MapCameraFollow gps = MapCameraFollow(
+        kind: MapCameraFollowKind.userPosition,
         change: MapCameraChange(center: munich),
         motion: MapCameraAnimated(Duration(milliseconds: 900)),
         origin: MapCameraIntentOrigin.discovery,
@@ -184,6 +187,7 @@ void main() {
         minPause: Duration(milliseconds: 800),
       );
       const MapCameraFollow bearing = MapCameraFollow(
+        kind: MapCameraFollowKind.compassBearing,
         change: MapCameraChange(bearing: 90),
         motion: MapCameraImmediate(),
         origin: MapCameraIntentOrigin.discovery,
@@ -198,6 +202,7 @@ void main() {
     test('die zwei Dauerabsichten der Quelle haben verschiedene Schwellen', () {
       // Genau deshalb sitzen die Schwellen an der Absicht und nicht am Gate.
       const MapCameraFollow gps = MapCameraFollow(
+        kind: MapCameraFollowKind.userPosition,
         change: MapCameraChange(center: munich),
         motion: MapCameraAnimated(Duration(milliseconds: 900)),
         origin: MapCameraIntentOrigin.discovery,
@@ -206,6 +211,7 @@ void main() {
         minPause: Duration(milliseconds: 800),
       );
       const MapCameraFollow bearing = MapCameraFollow(
+        kind: MapCameraFollowKind.compassBearing,
         change: MapCameraChange(bearing: 90),
         motion: MapCameraImmediate(),
         origin: MapCameraIntentOrigin.discovery,
@@ -219,6 +225,43 @@ void main() {
       expect(bearing.bearingDeadZoneDegrees, 1.5);
       expect(bearing.minPause, isNull);
       expect(bearing.deadZoneMeters, isNull);
+    });
+  });
+
+  group('Die Identität einer Dauerabsicht', () {
+    test('ist nicht die Herkunft', () {
+      // **Der Grund, warum es dieses Feld gibt.** Beide Dauerabsichten der
+      // Quelle kommen aus `discovery`. Wer den Zustand des Hosts nach der
+      // Herkunft schlüsselt, gibt ihnen einen gemeinsamen Platz: die
+      // Mindestpause des GPS-Folgens legte dann das Kompass-Folgen still, und
+      // dessen Winkel-Totzone bremste den nächsten GPS-Fix.
+      const MapCameraFollow gps = MapCameraFollow(
+        kind: MapCameraFollowKind.userPosition,
+        change: MapCameraChange(center: munich),
+        motion: MapCameraAnimated(Duration(milliseconds: 900)),
+        origin: MapCameraIntentOrigin.discovery,
+        yieldsToUserGesture: false,
+      );
+      const MapCameraFollow bearing = MapCameraFollow(
+        kind: MapCameraFollowKind.compassBearing,
+        change: MapCameraChange(bearing: 90),
+        motion: MapCameraImmediate(),
+        origin: MapCameraIntentOrigin.discovery,
+        yieldsToUserGesture: true,
+      );
+
+      expect(gps.origin, bearing.origin);
+      expect(gps.kind, isNot(bearing.kind));
+    });
+
+    test('kennt genau die zwei Dauerabsichten, die es in der Quelle gibt', () {
+      // Die Tour-Folgeabsicht der Phase 6 fehlt bewusst. Fällt dieser Test,
+      // ist gerade jemand dabei, eine dritte hinzuzunehmen, und dann ist der
+      // Zustand des Hosts je Sorte nachzuziehen.
+      expect(MapCameraFollowKind.values, <MapCameraFollowKind>[
+        MapCameraFollowKind.userPosition,
+        MapCameraFollowKind.compassBearing,
+      ]);
     });
   });
 
@@ -255,6 +298,7 @@ void main() {
           origin: MapCameraIntentOrigin.tours,
         ),
         MapCameraFollow(
+          kind: MapCameraFollowKind.userPosition,
           change: MapCameraChange(center: munich),
           motion: MapCameraAnimated(Duration(milliseconds: 900)),
           origin: MapCameraIntentOrigin.discovery,

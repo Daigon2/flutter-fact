@@ -53,6 +53,7 @@ lib/
 │
 ├── map/
 │   ├── domain/
+│   ├── application/
 │   └── presentation/
 │       └── avatar/
 │
@@ -76,7 +77,10 @@ file and not a folder, the root widget lives in `app/app.dart` and not in
 `app/fact_app.dart`, and `core/async/`, `core/diagnostics/` and
 `services/supabase/` are built and were missing here. `app/onboarding/` and
 `core/anchors/` come from E-26 and E-27 in `REBUILD_STATUS.md`. `map/` was added
-on 2026-08-28 with the map host decision and is empty at the time of writing.
+on 2026-08-28 with the map host decision; `map/application/` followed on
+2026-08-29 with step 12 and is the first `application/` folder in the
+repository. It carries composition, not use cases, see
+`architecture-overview.md` §7.
 
 ## Large feature template
 
@@ -142,6 +146,30 @@ features/settings/
   (rule 18 in `dependency-rules.md`). The 3D avatar stays behind
   `map/presentation/avatar/`, and `webview_flutter` may appear nowhere else
   (rule 19). Unlike `core/anchors/` above, both rules are machine-enforced.
+
+- `map/application/map_host_providers.dart` holds the two providers that give
+  access to the map host, and the boundary between them is drawn by **type**,
+  not by convention:
+
+  | Provider | Type | Who reads it |
+  |---|---|---|
+  | `mapHostProvider` | `Provider<MapHost>` | any feature |
+  | `mapHostRegistryProvider` | `Provider<MapHostRegistry>` | only `map/presentation/` |
+
+  Both return the same object. There are two because `MapHost` has no `attach`:
+  a feature that only sees `mapHostProvider` cannot register itself as the host,
+  and that is enforced by the compiler rather than by a comment or a new check
+  in `tool/check_architecture.dart`.
+
+  The registry is a plain mutable object and deliberately not a `Notifier`.
+  Attaching happens in `initState` and detaching in `dispose` of the map
+  widget, and Riverpod forbids provider mutation in both
+  (`flutter_riverpod-3.4.2/lib/src/core/provider_scope.dart:381-385`). Routing
+  it through `addPostFrameCallback` would open a window in which the map is
+  already on screen while every intent still falls into the void. This is the
+  same decision, for the same reason, as `core/anchors/anchor_registry.dart`,
+  and it is not the manual singleton registry ADR-005 rejects: the provider
+  creates and owns the object, and it dies with the scope.
 
 - Riverpod providers that construct a `data` or `application` implementation
   live next to that implementation, and **only app composition reads them**.

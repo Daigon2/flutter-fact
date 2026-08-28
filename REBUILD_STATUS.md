@@ -192,13 +192,74 @@ Sechs Löcher, keins davon dokumentiert, und alle sechs prägen den Entwurf:
 Folge: der Host führt seinen Animationszustand selbst, und „der Nutzer hat
 angefasst" ist nur als **unerklärte Kamerabewegung** erkennbar.
 
-**Ungemessen und in Schritt 12 zu klären:** ob `moveCamera` eine laufende
-`animateCamera` auf maplibre-native wirklich verwirft. Wenn nicht, springt die
-Kamera beim harten Reset in die Reset-Pose und kriecht danach wieder weg.
-Prüfbar in Minuten: ein `jumpTo` mitten in ein 1500-ms-`flyTo` setzen und
-zusehen.
+7. **Kein dauerhaftes Kamera-Padding.** `screen-map.jsx:1694` setzt
+   `map.setPadding({ top: 320 })` und verschiebt damit den wirksamen
+   Kartenmittelpunkt um 320 Pixel nach unten, damit die Figur im unteren
+   Drittel steht. Im Paket gibt es `setPadding` nicht. `padding` kommt an zwei
+   Stellen vor, `CameraUpdate.newLatLngBounds`
+   (`maplibre_gl_platform_interface-0.26.2/lib/src/camera.dart:106-119`) und
+   `setCameraBounds` (`controller.dart:1811-1826`). Die zweite grenzt den
+   **erlaubten Kartenausschnitt** ein; wer sie für ein Kamera-Padding hält,
+   sperrt das Schieben ein, statt die Kamera zu versetzen. **Entscheidet in
+   den Schritten 15 bis 18**, wo Nutzermarker und Avatar landen und wie ein
+   Neuzentrieren aussieht.
+8. **`maxPitch` und `minPitch` haben kein Gegenstück** (`:1677-1678`), das SDK
+   klemmt die Neigung zoomabhängig und still. Folgenlos, solange die
+   Auto-Neigung bei 58 endet. `dragRotate: false` (`:1681`) ist auf dem Gerät
+   gegenstandslos, es betrifft nur die Maus.
 
-- [ ] 12. MapLibre mit gebackenem Style · [ ] 13. Kamera-Verhalten
+**Ungemessen und beim nächsten Gerätelauf zu klären:** ob `moveCamera` eine
+laufende `animateCamera` auf maplibre-native wirklich verwirft. Wenn nicht,
+springt die Kamera beim harten Reset in die Reset-Pose und kriecht danach
+wieder weg. Prüfbar in Minuten: ein `jumpTo` mitten in ein 1500-ms-`flyTo`
+setzen und zusehen.
+
+### Schritt 12 ist fertig, und drei Dinge daran prägen alles Weitere
+
+**Ein Feature kann den Karten-Host niemals selbst mounten.** Gemessen mit
+einer Wegwerf-Probe: `map_page.dart` darf `map/presentation/` nicht
+importieren, Regel 18 bricht mit Exit-Code 1 ab. Die Kartenfläche kommt als
+Widget-Parameter herein und wird vom Routen-Adapter in `app_routes.dart`
+gesetzt, dasselbe Muster wie `onAudioGuidePressed` aus Schritt 8. Für jedes
+weitere Karten-Bauteil gilt derselbe Weg. Bis zu diesem Schritt war
+`maplibre_gl` in `lib/` an keiner Stelle importiert, Regel 18 und 20 waren
+also nie erprobt.
+
+**Die Grenze zwischen Feature und Host hängt am Typ, nicht an einer
+Konvention.** Zwei Provider zeigen auf dasselbe Objekt: Features lesen
+`Provider<MapHost>` und sehen kein `attach`, `map/presentation` liest
+`Provider<MapHostRegistry>`. Gemessen: der Versuch über den falschen Provider
+bricht `dart analyze` mit Exit-Code 3 ab. Damit ist keine neue Prüfregel
+nötig. Dass die Registry selbst `MapHost` ist, erledigt zwei Dinge nebenbei:
+kein Feature hält je einen veralteten Host, und ein Abonnement auf
+`cameraChanges` überlebt einen Hostwechsel.
+
+**`lib/map/application/` ist das erste `application/`-Verzeichnis im
+Repository**, und sein Inhalt ist Komposition, keine Anwendungsfälle. Als
+Ausnahme in `architecture-overview.md` festgehalten, weil kein anderer Ort
+übrig bleibt: die Domäne darf kein Riverpod, und `presentation/` ist für
+Features durch Regel 18 unerreichbar.
+
+**Vier Entscheidungen, die beim Bauen fielen und im Code begründet sind:** die
+Identität einer Dauerabsicht ist eine geschlossene Aufzählung statt einer
+freien Zeichenkette (ein Tippfehler sähe sonst wie eine neue Dauerabsicht aus
+und liefe ohne jede Totzone); eine Absicht vor der Karte wird fallen gelassen
+und gemeldet, nicht aufgehoben; `zoomend` gibt es im SDK nicht, Ersatz ist
+`onCameraIdle` plus Vergleich mit dem Zoom beim letzten Stillstand; und
+`steeringGrace` steht auf 200 ms, ausdrücklich geschätzt und nicht gemessen.
+
+**Zwei Angaben der Quelle sind dabei als veraltet aufgefallen:** der Kommentar
+bei `screen-map.jsx:1752` nennt 65 oder 75 Grad Neigung, wirksam sind **58**
+(`:1758`). Und der lange Kompassdruck löscht in `:3165` nur `lastCameraPosRef`,
+den Zeitstempel `lastCameraAtRef` fasst er nicht an; `clearsFollowAnchor`
+leert deshalb den Ort und lässt den Zeitpunkt stehen.
+
+**Sichtbar anders als die PWA:** der native Attributions-Knopf bleibt stehen.
+Die PWA setzt `attributionControl: false`, `maplibre_gl 0.26.2` hat dafür
+keinen Schalter, nur Position und Rand. Nicht behoben, weil eine Attribution
+auch rechtlich hingehört.
+
+- [x] 12. MapLibre mit gebackenem Style · [ ] 13. Kamera-Verhalten
 - [ ] 14. Kompass-Rotation · [ ] 15. Cluster-Layer · [ ] 16. Einzel-Marker
 - [ ] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
 - [ ] 19. Top-Chrome · [ ] 20. Sammel-Erlebnis

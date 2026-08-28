@@ -1,0 +1,210 @@
+/// Der Weg, auf dem ein Feature an den Karten-Host kommt, und die Stelle, an
+/// der der Host sich einklinkt.
+///
+/// ## Zwei Provider auf dasselbe Objekt, und die Grenze hängt am Typ
+///
+/// [mapHostProvider] ist auf `MapHost` typisiert und für Features gedacht.
+/// [mapHostRegistryProvider] ist auf [MapHostRegistry] typisiert und wird nur
+/// aus `lib/map/presentation/` gelesen. Beide liefern **dasselbe Objekt**.
+///
+/// Es sind deshalb zwei und nicht einer, weil `MapHost` kein [MapHostRegistry.attach]
+/// hat: ein Feature, das nur [mapHostProvider] sieht, **kann** sich nicht als
+/// Host eintragen, und das verhindert der Übersetzer und nicht eine Konvention.
+/// Ein einzelner Provider auf [MapHostRegistry] mit dem Kommentar „bitte nur
+/// Absichten abgeben" wäre eine Bitte, und der erste Schritt, in dem jemand
+/// schnell die Kamera braucht, wäre der letzte, in dem sie eingehalten wird.
+/// Eine neue Prüfregel im Skript braucht es dafür nicht.
+///
+/// ## Warum die Registry ein gewöhnliches Objekt ist und kein Notifier
+///
+/// Ein- und Ausklinken passiert im `initState` und im `dispose` des
+/// Kartenwidgets, und **an beiden Stellen ist eine Provider-Mutation
+/// verboten**: `_debugAssertNotificationAllowed`
+/// (`riverpod-3.4.2/lib/src/core/element.dart:871`) wirft „Tried to modify a
+/// provider while the widget tree was building", und die Meldung nennt beide
+/// ausdrücklich (`flutter_riverpod-3.4.2/lib/src/core/provider_scope.dart:381-385`).
+/// In Debug bricht es, im Release passiert es still, was schlimmer ist.
+///
+/// Der übliche Ausweg, ein `addPostFrameCallback`, hat einen Preis, den man
+/// nicht sieht: die Karte steht bereits, der Host ist aber noch nicht
+/// eingetragen, und **jede Absicht in diesem Fenster fällt auf den untätigen
+/// Standard**. Ein veränderliches Objekt hinter einem `Provider` hat dieses
+/// Fenster nicht, weil nichts benachrichtigt werden muss.
+///
+/// Dieses Repository hat dieselbe Entscheidung aus demselben Grund schon
+/// einmal getroffen, siehe `lib/core/anchors/anchor_registry.dart:4-9`.
+/// **ADR-005 verbietet die globale statische Registry, nicht diese:** hier
+/// erzeugt und besitzt der Provider das Objekt, es stirbt mit seinem Scope, und
+/// es gibt kein `static`-Feld.
+library;
+
+import 'dart:async';
+
+import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
+import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
+import 'package:fact_app/map/domain/map_camera.dart';
+import 'package:fact_app/map/domain/map_camera_intent.dart';
+import 'package:fact_app/map/domain/map_host.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// Nimmt Absichten entgegen und reicht sie an den eingeklinkten Host weiter.
+///
+/// ## Warum die Registry selbst ein [MapHost] ist
+///
+/// Sie könnte auch nur `MapHost? get host` anbieten. Dass sie stattdessen
+/// selbst die Fassade erfüllt, löst zwei Dinge auf einmal:
+///
+/// 1. **Ein Feature hält nie einen veralteten Host.** Wer sich den Host einmal
+///    holt und merkt, hält ihn über einen Bildschirmwechsel hinweg fest. Über
+///    die Registry gibt es diesen Zeiger gar nicht erst.
+/// 2. **Ein Abonnement auf [cameraChanges] überlebt den Wechsel des Hosts.**
+///    Der Strom gehört der Registry, nicht dem Host; sie leitet nur weiter.
+///    Ein Feature, das direkt am Host abonniert hätte, hielte nach dem
+///    Abmelden und Wiederanmelden ein totes Abonnement, und zwar ohne Fehler:
+///    der Strom wäre einfach still.
+final class MapHostRegistry implements MapHost {
+  /// Erzeugt eine leere Registry. [diagnostics] bekommt jede verlorene Absicht.
+  MapHostRegistry({required DiagnosticSink diagnostics})
+    : _diagnostics = diagnostics;
+
+  /// Gemeldet, wenn etwas den Host braucht und keiner eingeklinkt ist.
+  ///
+  /// Getrennt von [suppressedEvent], und das ist der Punkt: „niemand hat
+  /// zugehört" ist ein Verdrahtungsfehler, „der Host hat abgelehnt" ist der
+  /// geplante Betrieb. Ein gemeinsamer Name macht die beiden in jeder späteren
+  /// Auswertung ununterscheidbar, und die Trennung kostet jetzt eine Zeile.
+  static const String missingHostEvent = 'map.host.missing';
+
+  /// Gemeldet, wenn der eingeklinkte Host eine Absicht unterdrückt.
+  ///
+  /// Der Name steht hier und nicht beim Host, damit die beiden Ereignisse
+  /// nebeneinander stehen und niemand ein drittes erfindet, das dasselbe
+  /// meint. Gesendet wird er in `lib/map/presentation/`.
+  static const String suppressedEvent = 'map.host.intent_suppressed';
+
+  final DiagnosticSink _diagnostics;
+
+  /// Der Strom gehört der Registry und nicht dem Host, siehe Klassenkommentar.
+  ///
+  /// `broadcast`, weil mehrere Features gleichzeitig zusehen dürfen und keiner
+  /// von ihnen den Strom für die anderen verbraucht.
+  final StreamController<MapCameraView> _cameraChanges =
+      StreamController<MapCameraView>.broadcast();
+
+  MapHost? _host;
+  StreamSubscription<MapCameraView>? _subscription;
+
+  /// Klinkt [host] ein. Ein bereits eingeklinkter wird ersetzt.
+  ///
+  /// „Der letzte gewinnt" ist dieselbe Antwort wie in
+  /// `AnchorRegistry.register`, und aus demselben Grund: beim Wechsel zweier
+  /// Bildschirme hängen kurzzeitig beide im Baum, und der neuere ist der
+  /// sichtbare.
+  void attach(MapHost host) {
+    if (identical(_host, host)) {
+      return;
+    }
+    unawaited(_subscription?.cancel());
+    _host = host;
+    _subscription = host.cameraChanges.listen(_cameraChanges.add);
+  }
+
+  /// Klinkt [host] aus, aber nur, wenn er wirklich der eingeklinkte ist.
+  ///
+  /// **Die Identitätsprüfung ist eine bereits bezahlte Lehre aus Schritt 11.**
+  /// Beim Tourende meldete die neue Tab-Leiste ihre Anker an, **bevor** die
+  /// alte entsorgt war. Ein `detach` ohne Prüfung ersetzt in dieser Lage den
+  /// frisch eingetragenen Host wieder durch den untätigen Standard, und die
+  /// Karte ist danach still tot: kein Fehler, keine Meldung, nur keine
+  /// Kamerabewegung mehr. `lib/core/anchors/anchor_target.dart:29-38` und
+  /// `:68-75` zeigen die Fassung, die trägt, samt dem Grund, warum der
+  /// Aufrufer sich die Registry merkt, statt sie im `dispose` nachzuschlagen.
+  ///
+  /// Gibt zurück, ob wirklich ausgeklinkt wurde.
+  bool detach(MapHost host) {
+    if (!identical(_host, host)) {
+      return false;
+    }
+    unawaited(_subscription?.cancel());
+    _subscription = null;
+    _host = null;
+    return true;
+  }
+
+  /// Schließt den Strom. Ruft der Provider beim Entsorgen seines Scopes.
+  void dispose() {
+    unawaited(_subscription?.cancel());
+    _subscription = null;
+    _host = null;
+    unawaited(_cameraChanges.close());
+  }
+
+  @override
+  MapCameraView? get camera {
+    final MapHost? host = _host;
+    if (host == null) {
+      _reportMissing('camera');
+      return null;
+    }
+    return host.camera;
+  }
+
+  /// Meldet jede Kamerabewegung, auch über einen Wechsel des Hosts hinweg.
+  ///
+  /// **Ohne Host ist dieser Strom still und meldet das nicht.** Das ist der
+  /// eine Zugriff, bei dem nichts verloren geht: das Abonnement bleibt gültig
+  /// und bekommt seine Werte, sobald eine Karte steht. Ein Ereignis dafür wäre
+  /// kein Fehlerhinweis, sondern der Normalfall jedes Bildschirmaufbaus, und
+  /// ein Ereignis, das im Normalbetrieb feuert, liest nach der dritten Woche
+  /// niemand mehr.
+  @override
+  Stream<MapCameraView> get cameraChanges => _cameraChanges.stream;
+
+  @override
+  void submitIntent(MapCameraIntent intent) {
+    final MapHost? host = _host;
+    if (host == null) {
+      _reportMissing('submitIntent', intent: intent);
+      return;
+    }
+    host.submitIntent(intent);
+  }
+
+  /// Meldet den fehlenden Host.
+  ///
+  /// Nur flache Zeichenketten, wie [DiagnosticEvent] es verlangt, und **keine
+  /// Koordinaten**: `docs/engineering/security.md` §6 verbietet genaue
+  /// Standortangaben im Log, und der Mittelpunkt einer Absicht ist regelmäßig
+  /// die Nutzerposition.
+  void _reportMissing(String access, {MapCameraIntent? intent}) {
+    _diagnostics.report(
+      DiagnosticEvent(missingHostEvent, <String, String>{
+        'access': access,
+        if (intent != null) 'origin': intent.origin.name,
+        if (intent != null) 'rank': '${intent.rank}',
+      }),
+    );
+  }
+}
+
+/// Die Registry, gelesen ausschließlich von `lib/map/presentation/`.
+///
+/// Wer hier landet, weil er die Kamera bewegen will, ist falsch: dafür gibt es
+/// [mapHostProvider] und eine Absicht.
+final Provider<MapHostRegistry> mapHostRegistryProvider =
+    Provider<MapHostRegistry>((ref) {
+      final registry = MapHostRegistry(
+        diagnostics: ref.watch(diagnosticSinkProvider),
+      );
+      ref.onDispose(registry.dispose);
+      return registry;
+    });
+
+/// Der Karten-Host, wie ein Feature ihn sieht.
+///
+/// Immer vorhanden und nie `null`: steht keine Karte, nimmt die Registry die
+/// Absicht entgegen und meldet, dass niemand zugehört hat. Ein Feature muss
+/// deshalb nirgends prüfen, ob es schon eine Karte gibt.
+final Provider<MapHost> mapHostProvider = Provider<MapHost>(
+  (ref) => ref.watch(mapHostRegistryProvider),
+);

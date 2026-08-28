@@ -52,6 +52,7 @@ import 'package:fact_app/features/identity/presentation/pages/signup_page.dart';
 import 'package:fact_app/features/identity/presentation/pages/splash_page.dart';
 import 'package:fact_app/features/profile/presentation/pages/profile_page.dart';
 import 'package:fact_app/features/settings/presentation/widgets/audio_activation_dialog.dart';
+import 'package:fact_app/map/presentation/map_surface.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
@@ -139,7 +140,17 @@ class MapRoute extends GoRouteData with $MapRoute {
   const MapRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) => const MapPage();
+  Widget build(BuildContext context, GoRouterState state) => const MapPage(
+    // Kompositions-Adapter auf App-Ebene, Regel 10 der `dependency-rules.md`,
+    // dasselbe Muster wie `onAudioGuidePressed` weiter unten.
+    //
+    // **Er ist hier nicht bequem, sondern notwendig:** Regel 18 verbietet
+    // jedem Feature den Import von `map/presentation/`, damit die Kamera beim
+    // Karten-Host bleibt. `discovery` bekommt die Kartenfläche deshalb
+    // hereingereicht und erfährt nicht, woraus sie besteht. Ein Feature, das
+    // diese Zeile bei sich nachbaut, bricht den Architektur-Check.
+    mapSurface: MapSurface(initialCamera: MapPage.placeholderCamera),
+  );
 }
 
 /// Wurzelseite des Fakten-Tabs.
