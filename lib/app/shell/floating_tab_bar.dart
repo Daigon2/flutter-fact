@@ -42,7 +42,37 @@ class FloatingTabBar extends ConsumerWidget {
   /// `chrome.jsx:70`: `bottom: max(14px, env(safe-area-inset-bottom, 0px))`.
   /// Also **Maximum**, keine Summe: auf einem Gerät mit Home-Indicator liegt
   /// die Leiste auf der sicheren Kante, nicht 14px darüber.
+  ///
+  /// **Nachgetragen am 28.08.2026, weil die Rechnung der Quelle anders lautet
+  /// als dieser Vergleich vermuten lässt.** Das `bottom` der Quelle misst
+  /// nicht ab der Bildschirmkante, sondern ab der Unterkante der
+  /// `.app-frame`, und die ist auf dem Telefon schon um die Safe Area
+  /// eingerückt: `index.html:101-107` legt `padding-bottom:
+  /// env(safe-area-inset-bottom)` an den `body` und deckelt `#root` auf
+  /// `100dvh` minus beide Einzüge, `chrome.jsx:137` gibt dem Rahmen darin
+  /// `height: 100%` und `position: relative`. Die PWA zählt die Safe Area
+  /// damit **zweimal**: auf einem Gerät mit 34 Pixel Home-Indicator schwebt
+  /// ihre Leiste 68 statt 48 Pixel über der Kante.
+  ///
+  /// Übernommen ist deshalb die Absicht und nicht die Arithmetik. Das
+  /// Maximum ab der Bildschirmkante ergibt genau das, was die Quelle sagen
+  /// will. Wer beim nächsten Paritätsabgleich `max(14px, env(...))` liest und
+  /// nachrechnet, findet hier den Grund für die Abweichung.
   static const double minBottomInset = 14;
+
+  /// Höhe der Pille bei Systemschriftgröße 1.0.
+  ///
+  /// 2x1 Rahmen, 2x8 Innenabstand und die Spalte aus 2 + 30 + 2 + 10 + 2
+  /// (`chrome.jsx:81`, `:91`, `:92`, `:96`, `:114-117`).
+  ///
+  /// **Kein verlässliches Maß für andere Schriftgrößen.** Die Beschriftung
+  /// wächst mit der Systemschrift und bricht dabei um: gemessen am 28.08.2026
+  /// sind es bei Skalierung 2.0 auf 360, 375 und 390 Pixeln Breite jeweils 94
+  /// statt 64, weil "Challenge" dort zweizeilig wird. Wer die Oberkante der
+  /// Leiste genau braucht, misst sie über `ShellAnchors.bottomBar`. Diese
+  /// Konstante taugt als Ersatzwert, solange noch nichts gemessen ist, und als
+  /// Beleg dafür, woraus sich die 64 zusammensetzen.
+  static const double nominalPillHeight = 64;
 
   /// Seitenabstand der Leiste, `chrome.jsx:71`.
   static const double sideInset = 12;

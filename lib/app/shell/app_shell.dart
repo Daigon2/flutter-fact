@@ -1,6 +1,8 @@
 import 'package:fact_app/app/shell/floating_tab_bar.dart';
 import 'package:fact_app/app/shell/mini_player_slot.dart';
+import 'package:fact_app/app/shell/shell_anchors.dart';
 import 'package:fact_app/app/shell/shell_tab.dart';
+import 'package:fact_app/core/anchors/anchor_target.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -55,15 +57,21 @@ class AppShell extends StatelessWidget {
     return Scaffold(
       extendBody: true,
       body: navigationShell,
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const MiniPlayerSlot(),
-          FloatingTabBar(
-            current: ShellTab.values[navigationShell.currentIndex],
-            onSelected: _select,
-          ),
-        ],
+      // Der Anker zeichnet nichts und ändert nichts am Layout. Er macht die
+      // Oberkante dieses Rahmens messbar, damit das Tutorial-Chrome darüber
+      // liegen kann, ohne die Höhe der Leiste zu raten. Siehe `ShellAnchors`.
+      bottomNavigationBar: AnchorTarget(
+        anchorId: ShellAnchors.bottomBar,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const MiniPlayerSlot(),
+            FloatingTabBar(
+              current: ShellTab.values[navigationShell.currentIndex],
+              onSelected: _select,
+            ),
+          ],
+        ),
       ),
     );
   }

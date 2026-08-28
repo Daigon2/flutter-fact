@@ -16,6 +16,7 @@ import 'package:fact_app/app/onboarding/widgets/tour_hero_view.dart';
 import 'package:fact_app/app/onboarding/widgets/tour_highlight.dart';
 import 'package:fact_app/app/routing/app_routes.dart';
 import 'package:fact_app/app/shell/app_shell.dart';
+import 'package:fact_app/app/shell/floating_tab_bar.dart';
 import 'package:fact_app/app/shell/shell_tab.dart';
 import 'package:fact_app/core/anchors/anchor_id.dart';
 import 'package:fact_app/core/anchors/anchor_registry.dart';
@@ -617,10 +618,16 @@ void main() {
     // Testrahmen selbst: `tester.view.padding` ist standardmaessig null, es
     // gibt dort also gar keine Systemleiste, gegen die etwas stossen koennte.
     //
-    // Die Quelle misst ihre 18 und 24 und 50 Pixel **innerhalb** der
-    // `.app-frame`, und die traegt laut `index.html:101-107` bereits
-    // `padding-top` und `padding-bottom` aus `env(safe-area-inset-*)`. Ein
-    // `Positioned` misst dagegen ab der Bildschirmkante. Deshalb der Zuschlag.
+    // Oben bleibt es ein Zuschlag: die Quelle misst ihre 18 Pixel
+    // **innerhalb** der `.app-frame`, und die traegt laut `index.html:101-107`
+    // bereits `padding-top` aus `env(safe-area-inset-top)`. Ein `Positioned`
+    // misst dagegen ab der Bildschirmkante.
+    //
+    // Unten gibt es diesen Zuschlag seit dem 28.08.2026 nicht mehr, und das
+    // ist kein Rueckschritt: das untere Chrome haengt jetzt an der gemessenen
+    // Oberkante der Tab-Leiste, und die haelt selbst `max(14, Safe Area)`
+    // Abstand nach unten. Die Gestenleiste steckt also im gemessenen Wert.
+    // Ein eigener Zuschlag waere doppelt.
     const statusBar = 141.0;
     const gestureBar = 48.0;
 
@@ -638,21 +645,133 @@ void main() {
       await tester.pumpAndSettle();
 
       final screen = tester.getSize(find.byType(TourOverlay));
+      final bar = tester.getRect(find.byType(FloatingTabBar));
 
       expect(
         tester.getRect(find.byType(TourSkipButton)).top,
         statusBar + TourSkipButton.inset,
         reason: 'Ueberspringen unter der Statusleiste',
       );
+      // Vorbedingung der beiden folgenden Zusicherungen, keine Erwartung an
+      // das Tutorial: die Leiste selbst weicht der Gestenleiste aus.
       expect(
-        screen.height - tester.getRect(find.byType(TourTapHint)).bottom,
-        gestureBar + TourTapHint.bottom,
-        reason: 'Tipp-Hinweis in der Gestenleiste',
+        screen.height - bar.top,
+        gestureBar + FloatingTabBar.nominalPillHeight,
+        reason: 'Tab-Leiste in der Gestenleiste',
       );
       expect(
         screen.height - tester.getRect(find.byType(TourStepDots)).bottom,
-        gestureBar + TourStepDots.bottom,
-        reason: 'Punktreihe in der Gestenleiste',
+        gestureBar +
+            FloatingTabBar.nominalPillHeight +
+            TourBottomChrome.dotsGap,
+        reason: 'Punktreihe in der Gestenleiste oder in der Leiste',
+      );
+      expect(
+        screen.height - tester.getRect(find.byType(TourTapHint)).bottom,
+        gestureBar +
+            FloatingTabBar.nominalPillHeight +
+            TourBottomChrome.dotsGap +
+            TourBottomChrome.gapToTapHint,
+        reason: 'Tipp-Hinweis in der Gestenleiste oder in der Leiste',
+      );
+    });
+  });
+
+  group('Unteres Chrome ueber der Tab-Leiste', () {
+    // Am 28.08.2026 vom Product Owner entschieden, in Kenntnis dessen, dass es
+    // von der PWA abweicht: Punktreihe und Tipp-Hinweis liegen **ueber** der
+    // Tab-Leiste. Die Quelle setzt beide auf `bottom: 24` und `bottom: 50`
+    // (`screen-tour.jsx:310` und `:327`) und legt sie damit zwischen die
+    // Tab-Symbole.
+    //
+    // Gemessen statt `takeException()`: eine Ueberlappung ist kein Ueberlauf.
+    // `Stack` legt zwei Kinder ohne jede Meldung uebereinander, genau wie ein
+    // Zeilenumbruch keiner ist. Nur ein Rechteckvergleich findet das.
+    //
+    // Die Hoehe der Leiste ist dabei der ganze Punkt: sie ist bei Skalierung
+    // 1.0 genau 78 Pixel hoch und bei 2.0 schon 108, weil "Challenge"
+    // umbricht. Eine feste Zahl im Chrome waere bei einer der beiden Groessen
+    // falsch, deshalb misst `TourOverlay` die Leiste.
+    for (final scale in <double>[1, 2]) {
+      for (final size in <Size>[
+        Size(360, 640),
+        Size(375, 667),
+        Size(390, 844),
+      ]) {
+        // Schritt 1 ist ein Hero-Schritt und fuellt den Bildschirm, Schritt 2
+        // ein Blasen-Schritt. Das Chrome liegt auf beiden.
+        for (final step in <int>[1, 2]) {
+          final label =
+              'Skalierung $scale auf ${size.width.toInt()}x'
+              '${size.height.toInt()}, Schritt $step';
+          testWidgets('$label: Punktreihe, Hinweis und Leiste ueberlappen '
+              'sich nicht', (tester) async {
+            useTextScale(tester, scale);
+            await pumpApp(tester, size: size);
+            await goToStep(tester, step);
+
+            final rects = <String, Rect>{
+              'Tab-Leiste': tester.getRect(find.byType(FloatingTabBar)),
+              'Punktreihe': tester.getRect(find.byType(TourStepDots)),
+              'Tipp-Hinweis': tester.getRect(find.byType(TourTapHint)),
+            };
+
+            // 1. Paarweise, damit die Meldung sagt, welche zwei es sind.
+            final names = rects.keys.toList();
+            for (var i = 0; i < names.length; i++) {
+              for (var j = i + 1; j < names.length; j++) {
+                final a = rects[names[i]]!;
+                final b = rects[names[j]]!;
+                expect(
+                  a.overlaps(b),
+                  isFalse,
+                  reason: '$label: ${names[i]} $a ueberlappt ${names[j]} $b',
+                );
+              }
+            }
+
+            // 2. Und in der richtigen Reihenfolge. Ohne diese Zusicherung
+            //    wuerde ein Chrome, das aus dem Bildschirm heraus nach unten
+            //    rutscht, die Pruefung oben bestehen.
+            expect(
+              rects['Punktreihe']!.bottom,
+              lessThanOrEqualTo(rects['Tab-Leiste']!.top),
+              reason: '$label: Punktreihe nicht ueber der Leiste',
+            );
+            expect(
+              rects['Tipp-Hinweis']!.bottom,
+              lessThanOrEqualTo(rects['Punktreihe']!.top),
+              reason: '$label: Tipp-Hinweis nicht ueber der Punktreihe',
+            );
+
+            // 3. Nichts haengt ausserhalb des Bildschirms.
+            for (final entry in rects.entries) {
+              expect(
+                entry.value.top,
+                greaterThanOrEqualTo(0),
+                reason: '$label: ${entry.key} oben heraus',
+              );
+              expect(
+                entry.value.bottom,
+                lessThanOrEqualTo(size.height),
+                reason: '$label: ${entry.key} unten heraus',
+              );
+            }
+          });
+        }
+      }
+    }
+
+    testWidgets('der Abstand zwischen Punktreihe und Tipp-Hinweis bleibt der '
+        'der Quelle', (tester) async {
+      await pumpApp(tester);
+
+      // 50 minus 24 aus `screen-tour.jsx:310` und `:327`. Nur der gemeinsame
+      // Bezugspunkt darunter ist neu, der Abstand der beiden zueinander nicht.
+      expect(
+        tester.getRect(find.byType(TourStepDots)).bottom -
+            tester.getRect(find.byType(TourTapHint)).bottom,
+        TourBottomChrome.gapToTapHint,
       );
     });
   });

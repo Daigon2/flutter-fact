@@ -5,6 +5,7 @@ import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/onboarding/onboarding_providers.dart';
 import 'package:fact_app/app/onboarding/tour_store.dart';
 import 'package:fact_app/app/shell/floating_tab_bar.dart';
+import 'package:fact_app/app/shell/shell_anchors.dart';
 import 'package:fact_app/app/shell/shell_tab.dart';
 import 'package:fact_app/core/anchors/anchor_id.dart';
 import 'package:fact_app/core/anchors/anchor_registry.dart';
@@ -68,6 +69,7 @@ void main() {
       // Absichtlich die vollständige Menge und keine Teilmengenprüfung: eine
       // unerwartete Anmeldung ist genauso ein Fund wie eine fehlende.
       expect(registryOf(tester).debugRegisteredIds, <AnchorId>{
+        const AnchorId('shell-bottom-bar'),
         const AnchorId('tab-modus'),
         const AnchorId('tab-wallet'),
         const AnchorId('tab-challenge'),
@@ -94,6 +96,23 @@ void main() {
       // Nebeneinander, in der Reihenfolge von `ShellTab`.
       expect(challenge.left, closeTo(wallet.right, 0.01));
       expect(wallet.top, challenge.top);
+    });
+
+    testWidgets('der Anker der unteren Leiste deckt sie ganz ab', (
+      tester,
+    ) async {
+      // Er ist kein Ziel des Tutorials, sondern seine Messstelle: das untere
+      // Chrome des Tutorials liegt über der Leiste und muss dafür wissen, wo
+      // ihre Oberkante ist. Siehe `ShellAnchors.bottomBar`.
+      await pumpApp(tester);
+
+      final anker = registryOf(tester).rectOf(ShellAnchors.bottomBar)!;
+      final leiste = tester.getRect(find.byType(FloatingTabBar));
+
+      // Deckungsgleich, solange der Mini-Player keine Höhe hat. Bekommt er
+      // eine, wächst der Anker nach oben mit, und das Tutorial-Chrome weicht
+      // ihm ohne weitere Änderung aus.
+      expect(anker, leiste);
     });
 
     testWidgets('ein Tabwechsel lässt die Tab-Anker auflösbar', (tester) async {

@@ -8,6 +8,7 @@ import 'package:fact_app/app/onboarding/widgets/tour_chrome.dart';
 import 'package:fact_app/app/onboarding/widgets/tour_hero_view.dart';
 import 'package:fact_app/app/onboarding/widgets/tour_highlight.dart';
 import 'package:fact_app/app/onboarding/widgets/tour_palette.dart';
+import 'package:fact_app/app/shell/shell_anchors.dart';
 import 'package:fact_app/core/anchors/anchor_registry.dart';
 import 'package:fact_app/core/anchors/anchor_scope.dart';
 import 'package:flutter/material.dart';
@@ -79,6 +80,14 @@ class _TourOverlayState extends ConsumerState<TourOverlay> {
   /// Die zuletzt gemessene Bezugsfläche.
   Size? _frameSize;
 
+  /// Das zuletzt gemessene Rechteck der unteren Shell-Leiste, oder `null`,
+  /// solange noch nichts gemessen ist.
+  ///
+  /// Aus ihm kommt der einzige Wert, den das untere Chrome braucht: die
+  /// Oberkante der Leiste. Warum gemessen und nicht gerechnet, steht bei
+  /// [TourBottomChrome].
+  Rect? _bottomBarRect;
+
   AnchorRegistry? _registry;
   bool _measureScheduled = false;
 
@@ -118,7 +127,13 @@ class _TourOverlayState extends ConsumerState<TourOverlay> {
         ? null
         : registry.rectOf(step.anchorId);
     final frame = registry?.frameSize;
-    if (rect == _targetRect && frame == _frameSize) {
+    // Die untere Shell-Leiste ist kein Ziel eines Schritts, sondern die
+    // Messstelle für das Chrome darüber. Sie wird bei jedem Lauf mitgemessen,
+    // weil sie mit der Systemschriftgröße wächst.
+    final bottomBar = registry?.rectOf(ShellAnchors.bottomBar);
+    if (rect == _targetRect &&
+        frame == _frameSize &&
+        bottomBar == _bottomBarRect) {
       // Ohne diesen Vergleich liefe jeder Messlauf in ein `setState`, das den
       // nächsten Frame anfordert, und die Suite käme aus `pumpAndSettle` nie
       // zurück.
@@ -127,6 +142,7 @@ class _TourOverlayState extends ConsumerState<TourOverlay> {
     setState(() {
       _targetRect = rect;
       _frameSize = frame;
+      _bottomBarRect = bottomBar;
     });
   }
 
@@ -158,6 +174,12 @@ class _TourOverlayState extends ConsumerState<TourOverlay> {
     final frameSize = _frameSize ?? fallbackSize;
     final strings = ref.watch(appStringsProvider);
     final step = TourSteps.all[_index];
+    // Der Abstand der Leistenoberkante vom unteren Bildschirmrand. Ohne
+    // Messung der Ersatzwert, siehe `TourBottomChrome.fallbackBarInset`.
+    final barRect = _bottomBarRect;
+    final barInset = barRect == null
+        ? TourBottomChrome.fallbackBarInset(context)
+        : frameSize.height - barRect.top;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -182,11 +204,19 @@ class _TourOverlayState extends ConsumerState<TourOverlay> {
               step: anchored,
               strings: strings,
               frameSize: frameSize,
+              bottomReserve: TourBottomChrome.bubbleReserve(context, barInset),
             ),
           },
           TourSkipButton(label: strings.text('tour.skip'), onSkip: _skip),
-          TourTapHint(label: strings.text('tour.tapHint')),
-          TourStepDots(count: TourSteps.count, current: _index),
+          TourTapHint(
+            label: strings.text('tour.tapHint'),
+            bottom: TourBottomChrome.tapHintBottom(barInset),
+          ),
+          TourStepDots(
+            count: TourSteps.count,
+            current: _index,
+            bottom: TourBottomChrome.dotsBottom(barInset),
+          ),
         ],
       ),
     );
@@ -199,6 +229,7 @@ class _TourOverlayState extends ConsumerState<TourOverlay> {
     required TourAnchoredStep step,
     required AppStrings strings,
     required Size frameSize,
+    required double bottomReserve,
   }) {
     final rect = _targetRect;
     final geometry = TourArrowGeometry.forTarget(
@@ -222,6 +253,7 @@ class _TourOverlayState extends ConsumerState<TourOverlay> {
         ),
       TourBubble(
         top: step.bubbleTop,
+        bottomReserve: bottomReserve,
         counter: strings.text(
           'tour.stepCounter',
           params: <String, String>{

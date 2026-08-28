@@ -123,6 +123,14 @@ void main() {
       // Pille mit 64. Der Abstand nach unten ist max(14, Safe Area), in der
       // Testumgebung ohne Safe Area also 14.
       expect(tester.getSize(find.byType(FloatingTabBar)).height, 78);
+      // Dieselbe Zahl noch einmal, diesmal gegen die beiden Konstanten. Sie
+      // nagelt `nominalPillHeight` fest: dieser Wert ist der Ersatzwert des
+      // Tutorial-Chrome, solange die Leiste noch nicht gemessen ist, und er
+      // würde sonst still von der echten Pille wegdriften.
+      expect(
+        tester.getSize(find.byType(FloatingTabBar)).height,
+        FloatingTabBar.minBottomInset + FloatingTabBar.nominalPillHeight,
+      );
     });
   });
 

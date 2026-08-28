@@ -18,6 +18,7 @@ class TourBubble extends StatelessWidget {
   /// Erzeugt die Blase eines regulären Schritts.
   const TourBubble({
     required this.top,
+    required this.bottomReserve,
     required this.counter,
     required this.title,
     required this.body,
@@ -47,37 +48,27 @@ class TourBubble extends StatelessWidget {
   /// Der zweite Teil desselben Filters.
   static const double saturation = 1.4;
 
-  /// Wie viel Platz am unteren Rand der Bezugsfläche reserviert bleibt, egal
-  /// wie hoch der Blaseninhalt wird, damit die Blase nie über `TourTapHint`
-  /// oder `TourStepDots` wächst (`bottom: 50` und `bottom: 24`,
-  /// `tour_chrome.dart`).
-  ///
-  /// Kein gemessener Wert: beide liegen als eigene `Positioned`-Ebenen im
-  /// selben `Stack` wie die Blase (`tour_overlay.dart`), eine echte Messung
-  /// ihrer tatsächlichen Höhe bräuchte eine zweite Messphase wie die des
-  /// `TourOverlay` selbst, siehe dessen Kopfkommentar "Wann gemessen wird".
-  /// Stattdessen ein Sicherheitswert: `TourTapHint.bottom` (50) plus die
-  /// doppelte Zeilenhöhe seines Textes bei Skalierung 2.0 (gemessen an "Tipp
-  /// irgendwo für weiter": eine Zeile ist 29 Pixel hoch bei 375×667, das
-  /// Doppelte deckt einen Umbruch bei einer längeren Übersetzung ab) plus
-  /// gut 20 Pixel Luft zur Punktreihe darunter.
-  ///
-  /// Deckt Skalierung bis 2.0 ab, Androids Maximum (siehe
-  /// `test/support/app_fonts.dart`). Bei höherer Skalierung, die iOS erlaubt,
-  /// oder auf einem noch flacheren Bildschirm bleibt für Schritte mit
-  /// `bubbleTop: 380` nur noch wenig Raum. Das ist kein Rückfall in stilles
-  /// Abschneiden, weil die Blase dann scrollt, aber eine gestalterisch
-  /// bessere Lösung (kleinere Schrift, ein anderer `bubbleTop`-Wert je
-  /// Schritt) übersteigt diese Änderung und ist als offene Frage gemeldet,
-  /// nicht stillschweigend entschieden.
-  static const double bottomChromeReserve = 130;
-
-  /// Die Blase darf nie unter diese Höhe gepresst werden, sonst wäre selbst
-  /// die Schrittanzeige nicht mehr lesbar.
-  static const double minHeight = 90;
-
   /// Abstand der Blasenoberkante von der Oberkante der Bezugsfläche.
   final double top;
+
+  /// Wie viel Platz am unteren Rand der Bezugsfläche reserviert bleibt, egal
+  /// wie hoch der Blaseninhalt wird, damit die Blase nie unter `TourTapHint`
+  /// oder `TourStepDots` gerät.
+  ///
+  /// Kommt aus `TourBottomChrome.bubbleReserve` und damit aus der gemessenen
+  /// Oberkante der Tab-Leiste. Vorher stand hier eine Konstante von 130
+  /// Pixeln. Sie ist gefallen, weil das untere Chrome seit dem 28.08.2026
+  /// über der Leiste liegt: der freizuhaltende Bereich hängt seither an der
+  /// Höhe der Leiste und damit an der Systemschriftgröße.
+  ///
+  /// **Was das kostet, ehrlich beziffert.** Der Bereich wächst um die Höhe
+  /// der Leiste, und um genau diesen Betrag schrumpft die sichtbare Blase
+  /// dort, wo sie ohnehin schon an der Grenze war: auf 375x667 bei
+  /// Systemschrift 2.0 von 157 auf 104 Pixel, auf 360x640 von 130 auf 77.
+  /// Abgeschnitten wird deshalb nichts, der Inhalt bleibt über den
+  /// `SingleChildScrollView` erreichbar. Bei Systemschrift 1.0 ändert sich
+  /// auf 375x667 nichts: Schritt 3 braucht dort 148 Pixel und bekommt 150,5.
+  final double bottomReserve;
 
   /// Die Schrittanzeige, fertig formatiert, etwa `SCHRITT 5 VON 9`.
   final String counter;
@@ -135,11 +126,16 @@ class TourBubble extends StatelessWidget {
     // Höhe offen, wenn `bottom` fehlt) und der `Stack` clippt das lautlos,
     // ohne jede Überlauf-Meldung, siehe den Kopfkommentar von
     // `TourHeroView` für dasselbe Problem beim Hero-Schritt.
+    //
+    // Der frühere Boden von 90 Pixeln ist dabei gefallen, und das ist kein
+    // Versehen: seit das untere Chrome über der Tab-Leiste liegt, ist der
+    // freizuhaltende Bereich auf 360x640 bei Systemschrift 2.0 größer als
+    // der Platz unter `bubbleTop: 380`. Ein Boden hätte die Blase dort um
+    // drei Pixel unter den Tipp-Hinweis gedrückt. Von den beiden Zusagen
+    // "nie flacher als 90" und "nie unter dem Tipp-Hinweis" ist die zweite
+    // die sichtbare und die prüfbare, deshalb gewinnt sie.
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final maxHeight = math.max(
-      minHeight,
-      screenHeight - top - bottomChromeReserve,
-    );
+    final maxHeight = math.max(0.0, screenHeight - top - bottomReserve);
 
     return Positioned(
       top: top,
