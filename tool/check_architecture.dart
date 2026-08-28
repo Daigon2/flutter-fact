@@ -262,6 +262,27 @@ const _webViewBans = <Ban>[
   ),
 ];
 
+/// Regel 20: das Karten-SDK kennt nur der Karten-Host.
+///
+/// Die Entscheidung vom 28.08.2026 sagt: der Host besitzt die Kamera, Features
+/// geben Absichten ab. [_mapBans] (Regel 18) hält Features aus
+/// `map/presentation/` heraus, verbietet aber nicht den **direkten** Griff zum
+/// Paket. Genau diese Lücke ist am 28.08.2026 gemessen worden: ein
+/// `import 'package:maplibre_gl/maplibre_gl.dart'` in
+/// `lib/features/discovery/presentation/` lief mit Exit-Code 0 durch.
+///
+/// Ohne diese Regel bliebe die Entscheidung auf halber Strecke stehen: ein
+/// Feature dürfte die Karte nicht über den Host steuern, wohl aber an ihm
+/// vorbei. Heute risikofrei, weil `maplibre_gl` in `lib/` an keiner einzigen
+/// Stelle importiert wird.
+const _mapSdkBans = <Ban>[
+  Ban(
+    r'^package:maplibre_gl',
+    'Regel 20: das Karten-SDK gehört dem Karten-Host unter $_mapHome. Ein '
+        'Feature gibt eine Absicht ab, es steuert die Karte nicht selbst',
+  ),
+];
+
 /// Gate 7: ADR-005 verbietet ein zweites DI-System, projektweit.
 const _globalBans = <Ban>[
   Ban(r'^package:get_it', 'ADR-005: GetIt ist ausgeschlossen'),
@@ -326,6 +347,11 @@ final _layers = <LayerRule>[
     pathMatch: _ausserhalbAvatarHome,
     bans: _webViewBans,
   ),
+  LayerRule(
+    name: 'karten-sdk',
+    pathMatch: _ausserhalbMapHome,
+    bans: _mapSdkBans,
+  ),
   // Gate 7 gilt projektweit, nicht nur im Produktionscode. Ein GetIt-Container
   // in einem Test, einem Integrationstest oder einem Werkzeugskript ist
   // derselbe Regelbruch.
@@ -373,6 +399,25 @@ const _appComposition = 'lib/app/';
 
 /// Der einzige Ort, an dem `webview_flutter` vorkommen darf.
 const _avatarHome = 'lib/map/presentation/avatar/';
+
+/// Der Karten-Host, der einzige Ort, an dem das Karten-SDK vorkommen darf.
+const _mapHome = 'lib/map/';
+
+/// Alles unterhalb von `lib/`, außer [_mapHome] und außer jeder Domäne.
+///
+/// Die erste Ausnahme ist der Zweck der Regel: der Host darf das SDK.
+///
+/// Die zweite ist eine Abgrenzung und keine Lücke. `_domainBans` verbietet
+/// `^package:maplibre` bereits als Regel 4, und seit die Schichtmuster nicht
+/// mehr an `lib/features/` hängen, gilt das auch für `lib/map/domain/`, wo es
+/// richtig ist: die Kartenverträge sind reines Dart. Ohne diese Ausnahme
+/// bekäme eine Feature-Domäne für denselben Import **zwei** Meldungen. Das
+/// Repository hält es an drei anderen Stellen genauso, siehe den Test
+/// „Ä2: ein benanntes Verbot verdrängt die allgemeine Meldung": die
+/// schichtgenaue Regel gewinnt, die allgemeine schweigt.
+final _ausserhalbMapHome = RegExp(
+  '^lib/(?!${_mapHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
+);
 
 /// Alles unterhalb von `lib/`, außer [_avatarHome].
 ///

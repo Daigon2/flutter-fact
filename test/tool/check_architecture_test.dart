@@ -501,6 +501,15 @@ import 'package:fact_app/map/data/tile_cache.dart';
 
 class KartenZugriff {}
 ''',
+  // Ä11: das Karten-SDK gehört dem Host. Regel 18 hält Features aus
+  // map/presentation/ heraus, Regel 20 verbietet den direkten Griff zum
+  // Paket. Ohne sie dürfte ein Feature die Karte nicht über den Host steuern,
+  // wohl aber an ihm vorbei.
+  'lib/features/discovery/presentation/karten_sdk_versuch.dart': r'''
+import 'package:maplibre_gl/maplibre_gl.dart';
+
+class KartenSdkVersuch {}
+''',
   // Ä10: webview_flutter ist auf lib/map/presentation/avatar/ beschränkt.
   'lib/features/discovery/presentation/avatar_versuch.dart': r'''
 import 'package:webview_flutter/webview_flutter.dart';
@@ -666,6 +675,13 @@ class Komposition {}
 import 'package:fact_app/map/domain/kamera_absicht.dart';
 
 class KartenAbsicht {}
+''',
+  // Ä11 Gegenprobe: im Karten-Host ist das SDK erlaubt. Sonst hätte die Karte
+  // keinen Ort und die Regel wäre ein Verbot statt einer Zuordnung.
+  'lib/map/presentation/map_host_sdk.dart': r'''
+import 'package:maplibre_gl/maplibre_gl.dart';
+
+class MapHostSdk {}
 ''',
   // Ä10 Gegenprobe: im Avatar-Ordner ist die WebView erlaubt, sonst wäre die
   // Regel ein Verbot statt einer Kapselung.
@@ -860,6 +876,7 @@ void main() {
         'lib/services/karten_adapter.dart',
         'lib/features/discovery/presentation/karten_zugriff.dart',
         'lib/features/discovery/presentation/avatar_versuch.dart',
+        'lib/features/discovery/presentation/karten_sdk_versuch.dart',
         'lib/core/greift_auf_feature.dart',
       }, reason: verstoss.bericht);
     });
@@ -1518,6 +1535,44 @@ void main() {
             'Sonst ist die Regel ein Verbot statt einer Kapselung, und der '
             'Avatar hat keinen Ort mehr.\n${still.bericht}',
       );
+    });
+
+    test('Ä11: das Karten-SDK außerhalb des Karten-Hosts', () {
+      // Regel 18 hält Features aus map/presentation/ heraus, Regel 20
+      // verbietet den direkten Griff zum Paket. Ohne sie dürfte ein Feature
+      // die Karte nicht über den Host steuern, wohl aber an ihm vorbei.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/karten_sdk_versuch.dart',
+        <(int, String)>[(1, 'Regel 20: das Karten-SDK gehört dem Karten-Host')],
+      );
+    });
+
+    test('Ä11 Gegenprobe: im Karten-Host ist das SDK erlaubt', () {
+      expect(
+        still.fuer('lib/map/presentation/map_host_sdk.dart'),
+        isEmpty,
+        reason:
+            'Sonst hat die Karte keinen Ort, an dem sie gezeichnet werden '
+            'darf.\n${still.bericht}',
+      );
+    });
+
+    test('Ä11 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
+      // Regel 4 verbietet Karten-SDK in jeder Domäne und ist die genauere
+      // Aussage. Regel 20 lässt Domänen deshalb aus, sonst stünden für
+      // denselben Import zwei Meldungen da. Dasselbe Muster wie in Ä2.
+      //
+      // Gemessen, nicht theoretisch: die erste Fassung von Regel 20 ohne
+      // diese Ausnahme hat genau hier eine doppelte Meldung erzeugt und zwei
+      // bestehende Tests rot gemacht.
+      final zeile8 = verstoss
+          .fuer('lib/features/tours/domain/entities/technik_importe.dart')
+          .where((fund) => fund.zeile == 8)
+          .toList();
+
+      expect(zeile8, hasLength(1), reason: verstoss.bericht);
+      expect(zeile8.single.regel, contains('Regel 4: Domain darf keine'));
     });
   });
 
