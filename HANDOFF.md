@@ -71,25 +71,19 @@ gelaufen.
    Bildmaterial sind seither dazugekommen (Anker-Registry unsichtbar, Tutorial
    sichtbar), die optische Prüfung von Splash, Anmeldung, Registrierung und
    jetzt auch dem Tutorial ist formal offen.
-2. **D-5, das Chrome zur geschlossenen Einheit machen.** Entschieden am
-   28.08.2026 von Dairen, und zwar **vor** Schritt 12: der Umbau berührt nur
-   die Innereien, Schritt 12 nur die Aufrufstelle in `map_page.dart`. Danach
-   wird es teurer, weil derselbe Bildschirm dann einen Karten-Host trägt und
-   eine reine Verschiebung nicht mehr für sich reviewbar ist. Plan und
-   Belege in `REBUILD_STATUS.md` unter D-5.
-3. **Schritt 12, MapLibre-Host.** Die Strukturfrage ist seit dem 28.08.2026
+2. **Schritt 12, MapLibre-Host.** Die Strukturfrage ist seit dem 28.08.2026
    entschieden, das Fundament steht. Was zuerst zu klären ist: wo der Provider
    lebt, über den ein Feature an den Host kommt. Das Muster von E-32 (Vertrag
    in der Domäne, Provider daneben, Override im Bootstrap) **trägt hier
    nicht**, Begründung in `REBUILD_STATUS.md`. Bleibt blockiert an E-10
    (3D-Avatar, WebView oder Flutter) und E-07/E-23 (Distanzprüfung beim
    Sammeln umgehbar, geteiltes Backend).
-4. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` listet
+3. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` listet
    `balloon`, `user-marker`, `coins`, `mode-tour`, `compass` bereits als
    Kennungen. Sobald die Kartenwidgets entstehen, hüllt sie `AnchorTarget` ein
    und die fünf degradierenden Tutorial-Schritte werden voll baubar, ohne dass
    `lib/app/onboarding/` sich ändert.
-5. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
+4. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
    technische Sperre ist seit E-39 weg. Vorschlag DE/EN liegt in
    `REBUILD_STATUS.md` bei E-28, hergeleitet und nicht freigegeben.
 
@@ -98,6 +92,45 @@ gelaufen.
 ## Protokoll
 
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block.
+
+### 29.08.2026, D-5: das Karten-Chrome wird eine geschlossene Einheit
+
+Aus zehn öffentlichen Typen in einer Datei von 1096 Zeilen wird **ein**
+benutzbarer Name. Acht Hilfstypen tragen `@visibleForTesting`, zwei sind
+privat. **Kein Test wurde umgeschrieben**, die Testzahl steht unverändert bei
+987.
+
+Zwei Prämissen der Frage waren falsch, und beide sind teuer, wenn man sie
+glaubt:
+
+*Die Präzedenz trägt nicht.* `tour_chrome.dart` galt als Beleg dafür, dass man
+für Tests öffentlich exportiert. Stimmt nicht: seine Typen werden von
+`tour_overlay.dart:210-218` im Produktivcode instanziiert, und was dort nur
+intern gebraucht wird, ist privat. Die Datei ist das Gegenbeispiel.
+
+*Die Messbarkeit hing gar nicht an den Typen.* Vier Bauteile greift die
+Testdatei längst über die Anker-Registry ab und bekommt exakte Rechtecke, ohne
+je einen Typ zu nennen.
+
+**`@visibleForTesting` ist hier kein Linter-Gemecker, sondern ein Gate.**
+Gemessen mit einer Wegwerf-Datei unter `lib/app/`: `dart analyze` bricht mit
+**Exit-Code 2** ab. Und die Meldung nennt als erlaubten Ort
+`map_top_chrome.dart`, obwohl der Typ in einer `part`-Datei darunter steht.
+Das ist der Beleg, dass die Grenze die **Bibliothek** ist und nicht die Datei,
+und genau darauf baut die Lösung: `_Blurred` und fünf private Konstanten
+bleiben privat, obwohl vier Dateien sie benutzen. Bei einer Aufteilung in
+eigene Bibliotheken hätten sie öffentlich werden müssen, aus zehn Namen wären
+zwölf geworden.
+
+Der Beweis, dass die Verschiebung rein war, steckt nicht im grünen Testlauf:
+acht der neun Teildateien sind gegen ihren Original-Zeilenbereich aus
+`git show HEAD:` **byte-identisch**, die neunte zeigt genau die vier Zeilen
+der Umbenennung. Dazu zwei Mutationsproben, die belegen, dass die Tests die
+verschobene Geometrie noch festhalten.
+
+Eine fünfte Zeile hat der Analyzer erzwungen: nach der Umbenennung meldete
+`unused_element_parameter` ein `super.key` an einer nun privaten Klasse, der
+nie ein Key übergeben wurde. Ohne Entfernen wäre Gate 2 rot geblieben.
 
 ### 28.08.2026, Fundament von `lib/map/`: die Kamera als Vertrag
 

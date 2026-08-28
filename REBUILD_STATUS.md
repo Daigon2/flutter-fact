@@ -514,7 +514,22 @@ Paket noch nicht im Projekt ist; sie steht trotzdem schon da, damit sie wirkt,
 wenn E-10 es freigibt. **E-10 bleibt offen**: entschieden ist die Kapselung,
 nicht die endgültige Wahl zwischen WebView und einem Flutter-Nachbau.
 
-**D-5 ist am 28.08.2026 von Dairen entschieden.** Wortlaut: „Chrome bitte als
+**D-5 ist am 28.08.2026 entschieden und in der Nacht zum 29.08.2026
+umgesetzt**, mit Ausnahmebudget null. Aus zehn öffentlichen Typen ist einer
+geworden: `map_top_chrome.dart` ist jetzt eine Bibliothek mit neun
+`part`-Dateien, acht Hilfstypen tragen `@visibleForTesting`, zwei sind privat.
+Kein Test wurde umgeschrieben, die Testzahl blieb bei 987.
+
+Dass das trägt, ist gemessen und nicht angenommen: eine Wegwerf-Datei unter
+`lib/app/`, die einen annotierten Typ benutzt, lässt `dart analyze` mit
+**Exit-Code 2** abbrechen (`invalid_use_of_visible_for_testing_member`). Die
+Meldung nennt als erlaubten Ort die **Bibliothek** `map_top_chrome.dart`,
+obwohl der Typ in einer `part`-Datei darunter deklariert ist. Deshalb bleiben
+`_Blurred` und fünf private Konstanten privat, obwohl vier Dateien sie teilen.
+Bei einer Aufteilung in eigene Bibliotheken hätten sie öffentlich werden
+müssen, aus zehn Namen wären zwölf geworden.
+
+Wortlaut der Entscheidung: „Chrome bitte als
 geschlossene Einheit wenn möglich, falls Claude es gar nicht schafft dann
 können Teile offen sein, aber nur in zwingend notwendigen Ausnahmen", mit der
 Auflage, vorher nach Architekturverbesserungen zu suchen, weil ein
