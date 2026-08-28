@@ -278,10 +278,27 @@ abstract final class TourBottomChrome {
 
   /// Zeilenhöhe des Tipp-Hinweises als Vielfaches seiner Schriftgröße.
   ///
-  /// Gemessen am 28.08.2026 in beiden Sprachen und auf 360, 375 und 390
-  /// Pixeln Breite: eine Zeile ist bei Skalierung 1.0 genau 16 Pixel hoch
-  /// (Faktor 1,45) und bei 2.0 genau 31 (Faktor 1,41). Der Wert hier liegt
+  /// **Aus der Quelle nicht herleitbar, und das ist kein Versäumnis:**
+  /// `screen-tour.jsx:325-337` setzt für den Hinweis keine `line-height`,
+  /// und keine Regel im Vorfahrenpfad tut es. Der berechnete Wert dort ist
+  /// `normal`, also die Metrik von DM Sans. Was hier steht, ist deshalb
+  /// notwendigerweise eine Messung mit Sicherheitszuschlag und keine Zahl
+  /// aus dem JSX.
+  ///
+  /// Gemessen am 29.08.2026 in beiden Sprachen und auf 360, 375 und 390
+  /// Pixeln Breite: eine Zeile ist bei Skalierung 1.0 genau 14 Pixel hoch
+  /// (Faktor 1,273) und bei 2.0 genau 29 (Faktor 1,318). Der Wert hier liegt
   /// darüber, damit [bubbleReserve] eher zu viel als zu wenig freihält.
+  ///
+  /// **Die Vorgängerzahlen waren an Materials Zeilenhöhe gemessen.** Bis zum
+  /// 29.08.2026 standen hier 16 Pixel (Faktor 1,45) und 31 (Faktor 1,41).
+  /// Sie stimmten für den damaligen Zustand: das `Material` im
+  /// `OnboardingHost` hatte keinen eigenen Basisstil und vererbte
+  /// `height: 1.43` an jeden Text, der selbst keine setzt. Der Hinweis ist
+  /// einer davon. Seit `OnboardingHost.overlayTextStyle` steht, gilt wieder
+  /// die Schriftmetrik, und die Zeile ist niedriger. Der Zuschlag wächst
+  /// damit, [bubbleReserve] hält also etwas mehr frei als nötig; das ist die
+  /// Richtung, in die dieser Wert irren soll.
   ///
   /// **Bewusst kein Zuschlag für eine zweite Zeile.** Es gibt genau zwei
   /// Sprachen, beide sind gemessen und beide einzeilig, auch bei 2.0 auf 360

@@ -140,11 +140,18 @@ das `Scaffold` des Startbildschirms steht daneben und nützt ihm nichts, und
 `DialogRoute` bringt selbst kein `Material` mit.
 
 **Der Nebeneffekt der Behebung ist der eigentliche Merksatz:** ein `Material`
-ohne eigenen `textStyle` vererbt `theme.textTheme.bodyMedium`, also
-`letterSpacing: 0.25` und Zeilenhöhe 1.43. Das ist genau die Laufweite, die
-E-38 mühsam aus FACT-Text herausgenommen hat. Wer ein `Material` einzieht, um
-die Doppellinie loszuwerden, holt sich Materials Typografie ins Haus, wenn er
-den Basisstil nicht ausdrücklich hinschreibt.
+ohne eigenen `textStyle` vererbt `theme.textTheme.bodyMedium` an jeden Text
+darunter, der es nicht selbst setzt. Wer ein `Material` einzieht, um die
+Doppellinie loszuwerden, holt sich Materials Typografie ins Haus, wenn er den
+Basisstil nicht ausdrücklich hinschreibt.
+
+**Nachgemessen, und dabei hat sich eine naheliegende Annahme als falsch
+erwiesen:** die **Laufweite** kommt **nicht** durch. `letterSpacing` ist unter
+dem `Material` überall `null`, auch vor der Behebung. **E-38 hält**, weil sein
+Eingriff in `ThemeData.typography` sitzt und `bodyMedium` deshalb schon keine
+Laufweite mehr trägt, die weitergereicht werden könnte. Durchgekommen ist
+ausschließlich `height: 1.43`. Wer hier „Materials Typografie" liest, muss
+wissen, welcher Teil davon in dieser App noch scharf ist und welcher nicht.
 
 ### 29.08.2026, Schritt 12: MapLibre-Host mit gebackenem Stil
 

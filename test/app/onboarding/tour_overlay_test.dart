@@ -18,6 +18,7 @@ import 'package:fact_app/app/routing/app_routes.dart';
 import 'package:fact_app/app/shell/app_shell.dart';
 import 'package:fact_app/app/shell/floating_tab_bar.dart';
 import 'package:fact_app/app/shell/shell_tab.dart';
+import 'package:fact_app/app/theme/fact_typography.dart';
 import 'package:fact_app/core/anchors/anchor_id.dart';
 import 'package:fact_app/core/anchors/anchor_registry.dart';
 import 'package:fact_app/core/anchors/anchor_scope.dart';
@@ -812,6 +813,165 @@ void main() {
         }
       });
     }
+
+    // Die Behebung der Doppellinie hat sich am 28.08.2026 eine zweite Falle
+    // eingehandelt, und die ist unauffälliger: ein `Material` ohne eigenen
+    // `textStyle` vererbt `theme.textTheme.bodyMedium` an jeden Text darunter,
+    // und darin steckt Materials Geometrie. Gemessen wurde am 29.08.2026 eine
+    // Zeilenhöhe von 1.43 an vier Texten des Tutorials, die keine setzen:
+    // der Meta-Zeile der Hero-Schritte, der Schrittanzeige der Blase,
+    // "Überspringen" und dem Tipp-Hinweis. Die Laufweite kam nicht mit, weil
+    // E-38 sie schon aus `ThemeData.typography` genommen hat; ohne E-38 wären
+    // es beide.
+    //
+    // `screen-tour.jsx` gibt an keiner der vier Stellen eine `line-height` an
+    // (`:286-306`, `:325-337`, `:383-390`, `:477-483`), und keine Regel im
+    // Vorfahrenpfad tut es: `styles.css` kennt das Wort nicht, der einzige
+    // Treffer in `index.html:96` gehört zum toten Splash. Der berechnete Wert
+    // im Browser ist also `normal`, das sind die Metriken der Schrift, und in
+    // Flutter heißt das `height: null`.
+
+    /// Materials Geometrie, aus Flutter selbst gelesen statt abgetippt.
+    ///
+    /// Genau dieses `TextTheme` mischt das `Theme`-Widget beim Lokalisieren
+    /// als Basis unter `textTheme` (siehe `FactTheme._withoutTracking`), und
+    /// genau daraus speist sich `bodyMedium`. Ändert Flutter die Werte, folgt
+    /// dieser Test ihnen, statt gegen eine veraltete Zahl grün zu bleiben.
+    final materialGeometry = Typography.englishLike2021.bodyMedium!;
+
+    /// Der wirksame Stil jedes Absatzes **des Overlays**, mit Klartext.
+    ///
+    /// Bewusst nur unterhalb von [TourOverlay]: die Shell darunter hängt an
+    /// ihrem eigenen `Material` im `Scaffold` und ist hier nicht Gegenstand.
+    List<(String, TextStyle?)> overlayStyles(WidgetTester tester) {
+      return <(String, TextStyle?)>[
+        for (final paragraph in tester.renderObjectList<RenderParagraph>(
+          find.descendant(
+            of: find.byType(TourOverlay),
+            matching: find.byType(RichText),
+          ),
+        ))
+          (paragraph.text.toPlainText(), paragraph.text.style),
+      ];
+    }
+
+    /// Der wirksame Stil des Absatzes Nummer [at] eines Bauteils.
+    ///
+    /// Die Reihenfolge ist die des Baums und damit die der Quelle: in
+    /// `TourHeroView` Titel, Fließtext, Meta, in `TourBubble` Schrittanzeige,
+    /// Titel, Fließtext.
+    TextStyle styleIn(WidgetTester tester, Finder part, {int at = 0}) {
+      final paragraphs = tester
+          .renderObjectList<RenderParagraph>(
+            find.descendant(of: part, matching: find.byType(RichText)),
+          )
+          .toList();
+      // `!`, weil ein Absatz ohne wirksamen Stil hier bereits der Defekt
+      // wäre und die Meldung dann von der falschen Zeile käme.
+      return paragraphs[at].text.style!;
+    }
+
+    for (var step = 1; step <= TourSteps.count; step++) {
+      testWidgets('Schritt $step: kein Text erbt Materials Laufweite oder '
+          'Zeilenhöhe', (tester) async {
+        await pumpApp(tester);
+        await goToStep(tester, step);
+
+        final styles = overlayStyles(tester);
+        // Ohne diese Zusicherung wäre eine leere Liste ein grüner Test.
+        expect(
+          styles,
+          // Hero-Schritte: Titel, Fließtext, Meta, Überspringen, Hinweis.
+          // Blasen-Schritte: Schrittanzeige, Titel, Fließtext plus dieselben
+          // zwei Aufsaetze.
+          hasLength(5),
+          reason: 'erwartet: fünf Absätze, gemessen: $styles',
+        );
+
+        for (final (text, style) in styles) {
+          expect(
+            style?.height,
+            isNot(materialGeometry.height),
+            reason:
+                'Text "$text" trägt Materials Zeilenhöhe. Fehlt am '
+                '`Material` des OnboardingHost der Basisstil?',
+          );
+          expect(
+            style?.letterSpacing,
+            isNot(materialGeometry.letterSpacing),
+            reason:
+                'Text "$text" trägt Materials Laufweite. Fehlt am '
+                '`Material` des OnboardingHost der Basisstil, oder ist E-38 '
+                'aus `FactTheme` gefallen?',
+          );
+        }
+      });
+    }
+
+    testWidgets('die vier Texte ohne `line-height` in der Quelle haben auch '
+        'keine', (tester) async {
+      // Der Gegenpart zur Zusicherung oben: dort steht, was nicht sein darf,
+      // hier, was gelten muss. Ein Basisstil, der statt 1.43 irgendeine
+      // andere fremde Zeilenhöhe durchreicht, käme oben durch.
+      await pumpApp(tester);
+
+      // Schritt 1, Hero: Titel, Fließtext, Meta-Zeile.
+      final hero = find.byType(TourHeroView);
+      // `lineHeight: 1.05`, `screen-tour.jsx:365-370`.
+      expect(styleIn(tester, hero).height, 1.05);
+      // `lineHeight: 1.45`, `:374-376`.
+      expect(styleIn(tester, hero, at: 1).height, 1.45);
+      // `:384-387` setzt Familie, Gewicht, Größe, Laufweite und Farbe und
+      // **keine** `lineHeight`.
+      expect(styleIn(tester, hero, at: 2).height, isNull);
+      expect(
+        styleIn(tester, hero, at: 2).letterSpacing,
+        closeTo(11 * 0.22, 1e-9),
+      );
+
+      // `:293-295`, ebenfalls ohne `lineHeight` und ohne `letterSpacing`.
+      expect(styleIn(tester, find.byType(TourSkipButton)).height, isNull);
+      expect(
+        styleIn(tester, find.byType(TourSkipButton)).letterSpacing,
+        isNull,
+      );
+
+      // `:329-334`: `letterSpacing: '0.04em'`, keine `lineHeight`.
+      expect(styleIn(tester, find.byType(TourTapHint)).height, isNull);
+      expect(
+        styleIn(tester, find.byType(TourTapHint)).letterSpacing,
+        closeTo(11 * 0.04, 1e-9),
+      );
+
+      await goToStep(tester, 2);
+
+      // Schritt 2, Blase: Schrittanzeige, Titel, Fließtext.
+      final bubble = find.byType(TourBubble);
+      // `:478-482` setzt `letterSpacing: '0.18em'` und keine `lineHeight`.
+      expect(styleIn(tester, bubble).height, isNull);
+      expect(styleIn(tester, bubble).letterSpacing, closeTo(10 * 0.18, 1e-9));
+      // `lineHeight: 1.15`, `:485-489`.
+      expect(styleIn(tester, bubble, at: 1).height, 1.15);
+      // `lineHeight: 1.45`, `:496-498`.
+      expect(styleIn(tester, bubble, at: 2).height, 1.45);
+    });
+
+    test('der Basisstil des Overlays gibt keine Geometrie vor', () {
+      // Die Eigenschaft, aus der beide Zusicherungen oben folgen, direkt am
+      // Stil: er darf Familie und Gewicht mitbringen, aber weder Größe noch
+      // Zeilenhöhe noch Laufweite, denn all das steht in der Quelle am
+      // einzelnen Element.
+      final style = OnboardingHost.overlayTextStyle;
+
+      expect(style.fontSize, isNull);
+      expect(style.height, isNull);
+      expect(style.letterSpacing, isNull);
+      expect(style.fontFamily, FactFont.body);
+      // Half-Leading wie in CSS, bewusst behalten und nicht Materials
+      // Geschmack: `screen-tour.jsx` setzt vier `lineHeight`-Werte, und die
+      // verteilt ein Browser je zur Hälfte über und unter den Text.
+      expect(style.leadingDistribution, TextLeadingDistribution.even);
+    });
   });
 
   group('Maße', () {

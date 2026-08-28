@@ -1,5 +1,6 @@
 import 'package:fact_app/app/onboarding/onboarding_providers.dart';
 import 'package:fact_app/app/onboarding/tour_overlay.dart';
+import 'package:fact_app/app/theme/fact_typography.dart';
 import 'package:fact_app/core/async/detached_work.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -74,6 +75,49 @@ class OnboardingHost extends ConsumerWidget {
   /// [child] ist die App, über der das Tutorial liegen kann.
   const OnboardingHost({required this.child, super.key});
 
+  /// Der Basisstil, den das `Material` des Overlays vorgibt.
+  ///
+  /// **Er steht ausdrücklich da, weil ein `Material` ohne eigenen `textStyle`
+  /// `theme.textTheme.bodyMedium` an jeden Text darunter vererbt**, und darin
+  /// steckt Materials Geometrie: `fontSize: 14`, `height: 1.43` und, ohne
+  /// E-38, auch `letterSpacing: 0.25`. Wer das `Material` nur einzieht, um die
+  /// gelbe Doppellinie loszuwerden, holt sich damit genau die Typografie
+  /// zurück, die E-38 aus FACT-Text herausgenommen hat. Gemessen, nicht
+  /// befürchtet: ohne diese Zeile erben "— GOETHE", "SCHRITT n VON 9",
+  /// "Überspringen" und "Tipp irgendwo für weiter" eine Zeilenhöhe von 1.43,
+  /// die `screen-tour.jsx` an keiner der vier Stellen angibt.
+  ///
+  /// Gesetzt ist deshalb nur, was FACT selbst vorgibt:
+  ///
+  /// - Familie und Gewicht aus [FactTypography.bodyText], also `body` aus
+  ///   `styles.css:113-119`. Heute setzt jeder Text des Overlays beides
+  ///   selbst; der Wert ist der Auffangwert für den nächsten, der es nicht
+  ///   tut, und er ist derselbe wie in der Quelle.
+  /// - **Keine** Zeilenhöhe, **keine** Laufweite, **keine** Schriftgröße.
+  ///   Weder `styles.css` noch `screen-tour.jsx` setzen `line-height`
+  ///   irgendwo im Vorfahrenpfad des Overlays, der berechnete Wert dort ist
+  ///   also `normal`, und das sind die Metriken der Schrift. In Flutter heißt
+  ///   das `height: null`.
+  ///
+  /// ## Warum [TextLeadingDistribution.even] bleibt und nicht mitfällt
+  ///
+  /// Es kommt zwar aus derselben Material-Geometrie, ist aber kein
+  /// Material-Geschmack, sondern das Umbruchmodell der Quelle: CSS verteilt
+  /// den Durchschuss aus `line-height` je zur Hälfte über und unter den Text
+  /// (Half-Leading, `css-inline-3`), und `even` ist laut Flutters eigener
+  /// Dokumentation genau diese Strategie. Flutters Standard `proportional`
+  /// verteilt ihn im Verhältnis von Ober- zu Unterlänge und setzt damit die
+  /// Grundlinie woanders hin als der Browser.
+  ///
+  /// Betroffen wären die vier Texte, die ihre Zeilenhöhe selbst setzen
+  /// (Hero-Titel 1.05, Hero-Fließtext 1.45, Blasentitel 1.15, Blasentext
+  /// 1.45). Ihre Zeilenkästen sind in beiden Varianten gleich hoch, gemessen;
+  /// nur die Schrift säße darin anders. Der Rest der App rendert ohnehin mit
+  /// `even`, weil dort das `Material` des `Scaffold` darüber liegt.
+  static final TextStyle overlayTextStyle = FactTypography.bodyText.copyWith(
+    leadingDistribution: TextLeadingDistribution.even,
+  );
+
   /// Die laufende App.
   final Widget child;
 
@@ -100,8 +144,13 @@ class OnboardingHost extends ConsumerWidget {
           // `transparency` und nicht `canvas`: die Ebene soll keine Fläche
           // malen, der Verdunkler des Overlays macht das selbst und wäre sonst
           // doppelt.
+          //
+          // Und der Basisstil ausdrücklich, sonst reicht dieses `Material`
+          // Materials eigene Typografie an jeden Text des Tutorials weiter.
+          // Die Begründung samt Messung steht bei [overlayTextStyle].
           Material(
             type: MaterialType.transparency,
+            textStyle: overlayTextStyle,
             child: TourOverlay(
               // Der Zustand liegt im Provider und nicht im Overlay: verschwinden
               // soll es, weil die Merkung gesetzt ist, nicht weil es sich selbst
