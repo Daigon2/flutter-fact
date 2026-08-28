@@ -610,6 +610,53 @@ void main() {
     });
   });
 
+  group('Systemleisten', () {
+    // Am 28.08.2026 am Emulator gesehen: "Ueberspringen" lag ueber Uhrzeit und
+    // Funkanzeige, der Tipp-Hinweis und die Punktreihe sassen in der
+    // Gestenleiste. Kein Test hat es gemeldet, und der Grund ist der
+    // Testrahmen selbst: `tester.view.padding` ist standardmaessig null, es
+    // gibt dort also gar keine Systemleiste, gegen die etwas stossen koennte.
+    //
+    // Die Quelle misst ihre 18 und 24 und 50 Pixel **innerhalb** der
+    // `.app-frame`, und die traegt laut `index.html:101-107` bereits
+    // `padding-top` und `padding-bottom` aus `env(safe-area-inset-*)`. Ein
+    // `Positioned` misst dagegen ab der Bildschirmkante. Deshalb der Zuschlag.
+    const statusBar = 141.0;
+    const gestureBar = 48.0;
+
+    testWidgets('das Chrome weicht Status- und Gestenleiste aus', (
+      tester,
+    ) async {
+      useDeviceSurface(tester);
+      tester.view.padding = const FakeViewPadding(
+        top: statusBar * 3,
+        bottom: gestureBar * 3,
+      );
+      addTearDown(tester.view.reset);
+      useReducedMotion(tester);
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+
+      final screen = tester.getSize(find.byType(TourOverlay));
+
+      expect(
+        tester.getRect(find.byType(TourSkipButton)).top,
+        statusBar + TourSkipButton.inset,
+        reason: 'Ueberspringen unter der Statusleiste',
+      );
+      expect(
+        screen.height - tester.getRect(find.byType(TourTapHint)).bottom,
+        gestureBar + TourTapHint.bottom,
+        reason: 'Tipp-Hinweis in der Gestenleiste',
+      );
+      expect(
+        screen.height - tester.getRect(find.byType(TourStepDots)).bottom,
+        gestureBar + TourStepDots.bottom,
+        reason: 'Punktreihe in der Gestenleiste',
+      );
+    });
+  });
+
   group('Textstil', () {
     // Am 28.08.2026 auf dem Emulator gesehen, nicht im Test: **jeder** Text
     // des Overlays trug eine gelbe Doppellinie. Das ist Flutters Notsignal

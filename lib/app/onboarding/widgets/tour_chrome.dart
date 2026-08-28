@@ -47,7 +47,16 @@ class TourSkipButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      top: inset,
+      // Die 18 der Quelle plus die Systemleiste. `screen-tour.jsx:294` setzt
+      // `top: 18`, misst das aber **innerhalb** der `.app-frame`, und die trägt
+      // laut `index.html:101-107` bereits `padding-top:
+      // env(safe-area-inset-top)`. Ein `Positioned` misst dagegen ab der
+      // Bildschirmkante.
+      //
+      // Am 28.08.2026 am Emulator gesehen: ohne diesen Zuschlag liegt
+      // "Überspringen" über Uhrzeit und Funkanzeige. Kein Test hat es gemeldet,
+      // weil der Testrahmen ohne `FakeViewPadding` gar keine Systemleiste hat.
+      top: inset + MediaQuery.paddingOf(context).top,
       right: inset,
       child: Semantics(
         button: true,
@@ -106,7 +115,9 @@ class TourTapHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: bottom,
+      // Wie beim Überspringen-Knopf: die Quelle misst innerhalb eines Rahmens,
+      // der schon `padding-bottom: env(safe-area-inset-bottom)` trägt.
+      bottom: bottom + MediaQuery.paddingOf(context).bottom,
       left: 0,
       right: 0,
       // `pointerEvents: 'none'`, `screen-tour.jsx:334`: der Hinweis fängt den
@@ -151,7 +162,8 @@ class TourStepDots extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: bottom,
+      // Wie bei [TourTapHint], siehe dort.
+      bottom: bottom + MediaQuery.paddingOf(context).bottom,
       left: 0,
       right: 0,
       // `pointerEvents: 'none'`, `screen-tour.jsx:314`. Die Punkte sind keine
