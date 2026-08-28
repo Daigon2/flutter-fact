@@ -301,6 +301,31 @@ void main() {
       expect(find.byType(LoginPage), findsNothing);
     });
 
+    testWidgets('die beiden Felder gehen unvertauscht ans Repository', (
+      tester,
+    ) async {
+      // Nachgemessen mit einer Mutation: `signIn(email: _password.text,
+      // password: _email.text)` überlebte die ganze Suite. Der Bildschirm
+      // navigierte weiter auf die Karte, und kein Test sah hin, **womit**
+      // angemeldet wurde. Für die Registrierung war diese Stelle schon dicht
+      // (`lastSignUpEmail` und `lastSignUpName`), für die Anmeldung nicht.
+      //
+      // Deshalb zwei Werte, die sich nicht verwechseln lassen. Das Passwort
+      // trägt zusätzlich ein Leerzeichen: die Adresse kommt getrimmt an, das
+      // Passwort **ungetrimmt**, wie in `screen-auth.jsx:465`.
+      await pumpLogin(tester);
+      await fillCredentials(
+        tester,
+        email: '  anmeldung@example.de  ',
+        password: 'geheimes Wort ',
+      );
+
+      await tapText(tester, 'Anmelden →');
+
+      expect(auth.lastEmail, 'anmeldung@example.de');
+      expect(auth.lastPassword, 'geheimes Wort ');
+    });
+
     testWidgets('nach Erfolg navigiert der Bildschirm selbst weg', (
       tester,
     ) async {

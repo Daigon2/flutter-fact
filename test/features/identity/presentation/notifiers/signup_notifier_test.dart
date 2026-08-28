@@ -17,6 +17,7 @@ void main() {
   tearDown(() async => repository.close());
 
   late ProviderContainer scope;
+  late ProviderSubscription<AsyncValue<SignupStatus>> screen;
 
   /// Baut den Container und hält den Provider am Leben, siehe die Begründung in
   /// `login_notifier_test.dart`.
@@ -25,7 +26,7 @@ void main() {
       overrides: [authRepositoryProvider.overrideWithValue(repository)],
     );
     addTearDown(scope.dispose);
-    scope.listen(signupProvider, (_, _) {});
+    screen = scope.listen(signupProvider, (_, _) {});
   }
 
   /// Eine gültige Eingabe. Einzelne Felder werden je Test überschrieben.
@@ -317,6 +318,24 @@ void main() {
       expect(await pending, isFalse);
       // Die Registrierung selbst hat stattgefunden.
       expect(repository.signUpCount, 1);
+    });
+  });
+
+  group('Beim Verlassen des Bildschirms', () {
+    test('vergisst der Provider seinen Fehler', () async {
+      // `isAutoDispose: true` ist keine Deko: ohne das begrüßt die
+      // Registrierung den Wiederkehrer mit der roten Box von vorhin.
+      // Nachgemessen, die Mutation auf `false` überlebte die Suite.
+      openScreen();
+      expect(await submit(termsAccepted: false), isFalse);
+      expect(state().hasError, isTrue);
+
+      // Das ist, was ein verlassener Bildschirm tut: er hört auf zuzuhören.
+      screen.close();
+      await pumpEventQueue();
+
+      expect(state().hasError, isFalse);
+      expect(state().value, SignupStatus.untouched);
     });
   });
 }

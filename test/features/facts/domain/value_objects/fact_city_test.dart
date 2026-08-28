@@ -95,11 +95,19 @@ void main() {
 
   group('Wertsemantik', () {
     test('gleicher Anzeigename heißt gleiche Stadt', () {
-      expect(const FactCity('München'), const FactCity('München'));
-      expect(
-        const FactCity('München').hashCode,
-        const FactCity('München').hashCode,
-      );
+      // Zur Laufzeit gebaut und mit `identical` gegengeprüft, wie in
+      // `auth_city_test.dart`. Zwei gleich geschriebene
+      // `const FactCity('München')` sind in Dart **dasselbe Objekt**; ein
+      // Gleichheitstest darauf prüfte nichts. Nachgemessen: `==` auf
+      // `identical(this, other)` zu reduzieren überlebte damit die Suite.
+      // Städte, die aus Supabase kommen, sind nicht kanonisiert, und ein
+      // solcher Regress bräche jeden Vergleich nach Stadt.
+      final left = FactCity(<String>['Mün', 'chen'].join());
+      final right = FactCity(String.fromCharCodes('München'.runes));
+
+      expect(identical(left, right), isFalse);
+      expect(left, right);
+      expect(left.hashCode, right.hashCode);
     });
 
     test('zwei Anzeigenamen mit gleichem Slug bleiben verschieden', () {

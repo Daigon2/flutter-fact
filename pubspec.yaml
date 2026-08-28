@@ -41,6 +41,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   go_router_builder: ^4.4.0
+  # Nur für Tests, geht nicht in die App. `SupabaseClient` nimmt seinen
+  # `httpClient` als `http.Client` entgegen, und kein Supabase-Paket exportiert
+  # den Typ weiter. Damit ist er die einzige Möglichkeit, die vier
+  # Instanzmethoden der Datenquelle ohne Netz zu prüfen. Das Paket lag ohnehin
+  # transitiv im Baum; hier steht nur noch, dass die Tests es direkt brauchen.
+  http: ^1.6.0
 
 flutter:
   uses-material-design: true

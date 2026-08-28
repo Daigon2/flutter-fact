@@ -476,10 +476,21 @@ void main() {
 
   group('FactId', () {
     test('gleiche Zahl heißt gleiche Kennung', () {
-      expect(const FactId(7), const FactId(7));
-      expect(const FactId(7).hashCode, const FactId(7).hashCode);
-      expect(const FactId(7), isNot(const FactId(8)));
-      expect(const FactId(7).value, 7);
+      // Zur Laufzeit gebaut und mit `identical` gegengeprüft, wie in
+      // `auth_city_test.dart`. Zwei gleich geschriebene `const FactId(7)` sind
+      // in Dart **dasselbe Objekt**; ein Gleichheitstest darauf prüfte nichts.
+      // Nachgemessen: `==` auf `identical(this, other)` zu reduzieren überlebte
+      // damit die Suite. Aus Supabase geparste Kennungen sind nicht
+      // kanonisiert, ein solcher Regress bräche jeden Vergleich nach Kennung.
+      final row = <String, Object?>{'id': 7};
+      final left = FactId(row['id']! as int);
+      final right = FactId(int.parse('7'));
+
+      expect(identical(left, right), isFalse);
+      expect(left, right);
+      expect(left.hashCode, right.hashCode);
+      expect(left, isNot(FactId(int.parse('8'))));
+      expect(left.value, 7);
     });
   });
 

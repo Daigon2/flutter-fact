@@ -485,6 +485,59 @@ void main() {
     });
   });
 
+  group('Das Passwortfeld', () {
+    testWidgets('ist verdeckt, und "ZEIGEN" kippt Text und Verdeckung', (
+      tester,
+    ) async {
+      // Die Anmeldung hat diesen Test seit Schritt 9, die Registrierung nicht.
+      // Nachgemessen: `obscureText: _passwordVisible` statt `!_passwordVisible`
+      // überlebte die Suite. Der Nutzer sähe sein Passwort von Anfang an im
+      // Klartext, und "ZEIGEN" würde es verstecken.
+      await pumpSignup(tester);
+
+      TextField passwordField() => tester.widget<TextField>(authFieldInput(1));
+      expect(passwordField().obscureText, isTrue);
+
+      await tapText(tester, 'ZEIGEN');
+
+      expect(find.text('VERBERGEN'), findsOneWidget);
+      expect(find.text('ZEIGEN'), findsNothing);
+      expect(passwordField().obscureText, isFalse);
+
+      // Und zurück. Ohne diesen Teil bliebe eine Verdeckung unentdeckt, die nur
+      // in eine Richtung schaltet.
+      await tapText(tester, 'VERBERGEN');
+
+      expect(find.text('ZEIGEN'), findsOneWidget);
+      expect(passwordField().obscureText, isTrue);
+    });
+
+    testWidgets('kündigt dem Passwortspeicher ein neues Passwort an', (
+      tester,
+    ) async {
+      // `autoComplete="new-password"` in der Quelle. Mit `AutofillHints.password`
+      // setzt ein Passwortspeicher das **bestehende** Passwort ein, statt ein
+      // neues vorzuschlagen: genau das falsche Verhalten in einer
+      // Registrierung. Nachgemessen, die Vertauschung überlebte die Suite.
+      await pumpSignup(tester);
+
+      expect(
+        tester.widget<TextField>(authFieldInput(1)).autofillHints,
+        <String>[AutofillHints.newPassword],
+      );
+    });
+
+    testWidgets('das E-Mail-Feld öffnet die E-Mail-Tastatur', (tester) async {
+      // Ohne `TextInputType.emailAddress` fehlen @ und Punkt auf der ersten
+      // Tastaturebene. Auch das überlebte als Mutation.
+      await pumpSignup(tester);
+
+      final email = tester.widget<TextField>(authFieldInput(0));
+      expect(email.keyboardType, TextInputType.emailAddress);
+      expect(email.autofillHints, <String>[AutofillHints.email]);
+    });
+  });
+
   group('Die Passwort-Stärke', () {
     testWidgets('erscheint erst mit einer Eingabe', (tester) async {
       await pumpSignup(tester);

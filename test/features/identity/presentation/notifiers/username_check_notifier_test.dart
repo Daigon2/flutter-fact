@@ -28,6 +28,7 @@ void main() {
   tearDown(() async => repository.close());
 
   late ProviderContainer scope;
+  late ProviderSubscription<UsernameStatus> field;
 
   /// Baut den Container und **hält** den Provider am Leben.
   ///
@@ -40,7 +41,7 @@ void main() {
       overrides: [authRepositoryProvider.overrideWithValue(repository)],
     );
     addTearDown(scope.dispose);
-    scope.listen(usernameCheckProvider, (_, _) {});
+    field = scope.listen(usernameCheckProvider, (_, _) {});
   }
 
   void type(String value) =>
@@ -335,6 +336,28 @@ void main() {
       ]) {
         expect(blocksSignup(status), isFalse, reason: status.name);
       }
+    });
+  });
+
+  group('Beim Verlassen des Bildschirms', () {
+    // Ein `test` und kein `testWidgets`: hier läuft keine Uhr, ein ungültiger
+    // Name setzt seinen Zustand sofort und plant keinen Timer. Und
+    // `pumpEventQueue` **hängt** in der `FakeAsync`-Zone von `testWidgets`,
+    // gemessen bis zur Zeitüberschreitung.
+    test('vergisst der Provider seinen Zustand', () async {
+      // `isAutoDispose: true` ist hier die Zusicherung mit der schlimmsten
+      // Gegenprobe: ohne sie steht beim Wiederkommen ein **leeres** Feld neben
+      // einem ✗, und `blocksSignup` sperrt das Abschicken, bis jemand tippt.
+      // Nachgemessen, die Mutation auf `false` überlebte die Suite.
+      openField();
+      type('nicht gültig!');
+      expect(status(), UsernameStatus.invalid);
+
+      // Das ist, was ein verlassener Bildschirm tut: das `ref.watch` endet.
+      field.close();
+      await pumpEventQueue();
+
+      expect(status(), UsernameStatus.idle);
     });
   });
 }

@@ -59,30 +59,48 @@ class AuthOAuthRow extends StatelessWidget {
     // Abgefragt wird trotzdem die Helligkeit des Themes und nicht die
     // Startannahme, damit ein späterer Theme-Schalter das hier nicht bricht.
     final isLight = Theme.of(context).brightness == Brightness.light;
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: _button(
-            label: appleLabel,
-            background: isLight
-                ? const Color(0xFF000000)
-                : const Color(0xFFFFFFFF),
-            foreground: isLight
-                ? const Color(0xFFFFFFFF)
-                : const Color(0xFF000000),
+    return IntrinsicHeight(
+      child: Row(
+        // `display: flex` steht in CSS auf `align-items: stretch`, die Knöpfe
+        // sind dort also immer gleich hoch. Flutters Standard ist `center`, und
+        // damit steht bei großer Systemschrift ein einzeiliger Knopf mittig
+        // neben einem zweizeiligen. Gemessen bei 390 und Skalierung 2.0:
+        // "Mit Apple" 64 Pixel hoch, "Mit Google" 104. Bei Skalierung 1.0
+        // ändert das hier nichts, dort sind beide 44.
+        //
+        // `IntrinsicHeight` ist dabei **nicht** optional. Beide Bildschirme
+        // stellen diese Zeile in ein `SingleChildScrollView`, die Höhe ist dort
+        // also unbeschränkt. `CrossAxisAlignment.stretch` gibt seinen Kindern
+        // `BoxConstraints.tightFor(height: constraints.maxHeight)`, und das
+        // wäre `Infinity`. Gemessen, nicht befürchtet: ohne diesen Rahmen wirft
+        // jeder Aufbau der Anmeldung
+        // `BoxConstraints forces an infinite height`.
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Expanded(
+            child: _button(
+              label: appleLabel,
+              background: isLight
+                  ? const Color(0xFF000000)
+                  : const Color(0xFFFFFFFF),
+              foreground: isLight
+                  ? const Color(0xFFFFFFFF)
+                  : const Color(0xFF000000),
+            ),
           ),
-        ),
-        const SizedBox(width: gap),
-        Expanded(
-          child: _button(
-            label: googleLabel,
-            // Google ist in beiden Themes weiß auf `#1A1208`, also dem
-            // `ink`-Wert des hellen Themes, hier als Literal wie in der Quelle.
-            background: const Color(0xFFFFFFFF),
-            foreground: const Color(0xFF1A1208),
+          const SizedBox(width: gap),
+          Expanded(
+            child: _button(
+              label: googleLabel,
+              // Google ist in beiden Themes weiß auf `#1A1208`, also dem
+              // `ink`-Wert des hellen Themes, hier als Literal wie in der
+              // Quelle.
+              background: const Color(0xFFFFFFFF),
+              foreground: const Color(0xFF1A1208),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

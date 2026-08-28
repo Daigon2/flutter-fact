@@ -52,4 +52,39 @@ void main() {
     expect(updates, 1);
     expect(store.hasLaunched(), isTrue);
   });
+
+  test('ein zweiter Aufruf schreibt auch nicht noch einmal', () async {
+    // Der Test darüber allein ist **zu schwach**, und das ist gemessen: nimmt
+    // man die Abkürzung `if (state) return;` heraus, bleibt er grün. Riverpod
+    // meldet ein `state = true` auf einen Zustand, der schon `true` ist, gar
+    // nicht erst als Änderung, der Zähler steht also so oder so auf 1.
+    //
+    // Beobachtbar wird der Unterschied erst am Speicher: ohne die Abkürzung
+    // läuft der Schreibvorgang ein zweites Mal.
+    final store = _CountingFirstLaunchStore();
+    final notifier = containerWith(store).read(firstLaunchProvider.notifier);
+
+    await notifier.markLaunched();
+    await notifier.markLaunched();
+    await notifier.markLaunched();
+
+    expect(store.writes, 1);
+  });
+}
+
+/// Zählt die Schreibvorgänge, sonst wie [InMemoryFirstLaunchStore].
+class _CountingFirstLaunchStore implements FirstLaunchStore {
+  bool _hasLaunched = false;
+
+  /// Wie oft [markLaunched] gerufen wurde.
+  int writes = 0;
+
+  @override
+  bool hasLaunched() => _hasLaunched;
+
+  @override
+  Future<void> markLaunched() async {
+    writes++;
+    _hasLaunched = true;
+  }
 }
