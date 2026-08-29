@@ -22,13 +22,13 @@ Phase 0 und Phase 1 sind abgeschlossen. Aus Phase 2 sind laut Protokoll die
 Schritte 12, 13, 15, 16, 17 und 19 fertig, offen bleiben dort 14, 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen.
 
-**Widerspruch, bewusst nicht geglättet:** der bisherige Stand zählte „13 von 50,
-nämlich 1 bis 12 plus 19", `REBUILD_STATUS.md` führt Schritt 19 als offen, und
-die Protokolleinträge vom 29.08.2026 nennen zusätzlich 13, 15, 16, 17 und 21 als
-fertig. Wer den nächsten Schritt abschließt, klärt die Zählung an genau einer
-Stelle.
+**Fertig sind 18 von 50:** 1 bis 13, dazu 15, 16, 17, 19 und 21. Der
+Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
+19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
+steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
+Kästchen war das Veraltete, nicht der Stand.
 
-**Kennzahlen:** 1540 Tests grün, alle vier Gates auf Exit-Code 0, dazu
+**Kennzahlen:** 1553 Tests grün, alle vier Gates auf Exit-Code 0, dazu
 `dart run tool/generate_i18n.dart --check` und
 `dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
 

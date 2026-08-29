@@ -695,7 +695,7 @@ eine der beiden Stellen richtig.
 - [!] 14. Kompass-Rotation (Sensorpaket fehlt) · [x] 15. Cluster-Layer
   · [x] 16. Einzel-Marker
 - [x] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
-- [ ] 19. Top-Chrome · [ ] 20. Sammel-Erlebnis
+- [x] 19. Top-Chrome (vorgezogen, D-5 am 29.08.2026 abgeschlossen) · [ ] 20. Sammel-Erlebnis
 
 ## Phase 3, Fakt-Akte und Audio
 
