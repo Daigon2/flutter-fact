@@ -67,9 +67,9 @@ part 'map_top_chrome/map_top_right_column.dart';
 /// |---|---|---|---|
 /// | Stadt-Pille | `:3105-3116` | 50 | keiner |
 /// | Coin-Pille | `:707-728` | 40 | `coins` |
-/// | Level-Ring | `:730-745` | 40 | keiner |
+/// | Level-Ring | `:730-742` | 40 | keiner |
 /// | Kompass-Knopf | `:3152-3199` | 30 | `compass` |
-/// | Modus-Umschalter | `:3203-3241` | 30 | `mode-fact-finder`, `mode-tour` |
+/// | Modus-Umschalter | `:3203-3240` | 30 | `mode-fact-finder`, `mode-tour` |
 ///
 /// ## Dieses Widget weiß nichts von einer Karte
 ///
@@ -95,7 +95,7 @@ part 'map_top_chrome/map_top_right_column.dart';
 /// - **Die Münz-Abzugsanimation** (`:3140-3151`). Sie hängt an `coinDelta`,
 ///   das nur beim Kauf eines Jagd-Hinweises entsteht. Werte für den Nachbau:
 ///   `top: 62`, `right: 58`, Nunito 900/16, `#E8380D`, `coinDeduct 0.85s`.
-/// - **Der Nähe-Toast** (`:3122-3136`). Er zählt ungesammelte Fakten im
+/// - **Der Nähe-Toast** (`:3125-3136`). Er zählt ungesammelte Fakten im
 ///   Kilometer-Umkreis, braucht also Fakten und GPS.
 /// - **Die Münzdrehung** `coinFlip`. Sie liefe endlos und ließe jedes
 ///   `pumpAndSettle` hängen. Zur Quelle gehört eine Falle: `coinFlip` ist

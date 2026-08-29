@@ -39,11 +39,11 @@ class MapChromePalette {
     coinPillBackground: Color(0xEBF0FFF8),
     // `rgba(80,160,80,0.25)`, `:689`.
     coinPillBorder: Color(0x4050A050),
-    // `rgba(0,0,0,0.08)`, `:733`.
+    // `rgba(0,0,0,0.08)`, `:732`.
     levelTrack: Color(0x14000000),
-    // `#FDF7E8`, `:739`.
+    // `#FDF7E8`, `:738`.
     levelInnerBackground: Color(0xFFFDF7E8),
-    // `#7A5C00`, `:741`.
+    // `#7A5C00`, `:740`.
     levelText: Color(0xFF7A5C00),
     // `actBg`, `:3220`.
     modeActiveBackground: Color(0xFF1A1208),
@@ -66,11 +66,11 @@ class MapChromePalette {
     coinPillBackground: Color(0xDB120E0A),
     // `rgba(255,200,120,0.12)`, `:688`.
     coinPillBorder: Color(0x1FFFC878),
-    // `rgba(255,255,255,0.10)`, `:733`.
+    // `rgba(255,255,255,0.10)`, `:732`.
     levelTrack: Color(0x1AFFFFFF),
-    // `#1A1410`, `:739`.
+    // `#1A1410`, `:738`.
     levelInnerBackground: Color(0xFF1A1410),
-    // `#F5C518`, `:741`.
+    // `#F5C518`, `:740`.
     levelText: Color(0xFFF5C518),
     // `actBg`, `:3220`.
     modeActiveBackground: Color(0xFFFFFFFF),

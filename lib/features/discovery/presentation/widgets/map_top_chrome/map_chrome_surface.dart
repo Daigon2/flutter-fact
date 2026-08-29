@@ -68,13 +68,13 @@ class _Blurred extends StatelessWidget {
 /// `borderRadius: 999`, also so rund wie möglich.
 const double _fullRadius = 999;
 
-/// `backdropFilter: 'blur(14px)'`, `screen-map.jsx:3029`, `:3106`, `:3209`.
+/// `backdropFilter: 'blur(14px)'`, `screen-map.jsx:3028`, `:3107`, `:3207`.
 const double _blurStrong = 14;
 
-/// `backdropFilter: 'blur(10px)'` der Coin-Pille, `screen-map.jsx:711`.
+/// `backdropFilter: 'blur(10px)'` der Coin-Pille, `screen-map.jsx:713`.
 const double _blurLight = 10;
 
-/// `boxShadow: '0 1px 6px rgba(0,0,0,0.12)'`, `screen-map.jsx:714` und `:3111`.
+/// `boxShadow: '0 1px 6px rgba(0,0,0,0.12)'`, `screen-map.jsx:715` und `:3111`.
 const BoxShadow _softShadow = BoxShadow(
   color: Color(0x1F000000),
   offset: Offset(0, 1),

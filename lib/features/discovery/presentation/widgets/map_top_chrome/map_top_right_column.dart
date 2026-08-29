@@ -17,7 +17,7 @@ part of 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome
 /// Pixel Rahmen; `box-sizing: border-box` aus `styles.css:109` ändert daran
 /// nichts, weil die Pille keine gesetzte Höhe hat. Die letzten 8 sind der
 /// Rest, und sie sind zugleich der `gap: 8`, den die Quelle der
-/// Kompass-Spalte selbst gibt (`:3151`).
+/// Kompass-Spalte selbst gibt (`:3152`).
 @visibleForTesting
 class MapTopRightColumn extends StatelessWidget {
   /// Erzeugt die rechte Spalte.

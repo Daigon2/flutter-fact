@@ -1,6 +1,6 @@
 part of 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome.dart';
 
-/// Der Modus-Umschalter, `screen-map.jsx:3203-3241`.
+/// Der Modus-Umschalter, `screen-map.jsx:3203-3240`.
 ///
 /// **Keine fünfte Tab-Leiste und auch nicht `ModeBar`**, siehe `map_mode.dart`.
 @visibleForTesting
@@ -41,13 +41,13 @@ class MapModeToggle extends StatelessWidget {
       sigma: _blurStrong,
       background: palette.background,
       border: palette.border,
-      // `padding: 4`, `screen-map.jsx:3210`.
+      // `padding: 4`, `screen-map.jsx:3208`.
       padding: const EdgeInsets.all(4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           for (final entry in MapMode.values) ...<Widget>[
-            // `gap: 3`, `:3208`. Vor jedem Eintrag außer dem ersten.
+            // `gap: 3`, `:3206`. Vor jedem Eintrag außer dem ersten.
             if (entry != MapMode.values.first) const SizedBox(width: 3),
             // Ausdrücklich **kein** `Flexible`: zwei `Flexible` mit gleichem
             // `flex` deckeln beide Knöpfe auf die halbe Breite, und die
@@ -113,7 +113,7 @@ class _MapModeButton extends StatelessWidget {
             clipBehavior: Clip.none,
             children: <Widget>[
               Container(
-                // `padding: '7px 16px'`, `borderRadius: 999`, `:3220`.
+                // `padding: '7px 16px'`, `borderRadius: 999`, `:3219`.
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 7,
@@ -128,7 +128,7 @@ class _MapModeButton extends StatelessWidget {
                 ),
                 child: Text(
                   label,
-                  // `fontWeight: 900, fontSize: 13`, `:3224`.
+                  // `fontWeight: 900, fontSize: 13`, `:3222`.
                   style: FactTypography.emphasis.copyWith(
                     fontSize: 13,
                     color: isActive ? palette.modeActiveText : palette.muted,
@@ -145,7 +145,7 @@ class _MapModeButton extends StatelessWidget {
                   right: 3,
                   child: MapNotificationDot(
                     size: 7,
-                    // `border: 1.5px solid pill.bg`, `:3233`. Ein CSS-Rahmen
+                    // `border: 1.5px solid pill.bg`, `:3232`. Ein CSS-Rahmen
                     // liegt innerhalb der 7 Pixel, weil `styles.css:109`
                     // global `box-sizing: border-box` setzt.
                     ringWidth: 1.5,

@@ -44,7 +44,7 @@ class MapNotificationDot extends StatelessWidget {
   }
 }
 
-/// `#E8380D`, `screen-map.jsx:3196` und `:3232`.
+/// `#E8380D`, `screen-map.jsx:3196` und `:3231`.
 ///
 /// Wertgleich mit `--red` aus `styles.css`, aber **nicht** von dort geholt: die
 /// Quelle schreibt an diesen beiden Stellen die Zahl hin und nicht

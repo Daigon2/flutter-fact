@@ -194,6 +194,32 @@ Laufweite mehr trägt, die weitergereicht werden könnte. Durchgekommen ist
 ausschließlich `height: 1.43`. Wer hier „Materials Typografie" liest, muss
 wissen, welcher Teil davon in dieser App noch scharf ist und welcher nicht.
 
+### 29.08.2026, Fundstellen des Karten-Chrome: 41 von 138 waren falsch
+
+Ein vollständiger Rundgang über die zehn Chrome-Dateien und ihre Testdatei.
+**138 Fundstellen, 41 falsch**, also fast ein Drittel. Nur Kommentartext
+geändert, kein Verhalten, Testzahl unverändert 1198. Der Nachweis dafür ist
+nicht der grüne Lauf: `git diff -U0`, gefiltert auf Zeilen ohne `//`, ist
+**leer**, und die Dateilängen sind unverändert.
+
+**Warum das kein Aufräumen war.** Fundstellen sind hier Vertragsfläche: die
+nächste Sitzung liest sie **statt** der Quelle. Eine falsche Angabe wird nie
+nachgeprüft, weil sie sich als belegt ausgibt, und genau dieser Fehlertyp hat
+in dieser Woche viermal Geld gekostet.
+
+**Der Versatz war uneinheitlich**, ein bis drei Zeilen, mal zu hoch, mal zu
+tief. Es gibt keine Formel, jede Angabe muss einzeln aufgeschlagen werden. An
+drei Stellen zeigte die Angabe auf die schließende Klammer statt auf die
+Eigenschaft. Eine Vermutung zur Ursache, nicht belegt: im Lese-Repo liegen
+mehrere Arbeitskopien mit eigener `screen-map.jsx`. Wer gegen eine andere als
+die in `CLAUDE.md` benannte liest, bekommt genau so einen wandernden Versatz.
+
+**Zwei Funde sind keine Zahlen, sondern Aussagen**, und deshalb stehen
+geblieben: `actBg` und `actText` zeigen buchstäblich richtig auf ihre
+**Verwendungsstelle**, die Farbwerte selbst stehen sieben Zeilen höher. Und
+eine Zahl trägt zwei Aussagen, von denen nur eine stimmt. Beides ist eine
+Formulierungsfrage, keine Korrektur, und gehört in einen eigenen Durchgang.
+
 ### 29.08.2026, Schritt 13: die Karte folgt dem Nutzer
 
 Ortungsdienst, GPS-Folgen, Sky-Fall und die drei Bedienelemente des

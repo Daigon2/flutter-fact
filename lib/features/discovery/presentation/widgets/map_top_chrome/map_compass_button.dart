@@ -141,7 +141,7 @@ class MapCompassButton extends StatelessWidget {
                       right: 5,
                       child: MapNotificationDot(
                         size: 8,
-                        // `boxShadow: '0 0 0 2px ' + pill.bg`, `:3197`.
+                        // `boxShadow: '0 0 0 2px ' + pill.bg`, `:3196`.
                         ringWidth: 2,
                         ringColor: palette.background,
                       ),

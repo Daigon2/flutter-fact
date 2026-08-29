@@ -238,7 +238,7 @@ void main() {
       final pill = tester.getRect(anchorOf(DiscoveryAnchors.coins));
       expect(pill.top, safeTop(tester) + MapTopChrome.topRightColumnTop);
       expect(pill.right, 390 - MapTopChrome.sideInset);
-      // 4 + 22 + 4 plus zwei mal ein Pixel Rahmen, `screen-map.jsx:713-717`.
+      // 4 + 22 + 4 plus zwei mal ein Pixel Rahmen, `screen-map.jsx:714-720`.
       expect(pill.height, 32);
     });
 
@@ -313,12 +313,12 @@ void main() {
       final first = tester.getRect(anchorOf(DiscoveryAnchors.modeFactFinder));
       final second = tester.getRect(anchorOf(DiscoveryAnchors.modeTour));
 
-      // `padding: 4` der Pille plus ein Pixel Rahmen, `:3209-3210`.
+      // `padding: 4` der Pille plus ein Pixel Rahmen, `:3208`.
       expect(first.left - toggle.left, 5);
       expect(second.left - first.right, 3);
       expect(toggle.right - second.right, 5);
 
-      // `padding: '7px 16px'` am Knopf, `:3220`.
+      // `padding: '7px 16px'` am Knopf, `:3219`.
       final label = tester.getRect(find.text('🔍 Fact Finder'));
       expect(label.left - first.left, 16);
       expect(first.right - label.right, 16);
@@ -378,7 +378,7 @@ void main() {
       tester,
     ) async {
       // `conic-gradient(#F5C518 ${levelPct * 3.6}deg, <track> 0deg)`,
-      // `screen-map.jsx:733`: zwei harte Stopps an derselben Stelle. Ohne
+      // `screen-map.jsx:732`: zwei harte Stopps an derselben Stelle. Ohne
       // diese Zusicherung wäre ein fest verdrahteter Ring nicht von einem
       // rechnenden zu unterscheiden, weil der Startwert 0 ist.
       SweepGradient gradientOf(WidgetTester tester) {
@@ -465,7 +465,7 @@ void main() {
       tester,
     ) async {
       // `handleModeChange` prüft in der Quelle nicht auf Gleichheit
-      // (`screen-map.jsx:3218`).
+      // (`screen-map.jsx:3048`).
       await pumpChrome(tester, mode: MapMode.tour);
 
       await tester.tap(anchorOf(DiscoveryAnchors.modeTour));
