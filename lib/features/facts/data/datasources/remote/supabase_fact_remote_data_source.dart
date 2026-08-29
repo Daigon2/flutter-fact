@@ -99,11 +99,25 @@ class SupabaseFactRemoteDataSource implements FactRemoteDataSource {
   }
 }
 
-/// Die Datenquelle für Fakten.
+/// Die Datenquelle für Fakten. **Nur `lib/app/` und der Provider daneben lesen
+/// ihn**, siehe unten.
 ///
-/// Regel 7: Widgets und Notifier bauen sich das nicht selbst zusammen, sie
-/// beziehen es über einen Provider (ADR-005). Der Provider steht neben der
-/// Implementierung, die er bereitstellt.
+/// Regel 7 und ADR-005 gelten: niemand baut sich eine Datenquelle selbst
+/// zusammen, sie entsteht genau hier. Der Provider steht neben der
+/// Implementierung, die er baut.
+///
+/// ## Der Satz, der hier bis zum 29.08.2026 stand, war falsch
+///
+/// Er lautete „Widgets und Notifier bauen sich das nicht selbst zusammen, sie
+/// beziehen es über einen Provider". **Beziehen können sie ihn nie:** Regel 17
+/// verbietet `presentation` jeden Import aus `data`, auch aus dem eigenen
+/// Feature, und Regel 9 verbietet ihn jedem anderen Feature. Derselbe Satz
+/// stand am Repository-Provider daneben, und genau er ist der Grund, warum
+/// E-32 aufgemacht wurde; dort ist er behoben, hier war er stehen geblieben.
+///
+/// Wer ein `FactRepository` **benutzen** will, liest
+/// `features/facts/application/fact_providers.dart`. Eine `FactRemoteDataSource`
+/// benutzt außerhalb von `data/` niemand.
 final factRemoteDataSourceProvider = Provider<FactRemoteDataSource>(
   (ref) => SupabaseFactRemoteDataSource(ref.watch(supabaseClientProvider)),
 );

@@ -30,6 +30,7 @@ library;
 
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
+import 'package:fact_app/map/domain/map_overlay.dart';
 
 /// Was ein Feature vom Karten-Host sehen darf.
 ///
@@ -93,4 +94,33 @@ abstract interface class MapHost {
   /// Begründung und der Auslöser für eine Änderung stehen bei
   /// `MapCameraHost.submitIntent`.
   void submitIntent(MapCameraIntent intent);
+
+  /// Registriert die Bilder, mit denen Punkte gezeichnet werden.
+  ///
+  /// **Vor [setOverlay] zu rufen, und der Grund ist ein lautloser Ausfall:**
+  /// ein Symbol-Layer, dessen `icon-image` auf eine unbekannte Kennung zeigt,
+  /// zeichnet gar nichts, ohne Fehler. Der Host meldet eine unbekannte
+  /// Kennung deshalb als Diagnose-Ereignis; das ist der einzige Schutz, den
+  /// ein Vertrag mit freien Zeichenketten haben kann, siehe [MapOverlayPoint].
+  ///
+  /// Ein zweiter Aufruf mit derselben [MapOverlayImage.styleId] ersetzt das
+  /// Bild. Bereits registrierte Bilder bleiben, bis der Host stirbt: sie
+  /// hängen an der Karte, nicht an einer Überlagerung, und dieselben zwölf
+  /// Kategorienbilder tragen jede weitere Überlagerung mit.
+  void registerOverlayImages(List<MapOverlayImage> images);
+
+  /// Legt [overlay] auf die Karte oder ersetzt eine gleichnamige.
+  ///
+  /// **Anders als [submitIntent] geht hier nichts verloren.** Eine Absicht ist
+  /// ein Ereignis und verfällt, eine Überlagerung ist Zustand: kommt sie an,
+  /// bevor die Karte steht, hält der Host sie fest und legt sie auf, sobald es
+  /// eine Karte gibt. Die Begründung steht bei [MapOverlay].
+  void setOverlay(MapOverlay overlay);
+
+  /// Nimmt die Überlagerung mit der Kennung [overlayId] wieder herunter.
+  ///
+  /// Eine unbekannte Kennung ist kein Fehler und tut nichts: das Aufräumen
+  /// eines Bildschirms, der nie eine Überlagerung gesetzt hat, soll nicht
+  /// melden müssen, ob er es getan hat.
+  void removeOverlay(String overlayId);
 }

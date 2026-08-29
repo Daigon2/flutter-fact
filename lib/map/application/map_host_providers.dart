@@ -45,6 +45,7 @@ import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
+import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Nimmt Absichten entgegen und reicht sie an den eingeklinkten Host weiter.
@@ -94,6 +95,34 @@ final class MapHostRegistry implements MapHost {
   MapHost? _host;
   StreamSubscription<MapCameraView>? _subscription;
 
+  /// Die zuletzt registrierten Bilder, nach Stil-Kennung.
+  ///
+  /// ## Warum die Registry das aufhebt, obwohl der Host es auch tut
+  ///
+  /// **Weil die beiden zwei verschiedene Lücken schließen.** Die Reihenfolge
+  /// beim Start ist gemessen und nicht vermutet:
+  ///
+  /// 1. `MapPage.didChangeDependencies` läuft, **bevor** die Kartenfläche als
+  ///    Kind überhaupt gebaut ist. Zu diesem Zeitpunkt hängt kein Host in der
+  ///    Registry. Ohne diesen Zwischenspeicher wären die zwölf Ballonbilder
+  ///    weg, und der Symbol-Layer zeichnete später nichts, ohne Fehler.
+  /// 2. `MapSurface.initState` klinkt den Host ein, die Karte selbst kommt erst
+  ///    mit `onMapCreated`. Diese zweite Lücke schließt der Host mit seinem
+  ///    eigenen Zwischenspeicher.
+  ///
+  /// Dazu kommt der Wechsel des Hosts: die Registry überlebt ihn, siehe den
+  /// Klassenkommentar zum Kamerastrom. Ein Feature, das seine Bilder einmal
+  /// registriert hat, soll sie nach einem Wechsel nicht erneut zeichnen müssen.
+  ///
+  /// Zwei Zwischenspeicher für dasselbe wären eine zweite Wahrheit, wenn beide
+  /// unabhängig geschrieben würden. Werden sie nicht: hier steht, **was das
+  /// Feature will**, dort, **was auf diese eine Karte gehört**, und der Weg
+  /// führt immer von hier nach dort.
+  final Map<String, MapOverlayImage> _images = <String, MapOverlayImage>{};
+
+  /// Die zuletzt gesetzten Überlagerungen, nach Kennung. Siehe [_images].
+  final Map<String, MapOverlay> _overlays = <String, MapOverlay>{};
+
   /// Klinkt [host] ein. Ein bereits eingeklinkter wird ersetzt.
   ///
   /// „Der letzte gewinnt" ist dieselbe Antwort wie in
@@ -107,6 +136,14 @@ final class MapHostRegistry implements MapHost {
     unawaited(_subscription?.cancel());
     _host = host;
     _subscription = host.cameraChanges.listen(_cameraChanges.add);
+    // Bilder vor Überlagerungen: ein Symbol-Layer ohne sein Bild zeichnet
+    // nichts, und zwar ohne Fehlermeldung.
+    if (_images.isNotEmpty) {
+      host.registerOverlayImages(_images.values.toList());
+    }
+    for (final MapOverlay overlay in _overlays.values) {
+      host.setOverlay(overlay);
+    }
   }
 
   /// Klinkt [host] aus, aber nur, wenn er wirklich der eingeklinkte ist.
@@ -136,6 +173,8 @@ final class MapHostRegistry implements MapHost {
     unawaited(_subscription?.cancel());
     _subscription = null;
     _host = null;
+    _images.clear();
+    _overlays.clear();
     unawaited(_cameraChanges.close());
   }
 
@@ -168,6 +207,35 @@ final class MapHostRegistry implements MapHost {
       return;
     }
     host.submitIntent(intent);
+  }
+
+  /// Merkt sich die Bilder und reicht sie durch, wenn ein Host da ist.
+  ///
+  /// **Ohne Host geht hier nichts verloren, und deshalb wird auch nichts
+  /// gemeldet.** Das ist der Unterschied zu [submitIntent]: eine Absicht ist
+  /// ein Ereignis und verfällt, ein Bild ist Zustand und wartet. Ein Ereignis
+  /// im Normalbetrieb jedes Startvorgangs liest nach der dritten Woche
+  /// niemand mehr, und dieser Fall ist der Normalbetrieb, siehe [_images].
+  @override
+  void registerOverlayImages(List<MapOverlayImage> images) {
+    for (final MapOverlayImage image in images) {
+      _images[image.styleId] = image;
+    }
+    _host?.registerOverlayImages(images);
+  }
+
+  /// Merkt sich die Überlagerung und reicht sie durch. Siehe
+  /// [registerOverlayImages].
+  @override
+  void setOverlay(MapOverlay overlay) {
+    _overlays[overlay.id] = overlay;
+    _host?.setOverlay(overlay);
+  }
+
+  @override
+  void removeOverlay(String overlayId) {
+    _overlays.remove(overlayId);
+    _host?.removeOverlay(overlayId);
   }
 
   /// Meldet den fehlenden Host.

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
@@ -6,6 +7,7 @@ import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
+import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,6 +35,33 @@ class FakeMapHost implements MapHost {
   @override
   void submitIntent(MapCameraIntent intent) => submitted.add(intent);
 
+  /// Die Bilder, die angemeldet wurden, in der Reihenfolge des Eingangs.
+  final List<MapOverlayImage> registeredImages = <MapOverlayImage>[];
+
+  /// Die Überlagerungen, die gesetzt wurden, in der Reihenfolge des Eingangs.
+  final List<MapOverlay> overlays = <MapOverlay>[];
+
+  /// Die Kennungen, die entfernt wurden.
+  final List<String> removedOverlays = <String>[];
+
+  /// Ob zuerst Bilder oder zuerst Überlagerungen ankamen.
+  final List<String> order = <String>[];
+
+  @override
+  void registerOverlayImages(List<MapOverlayImage> images) {
+    order.add('images');
+    registeredImages.addAll(images);
+  }
+
+  @override
+  void setOverlay(MapOverlay overlay) {
+    order.add('overlay');
+    overlays.add(overlay);
+  }
+
+  @override
+  void removeOverlay(String overlayId) => removedOverlays.add(overlayId);
+
   void moveTo(MapCameraView view) {
     _camera = view;
     _controller.add(view);
@@ -50,6 +79,24 @@ class RecordingSink implements DiagnosticSink {
   List<String> get names =>
       events.map((DiagnosticEvent event) => event.name).toList();
 }
+
+MapOverlayImage imageFor(String styleId) => MapOverlayImage(
+  styleId: styleId,
+  bytes: Uint8List.fromList(const <int>[1, 2, 3]),
+  pixelRatio: 1,
+);
+
+MapOverlay overlayNamed(String id) => MapOverlay(
+  id: id,
+  points: const <MapOverlayPoint>[
+    MapOverlayPoint(
+      id: '1',
+      position: munich,
+      styleId: 'a',
+      state: 'uncollected',
+    ),
+  ],
+);
 
 MapCameraOneShot skyFall() => const MapCameraOneShot(
   change: MapCameraChange(zoom: 16.5, pitch: 58, bearing: 0),
@@ -239,5 +286,97 @@ void main() {
     // 'MapHost'` und bricht mit **Exit-Code 3** ab. Die Probe steht im Bericht
     // zu Schritt 12 und nicht hier, weil ein Test, der nichts misst,
     // schlechter ist als keiner.
+  });
+
+  group('Überlagerungen', () {
+    test('ohne Host gehen Bilder und Überlagerungen nicht verloren', () async {
+      // **Der belegte Startablauf, nicht ein gedachter.**
+      // `MapPage.didChangeDependencies` läuft, bevor die Kartenfläche als Kind
+      // gebaut ist, und erst deren `initState` klinkt den Host ein. Ohne diesen
+      // Zwischenspeicher wären die zwölf Ballonbilder in genau diesem Fenster
+      // weg, und der Symbol-Layer zeichnete später **nichts**, ohne Fehler.
+      final MapHostRegistry registry = MapHostRegistry(diagnostics: sink);
+      addTearDown(registry.dispose);
+
+      registry
+        ..registerOverlayImages(<MapOverlayImage>[imageFor('a')])
+        ..setOverlay(overlayNamed('discovery.facts'))
+        ..attach(host);
+
+      expect(host.registeredImages.map((image) => image.styleId), <String>[
+        'a',
+      ]);
+      expect(host.overlays.map((overlay) => overlay.id), <String>[
+        'discovery.facts',
+      ]);
+      await host.close();
+    });
+
+    test('nichts davon meldet einen fehlenden Host', () {
+      // Anders als bei einer Absicht: die verfällt, ein Bild wartet. Ein
+      // Ereignis, das im Normalbetrieb jedes Startvorgangs feuert, liest nach
+      // der dritten Woche niemand mehr.
+      final MapHostRegistry registry = MapHostRegistry(diagnostics: sink);
+      addTearDown(registry.dispose);
+
+      registry
+        ..registerOverlayImages(<MapOverlayImage>[imageFor('a')])
+        ..setOverlay(overlayNamed('discovery.facts'))
+        ..removeOverlay('discovery.facts');
+
+      expect(sink.events, isEmpty);
+    });
+
+    test(
+      'beim Einklinken kommen erst die Bilder, dann die Überlagerung',
+      () async {
+        final MapHostRegistry registry = MapHostRegistry(diagnostics: sink);
+        addTearDown(registry.dispose);
+
+        registry
+          ..setOverlay(overlayNamed('discovery.facts'))
+          ..registerOverlayImages(<MapOverlayImage>[imageFor('a')])
+          ..attach(host);
+
+        // Gesetzt wurde die Überlagerung zuerst, weitergereicht wird sie zuletzt:
+        // ein Symbol-Layer ohne sein Bild zeichnet nichts.
+        expect(host.registeredImages, isNotEmpty);
+        expect(host.overlays, isNotEmpty);
+        expect(host.order, <String>['images', 'overlay']);
+        await host.close();
+      },
+    );
+
+    test('eine entfernte Überlagerung wird nicht nachgereicht', () async {
+      final MapHostRegistry registry = MapHostRegistry(diagnostics: sink);
+      addTearDown(registry.dispose);
+
+      registry
+        ..setOverlay(overlayNamed('discovery.facts'))
+        ..removeOverlay('discovery.facts')
+        ..attach(host);
+
+      expect(host.overlays, isEmpty);
+      await host.close();
+    });
+
+    test('ein zweiter Host bekommt denselben Stand', () async {
+      // Der Grund, warum die Registry das überhaupt aufhebt: sie überlebt den
+      // Wechsel des Hosts, so wie der Kamerastrom es tut.
+      final MapHostRegistry registry = MapHostRegistry(diagnostics: sink);
+      addTearDown(registry.dispose);
+      final FakeMapHost second = FakeMapHost();
+
+      registry
+        ..registerOverlayImages(<MapOverlayImage>[imageFor('a')])
+        ..setOverlay(overlayNamed('discovery.facts'))
+        ..attach(host)
+        ..attach(second);
+
+      expect(second.registeredImages, hasLength(1));
+      expect(second.overlays, hasLength(1));
+      await host.close();
+      await second.close();
+    });
   });
 }

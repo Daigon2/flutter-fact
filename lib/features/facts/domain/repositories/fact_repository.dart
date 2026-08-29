@@ -58,3 +58,61 @@ abstract interface class FactRepository {
   /// Einmal-Strom wäre schlimmer: er sähe live aus und wäre es nicht.
   Stream<FactBatch> watchFacts({FactQuery query = FactQuery.all});
 }
+
+/// Der untätige Standard: **es gibt keine Fakten, und jeder Versuch scheitert
+/// sichtbar.**
+///
+/// ## Wozu er da ist
+///
+/// `features/facts/application/fact_providers.dart` gibt höheren Schichten
+/// einen Provider, der auf diesem Vertrag typisiert ist. Der braucht einen
+/// Standard, und `lib/app/bootstrap.dart` setzt die Supabase-Fassung per
+/// Override ein. Dieselbe Bauform wie `unavailableAuthRepository`, aus
+/// derselben Not: `flutter test` hat keinen Plattformkanal, und ein echter
+/// Supabase-Client scheiterte dort mit einer `MissingPluginException`.
+///
+/// ## Warum werfend und nicht leer
+///
+/// Hier weicht die Bauform von der Anmeldung ab, und zwar bewusst. Eine leere
+/// Faktenliste ist eine **plausible Antwort**: eine Stadt ohne Fakten sieht
+/// genauso aus. Fehlt der Override, zeigte die App also eine leere Karte, und
+/// niemand könnte sie von einer richtigen unterscheiden. Ein Fehlschlag ist
+/// dagegen unverwechselbar, und `FactRepository` sagt ausdrücklich: „Die
+/// Präsentation zeigt einen Fehler an, statt eine leere Karte."
+///
+/// [FactBackendUnreachable] und nicht [FactAccessDenied]: es gab gar keine
+/// Antwort, weil gar niemand gefragt wurde. Der Code benennt die Ursache, damit
+/// eine Diagnose nicht nach einem Netzproblem sucht, das es nicht gibt.
+///
+/// ## Warum eine Konstante und keine Klasse zum Instanziieren
+///
+/// Damit Presentation und Application ihn benutzen können. Regel 7 wird
+/// textuell geprüft und meldet dort **jeden** Konstruktoraufruf einer Klasse,
+/// deren Name auf `Repository`, `DataSource` oder `Client` endet
+/// (`tool/check_architecture.dart`). Der kleingeschriebene Name dieser
+/// Konstante trifft das Muster nicht.
+const FactRepository unavailableFactRepository = _UnavailableFactRepository();
+
+/// Siehe [unavailableFactRepository]. Privat, damit niemand eine zweite Instanz
+/// baut und damit den Vergleich `same(unavailableFactRepository)` unterläuft.
+final class _UnavailableFactRepository implements FactRepository {
+  const _UnavailableFactRepository();
+
+  /// Der Diagnosecode, an dem der fehlende Override zu erkennen ist.
+  static const String _code = 'fact_repository_not_configured';
+
+  @override
+  Future<FactBatch> fetchFacts({FactQuery query = FactQuery.all}) async {
+    throw const FactBackendUnreachable(code: _code);
+  }
+
+  @override
+  Future<FactBatch> fetchFactById(FactId id) async {
+    throw const FactBackendUnreachable(code: _code);
+  }
+
+  @override
+  Stream<FactBatch> watchFacts({FactQuery query = FactQuery.all}) {
+    throw const FactBackendUnreachable(code: _code);
+  }
+}

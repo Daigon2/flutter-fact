@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
+import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -31,6 +32,25 @@ class FakeMapHost implements MapHost {
 
   @override
   void submitIntent(MapCameraIntent intent) => submitted.add(intent);
+
+  /// Die Bilder, die angemeldet wurden, in der Reihenfolge des Eingangs.
+  final List<MapOverlayImage> registeredImages = <MapOverlayImage>[];
+
+  /// Die Überlagerungen, die gesetzt wurden, in der Reihenfolge des Eingangs.
+  final List<MapOverlay> overlays = <MapOverlay>[];
+
+  /// Die Kennungen, die entfernt wurden.
+  final List<String> removedOverlays = <String>[];
+
+  @override
+  void registerOverlayImages(List<MapOverlayImage> images) =>
+      registeredImages.addAll(images);
+
+  @override
+  void setOverlay(MapOverlay overlay) => overlays.add(overlay);
+
+  @override
+  void removeOverlay(String overlayId) => removedOverlays.add(overlayId);
 
   /// Tut so, als hätte sich die Karte bewegt.
   void moveTo(MapCameraView view) {

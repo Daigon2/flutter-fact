@@ -1,5 +1,7 @@
 import 'package:fact_app/app/app.dart';
 import 'package:fact_app/app/startup_failure_app.dart';
+import 'package:fact_app/features/facts/application/fact_providers.dart';
+import 'package:fact_app/features/facts/data/repositories/supabase_fact_repository.dart';
 import 'package:fact_app/features/identity/data/datasources/remote/supabase_auth_remote_data_source.dart';
 import 'package:fact_app/features/identity/data/repositories/supabase_auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
@@ -103,6 +105,17 @@ ProviderScope productionProviderScope({required Widget child}) {
       // Eintrag.
       locationServiceProvider.overrideWith(
         (ref) => const GeolocatorLocationService(),
+      ),
+      // Der Standard `unavailableFactRepository` wirft, statt eine leere Liste
+      // zu liefern, und genau deshalb ist dieser Override kein stiller Ausfall
+      // mehr, sondern ein sichtbarer. Er steht trotzdem im Test, weil ohne ihn
+      // die Karte leer bliebe und der Fehler erst am Gerät sichtbar würde.
+      //
+      // `overrideWith` und nicht `overrideWithValue`, wie oben: der Provider
+      // daneben braucht den Supabase-Client, und der entsteht erst beim ersten
+      // Zugriff.
+      factRepositoryProvider.overrideWith(
+        (ref) => ref.watch(supabaseFactRepositoryProvider),
       ),
     ],
     child: child,

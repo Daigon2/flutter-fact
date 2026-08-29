@@ -364,7 +364,8 @@ keinen Schalter, nur Position und Rand. Nicht behoben, weil eine Attribution
 auch rechtlich hingehört.
 
 - [x] 12. MapLibre mit gebackenem Style · [x] 13. Kamera-Verhalten
-- [ ] 14. Kompass-Rotation · [ ] 15. Cluster-Layer · [ ] 16. Einzel-Marker
+- [!] 14. Kompass-Rotation (Sensorpaket fehlt) · [x] 15. Cluster-Layer
+  · [x] 16. Einzel-Marker
 - [ ] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
 - [ ] 19. Top-Chrome · [ ] 20. Sammel-Erlebnis
 

@@ -9,8 +9,11 @@ import 'package:fact_app/core/anchors/anchor_target.dart';
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/discovery/presentation/discovery_anchors.dart';
+import 'package:fact_app/features/discovery/presentation/fact_categories.dart';
+import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/map_camera_intents.dart';
 import 'package:fact_app/features/discovery/presentation/map_mode.dart';
+import 'package:fact_app/features/discovery/presentation/notifiers/fact_overlay_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/map_mode_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
 import 'package:fact_app/features/discovery/presentation/pages/map_page.dart';
@@ -20,6 +23,7 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_gate.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
+import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/services/location/device_position.dart';
 import 'package:fact_app/services/location/location_providers.dart';
@@ -64,6 +68,19 @@ void main() {
     key: const ValueKey<String>('kartenflaeche'),
   );
 
+  /// Die Überlagerung, die der überschriebene Provider liefert.
+  const MapOverlay factOverlay = MapOverlay(
+    id: factOverlayId,
+    points: <MapOverlayPoint>[
+      MapOverlayPoint(
+        id: '17',
+        position: MapPosition(latitude: 48.1371, longitude: 11.5754),
+        styleId: 'fact.hist.uncollected',
+        state: 'uncollected',
+      ),
+    ],
+  );
+
   late FakeMapHost host;
   late FakeLocationService location;
 
@@ -98,6 +115,18 @@ void main() {
         if (diagnostics != null)
           diagnosticSinkProvider.overrideWithValue(diagnostics),
         locationServiceProvider.overrideWithValue(location),
+        // **Ohne diesen Override endet jeder Test hier in „A Timer is still
+        // pending".** Der Standard `unavailableFactRepository` wirft, und
+        // Riverpod 3 wiederholt einen gescheiterten Provider von sich aus bis
+        // zu zehnmal mit wachsender Pause
+        // (`provider_container.dart:982-996`); der erste dieser Timer
+        // überlebt den Widget-Baum.
+        //
+        // Überschrieben wird die **Überlagerung** und nicht das Repository:
+        // dieser Test misst die Verdrahtung des Bildschirms, und die Strecke
+        // vom Fakt zur Überlagerung steht vollständig in
+        // `fact_overlay_test.dart`.
+        factOverlayProvider.overrideWith((ref) async => factOverlay),
       ],
     );
     addTearDown(container.dispose);
@@ -701,6 +730,152 @@ void main() {
       expect(host.intents, isEmpty);
     });
   });
+
+  group('Die Fakten landen auf der Karte', () {
+    // **Diese Gruppe läuft in `tester.runAsync`, und das ist gemessen und
+    // nicht Geschmack.** `Picture.toImage` antwortet aus der Engine, nicht aus
+    // der fingierten Zeit eines `testWidgets`. Entscheidend ist dabei die
+    // **Zone und nicht die Wartezeit**: ein Future, das im `didChangeDependencies`
+    // innerhalb der fingierten Zeit entsteht, kommt auch nach 200 Millisekunden
+    // in `runAsync` nicht zurück; wird dagegen `pumpWidget` selbst innerhalb
+    // von `runAsync` gerufen, sind die zwölf Bilder in Millisekunden da.
+    // Nachgemessen am 29.08.2026 mit vier Wegwerf-Proben, und mit einer
+    // fünften für den vollständigen Rahmen dieser Datei: Riverpod-Container,
+    // Ortungsstrom, Kamerastrom und `TickerMode` überstehen es unverändert.
+    //
+    // Deshalb gibt es hier **keinen Test-Haken mehr**. `MapPage` hatte einen
+    // (`debugBuildBalloonImages`), begründet mit „überhaupt nicht prüfbar";
+    // das galt für den einen Aufbau, der probiert worden war. Eine öffentliche
+    // Fläche weniger an einem Widget, das der Routen-Adapter baut.
+
+    /// Wartet, bis die zwölf echten Ballonbilder gezeichnet sind.
+    ///
+    /// `pump` und `pumpAndSettle` helfen dafür nicht: sie treiben die fingierte
+    /// Zeit voran, die Bilder entstehen in der echten. Deshalb echte
+    /// Wartezeit, gedeckelt, damit ein Ausfall als Zeitüberschreitung mit
+    /// Ansage endet und nicht als Hänger.
+    Future<void> awaitBalloons(WidgetTester tester) async {
+      final Stopwatch watch = Stopwatch()..start();
+      while (host.registeredImages.isEmpty &&
+          watch.elapsed < const Duration(seconds: 10)) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      await tester.pump();
+    }
+
+    testWidgets('die Bilder gehen vor der Überlagerung an den Host', (
+      tester,
+    ) async {
+      // **Die Reihenfolge ist die Zusicherung, und sie war verletzt.**
+      // `MapHost.registerOverlayImages` verlangt, vor `setOverlay` gerufen zu
+      // werden; der Host meldet sonst jede Stil-Kennung als
+      // `map.overlay.unknown_style`. Die Fakten kommen aus dem Netz, die Bilder
+      // aus der Zeichenschleife, und bis zum 29.08.2026 gewann, wer schneller
+      // war: kamen die Fakten zuerst, feuerte die Meldung mit allen zwölf
+      // Kategorien, und ein „doch alles da" gibt es hinterher nicht. Der
+      // einzige Schutz gegen eine wirklich vertippte Kennung war damit ein
+      // Fehlalarm bei jedem Start.
+      await tester.runAsync(() async {
+        await pumpPage(tester, container: newContainer());
+        await tester.pump();
+        await awaitBalloons(tester);
+      });
+
+      expect(host.arrivals, <String>['images', 'overlay:discovery.facts']);
+    });
+
+    testWidgets('die geladene Überlagerung geht an den Host', (tester) async {
+      await tester.runAsync(() async {
+        await pumpPage(tester, container: newContainer());
+        await tester.pump();
+        await awaitBalloons(tester);
+      });
+
+      expect(host.overlays, <MapOverlay>[factOverlay]);
+    });
+
+    testWidgets('die Ballonbilder werden beim Karten-Host angemeldet', (
+      tester,
+    ) async {
+      // Geprüft wird die **Verdrahtung**: dass der Bildschirm zeichnen lässt,
+      // je Kategorie ein Bild, und mit dem Bildverhältnis des Bildschirms.
+      // Was dabei gezeichnet wird, steht in `fact_balloon_images_test.dart`.
+      await tester.runAsync(() async {
+        await pumpPage(tester, container: newContainer());
+        await tester.pump();
+        await awaitBalloons(tester);
+      });
+
+      expect(host.registeredImages, hasLength(factCategoryStyles.length));
+      expect(host.registeredImages.first.styleId, 'fact.hist.uncollected');
+      // 3 ist das Bildverhältnis, mit dem `flutter test` rechnet. Wer hier
+      // stumpf 1 liefert, bekommt auf jedem heutigen Telefon matschige
+      // Ballons.
+      expect(
+        host.registeredImages
+            .map((MapOverlayImage image) => image.pixelRatio)
+            .toSet(),
+        <double>{3},
+      );
+    });
+
+    testWidgets('solange nichts geladen ist, geht nichts an den Host', (
+      tester,
+    ) async {
+      // `AsyncLoading` ist kein Wert. Eine leere Überlagerung in diesem
+      // Moment aufzulegen wäre schlimmer als gar keine: sie sähe aus wie eine
+      // Stadt ohne Fakten. Der Ladevorgang endet hier nie, das ist der Punkt.
+      //
+      // **Und die Bilder kommen trotzdem an**, sonst prüfte dieser Test die
+      // falsche Sache: ohne sie hielte der Riegel aus der Reihenfolge oben die
+      // Überlagerung zurück, und der Test wäre aus dem falschen Grund grün.
+      final Completer<MapOverlay> pending = Completer<MapOverlay>();
+      addTearDown(() => pending.complete(factOverlay));
+      final ProviderContainer container = ProviderContainer(
+        overrides: [
+          languagePreferenceStoreProvider.overrideWithValue(
+            InMemoryLanguagePreferenceStore(),
+          ),
+          mapHostProvider.overrideWithValue(host),
+          locationServiceProvider.overrideWithValue(location),
+          factOverlayProvider.overrideWith((ref) => pending.future),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.runAsync(() async {
+        await pumpPage(tester, container: container);
+        await tester.pump();
+        await awaitBalloons(tester);
+      });
+
+      expect(host.registeredImages, hasLength(factCategoryStyles.length));
+      expect(host.overlays, isEmpty);
+    });
+
+    testWidgets('bei gleichem Bildverhältnis wird nicht neu gezeichnet', (
+      tester,
+    ) async {
+      // `didChangeDependencies` läuft bei jeder Änderung der Umgebung erneut,
+      // auch bei einem Tabwechsel. Ohne die Marke entstünden zwölf Bilder je
+      // Wechsel.
+      final ProviderContainer container = newContainer();
+      await tester.runAsync(() async {
+        await pumpPage(tester, container: container);
+        await tester.pump();
+        await awaitBalloons(tester);
+        await pumpPage(tester, container: container, branchIsActive: false);
+        await tester.pump();
+        // Feste Wartezeit, weil hier **nichts** passieren soll und es dafür
+        // kein Ereignis zum Abwarten gibt. Ein zweiter Durchgang wäre nach der
+        // Messung oben lange fertig.
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        await tester.pump();
+      });
+
+      expect(host.registeredImages, hasLength(factCategoryStyles.length));
+    });
+  });
 }
 
 /// Ein Karten-Host, der jede Absicht mitschreibt statt sie auszuführen.
@@ -725,6 +900,37 @@ class FakeMapHost implements MapHost {
 
   @override
   void submitIntent(MapCameraIntent intent) => intents.add(intent);
+
+  /// Die Bilder, die angemeldet wurden, in der Reihenfolge des Eingangs.
+  final List<MapOverlayImage> registeredImages = <MapOverlayImage>[];
+
+  /// Die Überlagerungen, die gesetzt wurden, in der Reihenfolge des Eingangs.
+  final List<MapOverlay> overlays = <MapOverlay>[];
+
+  /// Die Kennungen, die entfernt wurden.
+  final List<String> removedOverlays = <String>[];
+
+  /// Bilder und Überlagerungen in **einer** Liste, in der Reihenfolge des
+  /// Eingangs.
+  ///
+  /// Zwei getrennte Listen sagen nichts über die Reihenfolge, und genau die
+  /// ist die Zusage von `MapHost.registerOverlayImages`.
+  final List<String> arrivals = <String>[];
+
+  @override
+  void registerOverlayImages(List<MapOverlayImage> images) {
+    registeredImages.addAll(images);
+    arrivals.add('images');
+  }
+
+  @override
+  void setOverlay(MapOverlay overlay) {
+    overlays.add(overlay);
+    arrivals.add('overlay:${overlay.id}');
+  }
+
+  @override
+  void removeOverlay(String overlayId) => removedOverlays.add(overlayId);
 
   /// Die Karte steht: dasselbe Signal, das `MapCameraHost.bindSurface` sendet.
   void bind(MapCameraView view) {

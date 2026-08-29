@@ -1,11 +1,16 @@
 import 'dart:async';
 
+import 'package:fact_app/core/async/detached_work.dart';
+import 'package:fact_app/features/discovery/presentation/fact_balloon_images.dart';
 import 'package:fact_app/features/discovery/presentation/map_camera_intents.dart';
+import 'package:fact_app/features/discovery/presentation/notifiers/fact_overlay_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/map_mode_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
 import 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome.dart';
 import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
+import 'package:fact_app/map/domain/map_host.dart';
+import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/services/location/device_position.dart';
 import 'package:flutter/material.dart';
@@ -14,9 +19,46 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Der Karten-Bildschirm (`02_Frontend/app/screen-map.jsx`).
 ///
 /// Unter dem Top-Chrome liegt seit Schritt 12 die echte Karte, seit Schritt 13
-/// bewegt sie sich. Wem die Kamera gehört, ist seit dem 28.08.2026 entschieden:
-/// dem Host unter `lib/map/`. Dieses Feature steuert sie nicht, es gibt über
-/// `map/domain/` Absichten ab.
+/// bewegt sie sich, und seit Schritt 15 liegen die Fakten darauf. Wem die Karte
+/// gehört, ist seit dem 28.08.2026 entschieden: dem Host unter `lib/map/`.
+/// Dieses Feature steuert weder Kamera noch Layer, es gibt über `map/domain/`
+/// Absichten ab und legt Überlagerungen auf.
+///
+/// ## Was dieser Bildschirm mit den Fakten tut, und was nicht
+///
+/// Er ist auch hier Kurier. Geladen werden sie von
+/// `notifiers/fact_overlay_providers.dart`, übersetzt von `fact_overlay.dart`,
+/// gezeichnet von `fact_balloon_images.dart`. Hier stehen nur die drei Dinge,
+/// die ein Widget beitragen muss: **wann** die Bilder entstehen (dafür braucht
+/// es das Bildverhältnis des Bildschirms), **dass** die fertige Überlagerung
+/// den Weg zum Host findet, und **in welcher Reihenfolge** beides geschieht.
+///
+/// ## Die Reihenfolge ist eine Zusage, kein Zufall
+///
+/// `MapHost.registerOverlayImages` verlangt ausdrücklich, vor `setOverlay`
+/// gerufen zu werden, und der Grund ist eine Meldung: der Host meldet jede
+/// Stil-Kennung, für die kein Bild registriert ist, als
+/// `map.overlay.unknown_style`. **Dieser Bildschirm hat die Zusage bis zum
+/// 29.08.2026 gebrochen.** Die Bilder entstehen asynchron in
+/// [_ensureBalloonImages], die Überlagerung kommt unabhängig davon aus dem
+/// Netz; kamen die Fakten zuerst, feuerte die Meldung mit allen zwölf
+/// Kategorien auf einmal, und ein „doch alles da" gibt es hinterher nicht.
+/// Damit war der einzige Schutz gegen eine wirklich vertippte Kennung ein
+/// Fehlalarm bei jedem Start.
+///
+/// Behoben wird es **hier** und nicht im Host, weil hier die Reihenfolge
+/// entsteht. Der Host könnte stattdessen erst beim Einklinken prüfen, das
+/// verschiebt das Problem nur: auch dann können Bilder danach eintreffen, und
+/// die Meldung hätte wieder einen Zeitpunkt, den niemand kontrolliert. Der
+/// Bildschirm dagegen weiß genau, wann er fertig ist. Die Überlagerung wartet
+/// deshalb in [_latestOverlay], bis die Bilder angemeldet sind, siehe
+/// [_deliverOverlay]. Dass dabei nichts verloren geht, ist derselbe Gedanke wie
+/// beim Sky-Fall eine Zeile weiter unten.
+///
+/// **Was beim Antippen eines Ballons passiert, steht bewusst nicht hier.** Der
+/// Punkt-Tipp hat bis Schritt 21 keinen Empfänger, und das Aufklappen einer
+/// Gruppe hängt an einer offenen technischen Entscheidung. Ein Strom auf
+/// Vorrat wäre Zustand, den niemand prüft.
 ///
 /// ## Warum die Karte hereingereicht wird und nicht hier entsteht
 ///
@@ -38,7 +80,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// ## Der Bildschirm ist der Kurier, nicht der Fahrer
 ///
-/// Vier Fragen kann nur ein Widget beantworten, und deshalb hängt dieser
+/// Fünf Fragen kann nur ein Widget beantworten, und deshalb hängt dieser
 /// Bildschirm an einem `State` statt an einem Notifier:
 ///
 /// 1. **Lebt die Karte schon?** Der Host verwirft jede Absicht, die vor der
@@ -51,6 +93,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// 4. **Wohin blickt die Karte?** Die Kompassnadel dreht gegen die
 ///    Kartenblickrichtung (`:1792`), und die ändert sich, während dieser
 ///    Bildschirm längst steht.
+/// 5. **Wie fein löst der Bildschirm auf?** Die Ballonbilder entstehen zur
+///    Laufzeit, und ein Bild für ein 3x-Gerät muss dreifach aufgelöst sein.
+///    `MediaQuery` gibt es nur mit einem `BuildContext`.
 ///
 /// ## Die Platzhalterwerte, und warum sie so und nicht anders lauten
 ///
@@ -182,6 +227,30 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   StreamSubscription<MapCameraView>? _cameraSubscription;
 
+  /// Für welches Bildverhältnis die Ballonbilder schon gezeichnet wurden.
+  ///
+  /// `null` heißt „noch keine". Gemerkt, weil [didChangeDependencies] bei jeder
+  /// Änderung der Umgebung erneut läuft, auch bei einem Tabwechsel: ohne diese
+  /// Marke entstünden zwölf Bilder je Wechsel.
+  double? _balloonPixelRatio;
+
+  /// Ob die Ballonbilder beim Host angemeldet sind.
+  ///
+  /// Der Riegel vor [_deliverOverlay], siehe die Reihenfolge im
+  /// Klassenkommentar. Er fällt genau einmal und geht nicht wieder zu: ein
+  /// zweiter Durchgang mit anderem Bildverhältnis **ersetzt** Bilder, er nimmt
+  /// keine weg.
+  bool _balloonImagesRegistered = false;
+
+  /// Die zuletzt geladene Überlagerung, oder `null`, solange keine geladen ist.
+  ///
+  /// Wird nach dem Ablegen **nicht** geleert, anders als ein Riegel: kommt
+  /// später ein zweiter Satz Bilder (anderes Bildverhältnis), legt
+  /// [_deliverOverlay] dieselbe Überlagerung noch einmal auf. Das ist gewollt,
+  /// der Host ersetzt eine gleichnamige, und ein Symbol-Layer, dessen Bilder
+  /// gewechselt haben, soll sie auch benutzen.
+  MapOverlay? _latestOverlay;
+
   @override
   void initState() {
     super.initState();
@@ -194,11 +263,34 @@ class _MapPageState extends ConsumerState<MapPage> {
         .read(mapHostProvider)
         .cameraChanges
         .listen(_onCameraChange);
+
+    // **`listenManual` und nicht `ref.listen` im `build`, und der Grund ist
+    // `fireImmediately`.** `ref.listen` kennt den Schalter in
+    // `flutter_riverpod 3.4.2` nicht (`widget_ref.dart:227-232`), es meldet nur
+    // **Änderungen**. Ein Bildschirm, der neu entsteht, während die Fakten
+    // längst geladen sind, bekäme also nie eine Ausgabe und legte nie eine
+    // Überlagerung auf. `listenManual` hat den Schalter
+    // (`widget_ref.dart:249-255`) und räumt sich beim Entsorgen des Widgets
+    // selbst auf, ein `close()` im `dispose` ist ausdrücklich nicht nötig.
+    //
+    // Und es ist ein Zuhören und kein `watch`: die Fakten ändern an diesem
+    // Widget nichts, sie gehen an den Karten-Host. Ein `watch` baute das ganze
+    // Top-Chrome neu, sobald 600 Fakten eintreffen.
+    ref.listenManual(
+      factOverlayProvider,
+      _onFactOverlay,
+      fireImmediately: true,
+    );
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // **Vor der Zweigprüfung, weil die früh zurückkehrt.** Die Ballonbilder
+    // hängen am Bildverhältnis des Bildschirms, und das steht erst hier zur
+    // Verfügung; ein `initState` hat noch keine `MediaQuery`.
+    _ensureBalloonImages(MediaQuery.devicePixelRatioOf(context));
+
     final bool isActive = TickerMode.valuesOf(context).enabled;
     if (isActive == _branchIsActive) {
       return;
@@ -210,6 +302,90 @@ class _MapPageState extends ConsumerState<MapPage> {
       // sich der nächste Fix mit einem neueren Wert.
       _deliverPendingSkyFall();
     }
+  }
+
+  /// Zeichnet die zwölf Ballons und meldet sie beim Karten-Host an.
+  ///
+  /// ## Warum das hier passiert und nicht im Karten-Host
+  ///
+  /// Weil hier die Kategorien bekannt sind. `lib/map/` darf nicht wissen, was
+  /// eine Fakt-Kategorie ist (Regel 18); es bekommt fertige Bytes unter einer
+  /// Stil-Kennung. Und weil nur ein Widget das Bildverhältnis des Bildschirms
+  /// kennt: ein Bild für ein 3x-Gerät muss dreifach aufgelöst sein.
+  ///
+  /// ## Der Host ist zu diesem Zeitpunkt noch nicht eingeklinkt
+  ///
+  /// [didChangeDependencies] läuft, **bevor** die Kartenfläche als Kind gebaut
+  /// ist, und erst deren `initState` klinkt den Host ein. Verloren geht
+  /// trotzdem nichts: `MapHostRegistry` hebt Bilder und Überlagerungen auf und
+  /// reicht sie beim Einklinken weiter, Bilder zuerst. Das ist dort begründet
+  /// und ist der Grund, warum hier kein `addPostFrameCallback` steht.
+  ///
+  /// **Scheitert das Zeichnen, bleibt die Überlagerung liegen**, und das ist
+  /// die richtige Seite: ohne Bilder zeichnet ein Symbol-Layer ohnehin nichts,
+  /// eine aufgelegte Überlagerung wäre also unsichtbar und erzeugte zusätzlich
+  /// zwölf Meldungen über unbekannte Kennungen. Der Fehlschlag selbst geht
+  /// über [reportDetached] laut heraus.
+  void _ensureBalloonImages(double pixelRatio) {
+    if (_balloonPixelRatio == pixelRatio) {
+      return;
+    }
+    _balloonPixelRatio = pixelRatio;
+    // Vor der Unterbrechung gelesen: nach einem `await` ist `ref` nur noch
+    // gültig, solange dieser `State` lebt, und die Registry ist ohnehin
+    // dieselbe.
+    final MapHost host = ref.read(mapHostProvider);
+    reportDetached(
+      buildFactBalloonImages(pixelRatio: pixelRatio).then((
+        List<MapOverlayImage> drawn,
+      ) {
+        if (!mounted) {
+          return;
+        }
+        host.registerOverlayImages(drawn);
+        _balloonImagesRegistered = true;
+        _deliverOverlay();
+      }),
+      origin: 'discovery.fact_balloons',
+    );
+  }
+
+  /// Die Fakten sind da: auf die Karte damit.
+  ///
+  /// Ein Fehlschlag wird hier **nicht** in eine leere Überlagerung übersetzt.
+  /// Eine leere Karte sähe aus wie eine Stadt ohne Fakten, und `FactRepository`
+  /// trennt beides ausdrücklich. Was der Bildschirm einem Nutzer stattdessen
+  /// zeigt, entscheidet der Schritt, der die Fehleranzeige baut; bis dahin
+  /// bleibt der Fehlschlag im `AsyncValue` stehen, wo ihn jeder sieht, der ihn
+  /// braucht.
+  void _onFactOverlay(
+    AsyncValue<MapOverlay>? previous,
+    AsyncValue<MapOverlay> next,
+  ) {
+    final MapOverlay? overlay = next.value;
+    if (overlay == null) {
+      return;
+    }
+    _latestOverlay = overlay;
+    _deliverOverlay();
+  }
+
+  /// Legt die wartende Überlagerung auf, sobald die Bilder angemeldet sind.
+  ///
+  /// Zwei Auslöser rufen das, und welcher zuerst kommt, entscheidet niemand:
+  /// die geladenen Fakten und die fertig gezeichneten Bilder. Deshalb steht die
+  /// vollständige Bedingung an einer Stelle statt an zweien, genau wie bei
+  /// [_deliverPendingSkyFall].
+  ///
+  /// **Es gibt keinen Riegel wie beim Sky-Fall**, und das ist der Unterschied
+  /// zwischen Ereignis und Zustand: eine Absicht wird einmal abgegeben, eine
+  /// Überlagerung darf sich ändern. Der Host ersetzt eine gleichnamige.
+  void _deliverOverlay() {
+    final MapOverlay? overlay = _latestOverlay;
+    if (overlay == null || !_balloonImagesRegistered) {
+      return;
+    }
+    ref.read(mapHostProvider).setOverlay(overlay);
   }
 
   @override

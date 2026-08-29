@@ -4,7 +4,10 @@ import 'package:fact_app/app/routing/app_router.dart';
 import 'package:fact_app/app/routing/app_routes.dart';
 import 'package:fact_app/app/shell/shell_tab.dart';
 import 'package:fact_app/app/theme/fact_theme.dart';
+import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
+import 'package:fact_app/features/discovery/presentation/notifiers/fact_overlay_providers.dart';
 import 'package:fact_app/features/discovery/presentation/pages/map_page.dart';
+import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/presentation/map_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -95,6 +98,17 @@ void main() {
       overrides: [
         languagePreferenceStoreProvider.overrideWithValue(
           InMemoryLanguagePreferenceStore(),
+        ),
+        // **Ohne diesen Override endet der Test in „A Timer is still
+        // pending".** Der Kartenbildschirm lädt seit Schritt 15 die Fakten,
+        // der Standard `unavailableFactRepository` wirft, und Riverpod 3
+        // wiederholt einen gescheiterten Provider von sich aus bis zu zehnmal
+        // mit wachsender Pause (`provider_container.dart:982-996`). Der erste
+        // dieser Timer überlebt den Widget-Baum. Hier geht es um die Route und
+        // nicht um die Fakten, also liefert der Override eine leere
+        // Überlagerung.
+        factOverlayProvider.overrideWith(
+          (ref) async => const MapOverlay(id: factOverlayId, points: []),
         ),
       ],
     );

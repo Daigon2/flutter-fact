@@ -166,12 +166,26 @@ class SupabaseFactRepository implements FactRepository {
   }
 }
 
-/// Der Zugang zu Fakten für alle höheren Schichten.
+/// Baut die Supabase-Fassung. **Nur `lib/app/` liest diesen Provider.**
 ///
-/// Regel 7 und ADR-005: Widgets und Notifier instanziieren kein Repository, sie
-/// lesen diesen Provider. Der Provider steht neben der Implementierung, die er
-/// bereitstellt (`project-structure.md`).
-final factRepositoryProvider = Provider<FactRepository>(
+/// ## Der Name hat sich am 29.08.2026 geändert, und der Grund steht hier
+///
+/// Er hieß `factRepositoryProvider`, und sein Kommentar behauptete, „Widgets
+/// und Notifier lesen diesen Provider". **Das konnten sie nie:** Regel 17
+/// verbietet `presentation` jeden Import aus `data`, auch aus dem eigenen
+/// Feature, und Regel 9 verbietet ihn jedem anderen Feature. Der Satz war
+/// keine Kleinigkeit, sondern eine Falle für den nächsten Aufrufer;
+/// `dependency-rules.md` führt ihn seit E-32 als offenen Punkt und weist die
+/// Behebung dem Schritt zu, der `facts` an die Karte hängt.
+///
+/// Der Name sagt jetzt, was der Provider ist: die Baustelle der Supabase-
+/// Fassung. Wer ein `FactRepository` **benutzen** will, liest
+/// `features/facts/application/fact_providers.dart`, der auf dem Vertrag
+/// typisiert ist und die Implementierung nicht kennt.
+///
+/// Regel 7 und ADR-005 gelten unverändert: niemand instanziiert ein Repository
+/// selbst, es entsteht genau hier.
+final supabaseFactRepositoryProvider = Provider<FactRepository>(
   (ref) => SupabaseFactRepository(
     dataSource: ref.watch(factRemoteDataSourceProvider),
     diagnostics: ref.watch(diagnosticSinkProvider),

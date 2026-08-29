@@ -26,9 +26,12 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_gate.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
+import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/presentation/map_auto_pitch.dart';
 import 'package:fact_app/map/presentation/map_camera_driver.dart';
+import 'package:fact_app/map/presentation/map_overlay_driver.dart';
+import 'package:fact_app/map/presentation/map_overlay_host.dart';
 import 'package:flutter/foundation.dart';
 
 /// Was eine Dauerabsicht zuletzt getan hat.
@@ -78,6 +81,21 @@ class _Steering {
 /// `MapHostRegistry.attach` bekannt gemacht. Die Karte selbst kommt später:
 /// bis [bindSurface] gerufen wurde, gibt es keine Kamera und keine
 /// SDK-Verbindung.
+///
+/// ## Die Überlagerungen führt er nicht selbst
+///
+/// Seit Schritt 15 verlangt `MapHost` außer der Kamera auch Punkte und Bilder.
+/// Dieses Objekt beantwortet die drei Methoden, **entscheidet aber nichts
+/// davon**: es reicht sie an [MapOverlayHost] weiter, der seinen eigenen
+/// Zustand und seine eigene Naht zum SDK hat. Die beiden teilen sich nichts
+/// außer der Karte, und ihre Regeln sind gegensätzlich (Absicht verfällt,
+/// Überlagerung bleibt liegen); in einem Objekt vermischt wären sie schwerer
+/// zu lesen als in zweien.
+///
+/// **Der Name ist damit enger als die Aufgabe**, und das bleibt vorerst so:
+/// `MapSurfaceHost` wäre die richtige Bezeichnung, die Umbenennung ist reine
+/// Kosmetik über acht Dateien und gehört nicht in denselben Schritt wie die
+/// Sache selbst.
 class MapCameraHost implements MapHost {
   /// Erzeugt einen Host ohne Karte.
   ///
@@ -89,7 +107,8 @@ class MapCameraHost implements MapHost {
     Duration Function()? now,
   }) : _diagnostics = diagnostics,
        _thresholds = thresholds,
-       _now = now ?? _stopwatchClock();
+       _now = now ?? _stopwatchClock(),
+       _overlays = MapOverlayHost(diagnostics: diagnostics);
 
   /// Gemeldet, wenn eine Absicht eintrifft, bevor eine Karte steht.
   static const String droppedEvent = 'map.host.intent_dropped';
@@ -129,6 +148,9 @@ class MapCameraHost implements MapHost {
 
   final DiagnosticSink _diagnostics;
   final MapCameraThresholds _thresholds;
+
+  /// Der Teil, der Bilder und Überlagerungen führt. Siehe Klassenkommentar.
+  final MapOverlayHost _overlays;
 
   /// Jetzt, als Abstand zu einem monotonen Nullpunkt.
   ///
@@ -205,19 +227,49 @@ class MapCameraHost implements MapHost {
   MapPosition? debugFollowAnchor(MapCameraFollowKind kind) =>
       _followRuns[kind]?.center;
 
+  /// Der Teil, der Bilder und Überlagerungen führt. Nur für Tests.
+  ///
+  /// Es gibt diesen Zugang, weil die sechs Durchreichungen dieses Objekts sonst
+  /// nur über ein erneutes [bindSurface] beobachtbar wären, und nach [dispose]
+  /// ist das nicht mehr möglich: der Kamerastrom ist dann geschlossen und
+  /// [bindSurface] würde werfen. Ein `dispose`, das den Überlagerungsteil
+  /// vergisst, wäre ohne ihn unprüfbar.
+  @visibleForTesting
+  MapOverlayHost get debugOverlays => _overlays;
+
   /// Die Karte steht: ab jetzt gibt es eine Kamera und einen Weg zum SDK.
   ///
   /// Ruft das Kartenwidget aus `onMapCreated`. [camera] ist die Startkamera,
   /// die dem Widget mitgegeben wurde: `maplibre_gl` meldet ohne eine Bewegung
   /// nichts, und ohne einen Startwert wäre [camera] bis zur ersten Geste des
   /// Nutzers `null`, obwohl die Karte längst steht.
+  ///
+  /// [overlays] ist die zweite Naht zum SDK und bewusst optional: ein Test, der
+  /// nur die Kamera prüft, soll keinen Überlagerungs-Doppelgänger mitbringen
+  /// müssen. Fehlt sie, bleiben gesetzte Überlagerungen liegen, bis eine Karte
+  /// mit Naht kommt; verloren geht nichts.
+  ///
+  /// **Und deshalb löst ein Binden ohne [overlays] die alte Naht ausdrücklich.**
+  /// Ohne diese Zeile gälte die Zusage oben nur beim ersten Mal: ein zweites
+  /// [bindSurface] ohne Überlagerungen tauschte den Kamera-Treiber aus und
+  /// ließe die Naht der **alten** Karte stehen, der Host schriebe also weiter
+  /// in Quellen, die zu einer Karte gehören, die es nicht mehr gibt. Der Fall
+  /// ist heute nicht erreichbar, `MapSurface` gibt immer beides mit; er steht
+  /// hier, weil eine Zusage, die nur unter einer ungeschriebenen Bedingung
+  /// gilt, später als belegt gelesen wird.
   void bindSurface({
     required MapCameraDriver driver,
     required MapCameraView camera,
+    MapOverlayDriver? overlays,
   }) {
     _driver = driver;
     _camera = camera;
     _zoomAtLastRest = camera.zoom;
+    if (overlays != null) {
+      _overlays.bindSurface(overlays);
+    } else {
+      _overlays.unbindSurface();
+    }
     _cameraChanges.add(camera);
   }
 
@@ -229,11 +281,13 @@ class MapCameraHost implements MapHost {
     _clearAnimation();
     _steering = null;
     _userIsGesturing = false;
+    _overlays.unbindSurface();
   }
 
   /// Schließt den Kamerastrom. Ruft das Kartenwidget beim Entsorgen.
   void dispose() {
     unbindSurface();
+    _overlays.dispose();
     unawaited(_cameraChanges.close());
   }
 
@@ -367,6 +421,19 @@ class MapCameraHost implements MapHost {
 
     _execute(driver, intent, view, verdict);
   }
+
+  /// Reicht durch, siehe Klassenkommentar.
+  @override
+  void registerOverlayImages(List<MapOverlayImage> images) =>
+      _overlays.registerImages(images);
+
+  /// Reicht durch, siehe Klassenkommentar.
+  @override
+  void setOverlay(MapOverlay overlay) => _overlays.setOverlay(overlay);
+
+  /// Reicht durch, siehe Klassenkommentar.
+  @override
+  void removeOverlay(String overlayId) => _overlays.removeOverlay(overlayId);
 
   // ---------------------------------------------------------------------------
   // Innenleben

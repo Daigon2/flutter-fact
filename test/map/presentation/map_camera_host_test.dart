@@ -1,15 +1,19 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_gate.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
+import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/presentation/map_auto_pitch.dart';
 import 'package:fact_app/map/presentation/map_camera_driver.dart';
 import 'package:fact_app/map/presentation/map_camera_host.dart';
+import 'package:fact_app/map/presentation/map_overlay_driver.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 /// Die Buchführung des Karten-Hosts, **ohne Widget und ohne Karte**.
 ///
@@ -135,6 +139,80 @@ MapCameraCommand hardReset() => const MapCameraCommand(
   releasesBearingLock: true,
   clearsFollowAnchor: true,
 );
+
+/// Eine Überlagerung, wie `features/discovery` sie auflegt.
+const MapOverlay overlay = MapOverlay(
+  id: 'discovery.facts',
+  points: <MapOverlayPoint>[
+    MapOverlayPoint(
+      id: '4711',
+      position: munich,
+      styleId: 'fact.hist.uncollected',
+      state: 'uncollected',
+    ),
+  ],
+  grouping: MapOverlayGrouping(maxZoom: 15, radiusInScreenPixels: 70),
+  minZoom: 11,
+);
+
+/// Ein Ballonbild, wie `features/discovery` es anmeldet.
+final MapOverlayImage balloonImage = MapOverlayImage(
+  styleId: 'fact.hist.uncollected',
+  bytes: Uint8List.fromList(const <int>[137, 80, 78, 71]),
+  pixelRatio: 1,
+);
+
+/// Die zweite Naht zum SDK, die jeden Aufruf in Reihenfolge mitschreibt.
+///
+/// Denselben Doppelgänger führt `map_overlay_host_test.dart`. Er steht hier
+/// noch einmal und wird nicht geteilt: dort prüft er, **was** der
+/// Überlagerungsteil baut, hier nur, **dass** dieses Objekt ihn überhaupt
+/// erreicht.
+class RecordingOverlayDriver implements MapOverlayDriver {
+  final List<String> calls = <String>[];
+
+  @override
+  Future<void> addImage(String name, Uint8List bytes) async =>
+      calls.add('addImage:$name');
+
+  @override
+  Future<void> addSource(String sourceId, SourceProperties properties) async =>
+      calls.add('addSource:$sourceId');
+
+  @override
+  Future<void> setGeoJsonSource(
+    String sourceId,
+    Map<String, dynamic> geoJson,
+  ) async => calls.add('setGeoJsonSource:$sourceId');
+
+  @override
+  Future<void> addCircleLayer(
+    String sourceId,
+    String layerId,
+    CircleLayerProperties properties, {
+    double? minzoom,
+    double? maxzoom,
+    Object? filter,
+  }) async => calls.add('addCircleLayer:$layerId');
+
+  @override
+  Future<void> addSymbolLayer(
+    String sourceId,
+    String layerId,
+    SymbolLayerProperties properties, {
+    double? minzoom,
+    double? maxzoom,
+    Object? filter,
+  }) async => calls.add('addSymbolLayer:$layerId');
+
+  @override
+  Future<void> removeLayer(String layerId) async =>
+      calls.add('removeLayer:$layerId');
+
+  @override
+  Future<void> removeSource(String sourceId) async =>
+      calls.add('removeSource:$sourceId');
+}
 
 void main() {
   late FakeCameraDriver driver;
@@ -703,6 +781,116 @@ void main() {
       expect(sink.events.last.name, MapHostRegistry.suppressedEvent);
       expect(sink.events.last.attributes['reason'], 'runningAnimation');
       expect(sink.events.last.attributes['origin'], 'mapHost');
+    });
+  });
+
+  group('Die sechs Durchreichungen an den Überlagerungsteil', () {
+    // **Hier lag die teuerste Lücke der Review zu Schritt 15.**
+    // `MapOverlayHost` war vorbildlich geprüft, `MapHostRegistry` auch, der
+    // Bildschirm gegen einen Doppelgänger. Ungeprüft war genau das Stück
+    // dazwischen, das in der App wirklich läuft: dieses Objekt ist die einzige
+    // Produktivfassung von `MapHost`. Jede der sechs Durchreichungen fällt
+    // lautlos aus, und die erste kostet **jeden Fakt auf der Karte**.
+    late RecordingOverlayDriver overlays;
+
+    setUp(() => overlays = RecordingOverlayDriver());
+
+    /// Bindet Kamera **und** Überlagerungsnaht, wie `MapSurface` es tut.
+    void bindBoth() =>
+        host.bindSurface(driver: driver, camera: viewAt(), overlays: overlays);
+
+    test('setOverlay legt die Überlagerung wirklich an', () async {
+      // Ohne diese Durchreichung erscheint **kein einziger Fakt**, ohne Fehler
+      // und ohne Meldung.
+      bindBoth();
+      host.setOverlay(overlay);
+      await host.debugOverlays.debugSettled;
+
+      expect(overlays.calls, contains('addSource:discovery.facts.source'));
+      expect(overlays.calls, contains('addSymbolLayer:discovery.facts.points'));
+    });
+
+    test('registerOverlayImages meldet die Bilder wirklich an', () async {
+      // Ein Symbol-Layer ohne sein Bild zeichnet nichts, ohne Fehler.
+      bindBoth();
+      host.registerOverlayImages(<MapOverlayImage>[balloonImage]);
+      await host.debugOverlays.debugSettled;
+
+      expect(overlays.calls, <String>['addImage:fact.hist.uncollected']);
+    });
+
+    test('removeOverlay nimmt sie wirklich herunter', () async {
+      bindBoth();
+      host.setOverlay(overlay);
+      await host.debugOverlays.debugSettled;
+      overlays.calls.clear();
+
+      host.removeOverlay('discovery.facts');
+      await host.debugOverlays.debugSettled;
+
+      expect(overlays.calls.first, 'removeLayer:discovery.facts.groups');
+      expect(overlays.calls.last, 'removeSource:discovery.facts.source');
+    });
+
+    test('bindSurface reicht die Überlagerungsnaht weiter', () async {
+      // Die Umkehrung: alles vor der Karte gesetzt, und erst das Binden
+      // schiebt es hinaus. Wer den Parameter ignoriert, lässt die Karte leer
+      // und behält trotzdem einen vollständigen Zwischenspeicher.
+      host
+        ..registerOverlayImages(<MapOverlayImage>[balloonImage])
+        ..setOverlay(overlay);
+      bindBoth();
+      await host.debugOverlays.debugSettled;
+
+      expect(overlays.calls.first, 'addImage:fact.hist.uncollected');
+      expect(overlays.calls, contains('addSource:discovery.facts.source'));
+    });
+
+    test('unbindSurface löst auch die Überlagerungsnaht', () async {
+      // Bliebe sie stehen, schöbe der Host nach dem Kartenwechsel Daten in
+      // eine Quelle, die es nicht mehr gibt.
+      bindBoth();
+      host.setOverlay(overlay);
+      await host.debugOverlays.debugSettled;
+      host.unbindSurface();
+      overlays.calls.clear();
+
+      host.setOverlay(overlay);
+      await host.debugOverlays.debugSettled;
+
+      expect(overlays.calls, isEmpty);
+    });
+
+    test('ein zweites bindSurface ohne Naht löst die alte', () async {
+      // Der Vertrag von `bindSurface` verspricht, ohne Überlagerungen gehe
+      // nichts verloren. Das galt nur beim **ersten** Mal: ein zweiter Aufruf
+      // tauschte den Kamera-Treiber und ließ die alte Naht stehen. Heute nicht
+      // erreichbar, `MapSurface` gibt immer beides mit.
+      bindBoth();
+      host.setOverlay(overlay);
+      await host.debugOverlays.debugSettled;
+      overlays.calls.clear();
+
+      host.bindSurface(driver: driver, camera: viewAt());
+      host.setOverlay(overlay);
+      await host.debugOverlays.debugSettled;
+
+      expect(overlays.calls, isEmpty);
+    });
+
+    test('dispose vergisst Bilder und Überlagerungen', () async {
+      // Ohne die Durchreichung überlebten sie die Karte, und der nächste Host
+      // erbte den Zwischenspeicher des vorigen.
+      bindBoth();
+      host
+        ..registerOverlayImages(<MapOverlayImage>[balloonImage])
+        ..setOverlay(overlay);
+      await host.debugOverlays.debugSettled;
+
+      host.dispose();
+
+      expect(host.debugOverlays.debugRegisteredStyleIds, isEmpty);
+      expect(host.debugOverlays.debugInstalledOverlayIds, isEmpty);
     });
   });
 

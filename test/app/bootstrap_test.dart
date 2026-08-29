@@ -1,4 +1,6 @@
 import 'package:fact_app/app/bootstrap.dart';
+import 'package:fact_app/features/facts/application/fact_providers.dart';
+import 'package:fact_app/features/facts/domain/repositories/fact_repository.dart';
 import 'package:fact_app/features/identity/domain/repositories/auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
 import 'package:fact_app/services/location/geolocator_location_service.dart';
@@ -92,6 +94,47 @@ void main() {
       expect(
         container.read(locationServiceProvider),
         same(unavailableLocationService),
+      );
+    });
+
+    test('bindet factRepositoryProvider an die Supabase-Umsetzung', () {
+      // Seit Schritt 15 hängt die Karte daran. Nachgewiesen wieder über die
+      // Wirkung: mit dem Override braucht das Repository die
+      // Supabase-Konfiguration, ohne ihn nicht.
+      final scope = productionProviderScope(child: const SizedBox.shrink());
+      final container = ProviderContainer(
+        overrides: [
+          ...scope.overrides,
+          supabaseConfigProvider.overrideWithValue(
+            const SupabaseConfig(url: '', publishableKey: ''),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(
+        () => container.read(factRepositoryProvider),
+        throwsA(
+          isA<Object>().having(
+            (error) => error.toString(),
+            'toString',
+            contains('Supabase ist nicht konfiguriert'),
+          ),
+        ),
+      );
+    });
+
+    test('ohne die Overrides scheitert jeder Faktenabruf sichtbar', () {
+      // Die Gegenprobe. **Und der Grund, warum der Standard hier wirft statt
+      // eine leere Liste zu liefern:** eine leere Faktenliste ist von einer
+      // Stadt ohne Fakten nicht zu unterscheiden, ein fehlender Override wäre
+      // also eine leere Karte ohne jede Meldung.
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(factRepositoryProvider),
+        same(unavailableFactRepository),
       );
     });
 

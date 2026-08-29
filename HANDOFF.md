@@ -36,7 +36,7 @@ Dazu D-5, das Karten-Chrome ist jetzt eine geschlossene Einheit.
 
 **Damit sind 13 von 50 Schritten fertig** (1 bis 12 plus 19).
 
-**Kennzahlen:** 1084 Tests grün, alle vier Gates auf Exit-Code 0, dazu
+**Kennzahlen:** 1308 Tests grün, alle vier Gates auf Exit-Code 0, dazu
 `dart run tool/generate_i18n.dart --check` und
 `dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
 
@@ -193,6 +193,58 @@ Eingriff in `ThemeData.typography` sitzt und `bodyMedium` deshalb schon keine
 Laufweite mehr trägt, die weitergereicht werden könnte. Durchgekommen ist
 ausschließlich `height: 1.43`. Wer hier „Materials Typografie" liest, muss
 wissen, welcher Teil davon in dieser App noch scharf ist und welcher nicht.
+
+### 29.08.2026, Schritte 15 und 16: die Fakten liegen auf der Karte
+
+Zusammen gebaut, weil sie nativ **eine** GeoJSON-Quelle teilen: gruppierte und
+einzelne Punkte kommen aus derselben Quelle, und die Trennung des Plans ist
+für diesen Weg künstlich. 1203 → 1308 Tests. **Antippen ist bewusst nicht
+gebaut**, das Aufklappen einer Gruppe hängt an einer offenen Entscheidung, und
+der Punkt-Tipp hat bis Schritt 21 keinen Empfänger.
+
+**Die teuerste Lücke fand die Review, nicht die Gates.** `MapOverlayHost` war
+vorbildlich getestet, die Registry auch, der Bildschirm gegen einen Fake, und
+**genau das Stück dazwischen, das in der App wirklich läuft, hatte null
+Tests.** Sechs Zeilen Durchreichung im echten Host. Macht man `setOverlay` zu
+einer leeren Methode, erscheint **kein einziger Fakt auf der Karte**, ohne
+Fehler, ohne Meldung, und alle 1290 Tests bleiben grün. Dasselbe Muster wie
+bei Anmeldung und Registrierung am 28.08.: zwei Stellen, gleiches Muster, nur
+eine geprüft.
+
+**Die Bildtests maßen das Rechteck statt des Inhalts.** Man konnte das Emoji
+aus allen zwölf Ballons entfernen, den weißen Rahmen streichen und den
+Bodenschatten über den Kopf setzen, ohne dass etwas anschlug. Bei den zwölf
+Kategorien hatte der Autor es richtig gemacht und eine zweite, unabhängige
+Abschrift aus der Quelle angelegt; bei den 45 Farbwerten der Gruppen-Layer
+nicht. Insgesamt überlebten 17 von 17 Mutationen der Review, nach der
+Behebung fallen alle 26.
+
+**Ein Testfund, der die Werkzeugkiste erweitert:** `Picture.toImage` kommt in
+einem `testWidgets` **doch** zurück, aber nur, wenn `pumpWidget` selbst
+innerhalb von `tester.runAsync` läuft. Der Unterschied ist die **Zone**, nicht
+die Zeit: ein Future, das in der fingierten Zeit erzeugt wird, kommt auch in
+`runAsync` nicht an. Die erste Messung war für ihren Aufbau richtig und die
+Verallgemeinerung falsch, und sie hatte bereits eine öffentliche Testfläche am
+Bildschirm gerechtfertigt. Die ist jetzt ersatzlos weg.
+
+**Zwei Paketfallen, beide lautlos.** `addGeoJsonSource` kann **nicht**
+clustern, die Methode reicht auf Android nur `withSynchronousUpdate` durch; der
+tragende Weg ist `addSource` mit `GeojsonSourceProperties`. Und die Kennung
+muss die **Top-Level-`id`** des GeoJSON-Merkmals sein, nicht `properties.id`
+wie in der PWA, sonst liefert der Antipp-Rückruf später die Zeichenkette
+`"null"`, und kein Test hier kann das finden.
+
+**Riverpod 3 wiederholt einen gescheiterten Provider von selbst**, zehnmal
+über rund 38 Sekunden, und nimmt dabei nur `Error` und `ProviderException`
+aus. `FactFailure` ist eine `Exception`, wird also wiederholt. Das trifft jeden
+künftigen Bildschirm mit einem `FutureProvider`.
+
+**Eine falsche Zeilennummer hat hier eine technische Aussage getragen.** Der
+Kommentar zu `setGeoJsonFeature` schloss aus `:451`, die Einzelaktualisierung
+von Punkten sei mit diesem Paketstand nicht zu haben. `:451` ist eine
+Leerzeile; der Eintrag steht auf `:450`, und ein zweiter auf `:477` in genau
+der Methode, die bei jeder Aktualisierung läuft. Richtig ist nur „vor dem
+ersten `setGeoJsonSource` nicht". Fundstellen sind hier keine Zierde.
 
 ### 29.08.2026, Regel 21: der Ortungsdienst bekommt ein Heimatverzeichnis
 

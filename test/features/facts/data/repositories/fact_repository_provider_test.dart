@@ -19,7 +19,7 @@ import 'supabase_fact_repository_test.dart'
 /// Abhängigkeit ist für einen Test austauschbar, ohne dass Supabase gestartet
 /// werden muss.
 void main() {
-  group('factRepositoryProvider', () {
+  group('supabaseFactRepositoryProvider', () {
     test('liefert den Domänenvertrag', () {
       final container = ProviderContainer(
         overrides: [
@@ -30,7 +30,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final repository = container.read(factRepositoryProvider);
+      final repository = container.read(supabaseFactRepositoryProvider);
 
       expect(repository, isA<FactRepository>());
       expect(repository, isA<SupabaseFactRepository>());
@@ -46,7 +46,9 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      final batch = await container.read(factRepositoryProvider).fetchFacts();
+      final batch = await container
+          .read(supabaseFactRepositoryProvider)
+          .fetchFacts();
 
       expect(batch.facts, hasLength(3));
     });
@@ -65,7 +67,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await container.read(factRepositoryProvider).fetchFacts();
+      await container.read(supabaseFactRepositoryProvider).fetchFacts();
 
       expect(sink.events, hasLength(1));
     });

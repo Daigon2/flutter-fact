@@ -50,6 +50,7 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/presentation/map_camera_driver.dart';
 import 'package:fact_app/map/presentation/map_camera_host.dart';
+import 'package:fact_app/map/presentation/map_overlay_driver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -164,9 +165,19 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
   /// **Läuft im Widget-Test nie**, weil ohne Plattformkanal kein Controller
   /// entsteht (`maplibre_map.dart:390-418`). Deshalb steht in dieser Methode
   /// nichts als die Verdrahtung.
+  ///
+  /// **Und deshalb ist genau diese Zeile die einzige des Karten-Hosts, für die
+  /// es keinen Test gibt und keinen geben kann.** Dass der Host seine sechs
+  /// Überlagerungsmethoden richtig durchreicht, ist seit Schritt 16 zugesichert
+  /// (`test/map/presentation/map_camera_host_test.dart`, „Die sechs
+  /// Durchreichungen"); dass der `MapLibreOverlayDriver` hier auch wirklich
+  /// mitgegeben wird, ist nur auf einem Gerät zu sehen. Ein Test dafür wäre ein
+  /// Test gegen einen Doppelgänger dieser Methode und würde nichts belegen.
+  /// Wer diese Zeile ändert, prüft sie am Gerät oder gar nicht.
   void _onMapCreated(MapLibreMapController controller) {
     _host.bindSurface(
       driver: MapLibreCameraDriver(controller),
+      overlays: MapLibreOverlayDriver(controller),
       camera: widget.initialCamera,
     );
   }

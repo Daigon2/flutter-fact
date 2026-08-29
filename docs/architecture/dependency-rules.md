@@ -148,12 +148,15 @@ here (E-32):
 - `core/diagnostics/diagnostics_providers.dart` sits next to its contract in
   `core` and is read from `presentation` and from `data`. Also correct: the
   provider is typed on the contract, not on an implementation.
-- `features/facts/data/repositories/supabase_fact_repository.dart` declares
-  `factRepositoryProvider` next to the implementation. It breaks no rule,
-  because nothing in `presentation` reads it and today only tests do. Its own
-  comment nevertheless claims that widgets and notifiers read "this provider",
-  and they cannot. Tracked in `REBUILD_STATUS.md`; the fix belongs to the step
-  that connects `facts` to the map.
+- `features/facts/data/repositories/supabase_fact_repository.dart` declares a
+  provider next to the implementation. It never broke a rule, but until
+  2026-08-29 it was called `factRepositoryProvider` and its comment claimed that
+  widgets and notifiers read "this provider", which they cannot. **Resolved in
+  the step that connects `facts` to the map, as E-32 said it would be:** the
+  provider is now called `supabaseFactRepositoryProvider`, only `lib/app/` reads
+  it, and the contract-typed provider moved to `features/facts/application/`
+  (next bullet). The same wrong sentence stood a second time next to
+  `factRemoteDataSourceProvider` and was corrected there as well.
 - `map/application/map_host_providers.dart` declares `mapHostProvider` on the
   `MapHost` contract and `mapHostRegistryProvider` on the implementation, both
   returning the same object. This is the **third** case in which neither
@@ -168,6 +171,20 @@ here (E-32):
   cannot register a host even if it tries. Whenever a provider must be readable
   by two layers with different rights, split it by type before splitting it by
   convention.
+
+- `features/facts/application/fact_providers.dart` declares
+  `factRepositoryProvider` on the `FactRepository` contract with an inert
+  default; `app/bootstrap.dart` overrides it with the Supabase implementation.
+  This is the **fourth** case, and it is the same constructive squeeze as the
+  third: the contract lives in `features/facts/domain/`, where rule 2 forbids
+  Riverpod, and `features/facts/presentation/` is unreachable for the consumer
+  `features/discovery` under rule 8. `application/` is the only remaining place,
+  and rule 10 names exactly that as a legal way across a feature boundary.
+
+  Note the difference to the first bullet: `authRepositoryProvider` may sit in
+  `identity/presentation/` because its only consumer is that same feature. As
+  soon as a **second** feature consumes a contract, the provider has to move to
+  `application/`. Placement follows the consumer, not taste.
 
 ## Exceptions
 
