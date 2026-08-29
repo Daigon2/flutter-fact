@@ -25,6 +25,7 @@ import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_screen_point.dart';
 import 'package:fact_app/services/location/device_position.dart';
 import 'package:fact_app/services/location/location_providers.dart';
 import 'package:fact_app/services/location/location_service.dart';
@@ -94,14 +95,39 @@ void main() {
     await location.close();
   });
 
-  /// [withFakeHost] `false` lässt die **echte** `MapHostRegistry` stehen.
+  /// Eine Überlagerung mit einem Fakt **auf** der Ortung und einem weit weg.
   ///
-  /// Das braucht genau eine Prüfung, und sie ist der Grund, warum es den
-  /// Schalter gibt: der Doppelgänger meldet nichts, die Registry meldet
+  /// Der nahe liegt genau auf `fixAt()`, die Entfernung ist also null und die
+  /// Betonung eins. Der ferne steht rund 18 Kilometer nördlich und fällt damit
+  /// nie in die Näherung.
+  const MapOverlay overlayWithNearbyFact = MapOverlay(
+    id: factOverlayId,
+    points: <MapOverlayPoint>[
+      MapOverlayPoint(
+        id: 'nah',
+        position: MapPosition(latitude: 48.1351, longitude: 11.582),
+        styleId: 'fact.hist.uncollected',
+        state: 'uncollected',
+      ),
+      MapOverlayPoint(
+        id: 'fern',
+        position: MapPosition(latitude: 48.3, longitude: 11.582),
+        styleId: 'fact.hist.uncollected',
+        state: 'uncollected',
+      ),
+    ],
+  );
+
+  /// Baut den Container für einen Test.
+  ///
+  /// [withFakeHost] `false` lässt die **echte** `MapHostRegistry` stehen. Das
+  /// braucht genau eine Prüfung, und sie ist der Grund, warum es den Schalter
+  /// gibt: der Doppelgänger meldet nichts, die Registry meldet
   /// `map.host.missing`, sobald jemand ohne Karte nach der Kamera fragt.
   ProviderContainer newContainer({
     bool withFakeHost = true,
     DiagnosticSink? diagnostics,
+    MapOverlay overlay = factOverlay,
   }) {
     // **Mit `addTearDown`, und das ist seit Schritt 12 keine Kosmetik mehr:**
     // an diesem Container hängen jetzt eine `MapHostRegistry` und ein
@@ -126,7 +152,7 @@ void main() {
         // dieser Test misst die Verdrahtung des Bildschirms, und die Strecke
         // vom Fakt zur Überlagerung steht vollständig in
         // `fact_overlay_test.dart`.
-        factOverlayProvider.overrideWith((ref) async => factOverlay),
+        factOverlayProvider.overrideWith((ref) async => overlay),
       ],
     );
     addTearDown(container.dispose);
@@ -876,6 +902,110 @@ void main() {
       expect(host.registeredImages, hasLength(factCategoryStyles.length));
     });
   });
+
+  group('Die lebenden Ballons verlassen die native Liste', () {
+    // **Warum das sein muss.** Ein Fakt innerhalb von 150 Metern wird von
+    // `FactBalloonOverlay` als Widget über der Karte gezeichnet. Bliebe er
+    // zusätzlich im Symbol-Layer, stünde er doppelt da: einmal lebend, einmal
+    // als stehendes Bild darunter, und auffallen würde es genau dann, wenn er
+    // wächst.
+    //
+    // Die Gruppe läuft aus demselben Grund in `tester.runAsync` wie die
+    // vorige: die zwölf Ballonbilder entstehen in der echten Zeit, und ohne
+    // sie hält der Riegel der Reihenfolge die Überlagerung zurück.
+
+    Future<void> awaitBalloons(WidgetTester tester) async {
+      final Stopwatch watch = Stopwatch()..start();
+      while (host.registeredImages.isEmpty &&
+          watch.elapsed < const Duration(seconds: 10)) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      await tester.pump();
+    }
+
+    List<String> idsOfLastOverlay() => host.overlays.last.points
+        .map((MapOverlayPoint point) => point.id)
+        .toList();
+
+    testWidgets('ohne Ortung geht die vollständige Liste hinaus', (
+      tester,
+    ) async {
+      final ProviderContainer container = newContainer(
+        overlay: overlayWithNearbyFact,
+      );
+      await tester.runAsync(() async {
+        await pumpPage(tester, container: container);
+        await tester.pump();
+        await awaitBalloons(tester);
+      });
+      await mapComesAlive(tester, zoom: 16);
+
+      expect(idsOfLastOverlay(), <String>['nah', 'fern']);
+    });
+
+    testWidgets('ein naher Fakt fehlt in der nativen Liste', (tester) async {
+      final ProviderContainer container = newContainer(
+        overlay: overlayWithNearbyFact,
+      );
+      await tester.runAsync(() async {
+        await pumpPage(tester, container: container);
+        await tester.pump();
+        await awaitBalloons(tester);
+      });
+      await mapComesAlive(tester, zoom: 16);
+      await emitFix(tester, fixAt());
+
+      expect(idsOfLastOverlay(), <String>['fern']);
+    });
+
+    testWidgets('bei zu kleinem Zoom ist er wieder drin', (tester) async {
+      // **Parität und keine Sparmaßnahme.** Die Quelle animiert nur, was als
+      // DOM-Marker existiert, und das sind allein die ungruppierten Features
+      // (`screen-map.jsx:2043-2045`). Wo nichts lebt, darf auch nichts fehlen,
+      // sonst verschwände der Fakt aus seiner Gruppe, ohne dass etwas an
+      // seine Stelle träte.
+      final ProviderContainer container = newContainer(
+        overlay: overlayWithNearbyFact,
+      );
+      await tester.runAsync(() async {
+        await pumpPage(tester, container: container);
+        await tester.pump();
+        await awaitBalloons(tester);
+      });
+      await mapComesAlive(tester, zoom: 16);
+      await emitFix(tester, fixAt());
+      expect(idsOfLastOverlay(), <String>['fern']);
+
+      await mapComesAlive(tester, zoom: 15);
+
+      expect(idsOfLastOverlay(), <String>['nah', 'fern']);
+    });
+
+    testWidgets('ohne Änderung geht die Liste nicht noch einmal hinaus', (
+      tester,
+    ) async {
+      // **Jeder `setOverlay` schiebt das vollständige GeoJSON über den
+      // Plattformkanal.** Bei fünf Ortungen je Sekunde wäre das fünfmal je
+      // Sekunde die ganze Sammlung, ohne dass sich etwas geändert hätte.
+      final ProviderContainer container = newContainer(
+        overlay: overlayWithNearbyFact,
+      );
+      await tester.runAsync(() async {
+        await pumpPage(tester, container: container);
+        await tester.pump();
+        await awaitBalloons(tester);
+      });
+      await mapComesAlive(tester, zoom: 16);
+      await emitFix(tester, fixAt());
+      final int afterFirstFix = host.overlays.length;
+
+      // Zweite Ortung an derselben Stelle: dieselbe Nachbarschaft, dieselbe
+      // Liste.
+      await emitFix(tester, fixAt());
+
+      expect(host.overlays, hasLength(afterFirstFix));
+    });
+  });
 }
 
 /// Ein Karten-Host, der jede Absicht mitschreibt statt sie auszuführen.
@@ -931,6 +1061,47 @@ class FakeMapHost implements MapHost {
 
   @override
   void removeOverlay(String overlayId) => removedOverlays.add(overlayId);
+
+  /// Die Anfragen an die Projektion, in der Reihenfolge des Eingangs.
+  final List<List<MapPosition>> projected = <List<MapPosition>>[];
+
+  /// Wie viele Anfragen gerade gleichzeitig unterwegs sind.
+  ///
+  /// Es gibt diesen Zähler, weil „nie zwei gleichzeitig" sonst nicht prüfbar
+  /// wäre: eine bloße Anzahl der Aufrufe sagt nichts darüber, ob sie sich
+  /// überlappt haben.
+  int inFlight = 0;
+
+  /// Der höchste je gleichzeitig erreichte Stand von [inFlight].
+  int peakInFlight = 0;
+
+  /// Wenn gesetzt, antwortet die Projektion erst, wenn der Test es sagt.
+  Completer<List<MapScreenPoint?>>? pendingProjection;
+
+  /// Was die Projektion liefert, wenn sie sofort antwortet.
+  List<MapScreenPoint?>? projectionAnswer;
+
+  @override
+  Future<List<MapScreenPoint?>> projectToScreen(List<MapPosition> positions) {
+    projected.add(positions);
+    inFlight++;
+    peakInFlight = inFlight > peakInFlight ? inFlight : peakInFlight;
+    final Completer<List<MapScreenPoint?>>? gate = pendingProjection;
+    final Future<List<MapScreenPoint?>> answer = gate != null
+        ? gate.future
+        : Future<List<MapScreenPoint?>>.value(
+            projectionAnswer ??
+                List<MapScreenPoint?>.filled(positions.length, null),
+          );
+    return answer.whenComplete(() => inFlight--);
+  }
+
+  /// Lässt eine angehaltene Projektion antworten.
+  void answerProjection(List<MapScreenPoint?> answer) {
+    final Completer<List<MapScreenPoint?>>? gate = pendingProjection;
+    pendingProjection = null;
+    gate?.complete(answer);
+  }
 
   /// Die Karte steht: dasselbe Signal, das `MapCameraHost.bindSurface` sendet.
   void bind(MapCameraView view) {

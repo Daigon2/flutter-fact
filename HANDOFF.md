@@ -36,7 +36,7 @@ Dazu D-5, das Karten-Chrome ist jetzt eine geschlossene Einheit.
 
 **Damit sind 13 von 50 Schritten fertig** (1 bis 12 plus 19).
 
-**Kennzahlen:** 1308 Tests grün, alle vier Gates auf Exit-Code 0, dazu
+**Kennzahlen:** 1421 Tests grün, alle vier Gates auf Exit-Code 0, dazu
 `dart run tool/generate_i18n.dart --check` und
 `dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
 
@@ -193,6 +193,69 @@ Eingriff in `ThemeData.typography` sitzt und `bodyMedium` deshalb schon keine
 Laufweite mehr trägt, die weitergereicht werden könnte. Durchgekommen ist
 ausschließlich `height: 1.43`. Wer hier „Materials Typografie" liest, muss
 wissen, welcher Teil davon in dieser App noch scharf ist und welcher nicht.
+
+### 29.08.2026, Schritt 17: die Münzen reagieren auf Nähe
+
+Janeks Zusage vom selben Tag ist eingelöst: Größe, Glühen und Drehung sind da,
+für **jeden** Ballon innerhalb der 150 Meter und nicht nur für den nächsten.
+1308 → 1421 Tests.
+
+**Der Entwurf ist am Gegenteil dessen gescheitert, was ich erwartet hatte.**
+Der Plan war, Größe und Glühen nativ über eine Merkmalseigenschaft zu machen
+und nur die Drehung als Flutter-Widget. Der Bruch liegt aber nicht bei der
+Drehung, sondern bei der **Größe**: `icon-size` skaliert das **ganze** Bild,
+die Quelle vergrößert nur den Kopf (`:2257-2258` fasst allein `.coin-head`
+an). Der 50 Pixel lange Stiel wäre mitgewachsen und der Ballon bei Annäherung
+vom Boden abgehoben. Deshalb verlassen die nahen Punkte jetzt die native
+Überlagerung und werden als Widgets gezeichnet, alles übrige bleibt nativ.
+Das Ergebnis ist **einfacher**: keine Betonungszahl im Vertrag, keine Farbe,
+kein Neubau von 600 Features im GPS-Takt. Der Kartenvertrag ist um genau eine
+Sache gewachsen, die Projektion.
+
+**Der tiefste Fund der Woche: die Perspektive erreicht den Ballonkopf in der
+PWA gar nicht.** `perspective:300px` sitzt an `el` (`:1841`), der Kopf ist ein
+**Enkel**, und der Wrap dazwischen hat kein `preserve-3d`. `grep` über die
+ganze Quelle findet `preserve-3d` genau einmal, an `:1850`, also am Kopf
+selbst. CSS-Perspektive gilt nur für direkte Kinder, der Wrap flacht seine
+Kinder in die eigene Ebene ab, und aus `rotateY(θ)` wird dort ein
+symmetrisches `scaleX(cos θ)` ohne jede Verkürzung. **Entschieden: die
+Perspektive bleibt**, weil die Quelle sie ausdrücklich wollte und nur an einer
+CSS-Feinheit scheitert, derselbe Fehlertyp wie der statische
+`coinShadowFar`. Sichtbare Abweichung, Janek informiert, eine Zeile in beide
+Richtungen.
+
+**Vier Zahlen im eigenen Bestand waren falsch, und die Ursache ist lehrreich.**
+Sie waren korrekt aus `coinMakeEl` abgeschrieben, aber diese Funktion
+beschreibt einen Zustand, den es **weniger als ein Bild lang** gibt:
+`coinRafTick` läuft ab `:2325` unbedingt und überschreibt ihn, auch ohne
+Ortung. Der ruhende Ballon ist 26 Pixel breit statt 28, sein Emoji **10,01
+statt 15**. Ein Drittel, und es wäre nie aufgefallen, weil beide Zahlen
+belegt aussahen.
+
+**Zum dritten Mal in dieser Woche hat ein Bildtest eine Fläche gemessen statt
+des Inhalts.** Man konnte den harten Farbring entfernen, die Drehrichtung
+umkehren, die Perspektive streichen und den Stiel mitwachsen lassen, ohne dass
+etwas anschlug. Vierzehn Mutationen überlebten, jetzt fallen alle zwanzig.
+
+**Zwei Testentwürfe haben sich beim Bauen selbst widerlegt**, und beide sind
+für die Werkzeugkiste: das **Verhältnis** zweier Zuwächse trägt einen
+Zeitbezug nicht (bei 100 und 200 ms liefern die richtige und die falsche
+Fassung dasselbe Verhältnis 2, gemessen werden muss der absolute Winkel), und
+die Perspektive lässt sich nicht durch zeilenweises Abtasten belegen, weil die
+Kopfmitte bei 48,07 nicht auf einer Pixelgrenze liegt und daraus schon ohne
+Perspektive eine Scheinasymmetrie von 1,14 Pixeln entsteht.
+
+**Zwei Fehler der Quelle bewusst nicht nachgebaut**, beide belegt: der
+statische `coinShadowFar` (`:1866` gegen `:2316-2320`), der bei jedem Ballon
+atmet, der **nie** nah war, und bei keinem, der einmal nah war; und „Grad je
+Bild", das auf einem 120-Hz-Gerät doppelt so schnell dreht. Der Nah-Schatten
+dagegen **ist** gebaut: er ist mit dem Hüpfen gepaart und kein Unfall, was ich
+in meinem ersten Auftrag falsch hatte.
+
+**Bekannte, offene Abweichung:** `:1851` blendet den Schattenwechsel über 0,4
+Sekunden weich. Bei uns schlägt er um. Teuer, weil die 150-Meter-Grenze
+zugleich der Wechsel zwischen nativem Layer und gezeichnetem Widget ist, eine
+Blende müsste beide Seiten kennen.
 
 ### 29.08.2026, Schritte 15 und 16: die Fakten liegen auf der Karte
 

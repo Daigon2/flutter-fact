@@ -6,6 +6,15 @@ import 'package:fact_app/features/facts/domain/value_objects/fact_coordinates.da
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_position.dart';
+// **Ausdrücklich der Import über die Grenze, und nur hier.** Regel 18 hält
+// `features/` aus `map/presentation/` heraus, und der Produktivcode hält sich
+// daran: `factBalloonZoomScale` und `overlayPointSizeExpression` sind zwei
+// unabhängige Abschriften derselben Quellzeile (`screen-map.jsx:1799`). Genau
+// deshalb braucht es **eine** Stelle, an der beide nebeneinander liegen und
+// ihre Übereinstimmung geprüft wird. Ohne sie ist der erste Beleg für ein
+// Auseinanderlaufen ein Sprung an der 150-Meter-Grenze, sichtbar nur am Gerät.
+import 'package:fact_app/map/presentation/map_overlay_host.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Der Weg vom Fakt zum Punkt auf der Karte.
@@ -146,6 +155,133 @@ void main() {
 
     expect(overlay.points, isEmpty);
     expect(overlay.id, factOverlayId);
+  });
+
+  group('Die Punkte, die leben, fallen aus der nativen Liste', () {
+    MapOverlay overlayWith(List<String> ids) => MapOverlay(
+      id: factOverlayId,
+      points: <MapOverlayPoint>[
+        for (final String id in ids)
+          MapOverlayPoint(
+            id: id,
+            position: const MapPosition(latitude: 48.1351, longitude: 11.582),
+            styleId: factBalloonStyleId('hist', factNotCollectedState),
+            state: factNotCollectedState,
+          ),
+      ],
+      grouping: factOverlayGrouping,
+      minZoom: factOverlayMinZoom,
+    );
+
+    test('die genannten Punkte fehlen, die anderen bleiben', () {
+      // Ohne das Ausdünnen stünde jeder Ballon in Reichweite **doppelt** da:
+      // einmal lebend als Widget, einmal als stehendes Bild darunter. Auffallen
+      // würde es genau dann, wenn er wächst.
+      final MapOverlay thinned = factOverlayWithout(
+        overlayWith(<String>['1', '2', '3']),
+        <String>{'2'},
+      );
+
+      expect(
+        thinned.points.map((MapOverlayPoint point) => point.id).toList(),
+        <String>['1', '3'],
+      );
+    });
+
+    test('Gruppierung und Zoomgrenzen bleiben unangetastet', () {
+      // Ein Punkt weniger heißt eine Gruppe mit einem Mitglied weniger, und
+      // genau so soll es sein. Fiele hier die Gruppierung weg, zerfielen beim
+      // ersten nahen Fakt **alle** Gruppen der Karte in Einzelballons.
+      final MapOverlay thinned = factOverlayWithout(
+        overlayWith(<String>['1', '2']),
+        <String>{'1'},
+      );
+
+      expect(thinned.id, factOverlayId);
+      expect(thinned.grouping, factOverlayGrouping);
+      expect(thinned.minZoom, factOverlayMinZoom);
+      expect(thinned.maxZoom, isNull);
+    });
+
+    test('ohne Kennungen kommt dieselbe Überlagerung zurück', () {
+      // **Dieselbe und keine Kopie.** Jeder `setOverlay` schiebt das
+      // vollständige GeoJSON über den Plattformkanal; eine gleich aussehende
+      // Kopie wäre ein Kanalaufruf für nichts.
+      final MapOverlay overlay = overlayWith(<String>['1']);
+
+      expect(
+        identical(factOverlayWithout(overlay, const <String>{}), overlay),
+        isTrue,
+      );
+    });
+
+    test('eine unbekannte Kennung nimmt nichts weg', () {
+      final MapOverlay overlay = overlayWith(<String>['1']);
+
+      expect(
+        factOverlayWithout(overlay, <String>{'gibtsnicht'}).points,
+        hasLength(1),
+      );
+    });
+  });
+
+  group('Die Zoomkurve gilt für beide Seiten', () {
+    /// Wertet den `interpolate`-Ausdruck des Karten-Hosts von Hand aus.
+    ///
+    /// Damit steht hier keine dritte Abschrift der Kurve, sondern der Ausdruck
+    /// selbst: die Stützstellen werden aus [overlayPointSizeExpression]
+    /// **gelesen** und nicht wiederholt. Wer eine davon ändert, ändert damit
+    /// auch die Erwartung, und der Vergleich unten fällt trotzdem, wenn die
+    /// Flutter-Seite nicht mitgeht.
+    double nativeScaleAt(double zoom) {
+      const List<Object> expression = overlayPointSizeExpression;
+      expect(expression[0], 'interpolate');
+      expect(expression[1], <Object>['linear']);
+      expect(expression[2], <Object>['zoom']);
+      final double lowZoom = expression[3] as double;
+      final double lowScale = expression[4] as double;
+      final double highZoom = expression[5] as double;
+      final double highScale = expression[6] as double;
+
+      // MapLibre hält außerhalb der Stützstellen den jeweiligen Randwert.
+      if (zoom <= lowZoom) {
+        return lowScale;
+      }
+      if (zoom >= highZoom) {
+        return highScale;
+      }
+      return lowScale +
+          (highScale - lowScale) * (zoom - lowZoom) / (highZoom - lowZoom);
+    }
+
+    test('nativ und gezeichnet ergeben denselben Faktor', () {
+      // **Die Falle dieses Schritts.** Auf Zoom 16 steht der Faktor bei 0,833
+      // und nicht bei 1; wer ihn auf der Flutter-Seite vergisst, sieht den
+      // Fehler erst am Gerät, als Sprung beim Überqueren der
+      // 150-Meter-Grenze.
+      for (double zoom = 10; zoom <= 20; zoom += 0.25) {
+        expect(
+          factBalloonZoomScale(zoom),
+          closeTo(nativeScaleAt(zoom), 1e-9),
+          reason: 'Zoom $zoom',
+        );
+      }
+    });
+
+    test('sie ist unten und oben geklammert', () {
+      // `Math.max(0.42, Math.min(1.25, (z - 11) / 6))`
+      // (`screen-map.jsx:1799`).
+      expect(factBalloonZoomScale(0), 0.42);
+      expect(factBalloonZoomScale(13.52), closeTo(0.42, 1e-9));
+      expect(factBalloonZoomScale(18.5), closeTo(1.25, 1e-9));
+      expect(factBalloonZoomScale(22), 1.25);
+    });
+
+    test('auf Zoom 16 steht sie bei 0,833 und nicht bei 1', () {
+      // Die eine Zahl, die man hinschreiben muss, damit niemand „ab 16 ist es
+      // eins" denkt.
+      expect(factBalloonZoomScale(16), closeTo(5 / 6, 1e-9));
+    });
   });
 }
 

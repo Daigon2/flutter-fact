@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
@@ -8,10 +9,12 @@ import 'package:fact_app/map/domain/map_camera_gate.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_screen_point.dart';
 import 'package:fact_app/map/presentation/map_auto_pitch.dart';
 import 'package:fact_app/map/presentation/map_camera_driver.dart';
 import 'package:fact_app/map/presentation/map_camera_host.dart';
 import 'package:fact_app/map/presentation/map_overlay_driver.dart';
+import 'package:fact_app/map/presentation/map_projection_driver.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
@@ -212,6 +215,38 @@ class RecordingOverlayDriver implements MapOverlayDriver {
   @override
   Future<void> removeSource(String sourceId) async =>
       calls.add('removeSource:$sourceId');
+}
+
+/// Die Projektionsnaht, so schmal wie [MapProjectionDriver].
+///
+/// Sie antwortet, was der Test ihr sagt, **auch Unsinn**: eine zu kurze Liste
+/// und `NaN` sind genau die Ausfälle, gegen die der Host gebaut ist, und beide
+/// wären auf einem Gerät nur mit Glück zu treffen.
+class FakeProjectionDriver implements MapProjectionDriver {
+  /// Die Anfragen, in der Reihenfolge des Eingangs.
+  final List<List<LatLng>> requests = <List<LatLng>>[];
+
+  /// Was zurückkommt. `null` heißt „so viele Punkte wie angefragt, alle 0".
+  List<Point<num>>? answer;
+
+  /// Wenn gesetzt, scheitert die Naht, statt zu antworten.
+  Object? failure;
+
+  @override
+  Future<List<Point<num>>> toScreenLocationBatch(Iterable<LatLng> latLngs) {
+    final List<LatLng> asked = latLngs.toList();
+    requests.add(asked);
+    final Object? thrown = failure;
+    if (thrown != null) {
+      return Future<List<Point<num>>>.error(thrown);
+    }
+    return Future<List<Point<num>>>.value(
+      answer ??
+          <Point<num>>[
+            for (int i = 0; i < asked.length; i++) const Point<num>(0, 0),
+          ],
+    );
+  }
 }
 
 void main() {
@@ -784,12 +819,12 @@ void main() {
     });
   });
 
-  group('Die sechs Durchreichungen an den Überlagerungsteil', () {
+  group('Die Durchreichungen an den Überlagerungsteil', () {
     // **Hier lag die teuerste Lücke der Review zu Schritt 15.**
     // `MapOverlayHost` war vorbildlich geprüft, `MapHostRegistry` auch, der
     // Bildschirm gegen einen Doppelgänger. Ungeprüft war genau das Stück
     // dazwischen, das in der App wirklich läuft: dieses Objekt ist die einzige
-    // Produktivfassung von `MapHost`. Jede der sechs Durchreichungen fällt
+    // Produktivfassung von `MapHost`. Jede der Durchreichungen fällt
     // lautlos aus, und die erste kostet **jeden Fakt auf der Karte**.
     late RecordingOverlayDriver overlays;
 
@@ -891,6 +926,166 @@ void main() {
 
       expect(host.debugOverlays.debugRegisteredStyleIds, isEmpty);
       expect(host.debugOverlays.debugInstalledOverlayIds, isEmpty);
+    });
+  });
+
+  group('Die Projektion', () {
+    late FakeProjectionDriver projections;
+
+    setUp(() => projections = FakeProjectionDriver());
+
+    void bindWithProjections() => host.bindSurface(
+      driver: driver,
+      camera: viewAt(),
+      projections: projections,
+    );
+
+    test('ohne Karte kommt lauter null, und zwar ohne Meldung', () async {
+      // Der Normalfall jedes Startvorgangs. Ein Ereignis, das dabei feuert,
+      // liest nach der dritten Woche niemand mehr.
+      final List<MapScreenPoint?> located = await host.projectToScreen(
+        <MapPosition>[munich, munich],
+      );
+
+      expect(located, <MapScreenPoint?>[null, null]);
+      expect(sink.names, isEmpty);
+    });
+
+    test('Breite und Länge gehen in der Reihenfolge des SDK hinaus', () async {
+      // **Die eine Vertauschung, die lautlos wäre.** `LatLng` nimmt Breite vor
+      // Länge, die Domäne auch, GeoJSON umgekehrt: hier liegt der einzige Ort,
+      // an dem das noch einmal falsch werden kann.
+      bindWithProjections();
+
+      await host.projectToScreen(<MapPosition>[
+        const MapPosition(latitude: 48.1351, longitude: 11.582),
+      ]);
+
+      expect(projections.requests.single.single.latitude, 48.1351);
+      expect(
+        projections.requests.single.single.longitude,
+        closeTo(11.582, 1e-9),
+      );
+    });
+
+    test('eine Antwort wird elementweise übernommen', () async {
+      bindWithProjections();
+      projections.answer = <Point<num>>[
+        const Point<num>(12.5, 340),
+        const Point<num>(7, 8),
+      ];
+
+      final List<MapScreenPoint?> located = await host.projectToScreen(
+        <MapPosition>[munich, munich],
+      );
+
+      expect(located, <MapScreenPoint?>[
+        const MapScreenPoint(xInScreenPixels: 12.5, yInScreenPixels: 340),
+        const MapScreenPoint(xInScreenPixels: 7, yInScreenPixels: 8),
+      ]);
+    });
+
+    test('x bleibt x und y bleibt y', () async {
+      // Auf einer quadratischen Testfläche wäre die Vertauschung unsichtbar,
+      // auf einem Telefon säße jeder Ballon an der gespiegelten Stelle.
+      bindWithProjections();
+      projections.answer = <Point<num>>[const Point<num>(10, 900)];
+
+      expect(
+        await host.projectToScreen(<MapPosition>[munich]),
+        <MapScreenPoint?>[
+          const MapScreenPoint(xInScreenPixels: 10, yInScreenPixels: 900),
+        ],
+      );
+    });
+
+    test('ein einzelner unbrauchbarer Punkt fällt als null heraus', () async {
+      // **Ein Punkt hinter dem Horizont ist bei 58 Grad Neigung ein realer
+      // Fall**, und das Paket widerspricht sich, was dann kommt:
+      // `controller.dart:1784` sagt „Returns null if not currently visible",
+      // die Signatur auf `:1785` ist nicht nullfähig.
+      bindWithProjections();
+      projections.answer = <Point<num>>[
+        const Point<num>(5, 5),
+        const Point<num>(double.nan, 3),
+        const Point<num>(double.infinity, 3),
+      ];
+
+      final List<MapScreenPoint?> located = await host.projectToScreen(
+        <MapPosition>[munich, munich, munich],
+      );
+
+      expect(located.first, isNotNull);
+      expect(located[1], isNull);
+      expect(located[2], isNull);
+      // **Und die Reihenfolge bleibt.** Wer die unbrauchbaren Punkte
+      // herausfiltert, statt sie auf `null` zu setzen, verschiebt die
+      // Zuordnung, und jeder Ballon säße auf der Koordinate seines Nachbarn.
+      expect(located, hasLength(3));
+    });
+
+    test('eine zu kurze Antwort wird ganz verworfen und gemeldet', () async {
+      // Die Kanalfassung baut ihre Liste stumpf aus einer `Float64List`, zwei
+      // Zahlen je Punkt (`method_channel_maplibre_gl.dart:598-613`). Kommt von
+      // der Plattform ein kürzeres Feld, wäre eine elementweise Zuordnung
+      // **verschoben**.
+      bindWithProjections();
+      projections.answer = <Point<num>>[const Point<num>(1, 2)];
+
+      final List<MapScreenPoint?> located = await host.projectToScreen(
+        <MapPosition>[munich, munich],
+      );
+
+      expect(located, <MapScreenPoint?>[null, null]);
+      expect(sink.names, <String>[MapCameraHost.projectionFailedEvent]);
+      expect(sink.events.single.attributes['reason'], 'length:1');
+    });
+
+    test('ein Fehler auf dem Kanal wird gemeldet und nicht geworfen', () async {
+      // Ein Aufrufer, der 60-mal je Sekunde projiziert, kann mit einer
+      // Ausnahme nichts anfangen; er zeichnet dann eben nichts.
+      bindWithProjections();
+      projections.failure = StateError('Kanal weg');
+
+      final List<MapScreenPoint?> located = await host.projectToScreen(
+        <MapPosition>[munich],
+      );
+
+      expect(located, <MapScreenPoint?>[null]);
+      expect(sink.names, <String>[MapCameraHost.projectionFailedEvent]);
+      expect(sink.events.single.attributes['reason'], 'StateError');
+    });
+
+    test('eine leere Anfrage geht gar nicht erst hinaus', () async {
+      bindWithProjections();
+
+      expect(await host.projectToScreen(<MapPosition>[]), isEmpty);
+      expect(projections.requests, isEmpty);
+    });
+
+    test('unbindSurface löst auch die Projektionsnaht', () async {
+      // Bliebe sie stehen, rechnete der Host gegen eine Kamera, die es nicht
+      // mehr gibt, und die Ballons stünden an den Stellen der alten Karte.
+      bindWithProjections();
+      host.unbindSurface();
+
+      expect(
+        await host.projectToScreen(<MapPosition>[munich]),
+        <MapScreenPoint?>[null],
+      );
+      expect(projections.requests, isEmpty);
+    });
+
+    test('ein zweites bindSurface ohne Naht löst die alte', () async {
+      // Dieselbe Zusage wie beim Überlagerungsteil und aus demselben Grund.
+      bindWithProjections();
+      host.bindSurface(driver: driver, camera: viewAt());
+
+      expect(
+        await host.projectToScreen(<MapPosition>[munich]),
+        <MapScreenPoint?>[null],
+      );
+      expect(projections.requests, isEmpty);
     });
   });
 

@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:fact_app/core/async/detached_work.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_images.dart';
+import 'package:fact_app/features/discovery/presentation/fact_balloon_overlay.dart';
+import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
+import 'package:fact_app/features/discovery/presentation/fact_proximity.dart';
 import 'package:fact_app/features/discovery/presentation/map_camera_intents.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/fact_overlay_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/map_mode_providers.dart';
@@ -13,6 +16,7 @@ import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/services/location/device_position.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -59,6 +63,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Punkt-Tipp hat bis Schritt 21 keinen Empfänger, und das Aufklappen einer
 /// Gruppe hängt an einer offenen technischen Entscheidung. Ein Strom auf
 /// Vorrat wäre Zustand, den niemand prüft.
+///
+/// ## Seit Schritt 17 liegen die nahen Fakten nicht mehr nativ
+///
+/// [FactBalloonOverlay] zeichnet die Handvoll Fakten innerhalb von 150 Metern
+/// als Flutter-Widgets über der Karte, mit Größe, Glühen und Drehung. Dieser
+/// Bildschirm trägt davon genau ein Stück: er **nimmt sie aus der nativen
+/// Punktliste heraus**, solange sie leben, siehe [_animatedIds]. Ohne das
+/// stünde jeder nahe Ballon doppelt da, einmal lebend und einmal als stehendes
+/// Bild darunter.
 ///
 /// ## Warum die Karte hereingereicht wird und nicht hier entsteht
 ///
@@ -251,6 +264,39 @@ class _MapPageState extends ConsumerState<MapPage> {
   /// gewechselt haben, soll sie auch benutzen.
   MapOverlay? _latestOverlay;
 
+  /// Ob die Näherungs-Animation bei der aktuellen Zoomstufe läuft.
+  ///
+  /// Ein `bool` und nicht die Zoomstufe selbst, und das ist der Unterschied
+  /// zwischen einem Neuaufbau je Kamerabild und einem beim Überqueren einer
+  /// Zoomgrenze. Die Zahl selbst braucht dieser Bildschirm nicht, sie gehört
+  /// dem Zeichner.
+  bool _animationRuns = false;
+
+  /// Die Fakten, die gerade **nicht** nativ liegen, weil sie leben.
+  ///
+  /// ## Warum die native Liste überhaupt schrumpft
+  ///
+  /// Ein Fakt in Reichweite wird von [FactBalloonOverlay] als Widget über der
+  /// Karte gezeichnet. Bliebe er zusätzlich im Symbol-Layer, stünde er
+  /// doppelt da: einmal lebend, einmal als stehendes Bild darunter. Der
+  /// Unterschied fällt genau dann auf, wenn er wächst, also im auffälligsten
+  /// Moment.
+  ///
+  /// ## Warum das hier steht und nicht im Zeichner
+  ///
+  /// Weil die Überlagerung diesem Bildschirm gehört: er hält die Reihenfolge
+  /// „erst Bilder, dann Punkte" ein, und die ist eine Zusage von
+  /// `MapHost.registerOverlayImages`. Zwei Absender für dieselbe Überlagerung
+  /// wären zwei Wahrheiten.
+  ///
+  /// **Der Preis ist ein Bild Versatz, und der ist bekannt.** Zeichner und
+  /// Bildschirm hören beide auf den Kamerastrom und auf `factProximityProvider`
+  /// und wenden beide dieselbe Regel [factAnimationRunsAt] an; welcher zuerst
+  /// dran ist, entscheidet niemand. Der native Weg ist ohnehin asynchron, ein
+  /// gemeinsamer Zeitpunkt wäre also auch mit einem gemeinsamen Zustand nicht
+  /// zu haben.
+  Set<String> _animatedIds = const <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -385,7 +431,9 @@ class _MapPageState extends ConsumerState<MapPage> {
     if (overlay == null || !_balloonImagesRegistered) {
       return;
     }
-    ref.read(mapHostProvider).setOverlay(overlay);
+    ref
+        .read(mapHostProvider)
+        .setOverlay(factOverlayWithout(overlay, _animatedIds));
   }
 
   @override
@@ -407,9 +455,36 @@ class _MapPageState extends ConsumerState<MapPage> {
       _mapIsAlive = true;
       _deliverPendingSkyFall();
     }
+    final bool runs = factAnimationRunsAt(view.zoom);
+    if (runs != _animationRuns) {
+      _animationRuns = runs;
+      _syncAnimatedIds();
+    }
     if (view.bearing != _bearingDegrees) {
       setState(() => _bearingDegrees = view.bearing);
     }
+  }
+
+  /// Gleicht ab, welche Fakten aus der nativen Liste fallen.
+  ///
+  /// Zwei Auslöser, und welcher zuerst kommt, entscheidet niemand: eine neue
+  /// Ortung und das Überqueren der Gruppierungsgrenze. Deshalb steht die
+  /// vollständige Bedingung an einer Stelle statt an zweien, genau wie bei
+  /// [_deliverPendingSkyFall] und [_deliverOverlay].
+  ///
+  /// **Ohne Änderung passiert nichts.** Jeder Aufruf von `setOverlay` schiebt
+  /// das vollständige GeoJSON über den Plattformkanal; bei fünf Ortungen je
+  /// Sekunde wäre das fünfmal je Sekunde die ganze Sammlung, ohne dass sich
+  /// etwas geändert hätte.
+  void _syncAnimatedIds() {
+    final Set<String> next = _animationRuns
+        ? ref.read(factProximityProvider).ids
+        : const <String>{};
+    if (setEquals(next, _animatedIds)) {
+      return;
+    }
+    _animatedIds = next;
+    _deliverOverlay();
   }
 
   /// Eine neue Ortung ist angekommen.
@@ -518,6 +593,16 @@ class _MapPageState extends ConsumerState<MapPage> {
   Widget build(BuildContext context) {
     final mode = ref.watch(mapModeProvider);
     ref.listen(userLocationProvider, _onLocationChange);
+    // **Zuhören und nicht beobachten.** Wer in Reichweite ist, ändert an
+    // diesem Bildschirm nichts Sichtbares; es entscheidet allein darüber,
+    // welche Punkte nativ liegen. Ein `watch` baute das ganze Top-Chrome bei
+    // jeder Ortung neu.
+    ref.listen(factProximityProvider, (
+      FactProximity? previous,
+      FactProximity next,
+    ) {
+      _syncAnimatedIds();
+    });
     // **Nur die Frage, ob es überhaupt eine Ortung gibt, und nicht welche.**
     // Ohne `select` baute sich das ganze Top-Chrome bei jeder Ortung neu, also
     // bis zu fünfmal je Sekunde, obwohl sich daran nichts ändert.
@@ -529,6 +614,12 @@ class _MapPageState extends ConsumerState<MapPage> {
       fit: StackFit.expand,
       children: <Widget>[
         widget.mapSurface,
+        // **Unmittelbar über der Kartenfläche und im selben `Stack`.** Die
+        // Bildschirmlagen, die das Karten-SDK liefert, zählen ab der linken
+        // oberen Ecke **der Karte** (`controller.dart:1779`); ein Rahmen
+        // dazwischen verschöbe jeden Ballon. Und unter dem Top-Chrome, damit
+        // ein wachsender Ballon nicht über die Stadt-Pille läuft.
+        const FactBalloonOverlay(),
         MapTopChrome(
           cityName: MapPage.placeholderCityName,
           coins: MapPage.placeholderCoins,
@@ -560,17 +651,3 @@ class _MapPageState extends ConsumerState<MapPage> {
     );
   }
 }
-
-/// Der Weg vom Ortungsdienst in die Kartensprache.
-///
-/// **Die Umrechnung passiert beim Verbraucher und nicht im Dienst.** Der
-/// Ortungsdienst kennt keine Karte: gäbe er `MapPosition` heraus, hätte der
-/// Karten-Host den Aufenthaltsort des Nutzers in seiner Vertragsfläche, und
-/// das ist mit E-07 eine Sicherheitsfrage. Zwei Wertobjekte für denselben
-/// Punkt sind der Preis dafür, siehe `DevicePosition`, dritte Instanz der
-/// Geo-Typ-Sperre, und die offene Entscheidung D-9.
-///
-/// Öffentlich und nicht privat, damit ein Test die Richtung festnageln kann:
-/// vertauschte Breite und Länge sähen in jedem Widget-Test gleich aus.
-MapPosition mapPositionOf(DevicePosition fix) =>
-    MapPosition(latitude: fix.latitude, longitude: fix.longitude);

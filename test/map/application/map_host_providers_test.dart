@@ -9,6 +9,7 @@ import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_screen_point.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -61,6 +62,18 @@ class FakeMapHost implements MapHost {
 
   @override
   void removeOverlay(String overlayId) => removedOverlays.add(overlayId);
+
+  /// Die Anfragen an die Projektion, in der Reihenfolge des Eingangs.
+  final List<List<MapPosition>> projected = <List<MapPosition>>[];
+
+  /// Was die Projektion zurückgibt.
+  List<MapScreenPoint?> projectionAnswer = <MapScreenPoint?>[];
+
+  @override
+  Future<List<MapScreenPoint?>> projectToScreen(List<MapPosition> positions) {
+    projected.add(positions);
+    return Future<List<MapScreenPoint?>>.value(projectionAnswer);
+  }
 
   void moveTo(MapCameraView view) {
     _camera = view;
@@ -149,10 +162,42 @@ void main() {
 
       expect(sink.events, isEmpty);
     });
+
+    test('liegt jeder Punkt nirgends, ohne dass es gemeldet wird', () async {
+      // **Die dritte Antwort dieser Klasse auf „kein Host", und sie folgt
+      // derselben Trennlinie:** eine Absicht ist ein Ereignis und verfällt,
+      // also wird sie gemeldet; ein Bild ist Zustand und wartet, also nicht.
+      // Eine Projektion ist eine **Frage**, und die richtige Antwort auf „wo
+      // liegt das auf einer Karte, die es nicht gibt" ist „nirgends".
+      final List<MapScreenPoint?> located = await registry.projectToScreen(
+        <MapPosition>[munich, rome],
+      );
+
+      expect(located, <MapScreenPoint?>[null, null]);
+      expect(sink.events, isEmpty);
+    });
   });
 
   group('Mit eingeklinktem Host', () {
     setUp(() => registry.attach(host));
+
+    test('reicht die Registry eine Projektion durch', () async {
+      // **Ungeprüft wäre das eine lautlose Lücke.** Die Registry ist die
+      // einzige `MapHost`-Fassung, die ein Feature je sieht; eine
+      // Durchreichung, die ihre Antwort verschluckt, sähe von außen aus wie
+      // eine Karte ohne sichtbare Punkte.
+      host.projectionAnswer = <MapScreenPoint?>[
+        const MapScreenPoint(xInScreenPixels: 12, yInScreenPixels: 34),
+      ];
+
+      final List<MapScreenPoint?> located = await registry.projectToScreen(
+        <MapPosition>[munich],
+      );
+
+      expect(host.projected.single, <MapPosition>[munich]);
+      expect(located, host.projectionAnswer);
+      expect(sink.events, isEmpty);
+    });
 
     test('reicht die Registry Absichten durch, ohne zu melden', () {
       final MapCameraOneShot intent = skyFall();

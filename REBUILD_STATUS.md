@@ -366,7 +366,7 @@ auch rechtlich hingehört.
 - [x] 12. MapLibre mit gebackenem Style · [x] 13. Kamera-Verhalten
 - [!] 14. Kompass-Rotation (Sensorpaket fehlt) · [x] 15. Cluster-Layer
   · [x] 16. Einzel-Marker
-- [ ] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
+- [x] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
 - [ ] 19. Top-Chrome · [ ] 20. Sammel-Erlebnis
 
 ## Phase 3, Fakt-Akte und Audio

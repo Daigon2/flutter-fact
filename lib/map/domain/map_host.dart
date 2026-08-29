@@ -31,6 +31,8 @@ library;
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_screen_point.dart';
 
 /// Was ein Feature vom Karten-Host sehen darf.
 ///
@@ -123,4 +125,37 @@ abstract interface class MapHost {
   /// eines Bildschirms, der nie eine Überlagerung gesetzt hat, soll nicht
   /// melden müssen, ob er es getan hat.
   void removeOverlay(String overlayId);
+
+  /// Rechnet [positions] in Bildschirmlagen um, in derselben Reihenfolge.
+  ///
+  /// ## Warum das hier steht, obwohl der Prüfstein oben eng ist
+  ///
+  /// Der Klassenkommentar lässt nur herein, „was ohne die Karte gar nicht
+  /// geht". Das ist genau dieser Fall: aus einem Breiten- und Längengrad wird
+  /// eine Bildschirmlage erst mit Sichtfeld, Kamerahöhe, Neigung und
+  /// Blickrichtung, und alle vier gehören dem Host. Ein Feature, das das
+  /// selbst rechnete, baute die Kamerahoheit nach.
+  ///
+  /// Gebraucht wird es, seit die Fakt-Ballons im Sammelradius als
+  /// Flutter-Widgets über der Karte liegen statt als Symbole in ihr: ein
+  /// Widget braucht eine Bildschirmlage, ein Symbol-Layer nicht.
+  ///
+  /// ## Die Rückgabe ist elementweise nullfähig, und das ist kein Vorrat
+  ///
+  /// Die Liste hat immer die Länge von [positions]. Ein Eintrag ist `null`,
+  /// wenn dieser Punkt gerade **keine** Bildschirmlage hat. Das ist ein
+  /// realer Fall und keine Vorsicht: bei 58 Grad Neigung liegt alles jenseits
+  /// des Horizonts hinter der Kamera, und `maplibre_gl 0.26.2` sagt dazu
+  /// selbst „Returns null if [latLng] is not currently visible on the map"
+  /// (`lib/src/controller.dart:1784`), bei einer Signatur, die
+  /// `Future<Point>` und damit **nicht** nullfähig ist (`:1785`). Eines von
+  /// beidem stimmt nicht, und welches, entscheidet erst ein Gerät. Wer hier
+  /// eine nicht nullfähige Liste verspricht, muss sich im Zweifel eine Lage
+  /// ausdenken.
+  ///
+  /// **Wirft nicht.** Eine gescheiterte Umrechnung kommt als Liste aus lauter
+  /// `null` zurück. Der Aufrufer zeichnet dann nichts, und das ist die
+  /// richtige Seite: eine Überlagerung, die bei einem Kanalfehler an der
+  /// falschen Stelle stehen bleibt, ist schlechter als keine.
+  Future<List<MapScreenPoint?>> projectToScreen(List<MapPosition> positions);
 }

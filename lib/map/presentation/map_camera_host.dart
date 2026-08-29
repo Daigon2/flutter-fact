@@ -18,6 +18,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:fact_app/core/async/detached_work.dart';
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
@@ -28,11 +29,14 @@ import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_screen_point.dart';
 import 'package:fact_app/map/presentation/map_auto_pitch.dart';
 import 'package:fact_app/map/presentation/map_camera_driver.dart';
 import 'package:fact_app/map/presentation/map_overlay_driver.dart';
 import 'package:fact_app/map/presentation/map_overlay_host.dart';
+import 'package:fact_app/map/presentation/map_projection_driver.dart';
 import 'package:flutter/foundation.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 /// Was eine Dauerabsicht zuletzt getan hat.
 ///
@@ -113,6 +117,16 @@ class MapCameraHost implements MapHost {
   /// Gemeldet, wenn eine Absicht eintrifft, bevor eine Karte steht.
   static const String droppedEvent = 'map.host.intent_dropped';
 
+  /// Gemeldet, wenn eine Projektion nicht auswertbar zurückkommt.
+  ///
+  /// Getrennt von [droppedEvent] und von `MapHostRegistry.missingHostEvent`,
+  /// aus demselben Grund wie deren Trennung untereinander: „das SDK hat
+  /// geantwortet, aber falsch" ist ein anderer Befund als „niemand hat
+  /// zugehört", und ein gemeinsamer Name macht beide in jeder späteren
+  /// Auswertung ununterscheidbar. **Ohne Karte feuert er ausdrücklich nicht**,
+  /// das ist der Normalfall jedes Startvorgangs.
+  static const String projectionFailedEvent = 'map.projection.failed';
+
   /// Wie lange nach einem eigenen SDK-Aufruf eintreffende Kamerabewegungen als
   /// eigene gelten.
   ///
@@ -180,6 +194,9 @@ class MapCameraHost implements MapHost {
   MapCameraDriver? _driver;
   MapCameraView? _camera;
 
+  /// Die Naht, über die Koordinaten zu Bildschirmlagen werden.
+  MapProjectionDriver? _projections;
+
   Duration? _animationStartedAt;
   Duration? _animationEndsAt;
 
@@ -229,7 +246,7 @@ class MapCameraHost implements MapHost {
 
   /// Der Teil, der Bilder und Überlagerungen führt. Nur für Tests.
   ///
-  /// Es gibt diesen Zugang, weil die sechs Durchreichungen dieses Objekts sonst
+  /// Es gibt diesen Zugang, weil die Durchreichungen dieses Objekts sonst
   /// nur über ein erneutes [bindSurface] beobachtbar wären, und nach [dispose]
   /// ist das nicht mehr möglich: der Kamerastrom ist dann geschlossen und
   /// [bindSurface] würde werfen. Ein `dispose`, das den Überlagerungsteil
@@ -261,6 +278,7 @@ class MapCameraHost implements MapHost {
     required MapCameraDriver driver,
     required MapCameraView camera,
     MapOverlayDriver? overlays,
+    MapProjectionDriver? projections,
   }) {
     _driver = driver;
     _camera = camera;
@@ -270,6 +288,10 @@ class MapCameraHost implements MapHost {
     } else {
       _overlays.unbindSurface();
     }
+    // Dieselbe Zusage wie bei [overlays] und aus demselben Grund: ein zweites
+    // Binden ohne Projektionsnaht darf nicht die Naht der **alten** Karte
+    // stehen lassen.
+    _projections = projections;
     _cameraChanges.add(camera);
   }
 
@@ -281,6 +303,7 @@ class MapCameraHost implements MapHost {
     _clearAnimation();
     _steering = null;
     _userIsGesturing = false;
+    _projections = null;
     _overlays.unbindSurface();
   }
 
@@ -434,6 +457,82 @@ class MapCameraHost implements MapHost {
   /// Reicht durch, siehe Klassenkommentar.
   @override
   void removeOverlay(String overlayId) => _overlays.removeOverlay(overlayId);
+
+  /// Rechnet Koordinaten in Bildschirmlagen um. Siehe `MapHost`.
+  ///
+  /// ## Vier Fälle, und drei davon sind Ausfälle des Pakets
+  ///
+  /// 1. **Keine Karte.** Ohne Naht gibt es keine Kamera, also auch keine
+  ///    Bildschirmlage. Kommt als lauter `null` zurück, ohne Meldung: das ist
+  ///    der Normalfall jedes Startvorgangs, genau wie bei einer Überlagerung,
+  ///    die vor der Karte eintrifft.
+  /// 2. **Die Antwort ist zu kurz.** Die Kanalfassung baut ihre Liste stumpf
+  ///    aus einer `Float64List`, zwei Zahlen je Punkt
+  ///    (`method_channel_maplibre_gl.dart:598-613`). Kommt von der Plattform
+  ///    ein kürzeres Feld, wäre eine elementweise Zuordnung **verschoben**,
+  ///    und jeder Ballon säße auf der Koordinate seines Nachbarn. Deshalb wird
+  ///    die ganze Antwort verworfen und gemeldet, statt sie halb zu benutzen.
+  /// 3. **Eine Zahl, die keine ist.** Ein Punkt hinter dem Horizont ist bei
+  ///    58 Grad Neigung ein realer Fall, und das Paket widerspricht sich, was
+  ///    dann kommt (`controller.dart:1784` gegen `:1785`). `NaN` und
+  ///    `Infinity` fallen deshalb einzeln als `null` heraus.
+  /// 4. **Der Kanal wirft.** Kommt als lauter `null` zurück und wird gemeldet.
+  ///
+  /// **Gemeldet und nicht geworfen.** Ein Aufrufer, der 60-mal je Sekunde
+  /// projiziert, kann mit einer Ausnahme nichts anfangen; er zeichnet dann
+  /// eben nichts, und der nächste Kameratakt versucht es erneut.
+  @override
+  Future<List<MapScreenPoint?>> projectToScreen(
+    List<MapPosition> positions,
+  ) async {
+    final List<MapScreenPoint?> nothing = List<MapScreenPoint?>.filled(
+      positions.length,
+      null,
+    );
+    final MapProjectionDriver? projections = _projections;
+    if (projections == null || positions.isEmpty) {
+      return nothing;
+    }
+
+    final List<Point<num>> screen;
+    try {
+      screen = await projections.toScreenLocationBatch(
+        positions.map(
+          (MapPosition position) =>
+              LatLng(position.latitude, position.longitude),
+        ),
+      );
+    } on Object catch (error) {
+      _diagnostics.report(
+        DiagnosticEvent(projectionFailedEvent, <String, String>{
+          'count': '${positions.length}',
+          'reason': error.runtimeType.toString(),
+        }),
+      );
+      return nothing;
+    }
+
+    if (screen.length != positions.length) {
+      _diagnostics.report(
+        DiagnosticEvent(projectionFailedEvent, <String, String>{
+          'count': '${positions.length}',
+          'reason': 'length:${screen.length}',
+        }),
+      );
+      return nothing;
+    }
+
+    return <MapScreenPoint?>[
+      for (final Point<num> point in screen)
+        if (point.x.isFinite && point.y.isFinite)
+          MapScreenPoint(
+            xInScreenPixels: point.x.toDouble(),
+            yInScreenPixels: point.y.toDouble(),
+          )
+        else
+          null,
+    ];
+  }
 
   // ---------------------------------------------------------------------------
   // Innenleben

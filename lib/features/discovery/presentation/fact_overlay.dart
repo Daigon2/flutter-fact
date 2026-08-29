@@ -131,3 +131,71 @@ MapOverlay factOverlayOf(
     minZoom: factOverlayMinZoom,
   );
 }
+
+/// Die Zoom-Skalierung eines einzelnen Ballons, in Dart gerechnet.
+///
+/// ## Warum diese Zahl zweimal im Repository steht
+///
+/// Nativ ist sie ein Style-Ausdruck: `overlayPointSizeExpression` in
+/// `lib/map/presentation/map_overlay_host.dart` gibt MapLibre zwei
+/// Stützstellen, und das SDK interpoliert. Ein Flutter-Ballon über der Karte
+/// hat kein SDK, das für ihn rechnet, und **er darf den Ausdruck auch nicht
+/// lesen**: Regel 18 verbietet Features jeden Import aus `map/presentation/`.
+///
+/// Beide sind deshalb **unabhängig aus derselben Quellzeile** abgeschrieben,
+/// `screen-map.jsx:1799`:
+///
+/// ```js
+/// const mapGetScale = z => Math.max(0.42, Math.min(1.25, (z - 11) / 6));
+/// ```
+///
+/// Das ist dasselbe Muster wie bei den zwölf Kategorien, wo eine zweite
+/// unabhängige Abschrift die Zusicherung trägt. Dass die beiden Seiten
+/// übereinstimmen, ist ausdrücklich geprüft; ohne diese Prüfung wäre der
+/// erste Beleg ein **Sprung an der 150-Meter-Grenze**, und den sieht man erst
+/// am Gerät: auf Zoom 16 steht der Faktor bei 0,833 und nicht bei 1.
+///
+/// ## Sie greift auf beiden Seiten auf alles
+///
+/// In der Quelle sitzt `scale()` an `.coin-float-wrap` und damit allein am
+/// Kopf (`screen-map.jsx:2185`), Stiel und Bodenschatten behalten ihre Maße.
+/// Nativ trägt **ein Bild** alle drei Teile, `icon-size` skaliert also alles;
+/// diese Abweichung ist bei `overlayPointSizeExpression` begründet und
+/// festgehalten. Der gezeichnete Ballon folgt hier ausdrücklich der
+/// **nativen** Seite und nicht der Quelle: die beiden müssen an der Grenze
+/// zusammenpassen, und die Quelle hat dort gar keine Grenze.
+double factBalloonZoomScale(double zoom) => ((zoom - 11) / 6).clamp(0.42, 1.25);
+
+/// [overlay] ohne die Punkte aus [hiddenIds].
+///
+/// ## Wozu das da ist
+///
+/// Die Ballons innerhalb von 150 Metern werden als Flutter-Widgets über der
+/// Karte gezeichnet. Bleiben sie zusätzlich in der nativen Überlagerung,
+/// stehen sie doppelt da: einmal lebend, einmal als stehendes Bild darunter.
+/// Deshalb verlassen sie die Liste, solange sie leben.
+///
+/// **Die Gruppierung bleibt unangetastet.** Ein Punkt weniger in der Quelle
+/// heißt eine Gruppe mit einem Mitglied weniger, und genau so soll es sein;
+/// die Zahl in der Gruppe zählt dann, was wirklich noch nativ liegt. Der Fall
+/// tritt ohnehin nur oberhalb der Gruppierungsgrenze auf, siehe
+/// `factAnimationRunsAt`.
+///
+/// Gibt bei leerer Menge **dieselbe** Überlagerung zurück und keine Kopie: der
+/// Host tauscht die Daten seiner Quelle bei jedem `setOverlay` aus, und eine
+/// gleich aussehende Kopie wäre ein Kanalaufruf für nichts.
+MapOverlay factOverlayWithout(MapOverlay overlay, Set<String> hiddenIds) {
+  if (hiddenIds.isEmpty) {
+    return overlay;
+  }
+  return MapOverlay(
+    id: overlay.id,
+    points: <MapOverlayPoint>[
+      for (final MapOverlayPoint point in overlay.points)
+        if (!hiddenIds.contains(point.id)) point,
+    ],
+    grouping: overlay.grouping,
+    minZoom: overlay.minZoom,
+    maxZoom: overlay.maxZoom,
+  );
+}

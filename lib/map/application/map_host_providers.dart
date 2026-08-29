@@ -46,6 +46,8 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_screen_point.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Nimmt Absichten entgegen und reicht sie an den eingeklinkten Host weiter.
@@ -236,6 +238,27 @@ final class MapHostRegistry implements MapHost {
   void removeOverlay(String overlayId) {
     _overlays.remove(overlayId);
     _host?.removeOverlay(overlayId);
+  }
+
+  /// Reicht durch. **Ohne Host kommt lauter `null` zurück, ohne Meldung.**
+  ///
+  /// Das ist die dritte Antwort dieser Klasse auf „kein Host", und sie folgt
+  /// derselben Trennlinie: eine Absicht ist ein Ereignis und **verfällt**,
+  /// also wird sie gemeldet; ein Bild ist Zustand und **wartet**, also nicht.
+  /// Eine Projektion ist eine **Frage**, und die richtige Antwort auf „wo
+  /// liegt das auf einer Karte, die es nicht gibt" ist „nirgends". Der
+  /// Aufrufer fragt im nächsten Kameratakt erneut, und ein Ereignis im
+  /// Normalbetrieb jedes Startvorgangs liest nach der dritten Woche niemand
+  /// mehr.
+  @override
+  Future<List<MapScreenPoint?>> projectToScreen(List<MapPosition> positions) {
+    final MapHost? host = _host;
+    if (host == null) {
+      return Future<List<MapScreenPoint?>>.value(
+        List<MapScreenPoint?>.filled(positions.length, null),
+      );
+    }
+    return host.projectToScreen(positions);
   }
 
   /// Meldet den fehlenden Host.

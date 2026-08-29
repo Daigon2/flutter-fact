@@ -5,6 +5,7 @@ import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_screen_point.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const MapPosition munich = MapPosition(latitude: 48.1351, longitude: 11.582);
@@ -51,6 +52,20 @@ class FakeMapHost implements MapHost {
 
   @override
   void removeOverlay(String overlayId) => removedOverlays.add(overlayId);
+
+  /// Die Anfragen an die Projektion, in der Reihenfolge des Eingangs.
+  final List<List<MapPosition>> projected = <List<MapPosition>>[];
+
+  /// Was die Projektion zurückgeben soll. `null` heißt „nichts sichtbar".
+  List<MapScreenPoint?>? projectionAnswer;
+
+  @override
+  Future<List<MapScreenPoint?>> projectToScreen(List<MapPosition> positions) {
+    projected.add(positions);
+    return Future<List<MapScreenPoint?>>.value(
+      projectionAnswer ?? List<MapScreenPoint?>.filled(positions.length, null),
+    );
+  }
 
   /// Tut so, als hätte sich die Karte bewegt.
   void moveTo(MapCameraView view) {
