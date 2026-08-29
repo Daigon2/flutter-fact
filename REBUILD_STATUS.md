@@ -228,9 +228,33 @@ nicht ablesbar. **N ist noch zu wählen**, das Gate trägt beide Lesarten bereit
 Auflage: *„aber Animation und Glühen, Drehung müssen dann später aber
 kommen!!"*. Das ist eine **Zusage, keine Option.** Der native Weg ist damit
 eine Vertagung und kein Verzicht, und Schritt 17 ist nicht abgeschlossen,
-bevor der nächstgelegene Ballon wieder stufenlos wächst, sich dreht und glüht.
-Betroffen ist ohnehin nur einer, der nächste innerhalb 150 Metern
-(`screen-map.jsx:2217-2232`, dort selbst als Korrektur dokumentiert).
+bevor die Ballons wieder stufenlos wachsen, sich drehen und glühen.
+
+**Korrektur an der Einschätzung, die dieser Entscheidung zugrunde lag.** Beim
+Vorbereiten von Schritt 17 nachgemessen: es ist **nicht** nur der
+nächstgelegene Ballon. Größe, Drehung und Glühen gelten für **jeden** nicht
+gesammelten Ballon innerhalb von `COIN_RADIUS = 150` Metern
+(`screen-map.jsx:2207`, `:2234-2295`). Nur das Auf-und-ab (`coinFloatNear`)
+bekommt allein der nächste (`:2298-2308`), und genau darauf bezieht sich der
+Korrekturkommentar bei `:2217-2222`. In einer dichten Altstadt sind das
+mehrere gleichzeitig, und das Beispiel dafür steht in der Quelle selbst:
+Weimars Altstadt.
+
+Die gemessenen Kurven, alle je Bild gerechnet, mit `t = 1 - dist / 150`:
+
+| Größe | `26 + 22 * pow(t, 1.5)` Pixel, also 26 fern bis 48 nah (`:2250-2255`) |
+|---|---|
+| Drehung | `0.12 + 17.88 * pow(t, 2.2)` Grad je Bild, aufsummiert (`:2207-2209`, `:2273-2278`) |
+| Glühen | Radius `4 + t * 8` px, Deckkraft `0.15 + t * 0.55` (`:2281-2283`) |
+
+**Was das für den Entwurf bedeutet**, und es ist eher eine Chance als ein
+Problem: Größe und Glühen hängen nur an der Entfernung, nicht an der Zeit. Sie
+sind als datengetriebene Stil-Ausdrücke über eine Merkmalseigenschaft
+darstellbar, die beim GPS-Takt (1 bis 5 Hz) aktualisiert wird, nicht beim
+Bildtakt. Wirklich je Bild ist nur die **Drehung**, und die ist eine
+Y-Achsen-Spiegelung, die `icon-rotate` nicht kann. Ob daraus eine
+Flutter-Überlagerung je Ballon wird oder nur eine für den nächsten, ist die
+Entwurfsfrage von Schritt 17.
 
 **3. Die Ballon-Bilder entstehen zur Laufzeit**, nicht als Dateien im
 Repository. Sie folgen damit den Design-Tokens automatisch. Die Zahl der
