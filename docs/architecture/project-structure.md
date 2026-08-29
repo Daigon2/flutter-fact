@@ -147,6 +147,16 @@ features/settings/
   `map/presentation/avatar/`, and `webview_flutter` may appear nowhere else
   (rule 19). Unlike `core/anchors/` above, both rules are machine-enforced.
 
+- `services/location/` is the location provider, the second home directory of
+  this kind. `domain-map.md` §3 lists the geolocation provider among the
+  capabilities that are not business domains, so it belongs here and not in a
+  feature. The whole `geolocator` package family may appear nowhere else
+  (rule 21): `Position` and `LocationAccuracy` live in
+  `geolocator_platform_interface`, so a ban on the main name alone would leave
+  the most obvious detour open. As with `map/`, the rule checks the import and
+  never the content. A service that hands the user's whereabouts somewhere it
+  does not belong passes it; that is E-07 and stays a review concern.
+
 - `map/application/map_host_providers.dart` holds the two providers that give
   access to the map host, and the boundary between them is drawn by **type**,
   not by convention:
