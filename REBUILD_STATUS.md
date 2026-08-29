@@ -973,6 +973,194 @@ nachsehen. Der Ausweg wird sein, dass `maplibre_gl` eine Fassung mit
 Built-in-Kotlin bekommt; dann ist zu prüfen, ob der `app_links`-Konflikt
 dabei mit verschwindet.
 
+## Fragen an Dairen, gestellt und unbeantwortet
+
+Am 29.08.2026 als Block verschickt, seither ohne Antwort. **Der Wortlaut steht
+hier, weil er sonst nirgends stand.** Im Repository gab es die D-Nummerierung
+bis dahin in genau drei Vorkommen: `D-5` (entschieden), ein beiläufiges `D-9` in
+`lib/services/location/device_position.dart:24` und ein `D-b` in der
+maplibre-Tabelle, das nirgends aufgelöst wird. Die sechs Fragen selbst lebten
+allein im Chatverlauf, und `CLAUDE.md` sagt, dass Chatverlauf keine Quelle ist.
+Eine eintreffende Antwort wäre ihrer Frage nicht mehr sicher zuzuordnen gewesen.
+
+Der Stand **im Fragetext** ist der vom Absenden: Schritte 12 und 13 fertig, 1203
+Tests. Was sich seither geändert hat, steht als **Nachtrag** unter der jeweiligen
+Frage. Der Fragetext selbst wird nicht nachgeführt, denn Dairen hat genau ihn
+bekommen.
+
+| Nr | Frage in einem Satz | Blockiert | Nachtrag seit dem Absenden |
+|---|---|---|---|
+| D-9 | Ein gemeinsamer Geo-Typ oder weiter je ein lokaler | nichts, wird teurer | Der angekündigte vierte Typ ist **nicht** entstanden |
+| D-10 | Ist `lib/map/application/` als Kompositionsschicht bestätigt | nichts | Seit Schritt 15 gibt es ein **zweites** `application/` |
+| D-11 | Braucht die Karten-Host-Regel ein Gegenstück für `test/` | nichts | Eine pauschale Regel träfe heute zwei Testdateien, die eine teuer gefundene Lücke schließen |
+| D-12 | Wie klappt eine Gruppe ohne `getClusterExpansionZoom` auf | Antippen in Schritt 15 | Schritt 15 ist **ohne** Antippen gebaut, die Ergänzung ist jetzt die Vertragsänderung, vor der die Frage warnte |
+| D-13 | Welches Sensorpaket für die Kompass-Drehung, und ist es frei | Schritt 14 | Der eingefrorene Port nennt `flutter_compass ^0.8.1` |
+| D-14 | Darf `presentation` direkt aus `lib/services/` lesen | nichts | Aus einer Lesestelle sind vier geworden |
+
+### D-9, gemeinsamer Geo-Typ
+
+**Blockiert nichts, wird aber teurer.**
+
+> Es gibt drei Typen für dieselben zwei Koordinaten: einen für Fakten, einen für
+> die Karte, einen für die Nutzerposition. Grund ist Gate 6, das jeder Domäne den
+> Import aus `core` verbietet, während die Strukturdokumente ein gemeinsames
+> `core/geo/GeoPoint` vorsehen. Beides gleichzeitig geht nicht. Der vierte Typ
+> kommt in Schritt 15.
+>
+> Zur Wahl: **(a)** eine eng begrenzte Ausnahme für `core/geo` in der
+> Erlaubnisliste, dann ein Typ statt vier und eine Umrechnung weniger an jeder
+> Modulgrenze, dafür bekommt Gate 6 sein erstes Loch. **(b)** Bei lokalen Typen
+> bleiben, Gate 6 bleibt unberührt, dafür Konvertierung an jeder Grenze.
+>
+> Der dritte Typ ist bewusst so klein gehalten, dass ein „ja" bei (a) ihn
+> ersatzlos löscht.
+
+**Nachtrag, 29.08.2026 abends:** die Vorhersage hat sich nicht erfüllt. Nach den
+Schritten 15, 16, 17 und 21 gibt es weiterhin genau **drei** Geo-Typen, nicht
+vier: `features/facts/domain/value_objects/fact_coordinates.dart`,
+`map/domain/map_position.dart` und `services/location/device_position.dart`. Die
+Überlagerung kam ohne einen eigenen aus. Der Druck ist damit kleiner als beim
+Absenden angenommen, die Abwägung selbst unverändert.
+
+### D-10, `lib/map/application/`
+
+**Bestätigung, blockiert nichts.**
+
+> Der Karten-Host hat ein `lib/map/application/` bekommen. Das ist das erste
+> `application/`-Verzeichnis im Repository, und es enthält Komposition statt
+> Anwendungsfällen. Kein anderer Ort bleibt übrig: die Domäne darf kein Riverpod,
+> und die Presentation des Hosts ist für Features per Regel gesperrt. Als
+> Ausnahme dokumentiert.
+>
+> Die Grenze zwischen Feature und Host hängt jetzt am Typ: Features sehen eine
+> Schnittstelle ohne `attach`, der Versuch bricht schon beim Analysieren ab.
+> Dafür braucht es keine zusätzliche Prüfregel.
+
+**Nachtrag, 29.08.2026 abends:** die Prämisse „das erste `application/`" stimmte
+beim Absenden und stimmt nicht mehr. `lib/map/application/` entstand mit Schritt
+12 (`6a8b038`), `lib/features/facts/application/fact_providers.dart` kam mit den
+Schritten 15 und 16 dazu (`12b8119`), beides über `git log --diff-filter=A`
+belegt. Die Frage lautet damit nicht mehr „darf es diese eine Ausnahme geben",
+sondern „ist `application/` die reguläre Kompositionsschicht". Das ist eine
+andere Frage mit einer anderen Folge: Antwort A wäre ein Eintrag in
+`project-structure.md`, Antwort B ein Rückbau an zwei Stellen.
+
+### D-11, die Karten-Host-Regel gilt in `test/` nicht
+
+**Offene Lücke, entschärft. Blockiert nichts.**
+
+> Die Regel, die Features vom Karten-Host fernhält, gilt in `test/` nicht: sie
+> hängt am Pfad `lib/features/`. Ein Test darf also alles importieren. Die
+> konkrete undichte Stelle ist behoben, die Lücke bleibt. Eigene Regel dafür,
+> oder bewusst offen lassen?
+
+**Nachtrag, 29.08.2026 abends, und er formt die Antwort.** Eine pauschale
+Pfadregel für `test/features/` wäre heute nicht folgenlos. Zwei Testdateien
+importieren `map/presentation` genau dort:
+
+- `test/features/discovery/presentation/fact_overlay_test.dart:17`
+  (`map_overlay_host.dart`)
+- `test/features/discovery/presentation/map_camera_intents_host_test.dart:9-10`
+  (`map_camera_driver.dart`, `map_camera_host.dart`)
+
+Das sind keine Nachlässigkeiten, sondern die Gegenprobe gegen den teuersten Fund
+der Schritte 15 und 16: die sechs Zeilen Durchreichung im **echten** Host hatten
+null Tests, und `setOverlay` leer zu machen löschte jeden Fakt von der Karte, bei
+1290 grünen Tests. Eine Regel, die den Pfad verbietet, verbietet damit
+ausgerechnet die Tests, die diese Lücke geschlossen haben. Wer D-11 mit „eigene
+Regel" beantwortet, muss also sagen, woran die Ausnahme hängt: am Dateinamen, an
+einer Anmerkung oder an einer Erlaubnisliste.
+
+### D-12, Aufklappen einer Gruppe
+
+**Blockiert das Antippen in Schritt 15.**
+
+> Wenn man in der PWA auf eine Cluster-Blase tippt, zoomt sie genau so weit auf,
+> dass der Cluster zerfällt. Die Zoomstufe dafür liefert
+> `getClusterExpansionZoom`. Diese Funktion gibt es im Flutter-Kartenpaket nicht,
+> null Treffer im ganzen Paket.
+>
+> Zur Wahl: **(a)** eine feste Zoomstufe raten. Kostet nichts, weicht sichtbar
+> ab, und bei dichten Clustern muss man mehrmals tippen. **(b)** Die Kamera auf
+> ein Rechteck fahren lassen, berechnet aus den Punkten, die das Feature ohnehin
+> hält. Trifft immer, kostet aber ein neues Feld im gerade fertiggestellten
+> Kameravertrag und einen zweiten Bewegungspfad im Host.
+>
+> Empfehlung: **(b)**, und zwar bevor Schritt 15 anfängt. Danach ist es in
+> Schritt 16 eine Vertragsänderung statt einer Ergänzung.
+
+**Nachtrag, 29.08.2026 abends.** Der empfohlene Zeitpunkt ist verstrichen.
+Schritt 15 ist seit `12b8119` gebaut, das Antippen der Gruppen bewusst nicht,
+und der Kameravertrag ist fertig und in Betrieb. Die Ergänzung ist damit genau
+die Vertragsänderung, vor der die Frage gewarnt hat. Zwei Messungen dazu, beide
+neu:
+
+- **Das Rechteck kann nur aus den eigenen Quelldaten kommen.** `getClusterLeaves`
+  und `getClusterChildren` fehlen im Paket ebenso wie `getClusterExpansionZoom`,
+  siehe „Was `maplibre_gl 0.26.2` nicht kann". Das SDK sagt also nicht, welche
+  Punkte in einer angetippten Gruppe stecken. Die Überlagerung hält sie ohnehin,
+  der Weg ist gangbar, aber er läuft über das Feature und nicht über die Karte.
+- **Was die Quelle genau tut**, für den Fall, dass (a) gewählt wird und die
+  Abweichung beziffert werden muss: `screen-map.jsx:2439-2459` fährt `easeTo` auf
+  `min(expansionZoom + 0.4, 18)` über 700 ms, zentriert auf die Koordinaten des
+  Cluster-Merkmals.
+
+### D-13, Sensorpaket für die Kompass-Drehung
+
+**Blockiert Schritt 14.**
+
+> Dafür braucht es die Geräteorientierung. Das vorhandene `geolocator` liefert
+> nur die Richtung, in die man sich bewegt, nicht wohin das Telefon zeigt. Wer
+> stehenbleibt und sich dreht, ändert nur das Zweite. Die PWA nutzt dafür
+> `deviceorientationabsolute`, in Flutter braucht es ein neues Paket. Keins ist
+> im Projekt.
+>
+> Frage: welches, und ist es freigegeben?
+
+**Nachtrag, 29.08.2026 abends:** der eingefrorene Port hat die Frage für sich
+schon beantwortet. `08_Flutter/pubspec.yaml` führt unter „Sensors / Location"
+`flutter_compass: ^0.8.1`, daneben `sensors_plus: ^6.1.0` für die
+Schüttel-Geste der Audio-Bedienung. Das ist keine Freigabe und kein Präjudiz,
+aber es ist der Präzedenzfall, den `CLAUDE.md` für genau solche Fragen im
+Lese-Repo nachschlagen lässt. Das `pubspec.yaml` hier führt heute weder das eine
+noch das andere. Ein neues Paket ist laut `CLAUDE.md` zustimmungspflichtig, die
+Frage bleibt also so oder so eine Frage.
+
+### D-14, `presentation` liest aus `lib/services/`
+
+**Bestätigung, blockiert nichts.**
+
+> Der Ortungsdienst liegt unter `lib/services/location/`, und die Oberfläche
+> liest ihn direkt. Das ist die erste Stelle im Repository, an der
+> `presentation` aus `lib/services/` liest, und die Abhängigkeitstabelle sieht es
+> nicht vor, dort steht „Application, Domain, narrowly scoped Core". Das
+> Prüfskript merkt es nicht, weil `lib/services/` keine Schicht ist.
+>
+> Der vollständig geschichtete Weg wäre möglich, kostet drei zusätzliche Dateien
+> und einen vierten Koordinatentyp, also genau das, was D-9 loswerden will.
+> Bestätigen, oder soll es umgebaut werden?
+
+**Nachtrag, 29.08.2026 abends:** aus der einen Lesestelle sind vier geworden. Es
+lesen heute `features/discovery/presentation/fact_proximity.dart`,
+`features/discovery/presentation/notifiers/user_location_providers.dart`,
+`features/discovery/presentation/pages/map_page.dart` und
+`features/facts/presentation/pages/fact_page.dart` aus `lib/services/location/`.
+Ein Umbau kostet damit mehr als beim Absenden, und die Frage wird mit jedem
+Schritt, der die Nutzerposition braucht, teurer statt billiger.
+
+### Zwei Punkte aus demselben Block, die keine Fragen sind
+
+Im selben Block mitgeschickt, ausdrücklich als selbst entschieden gekennzeichnet
+und beide mit einer Zeile umkehrbar:
+
+- **`geolocator` hat ein Heimatverzeichnis** und ist außerhalb davon maschinell
+  verboten (Regel 21). Das setzt eine bereits akzeptierte Entscheidung durch. Der
+  Präzedenzfall steht im Skript: dieselbe Regel für die WebView entstand
+  ebenfalls, bevor das Paket überhaupt im Projekt war.
+- **Die Cluster-Parameter gehören dem Feature**, nicht dem Karten-Host, weil sie
+  technisch ohnehin an der Datenquelle hängen und zwei Überlagerungen
+  unterschiedlich clustern dürfen.
+
 ## Offene Entscheidungen
 
 > **Hinweis zur Öffentlichkeit dieses Dokuments.** Das Repository ist öffentlich.

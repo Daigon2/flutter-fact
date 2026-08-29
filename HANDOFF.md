@@ -7,6 +7,7 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 | Frage | Dokument |
 |---|---|
 | Fortschritt aller 50 Schritte, offene Entscheidungen, Datenvertrags-Fallen | `REBUILD_STATUS.md` |
+| Was bei Dairen liegt, im Wortlaut, und was seither dazugekommen ist | `REBUILD_STATUS.md`, Abschnitt „Fragen an Dairen" |
 | Was `maplibre_gl 0.26.2` nicht kann, und wie Tests hier blind werden | `REBUILD_STATUS.md`, zwei eigene Abschnitte |
 | Warum die Architektur so ist | `docs/architecture/`, `docs/decisions/adr/` |
 | Welche Regeln beim Programmieren gelten | `docs/engineering/`, `.claude/rules/` |
@@ -59,15 +60,14 @@ siehe „Rechner einrichten".
    mitnehmen: ob `moveCamera` eine laufende `animateCamera` verwirft (davon hängt
    Vorrangregel 1 ab, denn `stop()` gibt es nicht), und ob die 200 ms
    `steeringGrace` tragen.
-2. **Zwei Fragen, die niemand beantwortet hat.** An Dairen: **wem gehört die
-   Nutzerposition?** Das ist die dritte Instanz der Geo-Typ-Sperre nach
-   `FactCoordinates` und `MapPosition`, und diesmal trifft sie mit E-07 eine
-   Sicherheitsprüfung; wer sie mit `MapPosition` beantwortet, gibt dem
-   Karten-Host den Aufenthaltsort des Nutzers. Schritt 13 ist ohne diese Antwort
-   gebaut worden, Begründung in `REBUILD_STATUS.md`. Nicht blockierend, aber
-   vorher zu klären: ob der Host im **unsichtbaren Tab** weiterfolgen soll. Der
-   Tabwechsel entsorgt ihn nicht, das ist gemessen; die PWA kennt keine Tabs, es
-   gibt also keine Quelle.
+2. **Sechs Fragen liegen bei Dairen und sind unbeantwortet.** Wortlaut, Stand
+   und Nachträge stehen seit dem 29.08.2026 in `REBUILD_STATUS.md` unter „Fragen
+   an Dairen". Zwei davon blockieren: **D-12** das Antippen der Gruppen aus
+   Schritt 15, **D-13** den ganzen Schritt 14. Die anderen vier kosten mit jedem
+   Schritt mehr, ohne etwas zu sperren. Wer eine Antwort bekommt, trägt sie dort
+   ein und nicht hier. Nicht Teil des Blocks und weiter offen: ob der Karten-Host
+   im **unsichtbaren Tab** weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht,
+   das ist gemessen; die PWA kennt keine Tabs, es gibt also keine Quelle.
 3. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` führt
    `balloon`, `user-marker`, `coins`, `mode-tour` und `compass` bereits als
    Kennungen. Sobald die Kartenwidgets sie mit `AnchorTarget` einhüllen, werden
@@ -84,6 +84,19 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 29.08.2026, Die sechs Fragen an Dairen stehen endlich im Repository
+
+Wortlaut, Blockadewirkung und Nachträge liegen jetzt in `REBUILD_STATUS.md`,
+kein Code geändert. **Überraschend war der Anlass:** die sechs Fragen, an denen
+praktisch jeder verbleibende Schritt hängt, existierten nur im Chatverlauf,
+während das Repository ihre Nummerierung an drei Stellen benutzte und an keiner
+auflöste. Beim Abgleich sind zwei Prämissen abgelaufen: D-12 empfahl eine
+Entscheidung **vor** Schritt 15, der am selben Tag gebaut wurde, und D-10s
+„das erste `application/`" gilt seit den Schritten 15 und 16 nicht mehr. Der
+dritte Fund formt eine Antwort um: eine pauschale Testregel für D-11 würde
+ausgerechnet die zwei Tests verbieten, die den teuersten Fund der Woche
+abgedeckt haben.
 
 ### 29.08.2026, Erster Gerätelauf mit echter Karte, und eine zurückgenommene Diagnose
 
