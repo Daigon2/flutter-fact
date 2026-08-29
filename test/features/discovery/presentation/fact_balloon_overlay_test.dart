@@ -189,25 +189,47 @@ void main() {
   });
 
   group('Wo der Ballon sitzt und wie groß er ist', () {
-    testWidgets('seine Unterkante sitzt mittig auf der Bildschirmlage', (
-      tester,
-    ) async {
-      // **Dieselbe Verankerung wie `icon-anchor: bottom`.** Wäre sie hier eine
-      // andere, spränge der Ballon beim Überqueren der 150-Meter-Grenze, und
-      // zwar um seine ganze Höhe.
-      host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
-      ];
-      final ProviderContainer container = containerWith(
-        FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 75)]),
-      );
-      await pumpOverlay(tester, container: container);
-      await mapComesAlive(tester);
+    // **Zwei Skalierungsfaktoren und nicht einer.** Mit einem einzigen wäre
+    // die Umrechnung durch eine beliebige Konstante zu ersetzen, und der Test
+    // bliebe grün; erst der zweite Faktor nagelt fest, dass wirklich durch den
+    // Skalierungsfaktor geteilt wird. Der Wert 2,625 ist der des Pixel 8, an
+    // dem die Sache am 30.08.2026 gemessen wurde.
+    for (final double ratio in <double>[2.625, 1.5]) {
+      testWidgets('seine Unterkante sitzt mittig auf der Bildschirmlage, '
+          'Skalierungsfaktor $ratio', (tester) async {
+        // **Dieselbe Verankerung wie `icon-anchor: bottom`.** Wäre sie hier
+        // eine andere, spränge der Ballon beim Überqueren der
+        // 150-Meter-Grenze, und zwar um seine ganze Höhe.
+        //
+        // **Und die Bildschirmlage kommt in Gerätepixeln.** Am 30.08.2026 am
+        // Gerät gemessen: die projizierte Kameramitte landet auf
+        // (540,75 | 1200,94) bei einer Fläche von 1080 × 2400 Gerätepixeln.
+        // Ohne die Umrechnung stünde jeder Ballon um den Skalierungsfaktor
+        // zu weit von der linken oberen Ecke weg. Belege in
+        // `REBUILD_STATUS.md` unter „Ungefragter Fund A".
+        //
+        // Gesetzt wird über `tester.view` und nicht über eine eigene
+        // `MediaQuery`: die läge unter der echten und wäre wirkungslos, siehe
+        // „Wie Tests hier blind werden", Muster 11.
+        tester.view.devicePixelRatio = ratio;
+        addTearDown(tester.view.reset);
 
-      final Rect rect = tester.getRect(find.byKey(const ValueKey<String>('7')));
-      expect(rect.bottomCenter.dx, closeTo(200, 0.001));
-      expect(rect.bottom, closeTo(400, 0.001));
-    });
+        host.projectionAnswer = <MapScreenPoint?>[
+          const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        ];
+        final ProviderContainer container = containerWith(
+          FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 75)]),
+        );
+        await pumpOverlay(tester, container: container);
+        await mapComesAlive(tester);
+
+        final Rect rect = tester.getRect(
+          find.byKey(const ValueKey<String>('7')),
+        );
+        expect(rect.bottomCenter.dx, closeTo(200 / ratio, 0.001));
+        expect(rect.bottom, closeTo(400 / ratio, 0.001));
+      });
+    }
 
     testWidgets('die Zoomkurve wirkt auch auf den gezeichneten Ballon', (
       tester,

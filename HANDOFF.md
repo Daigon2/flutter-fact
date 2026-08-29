@@ -52,13 +52,15 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **`toScreenLocation` liefert Gerätepixel, und die Division fehlt.** Am
-   30.08.2026 gemessen, Belege in `REBUILD_STATUS.md` unter „Ungefragter Fund A".
-   Die Stelle ist seit Schritt 17 benannt und wartet dort auf genau diese
-   Messung: `fact_balloon_overlay.dart:383-388`. **Die Behebung ändert, was der
-   Nutzer sieht**, geht also erst nach Janeks Kenntnisnahme, und sie braucht eine
-   eigene Gegenprüfung am Gerät statt eines grünen Gates. Die vier offenen
-   Gerätemessungen sind bei derselben Gelegenheit alle beantwortet worden.
+1. **Schritt 27, das Rätsel-Sheet.** Der einzige Schritt, der weder an Dairen
+   noch an der Belohnungsökonomie hängt und zugleich in der Reihenfolge dran
+   ist: `FactPuzzle` trägt seit Schritt 5 alle 21 Felder,
+   `lib/features/puzzles/` ist ein leerer Ordner. Gebaut wird der typisierte
+   Rätselvertrag und der Rahmen des Sheets, **ohne Einstieg**, wie die
+   Fakt-Akte. Nicht dazu gehören die Auswertung der Typen (28, hängt an E-08),
+   der Hinweis-Preis (29), der Reveal (30) und die Ökonomie (31 und 32, hängen
+   an E-06). Vorher der `architecture-guardian`, weil hier die Struktur die
+   ganze Phase 4 trägt.
 2. **Sechs Fragen liegen bei Dairen und sind unbeantwortet.** Wortlaut, Stand
    und Nachträge stehen seit dem 29.08.2026 in `REBUILD_STATUS.md` unter „Fragen
    an Dairen". Zwei davon blockieren: **D-12** das Antippen der Gruppen aus
@@ -83,6 +85,17 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 30.08.2026, Die Ballons standen außerhalb des Bildschirms
+
+Die Projektion liefert Geräte-Pixel, die Umrechnung fehlte, und damit stand
+jeder nahe Ballon um den Faktor 2,625 zu weit von der linken oberen Ecke weg.
+1553 → 1554 Tests, Behebung eine Zeile, geprüft über zwei Skalierungsfaktoren,
+eine Mutationsprobe und eine Zahl gegen ein Bildschirmfoto. **Überraschend war,
+warum das niemandem aufgefallen ist:** ein Ballon, der aus der Fläche fällt,
+wird nicht falsch gezeichnet, sondern gar nicht, und ein fehlender Ballon sieht
+aus wie ein Fakt, der eben nicht in Reichweite ist. Der Fehler hatte damit kein
+Aussehen, an dem man ihn hätte erkennen können, nur eine Abwesenheit.
 
 ### 30.08.2026, Die vier Gerätemessungen, und eine Zahl kippt eine Gegenprobe
 

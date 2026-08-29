@@ -662,7 +662,18 @@ Last. Auf einem belasteten Gerät kann die Spanne wachsen, und die Regel bleibt,
 dass sie nur unterhalb von 200 ms tragen darf.
 
 **3. Der gefährlichste Fund: hinter der Kamera wird still gespiegelt.** Zwei
-Leitern entlang des Meridians, Bildschirmlage in Gerätepixeln:
+Leitern entlang des Meridians, Bildschirmlage in Gerätepixeln.
+
+> **Korrektur vom 30.08.2026, noch in derselben Nacht.** Die Spalte
+> „Entfernung" ist gegen die **Startposition der Probe** gemessen, nicht gegen
+> die Kamera: Messung 1 hatte die Kamera vorher um 0,02 Grad nach Süden
+> gesprungen, also rund 2,2 km. Jeder Wert der Leiter ist damit um diese
+> Strecke nach Norden verschoben, und der Zoom stand bei 14,94 statt 16,5. Das
+> **qualitative** Ergebnis trägt trotzdem, weil es nur die Reihenfolge der
+> Werte braucht: das Vorzeichen kippt, und danach läuft alles gegen denselben
+> Fluchtwert. Die **Entfernungen** stimmen nicht. Richtig ist: der Umschlag
+> liegt zwischen rund 1,2 km und 2,8 km hinter der Kamera. Wer eine genauere
+> Grenze braucht, misst sie mit stehender Kamera nach.
 
 | Entfernung | nach vorn (y) | nach hinten (y) |
 |---|---|---|
@@ -714,16 +725,38 @@ geholt. Sie zeigt die Richtung des Unterschieds, nicht seine Ursache.
 
 `controller.dart:1779` sagt „screen pixels (not display pixels)", und
 `map_surface.dart` hält seit Schritt 12 fest, dass dieser Satz beides heißen
-kann. **Er heißt das Geräteraster.** Zwei unabhängige Argumente aus demselben
-Datensatz, und keines hängt am anderen:
+kann. **Er heißt das Geräteraster**, und zwar mit dem Faktor genau und ohne
+jeden Versatz.
 
-- Alle vierzehn Punkte der Leiter liegen auf dem Meridian der Kameramitte und
-  bekommen dieselbe Bildschirmlage `x = 540,75`. Das ist die halbe **physische**
-  Breite (1080 / 2). Logisch müsste die Mitte bei 205,7 liegen (411 / 2).
-- Die Mitte liegt bei `y` zwischen 1533 und 1775, also bei rund 1650. Die
-  **ganze** logische Bildschirmhöhe beträgt 914. Ein Wert, der die Höhe der
-  Fläche übersteigt, kann in dieser Einheit nicht die Mitte sein. Dieses zweite
-  Argument braucht die Annahme „die Karte ist bildschirmbreit" gar nicht.
+**Belegt mit einer zweiten Probe, die die Kameramitte selbst projiziert.** Die
+erste Fassung dieses Absatzes führte zwei Argumente, und das zweite war falsch
+hergeleitet: es schätzte die Bildmitte als Mittelwert zweier Leiterpunkte, aber
+bei geneigter Kamera ist dieser Mittelwert nicht die Mitte, und die Leiter lief
+außerdem gegen eine Position, an der die Kamera nicht mehr stand. Das Ergebnis
+stimmte, die Begründung nicht, und genau diese Sorte Begründung wird hier nie
+nachgeprüft. Deshalb steht sie nicht mehr da.
+
+Gemessen wird stattdessen die Abbildung selbst, alles aus einem Messsatz und
+alles abgelesen statt geschlossen:
+
+| Größe | Wert |
+|---|---|
+| Kartenfläche, logisch | 411,43 × 914,29, Ursprung im Fenster (0 \| 0) |
+| Kartenfläche, Gerätepixel | 1080,00 × 2400,00, Skalierungsfaktor 2,6250 |
+| Kameramitte projiziert auf | **(540,75 \| 1200,94)** Gerätepixel |
+| Mitte der Fläche wäre | (540,00 \| 1200,00) Gerätepixel |
+| dieselbe Lage geteilt durch 2,625 | (206,00 \| 457,50) logisch, Mitte wäre (205,7 \| 457,1) |
+
+Die Kameramitte landet also in der Mitte der Fläche, und sie tut es **im
+Geräteraster**. Damit sind Maßstab und Ursprung zugleich geklärt: der Faktor
+ist der Skalierungsfaktor, ein Versatz existiert nicht, und `toScreenLocation`
+bezieht sich auf die Kartenfläche und nicht auf das Fenster. Die
+Restabweichung von unter einem Pixel ist die Rundung des SDK.
+
+Zur Gegenprobe vier Punkte in 100 Metern Abstand, jeweils in logischen Pixeln
+ab der Mitte: Osten +177,5, Westen −177,5, Norden −84,8, Süden +105,6. Die
+Achsen sind sauber getrennt, und die kleinere senkrechte Strecke ist die
+Neigung von 58 Grad, nicht ein zweiter Maßstab.
 
 **Das widerspricht dem Eintrag vom 29.08.2026**, der aus einer Gegenprobe mit
 und ohne Division durch 2,625 schloss, „der Code stimmt, wie er ist". Beide
@@ -732,14 +765,43 @@ liest eine einzelne Zahl ab, statt zwei Bilder zu vergleichen, und genau dieser
 Unterschied steht seit dem 29.08.2026 als Merksatz im Dokument.
 
 **Die betroffene Stelle ist bekannt und benannt.**
-`fact_balloon_overlay.dart:383-388` sagt wörtlich: „Ergibt eine Gerätemessung,
-dass dort das Geräteraster liegt, gehört genau hier eine Division durch
-`MediaQuery.devicePixelRatioOf(context)` hin, und nirgendwo sonst." Heute steht
-dort keine Division, `at.xInScreenPixels` geht unverändert als logisches `left`
-in ein `Positioned`. **Die Behebung ändert, was der Nutzer sieht**, und gehört
-deshalb Janek vorgelegt, bevor sie passiert. Sie braucht außerdem eine eigene
-Gegenprüfung am Gerät: ein Ballon an einer bekannten Koordinate, verglichen mit
-der Stelle, an der er stehen müsste.
+`fact_balloon_overlay.dart` sagte wörtlich: „Ergibt eine Gerätemessung, dass
+dort das Geräteraster liegt, gehört genau hier eine Division durch
+`MediaQuery.devicePixelRatioOf(context)` hin, und nirgendwo sonst." Genau das
+ist am 30.08.2026 passiert, von Janek freigegeben, weil es ändert, was der
+Nutzer sieht. **Dass es nur eine Stelle war, war der Zweck des Aufbaus aus
+Schritt 17 und hat sich ausgezahlt: die Behebung ist eine Zeile.**
+
+#### Wie die Behebung geprüft ist, und warum kein Bild dabei gedeutet wird
+
+Drei Prüfungen, und keine davon beruht auf einem Eindruck.
+
+**1. Zwei Skalierungsfaktoren im Test statt einem.** Der Platzierungstest läuft
+jetzt über 2,625 und 1,5. Mit nur einem Faktor wäre die Division durch eine
+beliebige Konstante zu ersetzen, und der Test bliebe grün. Gesetzt wird über
+`tester.view.devicePixelRatio` und nicht über eine eigene `MediaQuery`, denn
+die läge unter der echten und wäre wirkungslos, siehe „Wie Tests hier blind
+werden", Muster 11.
+
+**2. Mutationsprobe, angelegt und wieder gelöscht.** Beide Divisionen entfernt,
+Suite gefahren: **beide** Testfälle fallen, für 2,625 wie für 1,5. Danach
+zurückgenommen.
+
+**3. Die Gegenprüfung am Gerät, als Zahl gegen Zahl.** Der Emulator stand 80 m
+südwestlich des Testfakts 3262, der damit innerhalb der 150 Meter lag und als
+Flutter-Widget gezeichnet wurde. Die Probe hat die Projektion dieses Fakts
+mitgeloggt: **(768,27 | 1059,30) Geräte-Pixel**. Ein Bildschirmfoto liegt im
+selben Raster, die Zahl ist also direkt gegen das Bild prüfbar. Gemessen im
+Foto: der Stielfuß mit seinem Bodenschatten sitzt bei **(768 | 1049)**. Die
+x-Achse trifft auf unter einen Pixel, die zehn Pixel in y sind das Hüpfen des
+nahen Ballons, das innerhalb seines Kastens läuft.
+
+**Der eigentliche Beleg ist aber ein anderer, und er braucht gar keine
+Genauigkeit:** ohne die Division stünde derselbe Ballon bei **logisch**
+(768 | 1059), und die Kartenfläche ist logisch nur 411 × 914 groß. Er wäre
+vollständig außerhalb und damit unsichtbar. Sichtbar war er trotzdem nie als
+Fehler aufgefallen, weil ein fehlender Ballon aussieht wie ein Fakt, der eben
+nicht in Reichweite ist.
 
 #### Ungefragter Fund B: eine abgebrochene Flugbewegung lässt ihren Zoom stehen
 

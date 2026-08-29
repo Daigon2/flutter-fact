@@ -347,6 +347,9 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
 
     final double scale = factBalloonZoomScale(zoom);
     final String? nearestId = proximity.nearest?.id;
+    // Die Projektion liefert Gerätepixel, `Positioned` rechnet in logischen.
+    // Begründung und Messung stehen an [_balloonAt].
+    final double pixelRatio = MediaQuery.devicePixelRatioOf(context);
 
     // **Kein Empfänger für Berührungen.** Das Antippen eines Ballons ist
     // Schritt 21; bis dahin darf diese Fläche keine Geste verschlucken, die
@@ -366,7 +369,13 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
           // Entfernung sortiert.
           for (final FactProximityPoint point in points.reversed)
             if (_screen[point.id] case final MapScreenPoint at)
-              _balloonAt(point, at, scale, isNearest: point.id == nearestId),
+              _balloonAt(
+                point,
+                at,
+                scale,
+                isNearest: point.id == nearestId,
+                pixelRatio: pixelRatio,
+              ),
         ],
       ),
     );
@@ -382,15 +391,29 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
   ///
   /// **Und das sind die einzigen zwei Zeilen, die eine Bildschirmlage des SDK
   /// benutzen.** Das ist Absicht: `controller.dart:1779` sagt „screen pixels
-  /// (not display pixels)", und dieser Satz kann beides heißen. Ergibt eine
-  /// Gerätemessung, dass dort das Geräteraster liegt, gehört genau hier eine
-  /// Division durch `MediaQuery.devicePixelRatioOf(context)` hin, und
-  /// nirgendwo sonst.
+  /// (not display pixels)", und dieser Satz kann beides heißen.
+  ///
+  /// **Am 30.08.2026 am Gerät gemessen: es ist das Geräteraster**, deshalb
+  /// steht die Division jetzt hier und nirgendwo sonst. Belegt ist sie nicht
+  /// über einen Bildvergleich, sondern über die projizierte **Kameramitte**:
+  /// sie kommt auf (540,75 | 1200,94) heraus, bei einer Kartenfläche von
+  /// 1080 × 2400 Gerätepixeln und einem Skalierungsfaktor von 2,625. Die Mitte
+  /// der Fläche liegt bei (540 | 1200). Damit sind Maßstab und Ursprung in
+  /// einem Messsatz geklärt: der Faktor ist [MediaQuery.devicePixelRatioOf],
+  /// einen Versatz gibt es nicht, und die Lage bezieht sich auf die
+  /// Kartenfläche und nicht auf das Fenster. Zahlen in `REBUILD_STATUS.md`
+  /// unter „Ungefragter Fund A".
+  ///
+  /// **Ohne die Division stand jeder Ballon um den Faktor 2,625 zu weit von
+  /// der linken oberen Ecke entfernt**, also umso weiter daneben, je weiter er
+  /// von dieser Ecke weg war. In der Bildmitte waren das rund 250 logische
+  /// Pixel.
   Widget _balloonAt(
     FactProximityPoint point,
     MapScreenPoint at,
     double scale, {
     required bool isNearest,
+    required double pixelRatio,
   }) {
     final FactBalloonMetrics metrics = FactBalloonMetrics(
       emphasis: point.emphasis,
@@ -398,8 +421,8 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
     final Size size = metrics.size * scale;
     return Positioned(
       key: ValueKey<String>(point.id),
-      left: at.xInScreenPixels - size.width / 2,
-      top: at.yInScreenPixels - size.height,
+      left: at.xInScreenPixels / pixelRatio - size.width / 2,
+      top: at.yInScreenPixels / pixelRatio - size.height,
       width: size.width,
       height: size.height,
       child: RepaintBoundary(

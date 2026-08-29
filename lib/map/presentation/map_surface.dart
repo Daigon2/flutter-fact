@@ -177,13 +177,15 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
   /// ein Test gegen einen Doppelgänger dieser Methode und würde nichts
   /// belegen. Wer diese Zeile ändert, prüft sie am Gerät oder gar nicht.
   ///
-  /// **Und hier hängt eine offene Messung, die über die ganze Näherungs-
-  /// Animation entscheidet.** `controller.dart:1779` sagt zur Umrechnung
-  /// „screen pixels (not display pixels)", und dieser Satz kann beides heißen.
-  /// Liegt dort das Geräteraster statt des logischen, sitzt jeder gezeichnete
-  /// Ballon um das Bildverhältnis daneben. Umgerechnet wird deshalb an genau
+  /// **Die Messung, die hier hing, ist am 30.08.2026 gefallen.**
+  /// `controller.dart:1779` sagt zur Umrechnung „screen pixels (not display
+  /// pixels)", und dieser Satz konnte beides heißen. Es ist das **Geräteraster**:
+  /// die projizierte Kameramitte kommt auf (540,75 | 1200,94) heraus, bei einer
+  /// Fläche von 1080 × 2400 Geräte-Pixeln. Umgerechnet wird deshalb an genau
   /// einer Stelle, im Aufrufer der Projektion, siehe
-  /// `features/discovery/presentation/fact_balloon_overlay.dart`.
+  /// `features/discovery/presentation/fact_balloon_overlay.dart`. Dass es nur
+  /// eine Stelle ist, war der Zweck des Aufbaus und hat sich ausgezahlt: die
+  /// Behebung war eine Zeile.
   void _onMapCreated(MapLibreMapController controller) {
     _host.bindSurface(
       driver: MapLibreCameraDriver(controller),
