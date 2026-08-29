@@ -4,7 +4,7 @@ part of 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome
 ///
 /// ## Warum eine Spalte und nicht drei absolute Kästen
 ///
-/// Die Quelle setzt `top: 60` für den XP-Streifen (`:706`) und `top: 148` für
+/// Die Quelle setzt `top: 60` für den XP-Streifen (`:705`) und `top: 148` für
 /// den Kompass (`:3152`). Beide Zahlen passen nur zueinander, solange die
 /// Schrift nicht mitwächst: bei Systemschrift 2.0 ist der Streifen hoch genug,
 /// um unter dem Kompass zu liegen, und ein `Stack` meldet das nicht, er
@@ -12,7 +12,7 @@ part of 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome
 ///
 /// In einer Spalte **ergibt** sich die Kompassposition. Bei Skalierung 1.0
 /// kommt exakt die 148 der Quelle heraus, nachgerechnet und per Test
-/// zugesichert: 60 + 32 (Coin-Pille) + 6 (`gap`, `:706`) + 42 (Level-Ring,
+/// zugesichert: 60 + 32 (Coin-Pille) + 6 (`gap`, `:705`) + 42 (Level-Ring,
 /// `:731`) + 8. Die Höhe 32 der Coin-Pille ist 4 + 22 + 4 plus zwei mal ein
 /// Pixel Rahmen; `box-sizing: border-box` aus `styles.css:109` ändert daran
 /// nichts, weil die Pille keine gesetzte Höhe hat. Die letzten 8 sind der
@@ -34,7 +34,7 @@ class MapTopRightColumn extends StatelessWidget {
     super.key,
   });
 
-  /// `gap: 6` zwischen Coin-Pille und Level-Ring, `screen-map.jsx:706`.
+  /// `gap: 6` zwischen Coin-Pille und Level-Ring, `screen-map.jsx:705`.
   static const double coinToLevelGap = 6;
 
   /// Abstand zwischen Level-Ring und Kompass, siehe Klassenkommentar.
@@ -71,7 +71,7 @@ class MapTopRightColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      // `alignItems: 'flex-end'`, `screen-map.jsx:706`.
+      // `alignItems: 'flex-end'`, `screen-map.jsx:705`.
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
         MapCoinPill(palette: palette, coins: coins),

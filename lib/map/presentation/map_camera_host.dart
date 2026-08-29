@@ -378,18 +378,52 @@ class MapCameraHost implements MapHost {
     MapCameraView view,
     MapCameraVerdict verdict,
   ) {
+    if (releasesBearingLock(intent)) {
+      _bearingLocked = false;
+    }
+    if (clearsFollowAnchor(intent)) {
+      _clearFollowAnchors();
+    }
+
+    if (_touchesNothing(intent.change)) {
+      // **Eine Änderung, die nichts ändert, fasst die Kamera nicht an.** Das
+      // ist keine Abkürzung, sondern der Vertrag: `MapCameraChange` sagt
+      // ausdrücklich, alle vier Felder `null` heiße „nichts tun", und „der
+      // Host hat nichts zu tun" (`map/domain/map_camera.dart`).
+      //
+      // **Was ein Aufruf hier anrichtet, und zwar ohne jede Ortung.** Ein
+      // `jump` auf `_resolve(leere Änderung, view)` setzt die Kamera auf die
+      // zuletzt gemeldete Stellung. Läuft gerade eine Animation, ist das ihre
+      // **Zwischenstellung**, und die Bewegung friert dort ein. Der belegte
+      // Fall ist der Kompass-Tipp ohne Ortungsfreigabe: der Nutzer zoomt,
+      // `handleCameraIdle` gibt die Auto-Neigung ab (300 ms, ohne jeden
+      // Ortsbezug), er tippt in diesem Fenster den Kompass, und die Neigung
+      // bliebe auf halbem Weg stehen. Die Quelle macht dort **gar keinen**
+      // Kameraaufruf (`screen-map.jsx:3175-3185`, `recenter` kehrt ohne
+      // Position sofort zurück), ihr `easeTo` läuft zu Ende.
+      //
+      // **Vorrangregel 1 bleibt unangetastet.** Der Befehl wird ausgeführt,
+      // seine Nebenwirkungen sind oben schon passiert; es gibt nur nichts zu
+      // bewegen. Deshalb bleibt hier auch der Animationszustand stehen: das
+      // Verwerfen ist die Ersatzhandlung für das fehlende `stop()` des
+      // Pakets, und wo keine neue Bewegung gesetzt wird, ist auch nichts
+      // abgebrochen worden. Ein gelöschter Zustand hieße dagegen „es läuft
+      // nichts", während das SDK weiter animiert, und die nächste
+      // Dauerabsicht liefe mitten hinein.
+      //
+      // Aus demselben Grund entsteht kein [_FollowRun]: eine Dauerabsicht,
+      // die nichts bewegt hat, darf die nächste nicht mit ihrer Mindestpause
+      // ausbremsen. Erreichbar ist das heute nicht, beide Sorten bringen eine
+      // Änderung mit.
+      return;
+    }
+
     if (verdict.interruptsRunningAnimation) {
       // `maplibre_gl 0.26.2` hat weder `stop()` noch `cancel()`. Der Abbruch
       // besteht darin, die neue Bewegung zu setzen und den eigenen
       // Animationszustand zu verwerfen; bliebe er stehen, hielte der Host die
       // abgebrochene Animation für laufend und unterdrückte grundlos.
       _clearAnimation();
-    }
-    if (releasesBearingLock(intent)) {
-      _bearingLocked = false;
-    }
-    if (clearsFollowAnchor(intent)) {
-      _clearFollowAnchors();
     }
 
     final MapCameraView target = _resolve(intent.change, view);
@@ -566,6 +600,17 @@ class MapCameraHost implements MapHost {
       _followRuns[kind] = _FollowRun(at: _followRuns[kind]!.at);
     }
   }
+
+  /// Ob diese Änderung die Kamera überhaupt anfasst.
+  ///
+  /// Die Frage steht hier und nicht in der Domäne: sie ist keine Regel über
+  /// Absichten, sondern die Antwort des Hosts darauf, wann er das SDK ruft.
+  /// [MapCameraChange] selbst hält den Fall bereits fest, siehe dort.
+  static bool _touchesNothing(MapCameraChange change) =>
+      change.center == null &&
+      change.zoom == null &&
+      change.bearing == null &&
+      change.pitch == null;
 
   /// Füllt die Lücken einer [MapCameraChange] mit dem Ist-Zustand.
   ///

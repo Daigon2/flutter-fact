@@ -1,6 +1,9 @@
 import 'package:fact_app/app/bootstrap.dart';
 import 'package:fact_app/features/identity/domain/repositories/auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
+import 'package:fact_app/services/location/geolocator_location_service.dart';
+import 'package:fact_app/services/location/location_providers.dart';
+import 'package:fact_app/services/location/location_service.dart';
 import 'package:fact_app/services/supabase/supabase_config.dart';
 import 'package:fact_app/services/supabase/supabase_providers.dart';
 import 'package:flutter/widgets.dart';
@@ -62,6 +65,33 @@ void main() {
       expect(
         container.read(authRepositoryProvider),
         same(unavailableAuthRepository),
+      );
+    });
+
+    test('bindet locationServiceProvider an die geolocator-Umsetzung', () {
+      // Derselbe stille Ausfall wie bei der Anmeldung, nur eine Ebene weiter:
+      // ohne diesen Override liefert der Standard nie eine Position, die Karte
+      // bliebe für immer auf der Rückfallstadt stehen, und es gäbe weder einen
+      // Fehler noch ein Log. Auffallen würde es erst auf einem Gerät.
+      final scope = productionProviderScope(child: const SizedBox.shrink());
+      final container = ProviderContainer(overrides: scope.overrides);
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(locationServiceProvider),
+        isA<GeolocatorLocationService>(),
+      );
+    });
+
+    test('ohne die Overrides liefert der Ortungsdienst nichts', () {
+      // Die Gegenprobe, wie oben. `same` und nicht `isA`: der Standard ist eine
+      // Konstante, damit ein Test ihn identifizieren kann.
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(locationServiceProvider),
+        same(unavailableLocationService),
       );
     });
 

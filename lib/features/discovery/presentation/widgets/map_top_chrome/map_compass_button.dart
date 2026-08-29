@@ -32,6 +32,56 @@ class MapCompassButton extends StatelessWidget {
   /// Langer Druck.
   final VoidCallback? onLongPress;
 
+  /// Die beiden Erkenner, und warum es sie einzeln gibt.
+  ///
+  /// `GestureDetector` täte dasselbe, ließe aber die Dauer des langen Drucks
+  /// nicht einstellen: sie steckt fest auf `kLongPressTimeout`, also 500
+  /// Millisekunden. Die Quelle wartet **700**
+  /// (`screen-map.jsx:3173`, der `setTimeout` im `onPointerDown`), und alles
+  /// davor ist dort ein kurzer Druck. Siehe
+  /// [MapTopChrome.compassLongPressDuration].
+  ///
+  /// **Ein Erkenner entsteht nur, wenn es für ihn einen Rückruf gibt**, genau
+  /// wie `GestureDetector` es hält. Was das kostet, steht nicht in der
+  /// Gestenarena, sondern in der Sprachausgabe.
+  ///
+  /// **Die frühere Begründung hier war falsch, und sie ist nachgemessen
+  /// worden.** Sie lautete, ein Erkenner ohne Rückruf nähme „trotzdem an der
+  /// Gestenarena teil und könnte einen Tipp verschlucken, der jemand anderem
+  /// gehört". Das tut er nicht: `TapGestureRecognizer.isPointerAllowed`
+  /// (`flutter/lib/src/gestures/tap.dart:692-701`) lehnt jeden Zeiger ab,
+  /// solange alle primären Rückrufe `null` sind, und der lange Druck hält es
+  /// genauso. An einer Wegwerf-Probe nachgestellt: ein Tipp auf den Kompass
+  /// ohne Rückrufe erreichte den umschließenden `GestureDetector`, mit und
+  /// ohne die beiden Bedingungen unten.
+  ///
+  /// **Der Preis, den es wirklich gibt, ist die Semantik.**
+  /// `RawGestureDetector` leitet seine Semantik-Aktionen aus den vorhandenen
+  /// Erkennern ab und nicht aus deren Rückrufen
+  /// (`flutter/lib/src/widgets/gesture_detector.dart:1711-1727`,
+  /// `_DefaultSemanticsGestureDelegate`). Ohne die Bedingungen trüge der Knopf
+  /// `SemanticsAction.tap` und `SemanticsAction.longPress`, obwohl beide ins
+  /// Leere laufen: eine Sprachausgabe böte eine Bedienung an, die nichts tut.
+  /// Gemessen, und seither zugesichert in `map_top_chrome_test.dart`.
+  Map<Type, GestureRecognizerFactory> _gestures() {
+    return <Type, GestureRecognizerFactory>{
+      if (onTap != null)
+        TapGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+              TapGestureRecognizer.new,
+              (recognizer) => recognizer.onTap = onTap,
+            ),
+      if (onLongPress != null)
+        LongPressGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+              () => LongPressGestureRecognizer(
+                duration: MapTopChrome.compassLongPressDuration,
+              ),
+              (recognizer) => recognizer.onLongPress = onLongPress,
+            ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget needle = Transform.rotate(
@@ -69,10 +119,9 @@ class MapCompassButton extends StatelessWidget {
         child: Opacity(
           // `opacity: compassDead ? 0.55 : 1`, `:3190`.
           opacity: isDead ? 0.55 : 1,
-          child: GestureDetector(
+          child: RawGestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            onLongPress: onLongPress,
+            gestures: _gestures(),
             child: _Blurred(
               // 44x44, `borderRadius: 14`, `btnStyle` in `:3027`.
               radius: 14,

@@ -194,6 +194,68 @@ Laufweite mehr trägt, die weitergereicht werden könnte. Durchgekommen ist
 ausschließlich `height: 1.43`. Wer hier „Materials Typografie" liest, muss
 wissen, welcher Teil davon in dieser App noch scharf ist und welcher nicht.
 
+### 29.08.2026, Schritt 13: die Karte folgt dem Nutzer
+
+Ortungsdienst, GPS-Folgen, Sky-Fall und die drei Bedienelemente des
+Top-Chrome. 1116 → 1198 Tests.
+
+**Wo der Standort hingehört, stand die ganze Zeit in einem akzeptierten
+Dokument:** `domain-map.md:153-156` führt den `geolocation provider` unter
+„The following are **not** business domains", in derselben Liste wie
+`map rendering`, und genau dieser Absatz hält den Umzug von `map rendering`
+nach `lib/map/` fest. Also `lib/services/location/` und kein Feature. Damit
+war Schritt 13 **nicht** von D-9 blockiert: einen weiteren lokalen Geo-Typ zu
+bauen ist der Status quo, den das Repository zweimal dokumentiert hat, und
+`DevicePosition` ist bewusst so klein, dass ein „ja, gemeinsamer Typ" die
+Datei ersatzlos löscht.
+
+**Der Bestandsdefekt, den erst dieser Schritt sichtbar gemacht hat:** der
+Kompass-Knopf benutzte `GestureDetector.onLongPress`, also Flutters
+`kLongPressTimeout` von **500 ms**, die Quelle wartet **700**. Unsichtbar,
+solange beide Rückrufe `null` waren. Die Nebenwirkung ist die teurere:
+`tester.longPress` hält `kLongPressTimeout + kPressTimeout` = 600 ms und wäre
+ab jetzt ein **kurzer** Druck gewesen. Der bestehende Test hätte lautlos den
+falschen Rückruf gemessen.
+
+**Zwei Zahlen der Quelle, die man ohne Nachschlagen falsch baut:** jede Ortung
+schlechter als **35 Meter** wird verworfen, sonst springt der Marker während
+der Aufwärmfolge Funkzelle → WLAN → GPS. Und die 12 Meter Totzone gehören der
+**Kamera**, nicht dem Ortungsdienst; wer sie zusätzlich als `distanceFilter`
+setzt, lässt die Schwelle zweimal wirken.
+
+**Der Fehler aus der Review ist wieder der bekannte Typ: eine Begründung, die
+sich als belegt ausgibt.** Der Kompass-Tipp ohne Ortung erzeugte einen Befehl
+mit leerer Änderung, und der Kommentar nannte das unsichtbar, weil es „ohne
+Position auch keinen Sky-Fall gab". Die Aufzählung war unvollständig: **die
+Auto-Neigung braucht keine Position.** Der leere Befehl verwarf den
+Animationszustand und setzte die Kamera auf die Zwischenstellung, die Neigung
+fror also auf halbem Weg ein. Behoben im Host: eine `MapCameraChange`, die
+nichts ändert, fasst die Kamera nicht mehr an. Der Vertrag sagte das längst,
+der Host hielt es nicht ein.
+
+**Ein Kommentar hat sich beim Nachmessen als falsch erwiesen**, und das ist
+der lehrreiche Teil: die bedingte Erzeugung der Gesten-Erkenner war mit
+„nähme sonst an der Gestenarena teil" begründet. Gemessen stimmt das nicht,
+`TapGestureRecognizer.isPointerAllowed` lehnt jeden Zeiger ab, solange alle
+Rückrufe `null` sind. Der Preis, den es wirklich gibt, ist ein anderer:
+`RawGestureDetector` leitet seine Sprachausgabe-Aktionen aus den vorhandenen
+**Erkennern** ab, nicht aus deren Rückrufen, der Knopf sagt also Bedienungen
+an, die ins Leere laufen. Jetzt steht die widerlegte Annahme ausdrücklich als
+widerlegt daneben.
+
+**Die Kompassnadel zeigte eine Richtung an, die die Karte nicht hat.** Sie
+stand fest auf 0, obwohl die Quelle sie ohne jeden Gerätekompass gegen die
+Kartenblickrichtung dreht (`:1792`). Sobald der Nutzer mit zwei Fingern
+drehte, log sie. Behoben, der Bildschirm abonnierte `cameraChanges` ohnehin
+schon.
+
+**Offen und gemeldet: das Prüfskript sieht `geolocator` nicht.** Mit sieben
+Wegwerf-Proben vermessen: **jedes Verzeichnis unterhalb von `lib/` außer einem
+`domain/`-Segment** darf es importieren, `shared_preferences` verhält sich
+identisch. Nur zwei Pakete haben eine Heimatverzeichnis-Regel, `maplibre_gl`
+(Regel 20) und `webview_flutter` (Regel 19). Das Muster zum Schließen liegt
+fertig da.
+
 ### 29.08.2026, Schritt 12: MapLibre-Host mit gebackenem Stil
 
 Die Karte ist echt. Zwei Hälften: der gebackene Stil, und der Host darunter.

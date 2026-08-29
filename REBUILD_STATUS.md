@@ -214,6 +214,53 @@ springt die Kamera beim harten Reset in die Reset-Pose und kriecht danach
 wieder weg. Prüfbar in Minuten: ein `jumpTo` mitten in ein 1500-ms-`flyTo`
 setzen und zusehen.
 
+### Vor Schritt 15 geprüft: drei Paketfallen bei Markern und Clustern
+
+Alle drei am Pub-Cache belegt, alle drei lautlos, keine davon dokumentiert.
+
+**1. `addGeoJsonSource` kann nicht clustern.** Die Methode, deren Name genau
+das verspricht, reicht auf Android nur `withSynchronousUpdate` durch
+(`MapLibreMapController.java:448`), es gibt keinen Cluster-Schalter. Eine so
+angelegte Quelle clustert **nie**, ohne Fehlermeldung. Der tragende Weg ist
+`addSource` mit `GeojsonSourceProperties`, das `cluster`, `clusterRadius` und
+`clusterMaxZoom` führt; umgesetzt in `SourcePropertyConverter` auf beiden
+Plattformen. Dieselbe Sorte Falle wie `PLAIN_MAP_LOOK`: der naheliegende Name
+liefert das Falsche, und wer den Fehler beim Layer sucht, sucht Stunden.
+
+**2. `getClusterExpansionZoom` gibt es nicht.** Null Treffer im ganzen Paket,
+ebenso `getClusterChildren` und `getClusterLeaves`. Die PWA rechnet damit die
+Zoomstufe, ab der genau dieser Cluster zerfällt (`screen-map.jsx:2447-2451`).
+Das ist die einzige Stelle, an der die Überlagerung in den **fertigen**
+Kameravertrag hineingreift, siehe D-b.
+
+**3. Der Antipp-Rückruf liefert keine `properties`.** Android schickt nur
+`layerId` und `feature.id()`, iOS nur `id`, `layerId` und die Positionen, und
+Dart macht daraus blind `payload["id"].toString()`. Die PWA legt die
+Fakt-Kennung nach `properties.id` (`screen-map.jsx:1896`). **Wer das GeoJSON
+eins zu eins übernimmt, bekommt beim Antippen die Zeichenkette `"null"`**,
+ohne Ausnahme und ohne Warnung. `promoteId` rettet das nicht, es wirkt laut
+eigener Doku nur im Web und wird vom Android-Konverter gar nicht gelesen.
+**Kein Test in diesem Repository kann das finden**, weil ohne Plattformkanal
+kein Controller entsteht. Es fällt am Gerät auf, und dort als „beim Tippen
+passiert nichts".
+
+**Korrektur an einer Annahme, die naheliegt und falsch ist:** die PWA animiert
+**einen** Ballon, nicht alle. `screen-map.jsx:2217-2232` ist ausdrücklich als
+Korrektur dokumentiert, vorher hüpften alle und „auf dichten Karten wie
+Weimars Altstadt sahen Nutzer dauerndes Gehüpfe". Animiert wird nur der
+nächstgelegene innerhalb 150 Metern. Und die vier Cluster-Layer wippen gar
+nicht, `clusterBob` gehört allein dem Stadt-Marker.
+
+**Folge für den Entwurf:** Cluster und Fakt-Ballons werden native Layer, der
+Nutzermarker kann es nicht werden (er trägt den Avatar-Container, und eine
+WebView ist kein Symbol-Layer). Eine `MapProjection` braucht `map/domain`
+deshalb in Schritt 15 **nicht**. Der Auslöser ist auch nicht „der erste
+Flutter-Aufbau", wie es unten stand, sondern „der erste Aufbau, der
+**zwischen zwei Kamerabildern** seine Bildschirmlage braucht": bei geneigter
+Kamera bis 58 Grad ist die Abbildung perspektivisch, und Sichtfeld und
+Kamerahöhe gibt das Paket nicht heraus. Das trifft die Münz-Animation
+(Schritt 17) und den Avatar (18).
+
 ### Schritt 12 ist fertig, und drei Dinge daran prägen alles Weitere
 
 **Ein Feature kann den Karten-Host niemals selbst mounten.** Gemessen mit
@@ -259,7 +306,7 @@ Die PWA setzt `attributionControl: false`, `maplibre_gl 0.26.2` hat dafür
 keinen Schalter, nur Position und Rand. Nicht behoben, weil eine Attribution
 auch rechtlich hingehört.
 
-- [x] 12. MapLibre mit gebackenem Style · [ ] 13. Kamera-Verhalten
+- [x] 12. MapLibre mit gebackenem Style · [x] 13. Kamera-Verhalten
 - [ ] 14. Kompass-Rotation · [ ] 15. Cluster-Layer · [ ] 16. Einzel-Marker
 - [ ] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
 - [ ] 19. Top-Chrome · [ ] 20. Sammel-Erlebnis

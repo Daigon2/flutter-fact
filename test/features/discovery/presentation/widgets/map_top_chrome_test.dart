@@ -143,6 +143,20 @@ void main() {
     (widget) => widget is AnchorTarget && widget.anchorId == id,
   );
 
+  /// Drückt den Kompass [hold] lang und lässt wieder los.
+  ///
+  /// **`tester.longPress` taugt hier nicht**, es hält fest
+  /// `kLongPressTimeout + kPressTimeout`, also 600 Millisekunden, und genau
+  /// diese Zahl ist eine der Grenzen, die hier geprüft werden.
+  Future<void> pressCompass(WidgetTester tester, Duration hold) async {
+    final gesture = await tester.startGesture(
+      tester.getCenter(anchorOf(DiscoveryAnchors.compass)),
+    );
+    await tester.pump(hold);
+    await gesture.up();
+    await tester.pump();
+  }
+
   AnchorRegistry registryOf(WidgetTester tester) {
     final scope = tester.element(find.byType(AnchorScope));
     late AnchorRegistry found;
@@ -565,10 +579,84 @@ void main() {
       await tester.pump();
       expect(compassTaps, 1);
 
-      await tester.longPress(anchorOf(DiscoveryAnchors.compass));
-      await tester.pump();
+      await pressCompass(tester, MapTopChrome.compassLongPressDuration);
       expect(compassLongPresses, 1);
       expect(compassTaps, 1, reason: 'ein langer Druck ist kein kurzer Tipp');
+    });
+
+    testWidgets('ohne Rückrufe sagt die Sprachausgabe keine Bedienung an', (
+      tester,
+    ) async {
+      // **Der gemessene Preis der bedingten Erzeugung, und er liegt nicht in
+      // der Gestenarena.** `RawGestureDetector` leitet seine Semantik-Aktionen
+      // aus den vorhandenen Erkennern ab und nicht aus deren Rückrufen
+      // (`flutter/lib/src/widgets/gesture_detector.dart:1711-1727`). Ohne die
+      // beiden Bedingungen in `MapCompassButton._gestures` trüge der Knopf
+      // `tap` und `longPress`, obwohl beide ins Leere laufen: angesagt würde
+      // eine Bedienung, die nichts tut.
+      //
+      // Der Tipp selbst wird davon **nicht** verschluckt, das ist am
+      // 29.08.2026 gemessen worden und steht als widerlegte Annahme im
+      // Kommentar des Knopfes.
+      await pumpChrome(tester);
+
+      final stumm = tester
+          .getSemantics(find.byType(MapCompassButton).first)
+          .getSemanticsData();
+      expect(stumm.hasAction(SemanticsAction.tap), isFalse);
+      expect(stumm.hasAction(SemanticsAction.longPress), isFalse);
+
+      await pumpChrome(tester, withCallbacks: true);
+
+      final bedienbar = tester
+          .getSemantics(find.byType(MapCompassButton).first)
+          .getSemanticsData();
+      expect(bedienbar.hasAction(SemanticsAction.tap), isTrue);
+      expect(bedienbar.hasAction(SemanticsAction.longPress), isTrue);
+    });
+
+    group('Der lange Druck dauert 700 Millisekunden', () {
+      // **Flutters Standard ist ein anderer.** `kLongPressTimeout` steht auf
+      // 500 (`flutter/lib/src/gestures/constants.dart:29`), die Quelle wartet
+      // 700 (`screen-map.jsx:3173`). Bis Schritt 13 fiel der Unterschied nicht
+      // auf, weil beide Rückrufe `null` waren. Geprüft werden **beide**
+      // Grenzen: eine Prüfung nur oberhalb wäre auch mit den 500 grün.
+      testWidgets('eine Millisekunde davor ist es ein kurzer Tipp', (
+        tester,
+      ) async {
+        await pumpChrome(tester, withCallbacks: true);
+
+        await pressCompass(
+          tester,
+          MapTopChrome.compassLongPressDuration -
+              const Duration(milliseconds: 1),
+        );
+
+        expect(compassTaps, 1);
+        expect(compassLongPresses, 0);
+      });
+
+      testWidgets('genau bei 700 ist es ein langer Druck', (tester) async {
+        await pumpChrome(tester, withCallbacks: true);
+
+        await pressCompass(tester, MapTopChrome.compassLongPressDuration);
+
+        expect(compassLongPresses, 1);
+        expect(compassTaps, 0);
+      });
+
+      testWidgets('bei 600 noch nicht, und genau das ist die Abweichung von '
+          'Flutters Standard', (tester) async {
+        // 600 ist, was `tester.longPress` hält
+        // (`kLongPressTimeout + kPressTimeout`). Mit Flutters Standard von 500
+        // wäre das ein langer Druck; hier ist es ein Tipp.
+        await pumpChrome(tester, withCallbacks: true);
+
+        await pressCompass(tester, const Duration(milliseconds: 600));
+
+        expect(compassTaps, 1);
+        expect(compassLongPresses, 0);
+      });
     });
   });
 

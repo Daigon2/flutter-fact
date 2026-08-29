@@ -45,6 +45,7 @@ import 'package:fact_app/app/theme/fact_typography.dart';
 import 'package:fact_app/core/anchors/anchor_target.dart';
 import 'package:fact_app/features/discovery/presentation/discovery_anchors.dart';
 import 'package:fact_app/features/discovery/presentation/map_mode.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -64,7 +65,7 @@ part 'map_top_chrome/map_top_right_column.dart';
 ///
 /// | Element | Quelle | z-index | Anker |
 /// |---|---|---|---|
-/// | Stadt-Pille | `:3103-3115` | 50 | keiner |
+/// | Stadt-Pille | `:3105-3116` | 50 | keiner |
 /// | Coin-Pille | `:707-728` | 40 | `coins` |
 /// | Level-Ring | `:730-745` | 40 | keiner |
 /// | Kompass-Knopf | `:3152-3199` | 30 | `compass` |
@@ -124,17 +125,17 @@ class MapTopChrome extends ConsumerWidget {
     super.key,
   });
 
-  /// Seitenabstand von Stadt-Pille und rechter Spalte, `screen-map.jsx:3103`
-  /// und `:706`.
+  /// Seitenabstand von Stadt-Pille und rechter Spalte, `screen-map.jsx:3105`
+  /// und `:705`.
   static const double sideInset = 14;
 
-  /// Oberkante der Stadt-Pille, `screen-map.jsx:3103`.
+  /// Oberkante der Stadt-Pille, `screen-map.jsx:3105`.
   static const double cityTop = 54;
 
-  /// Oberkante der rechten Spalte, `screen-map.jsx:706`.
+  /// Oberkante der rechten Spalte, `screen-map.jsx:705`.
   static const double topRightColumnTop = 60;
 
-  /// Oberkante des Modus-Umschalters, `screen-map.jsx:3205`.
+  /// Oberkante des Modus-Umschalters, `screen-map.jsx:3204`.
   static const double modeToggleTop = 136;
 
   /// Oberkante des Kompass-Knopfes, `screen-map.jsx:3152`.
@@ -145,6 +146,20 @@ class MapTopChrome extends ConsumerWidget {
 
   /// Kantenlänge des Kompass-Knopfes, `btnStyle` in `screen-map.jsx:3027`.
   static const double compassSize = 44;
+
+  /// Wie lange gedrückt werden muss, damit aus dem Tipp ein langer Druck wird.
+  ///
+  /// `screen-map.jsx:3173`: der `setTimeout` im `onPointerDown` läuft **700
+  /// Millisekunden**, und `onPointerUp` behandelt alles davor als kurzen Druck
+  /// (`:3175-3185`).
+  ///
+  /// **Flutters Standard ist ein anderer**, `kLongPressTimeout` steht auf 500
+  /// (`flutter/lib/src/gestures/constants.dart:29`). Bis Schritt 13 fiel das
+  /// nicht auf, weil beide Rückrufe `null` waren und keine Geste irgendwo
+  /// ankam. `GestureDetector` lässt die Dauer nicht einstellen, deshalb steht
+  /// im Kompass-Knopf ein `RawGestureDetector` mit
+  /// `LongPressGestureRecognizer(duration: ...)`.
+  static const Duration compassLongPressDuration = Duration(milliseconds: 700);
 
   /// Wie viel Platz die rechte Spalte dem Umschalter links und rechts frei
   /// hält.
@@ -165,10 +180,10 @@ class MapTopChrome extends ConsumerWidget {
   /// Der Münzstand, `screen-map.jsx:727`.
   final int coins;
 
-  /// Die Levelnummer, `screen-map.jsx:744`.
+  /// Die Levelnummer, `screen-map.jsx:741`.
   final int level;
 
-  /// Fortschritt im Level in Prozent, `screen-map.jsx:733`.
+  /// Fortschritt im Level in Prozent, `screen-map.jsx:732`.
   final double levelPercent;
 
   /// Der gerade aktive Modus.
@@ -177,7 +192,7 @@ class MapTopChrome extends ConsumerWidget {
   /// Wird beim Antippen eines Modus gerufen, auch wenn er schon aktiv ist.
   final ValueChanged<MapMode> onModeSelected;
 
-  /// Tipp auf die Stadt-Pille, in der Quelle `recenter` (`:3105`).
+  /// Tipp auf die Stadt-Pille, in der Quelle `recenter` (`:3106`).
   ///
   /// `null` heißt: kein Zeiger, kein Tipp. Das ist der Zustand, den die Quelle
   /// ohne GPS-Position ebenfalls zeigt (`cursor: userPos ? 'pointer' :

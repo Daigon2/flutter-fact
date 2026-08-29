@@ -3,6 +3,8 @@ import 'package:fact_app/app/startup_failure_app.dart';
 import 'package:fact_app/features/identity/data/datasources/remote/supabase_auth_remote_data_source.dart';
 import 'package:fact_app/features/identity/data/repositories/supabase_auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
+import 'package:fact_app/services/location/geolocator_location_service.dart';
+import 'package:fact_app/services/location/location_providers.dart';
 import 'package:fact_app/services/supabase/supabase_config.dart';
 import 'package:fact_app/services/supabase/supabase_initializer.dart';
 import 'package:fact_app/services/supabase/supabase_providers.dart';
@@ -93,6 +95,14 @@ ProviderScope productionProviderScope({required Widget child}) {
         (ref) => SupabaseAuthRepository(
           SupabaseAuthRemoteDataSource(ref.watch(supabaseClientProvider)),
         ),
+      ),
+      // Ohne diesen Override bleibt der Standard stehen, und der liefert nie
+      // eine Position: die Karte stünde für immer auf der Rückfallstadt, ohne
+      // Fehler und ohne Meldung. Das ist derselbe stille Ausfall wie bei der
+      // Anmeldung, deshalb prüft `test/app/bootstrap_test.dart` auch diesen
+      // Eintrag.
+      locationServiceProvider.overrideWith(
+        (ref) => const GeolocatorLocationService(),
       ),
     ],
     child: child,

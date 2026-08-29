@@ -1,6 +1,6 @@
 part of 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome.dart';
 
-/// Die Stadt-Pille links oben, `screen-map.jsx:3103-3115`.
+/// Die Stadt-Pille links oben, `screen-map.jsx:3105-3116`.
 @visibleForTesting
 class MapCityPill extends StatelessWidget {
   /// Erzeugt die Stadt-Pille.
@@ -18,7 +18,7 @@ class MapCityPill extends StatelessWidget {
   /// Der angezeigte Stadtname.
   final String name;
 
-  /// Beschriftung für die Sprachausgabe, `title` in der Quelle (`:3105`).
+  /// Beschriftung für die Sprachausgabe, `title` in der Quelle (`:3106`).
   final String tooltip;
 
   /// Tipp auf die Pille. `null` heißt: nicht antippbar.
