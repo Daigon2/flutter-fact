@@ -1,15 +1,18 @@
 import 'package:fact_app/app/app.dart';
 import 'package:fact_app/app/startup_failure_app.dart';
+import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
 import 'package:fact_app/features/facts/data/repositories/supabase_fact_repository.dart';
 import 'package:fact_app/features/identity/data/datasources/remote/supabase_auth_remote_data_source.dart';
 import 'package:fact_app/features/identity/data/repositories/supabase_auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
+import 'package:fact_app/services/diagnostics/console_diagnostic_sink.dart';
 import 'package:fact_app/services/location/geolocator_location_service.dart';
 import 'package:fact_app/services/location/location_providers.dart';
 import 'package:fact_app/services/supabase/supabase_config.dart';
 import 'package:fact_app/services/supabase/supabase_initializer.dart';
 import 'package:fact_app/services/supabase/supabase_providers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -93,6 +96,18 @@ Future<void> bootstrap() async {
 ProviderScope productionProviderScope({required Widget child}) {
   return ProviderScope(
     overrides: [
+      // Ohne diesen Override bleibt `SilentDiagnosticSink` stehen, und die
+      // nimmt jedes Ereignis an und verwirft es. Das ist der teuerste stille
+      // Ausfall der drei hier, weil er die anderen unsichtbar macht: eine
+      // verworfene Kameraabsicht, eine unbekannte Stil-Kennung und eine
+      // gescheiterte Projektion melden sich alle nur über diese Senke.
+      //
+      // `overrideWithValue` und nicht `overrideWith`: die Senke braucht weder
+      // Supabase noch sonst einen Provider, es gibt also nichts, was faul
+      // bleiben müsste.
+      diagnosticSinkProvider.overrideWithValue(
+        diagnosticSinkForBuild(debugBuild: kDebugMode),
+      ),
       authRepositoryProvider.overrideWith(
         (ref) => SupabaseAuthRepository(
           SupabaseAuthRemoteDataSource(ref.watch(supabaseClientProvider)),

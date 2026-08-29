@@ -68,6 +68,15 @@ durch eine offene Entscheidung
   Flutter sonst einen Overflow-Fehler zeigt; `MediaQuery.disableAnimations`
   schaltet beide Animationen ab, was gleichzeitig Systemeinstellung und
   Testbarkeit erfüllt.
+  **`onboarding.quote` ist ein toter Schlüssel:** er existiert, wird in der PWA
+  nirgends benutzt und weicht im Text ab (»…« statt „…", plus „(vermutlich)").
+  Für das sichtbare Goethe-Zitat gibt es also keinen Schlüssel, und Invariante 4
+  („kein Text hartcodieren") hat hier keine Quelle.
+  **Die Safe Area liegt andersherum als angenommen:** `index.html:101-107` setzt
+  `env(safe-area-inset-*)` als `padding` an den **`body`**, die PWA rückt also
+  den ganzen Bildschirm samt Verlauf und Pins ein. Eine `SafeArea` nur um die
+  Inhaltsspalte hätte die Wortmarke richtig und die fünf Pins um die Notch-Höhe
+  zu hoch gesetzt.
   Offen: der Startbildschirm deckt nur die erste Hälfte von `app.jsx:69` ab.
   Die zweite (`&& !Storage.getUser()`, also „angemeldet heißt kein Splash")
   braucht die Sitzung und gehört in Schritt 9 in die Weiche, nicht in den
@@ -85,9 +94,21 @@ durch eine offene Entscheidung
   Schlüssel existiert in der PWA nicht, sie zeigt dem Nutzer den rohen
   Schlüsselnamen.
   Bewusste Abweichung: die beiden Knöpfe bekommen Nunito statt der
-  Browser-Standardschrift, in der die PWA sie unbeabsichtigt rendert. Folge,
-  die dazugehört: Arial kennt kein Gewicht 900, in der PWA sehen beide Knöpfe
-  gleich fett aus, hier nicht.
+  Browser-Standardschrift, in der die PWA sie unbeabsichtigt rendert. Ein
+  `<button>` erbt `font-family` nicht, und `styles.css` holt das nur für
+  `.tab-pill button` nach, während jeder andere Knopf der App Nunito
+  ausdrücklich setzt. Folge, die dazugehört: Arial kennt kein Gewicht 900, in
+  der PWA sehen beide Knöpfe gleich fett aus, hier nicht.
+  **Mit echten Schriften fielen zwei echte Überläufe aus Schritt 7 auf**, beide
+  bei doppelter Systemschrift und damit innerhalb von Androids Maximum: die
+  Wortmarke um 65 Pixel und die Sprachzeile um 3,8 Pixel. Die Wortmarke skaliert
+  jetzt bewusst nicht mit, weil CSS-`px` der Betriebssystem-Textgröße nicht
+  folgt und eine feste Kachel neben einem mitwachsenden Schriftzug ein halb
+  skaliertes Logo wäre; der Kopfhörer-Knopf ist auf 115 Pixel gedeckelt. Ein
+  `LayoutBuilder` wäre dort der
+  naheliegende Weg und ist unmöglich: die Inhaltsspalte liegt in einem
+  `IntrinsicHeight`, und der bricht mit `LayoutBuilder does not support
+  returning intrinsic dimensions`.
 - [x] **9. Anmeldung.** Vertrag in `identity/domain/repositories/`, damit Regel
   13 greift, Supabase-Anbindung in `data/`, Zugang über einen auf den Vertrag
   typisierten Provider mit untätigem Standard plus Override in `bootstrap.dart`.
@@ -107,6 +128,24 @@ durch eine offene Entscheidung
   Anmeldung das heutige Datum schreibt; „Angemeldet bleiben" ist gebaut, aber
   wirkungslos, genau wie in der Quelle, siehe E-33.
   **Passwort-Reset entfällt**, siehe E-34.
+  Zwei Verdrahtungsfallen, beide mit Wegwerf-Proben belegt: Regel 7 meldet in
+  `presentation` **jeden** Konstruktoraufruf einer Klasse, deren Name auf
+  `Repository`, `DataSource` oder `Client` endet, ein `const
+  UnavailableAuthRepository()` im Provider wäre also ein Verstoß (gelöst über
+  einen kleingeschriebenen `const`-Wert im Vertrag; die drei bestehenden
+  Store-Provider überleben die Prüfung nur, weil ihre Klassen auf `Store`
+  enden). Und `Override` aus `flutter_riverpod 3.4.2` ist **nicht exportiert**,
+  eine Funktion `List<Override> productionOverrides()` ist nicht schreibbar,
+  deshalb gibt die benannte, testbare Funktion die `ProviderScope` selbst zurück.
+  **Aus der Review vom 28.08.2026** (47 Mutationen, 13 überlebend, kein
+  blockierender Fund): der eine echte Defekt waren die Fremdanmeldungs-Knöpfe,
+  die auf Flutters Standard `center` standen, während CSS auf
+  `align-items: stretch` steht. `CrossAxisAlignment.stretch` allein wirft, weil
+  beide Bildschirme die Zeile in ein `SingleChildScrollView` stellen und die Höhe
+  dort unbeschränkt ist (`BoxConstraints forces an infinite height`); es braucht
+  ein `IntrinsicHeight` darum. Ehrlich mitgeschrieben: **tragend ist das
+  `IntrinsicHeight`, nicht das `stretch`**, weil der `Container` seinen Inhalt
+  ohnehin zentriert, wer nur `stretch` entfernt, bricht heute nichts.
 - [x] **10. Registrierung.** Username-Feld mit fünf Statuszuständen und
   entprellter Prüfung über `check_username`, Passwort-Stärkeanzeige, Stadt-Picker
   mit Suche und Username-Vorschlag, Einwilligung, Fortschrittsleiste (statisch,
@@ -141,6 +180,17 @@ durch eine offene Entscheidung
   Shell samt aller vier Navigationsstapel neu aufgebaut; `TourBubble` schnitt
   Text bei großer Systemschrift lautlos ab, weil `Stack` clippt statt einen
   Überlauf zu melden.
+  Bemerkt wurde der erste Fund nicht in einem Layout-Test, sondern über ein
+  `assert` der Anker-Registry: die neue Tab-Leiste meldete ihre Anker an, bevor
+  die alte entsorgt war, und die Registry sagt das laut. Ein
+  Sicherheitsmechanismus aus Block 1 hat damit einen Fehler in Block 2 gefangen,
+  für den kein Test dieser Art vorgesehen war.
+  Der Sichtbarkeitslauf der Registry erkennt einen Anker in einem inaktiven
+  Shell-Zweig zuverlässig, obwohl `IndexedStack` allein das nicht verrät; nur
+  das zusätzliche `Offstage` von `go_router` tut es.
+  **605 → 761 Tests an diesem Tag**, in sechs geprüften Blöcken: E-38, zehn
+  Review-Lücken aus Schritt 9/10, die Anker-Registry, die i18n-Ergänzung, das
+  Overlay, zwei weitere Review-Funde.
 
 ## Phase 2, Map-Kern
 
@@ -172,41 +222,52 @@ Abschaltfall ist das Einrasten der Blickrichtung, und das ist Zustand am Gate.
 Gebraucht wird sie beim ersten Feature, das eine Dauerabsicht beendet, also
 beim Tourende in Phase 6.
 
-### Was `maplibre_gl 0.26.2` nicht kann, gemessen im Pub-Cache
+**Vorrangregel 2 hat zwei Eingänge, weil es zwei verschiedene Dinge sind.** Der
+erste Entwurf reduzierte „direkte Manipulation schlägt Automatik" auf einen
+Zeitpunkt, also eine Karenzzeit nach der letzten Nutzerbewegung, mit dem
+Argument, ein Zeitpunkt könne beide Lesarten ausdrücken und ein `bool` nur eine.
+Für das GPS-Folgen stimmt das (`screen-map.jsx:2668` prüft wirklich nur
+`!isEasing()`), für die zweite Dauerabsicht ist es **falsch**: `:2837` prüft
+zusätzlich `!userInteracting`, gesetzt ab `touchstart`, also **bevor** sich die
+Kamera überhaupt bewegt hat. Ein Fenster nach der Bewegung sperrt am Anfang zu
+spät und am Ende zu lange. Schlimmer als die Lücke war, dass der Code die
+Verkürzung als quellentreu dokumentierte.
 
-Sechs Löcher, keins davon dokumentiert, und alle sechs prägen den Entwurf:
+**Zwei Belege aus dem Testbau des Fundaments.** `MapCameraChange` durfte zwei
+seiner vier Felder aus der Gleichheit fallen lassen, ohne dass ein Test anschlug;
+sein Zwilling `MapCameraView` hatte den Test, er nicht. Und der erste Prüfwert
+für die Haversine-Strecke war **in der Richtung** falsch geraten: ein Längengrad
+auf 60° Breite ist als Großkreisstrecke nicht länger als der halbe
+Meridiangrad, sondern 0,53 Meter kürzer, weil die kürzeste Linie polwärts
+ausweicht. Dass der Test fiel, belegt, dass er gegen eine unabhängige Herleitung
+prüft und nicht gegen die Implementierung.
 
-1. **Kein `isEasing()`**, null Treffer im Paket. Vorrangregel 3 hängt genau daran.
-2. **`isCameraMoving` ist kein Ersatz, sondern eine Falle.** Gesetzt über
-   `onCameraMoveStartedPlatform` (`lib/src/controller.dart:185`), gilt für jede
-   Bewegung, auch fürs Ziehen mit dem Finger. `isEasing` meint nur
-   programmgesteuerte Animation.
-3. **`animateCamera` liefert auf iOS immer sofort `null`** (`controller.dart:416`,
-   eigene Doku). Taugt nicht zum Abwarten. Gilt genauso für `moveCamera`.
-4. **Kein `stop()`, kein `cancel()`** am Controller, obwohl Vorrangregel 1
-   „bricht alles ab" heißt. Der harte Reset kann nur überschreiben.
-5. **Kein `onCameraMoveStarted`** als Widget-Rückruf.
-6. **`OnCameraMoveCallback = void Function(CameraPosition)`**, ohne Ursache,
-   ohne `isGesture`.
+### Was `maplibre_gl 0.26.2` nicht kann
 
-Folge: der Host führt seinen Animationszustand selbst, und „der Nutzer hat
-angefasst" ist nur als **unerklärte Kamerabewegung** erkennbar.
+Alles am Pub-Cache gemessen, nichts davon steht in der Paketdoku, und jede Zeile
+prägt entweder den Host, die Überlagerung oder den Stil. Diese Tabelle ist die
+Sammelstelle: was hier fehlt, ist auch nicht anderswo dokumentiert.
 
-7. **Kein dauerhaftes Kamera-Padding.** `screen-map.jsx:1694` setzt
-   `map.setPadding({ top: 320 })` und verschiebt damit den wirksamen
-   Kartenmittelpunkt um 320 Pixel nach unten, damit die Figur im unteren
-   Drittel steht. Im Paket gibt es `setPadding` nicht. `padding` kommt an zwei
-   Stellen vor, `CameraUpdate.newLatLngBounds`
-   (`maplibre_gl_platform_interface-0.26.2/lib/src/camera.dart:106-119`) und
-   `setCameraBounds` (`controller.dart:1811-1826`). Die zweite grenzt den
-   **erlaubten Kartenausschnitt** ein; wer sie für ein Kamera-Padding hält,
-   sperrt das Schieben ein, statt die Kamera zu versetzen. **Entscheidet in
-   den Schritten 15 bis 18**, wo Nutzermarker und Avatar landen und wie ein
-   Neuzentrieren aussieht.
-8. **`maxPitch` und `minPitch` haben kein Gegenstück** (`:1677-1678`), das SDK
-   klemmt die Neigung zoomabhängig und still. Folgenlos, solange die
-   Auto-Neigung bei 58 endet. `dragRotate: false` (`:1681`) ist auf dem Gerät
-   gegenstandslos, es betrifft nur die Maus.
+| Lücke | Fundstelle | Folge für den Neubau |
+|---|---|---|
+| **Kein `isEasing()`** | null Treffer im ganzen Paket | Vorrangregel 3 hängt genau daran. Der Host führt seinen Animationszustand selbst. |
+| **`isCameraMoving` ist kein Ersatz, sondern eine Falle** | gesetzt über `onCameraMoveStartedPlatform`, `lib/src/controller.dart:185` | Gilt für **jede** Bewegung, auch fürs Ziehen mit dem Finger, während `isEasing` nur programmgesteuerte Animation meint. |
+| **Kein `stop()`, kein `cancel()`** am Controller | — | Vorrangregel 1 heißt „bricht alles ab"; der harte Reset kann nur überschreiben. |
+| **`animateCamera` liefert auf iOS immer sofort `null`**, auf Android echte Werte über einen Listener | `controller.dart:416`, eigene Doku; gilt genauso für `moveCamera` | Taugt nicht zum Abwarten. `if (await animateCamera(...) != true)` wäre auf Android richtig und auf iOS fatal: der Host löschte seinen Animationszustand nie mehr und unterdrückte danach jede Dauerabsicht. Regel: `true` und `false` löschen, `null` heißt „keine Auskunft" und lässt stehen. Ein Animationszustand mit Start und **ohne** geplantes Ende gilt sonst als „läuft ewig" und friert jede Dauerabsicht dauerhaft ein. |
+| **Keine Bewegungsursache im Rückruf** | `OnCameraMoveCallback = void Function(CameraPosition)`, ohne Ursache, ohne `isGesture`; `onCameraMoveStarted` gibt es als Widget-Rückruf nicht | „Der Nutzer hat angefasst" ist nur als **unerklärte Kamerabewegung** erkennbar. |
+| **Kein `setPaintProperty`, kein `setLayoutProperty`** | vorhanden ist nur `setLayerProperties`, das laut eigener Doku unbelegte Eigenschaften auf den Standard zurücksetzt | Der Stil wird **gebacken** statt zur Laufzeit umgefärbt, erzwungen und nicht gewählt. Die PWA ändert je Layer genau eine Eigenschaft und lässt den Rest stehen; nachbauen hieße, für jeden der **111 Layer** den vollständigen Eigenschaftssatz zurückzulesen und über den Plattformkanal zurückzuschieben. |
+| **Kein dauerhaftes Kamera-Padding** | `setPadding` fehlt; `padding` kommt nur an `CameraUpdate.newLatLngBounds` (`maplibre_gl_platform_interface-0.26.2/lib/src/camera.dart:106-119`) und an `setCameraBounds` (`controller.dart:1811-1826`) vor | `screen-map.jsx:1694` setzt `map.setPadding({ top: 320 })` und schiebt den wirksamen Kartenmittelpunkt um 320 Pixel nach unten, damit die Figur im unteren Drittel steht. `setCameraBounds` grenzt den **erlaubten Ausschnitt** ein; wer sie dafür hält, sperrt das Schieben ein, statt die Kamera zu versetzen. **Entscheidet in den Schritten 15 bis 18**, wo Nutzermarker und Avatar landen und wie ein Neuzentrieren aussieht. |
+| **`maxPitch` und `minPitch` haben kein Gegenstück** | `screen-map.jsx:1677-1678` | Das SDK klemmt die Neigung zoomabhängig und still. Folgenlos, solange die Auto-Neigung bei 58 endet. `dragRotate: false` (`:1681`) ist auf dem Gerät gegenstandslos, es betrifft nur die Maus. |
+| **Kein `getClusterExpansionZoom`** | null Treffer im ganzen Paket, ebenso `getClusterChildren` und `getClusterLeaves` | Die PWA rechnet damit die Zoomstufe, ab der genau dieser Cluster zerfällt (`screen-map.jsx:2447-2451`). Das ist die einzige Stelle, an der die Überlagerung in den **fertigen** Kameravertrag hineingreift, siehe D-b. |
+| **`addGeoJsonSource` kann nicht clustern** | reicht auf Android nur `withSynchronousUpdate` durch, `MapLibreMapController.java:448` | Die Methode, deren Name genau das verspricht, hat keinen Cluster-Schalter; eine so angelegte Quelle clustert **nie**, ohne Fehlermeldung. Tragend ist `addSource` mit `GeojsonSourceProperties`, das `cluster`, `clusterRadius` und `clusterMaxZoom` führt, umgesetzt in `SourcePropertyConverter` auf beiden Plattformen. Dieselbe Sorte Falle wie `PLAIN_MAP_LOOK`: der naheliegende Name liefert das Falsche, und wer den Fehler beim Layer sucht, sucht Stunden. |
+| **Der Antipp-Rückruf liefert keine `properties`**, nur die Top-Level-`id` | Android schickt `layerId` und `feature.id()`, iOS `id`, `layerId` und die Positionen; Dart macht daraus blind `payload["id"].toString()` | Die Fakt-Kennung muss die **Top-Level-`id`** des GeoJSON-Merkmals sein. Die PWA legt sie nach `properties.id` (`screen-map.jsx:1896`); wer das GeoJSON eins zu eins übernimmt, bekommt beim Antippen die Zeichenkette `"null"`, ohne Ausnahme und ohne Warnung. `promoteId` rettet das nicht, es wirkt laut eigener Doku nur im Web und wird vom Android-Konverter gar nicht gelesen. **Kein Test in diesem Repository kann das finden**, weil ohne Plattformkanal kein Controller entsteht; es fällt am Gerät auf, und dort als „beim Tippen passiert nichts". |
+
+**Teilweise doch möglich, entgegen einem eigenen Kommentar:**
+`setGeoJsonFeature` aktualisiert einzelne Punkte sehr wohl. Der Kommentar dazu
+schloss aus `:451`, das gehe mit diesem Paketstand nicht; `:451` ist eine
+Leerzeile, der Eintrag steht auf `:450` und ein zweiter auf `:477`, in genau der
+Methode, die bei jeder Aktualisierung läuft. Richtig ist nur „vor dem ersten
+`setGeoJsonSource` nicht".
 
 **Ungemessen und beim nächsten Gerätelauf zu klären:** ob `moveCamera` eine
 laufende `animateCamera` auf maplibre-native wirklich verwirft. Wenn nicht,
@@ -271,35 +332,11 @@ Fakten als die PWA, das ist bewusst.
 **Gruppe**, nicht Cluster. „Cluster" ist Vokabular des Karten-SDK, und
 `map/domain` soll keine Vendor-Sprache tragen.
 
-### Vor Schritt 15 geprüft: drei Paketfallen bei Markern und Clustern
+### Vor Schritt 15 geprüft: was Marker und Cluster kosten
 
-Alle drei am Pub-Cache belegt, alle drei lautlos, keine davon dokumentiert.
-
-**1. `addGeoJsonSource` kann nicht clustern.** Die Methode, deren Name genau
-das verspricht, reicht auf Android nur `withSynchronousUpdate` durch
-(`MapLibreMapController.java:448`), es gibt keinen Cluster-Schalter. Eine so
-angelegte Quelle clustert **nie**, ohne Fehlermeldung. Der tragende Weg ist
-`addSource` mit `GeojsonSourceProperties`, das `cluster`, `clusterRadius` und
-`clusterMaxZoom` führt; umgesetzt in `SourcePropertyConverter` auf beiden
-Plattformen. Dieselbe Sorte Falle wie `PLAIN_MAP_LOOK`: der naheliegende Name
-liefert das Falsche, und wer den Fehler beim Layer sucht, sucht Stunden.
-
-**2. `getClusterExpansionZoom` gibt es nicht.** Null Treffer im ganzen Paket,
-ebenso `getClusterChildren` und `getClusterLeaves`. Die PWA rechnet damit die
-Zoomstufe, ab der genau dieser Cluster zerfällt (`screen-map.jsx:2447-2451`).
-Das ist die einzige Stelle, an der die Überlagerung in den **fertigen**
-Kameravertrag hineingreift, siehe D-b.
-
-**3. Der Antipp-Rückruf liefert keine `properties`.** Android schickt nur
-`layerId` und `feature.id()`, iOS nur `id`, `layerId` und die Positionen, und
-Dart macht daraus blind `payload["id"].toString()`. Die PWA legt die
-Fakt-Kennung nach `properties.id` (`screen-map.jsx:1896`). **Wer das GeoJSON
-eins zu eins übernimmt, bekommt beim Antippen die Zeichenkette `"null"`**,
-ohne Ausnahme und ohne Warnung. `promoteId` rettet das nicht, es wirkt laut
-eigener Doku nur im Web und wird vom Android-Konverter gar nicht gelesen.
-**Kein Test in diesem Repository kann das finden**, weil ohne Plattformkanal
-kein Controller entsteht. Es fällt am Gerät auf, und dort als „beim Tippen
-passiert nichts".
+Die drei Paketfallen dazu stehen in der Tabelle oben: `addGeoJsonSource`
+clustert nicht, `getClusterExpansionZoom` fehlt, und der Antipp-Rückruf liefert
+nur die Top-Level-`id`. Alle drei sind lautlos und keine ist dokumentiert.
 
 **Korrektur an einer Annahme, die naheliegt und falsch ist:** die PWA animiert
 **einen** Ballon, nicht alle. `screen-map.jsx:2217-2232` ist ausdrücklich als
@@ -363,6 +400,297 @@ Die PWA setzt `attributionControl: false`, `maplibre_gl 0.26.2` hat dafür
 keinen Schalter, nur Position und Rand. Nicht behoben, weil eine Attribution
 auch rechtlich hingehört.
 
+### Schritt 12, weitere Belege
+
+1017 → 1084 Tests, danach eine unabhängige Review mit 25 Mutationen, 11
+überlebend.
+
+- **Die Falle beim Stil heißt `PLAIN_MAP_LOOK`.** `screen-map.jsx:13` steht auf
+  `true` und der Kommentar darüber liest sich wie „schlichte Karte". Der
+  Schalter kippt aber nur vier Dinge, `applyGameStyle` läuft **unbedingt** bei
+  jedem `style.load`, und die rund 250 Zeilen Umfärbung gelten immer. **Die
+  Häuser sind sichtbar:** eine unbedingte Liste blendet sie aus, der große
+  Durchlauf schaltet sie danach wieder sichtbar. Wer nur die erste Stelle liest,
+  backt eine Karte ohne Häuser.
+- **Das Steuerfenster stand dauerhaft offen.** Die 200 ms, in denen eine
+  Kamerarückmeldung als eigene gilt, verlängerten sich bei **jeder** eigenen
+  Bewegung und verkürzten sich nie; das Blickrichtungs-Folgen tickt häufiger als
+  alle 200 ms, also **rastete eine echte Zwei-Finger-Drehung nie ein**. Der
+  Kommentar nannte den Preis „verschluckt eine Drehung kurz danach", tatsächlich
+  war er „gar nicht mehr einrastbar". Auch ein Fenster, das an den **letzten**
+  Aufruf gebunden ist statt verlängert zu werden, steht bei 100-ms-Ticks
+  dauerhaft offen: **„steuert der Host gerade" ist als reine Zeitfrage nicht
+  beantwortbar.** Der Host merkt sich jetzt die zuletzt selbst gesetzte
+  Blickrichtung; weicht die eintreffende darüber hinaus ab, hat kein eigener
+  Aufruf sie verursacht.
+- **`@visibleForTesting` an einem Feld bewacht nur das Lesen.** Ein
+  Konstruktoraufruf `MapSurface(debugCreateHost: …)` aus `lib/` lief anstandslos
+  durch, also genau der Missbrauch, um den es geht. Erst die Annotation am
+  **Konstruktorparameter** meldet ihn. Wer sich auf die Absicherung aus D-5
+  verlässt, muss wissen, wo sie greift.
+- **Zwei Dinge, die eine unabhängige Prüfung vor dem Bauen verhindert hat.** Ein
+  Host, der seine Buchführung im `State` hält, wäre unprüfbar, weil ohne
+  Plattformkanal `onPlatformViewCreated` nie läuft und **nie ein Controller
+  entsteht**. Und Riverpod verbietet Provider-Mutation in `initState` **und**
+  `dispose`, im Release still statt werfend. Die Registry ist deshalb ein
+  gewöhnliches Objekt wie `AnchorRegistry`.
+- **Vertragslücke, die erst in Schritt 13 aufgefallen wäre:**
+  `MapCameraSituation` verlangt Zustand *zu dieser* Dauerabsicht, aber
+  `MapCameraFollow` trug keine Identität, und nach der Herkunft zu schlüsseln
+  ist beweisbar falsch, weil GPS-Folgen und Blickrichtungs-Folgen beide
+  `discovery` sind. Jetzt kostete es ein Feld.
+- Kleinkram mit Reichweite: `LatLng` normalisiert den Längengrad
+  verlustbehaftet, aus 11.582 wird 11.581999999999994, also mit `closeTo`
+  messen. Und Methoden-Tear-offs sind `==`, aber **nicht** `identical`; ein Test
+  auf `identical` fällt gegen richtigen Code.
+
+### Schritt 13, was daran gemessen ist
+
+Ortungsdienst, GPS-Folgen, Sky-Fall und die drei Bedienelemente des Top-Chrome,
+1116 → 1198 Tests.
+
+- **Nicht von D-9 blockiert.** `domain-map.md:153-156` führt den `geolocation
+  provider` unter „The following are **not** business domains", in derselben
+  Liste wie `map rendering`, und genau dieser Absatz trägt den Umzug von
+  `map rendering` nach `lib/map/`. Also `lib/services/location/` und kein
+  Feature. `DevicePosition` ist bewusst so klein, dass ein „ja, gemeinsamer Typ"
+  die Datei ersatzlos löscht.
+- **Bestandsdefekt am Kompass-Knopf.** Er benutzte `GestureDetector.onLongPress`
+  und damit Flutters `kLongPressTimeout` von **500 ms**, die Quelle wartet
+  **700**. Unsichtbar, solange beide Rückrufe `null` waren. Teurer ist die
+  Nebenwirkung: `tester.longPress` hält `kLongPressTimeout + kPressTimeout` =
+  600 ms und wäre ab jetzt ein **kurzer** Druck gewesen, der bestehende Test
+  hätte lautlos den falschen Rückruf gemessen.
+- **Zwei Zahlen der Quelle, die man ohne Nachschlagen falsch baut:** jede Ortung
+  schlechter als **35 Meter** wird verworfen, sonst springt der Marker während
+  der Aufwärmfolge Funkzelle → WLAN → GPS. Und die **12 Meter Totzone gehören
+  der Kamera**, nicht dem Ortungsdienst; wer sie zusätzlich als `distanceFilter`
+  setzt, lässt die Schwelle zweimal wirken.
+- **Der leere Befehl.** Der Kompass-Tipp ohne Ortung erzeugte eine
+  `MapCameraChange` ohne Änderung; der Kommentar nannte das unsichtbar, „weil es
+  ohne Position auch keinen Sky-Fall gab". Die Aufzählung war unvollständig,
+  **die Auto-Neigung braucht keine Position**: der leere Befehl verwarf den
+  Animationszustand und fror die Neigung auf halbem Weg ein. Behoben im Host,
+  eine Änderung ohne Inhalt fasst die Kamera nicht mehr an. Der Vertrag sagte
+  das längst, der Host hielt es nicht ein.
+- **Widerlegte Begründung, ausdrücklich als widerlegt stehen geblieben:** die
+  bedingte Erzeugung der Gesten-Erkenner war mit „nähme sonst an der Gestenarena
+  teil" begründet. `TapGestureRecognizer.isPointerAllowed` lehnt jeden Zeiger
+  ab, solange alle Rückrufe `null` sind. Der Preis, den es wirklich gibt:
+  `RawGestureDetector` leitet seine Sprachausgabe-Aktionen aus den vorhandenen
+  **Erkennern** ab, nicht aus deren Rückrufen, der Knopf sagt also Bedienungen
+  an, die ins Leere laufen.
+- **Die Kompassnadel zeigte eine Richtung an, die die Karte nicht hat.** Sie
+  stand fest auf 0, obwohl die Quelle sie ohne jeden Gerätekompass gegen die
+  Kartenblickrichtung dreht (`:1792`); sobald der Nutzer mit zwei Fingern
+  drehte, log sie. Behoben, der Bildschirm abonnierte `cameraChanges` ohnehin.
+
+### Schritte 15 und 16, was daran gemessen ist
+
+Zusammen gebaut, weil gruppierte und einzelne Punkte nativ **eine** GeoJSON-
+Quelle teilen; die Trennung des Plans ist für diesen Weg künstlich. 1203 → 1308
+Tests. **Antippen ist bewusst nicht gebaut:** das Aufklappen einer Gruppe hängt
+an einer offenen Entscheidung, und der Punkt-Tipp hat bis Schritt 21 keinen
+Empfänger.
+
+- **Die teuerste Lücke fand die Review, nicht die Gates.** `MapOverlayHost` war
+  vorbildlich getestet, die Registry auch, der Bildschirm gegen einen Fake, und
+  **genau die sechs Zeilen Durchreichung im echten Host, die in der App wirklich
+  laufen, hatten null Tests.** Macht man `setOverlay` zu einer leeren Methode,
+  erscheint **kein einziger Fakt auf der Karte**, ohne Fehler, ohne Meldung, und
+  alle 1290 Tests bleiben grün. Dasselbe Muster wie bei Anmeldung und
+  Registrierung am 28.08.2026.
+- **17 von 17 Mutationen der Review überlebten**, weil die Bildtests das
+  Rechteck maßen statt des Inhalts; nach der Behebung fallen alle 26. Bei den
+  zwölf Kategorien hatte der Autor eine zweite, unabhängige Abschrift aus der
+  Quelle angelegt, bei den **45 Farbwerten** der Gruppen-Layer nicht.
+- **`Picture.toImage` kommt in einem `testWidgets` doch zurück**, aber nur, wenn
+  `pumpWidget` selbst innerhalb von `tester.runAsync` läuft. Der Unterschied ist
+  die **Zone**, nicht die Zeit: ein Future, das in der fingierten Zeit erzeugt
+  wird, kommt auch in `runAsync` nicht an. Die erste Messung war für ihren
+  Aufbau richtig und ihre Verallgemeinerung falsch, und sie hatte bereits eine
+  öffentliche Testfläche am Bildschirm gerechtfertigt; die ist ersatzlos weg.
+- **Riverpod 3 wiederholt einen gescheiterten Provider von selbst**, zehnmal
+  über rund 38 Sekunden, und nimmt dabei nur `Error` und `ProviderException`
+  aus. `FactFailure` ist eine `Exception`, wird also wiederholt. Das trifft jeden
+  künftigen Bildschirm mit einem `FutureProvider`.
+
+### Schritt 17, was daran gemessen ist
+
+Größe, Glühen und Drehung für **jeden** nicht gesammelten Ballon innerhalb der
+150 Meter, 1308 → 1421 Tests. Damit ist Janeks Auflage aus Entscheidung 2
+eingelöst.
+
+- **Der Entwurf ist an der Größe gescheitert, nicht an der Drehung.** Der Plan
+  war, Größe und Glühen nativ über eine Merkmalseigenschaft zu machen und nur
+  die Drehung als Widget. `icon-size` skaliert aber das **ganze** Bild, während
+  die Quelle nur den Kopf vergrößert (`:2257-2258` fasst allein `.coin-head`
+  an); der 50 Pixel lange Stiel wäre mitgewachsen und der Ballon bei Annäherung
+  vom Boden abgehoben. Die nahen Punkte verlassen deshalb die native
+  Überlagerung und werden als Widgets gezeichnet, alles übrige bleibt nativ. Das
+  Ergebnis ist **einfacher**: keine Betonungszahl im Vertrag, keine Farbe, kein
+  Neubau von 600 Features im GPS-Takt, und der Kartenvertrag wächst um genau
+  eine Sache, die Projektion.
+- **Die Perspektive erreicht den Ballonkopf in der PWA gar nicht.**
+  `perspective:300px` sitzt an `el` (`:1841`), der Kopf ist ein **Enkel**, und
+  der Wrap dazwischen hat kein `preserve-3d`; `grep` über die ganze Quelle
+  findet `preserve-3d` genau einmal, an `:1850`, also am Kopf selbst.
+  CSS-Perspektive gilt nur für direkte Kinder, aus `rotateY(θ)` wird dort ein
+  symmetrisches `scaleX(cos θ)` ohne Verkürzung. **Entschieden: die Perspektive
+  bleibt**, weil die Quelle sie ausdrücklich wollte und nur an einer CSS-Feinheit
+  scheitert, derselbe Fehlertyp wie der statische `coinShadowFar`. Sichtbare
+  Abweichung, Janek informiert, eine Zeile in beide Richtungen.
+- **Vier Zahlen im eigenen Bestand waren falsch.** Sie waren korrekt aus
+  `coinMakeEl` abgeschrieben, aber diese Funktion beschreibt einen Zustand, den
+  es **weniger als ein Bild lang** gibt: `coinRafTick` läuft ab `:2325`
+  unbedingt und überschreibt ihn, auch ohne Ortung. Der ruhende Ballon ist 26
+  Pixel breit statt 28, sein Emoji **10,01 statt 15**. Ein Drittel, und es wäre
+  nie aufgefallen, weil beide Zahlen belegt aussahen.
+- **Vierzehn Mutationen überlebten**, weil der Bildtest wieder die Fläche maß:
+  man konnte den harten Farbring entfernen, die Drehrichtung umkehren, die
+  Perspektive streichen und den Stiel mitwachsen lassen, ohne dass etwas
+  anschlug. Jetzt fallen alle zwanzig.
+- **Zwei Testentwürfe haben sich beim Bauen selbst widerlegt.** Das
+  **Verhältnis** zweier Zuwächse trägt einen Zeitbezug nicht: bei 100 und 200 ms
+  liefern die richtige und die falsche Fassung dasselbe Verhältnis 2, gemessen
+  werden muss der absolute Winkel. Und die Perspektive lässt sich nicht durch
+  zeilenweises Abtasten belegen, weil die Kopfmitte bei 48,07 nicht auf einer
+  Pixelgrenze liegt und daraus schon ohne Perspektive eine Scheinasymmetrie von
+  1,14 Pixeln entsteht.
+- **Zwei Fehler der Quelle bewusst nicht nachgebaut**, beide belegt: der
+  statische `coinShadowFar` (`:1866` gegen `:2316-2320`), der bei jedem Ballon
+  atmet, der **nie** nah war, und bei keinem, der einmal nah war; und „Grad je
+  Bild", das auf einem 120-Hz-Gerät doppelt so schnell dreht. Der Nah-Schatten
+  dagegen **ist** gebaut, er ist mit dem Hüpfen gepaart und kein Unfall.
+- **Bekannte, offene Abweichung:** `:1851` blendet den Schattenwechsel über 0,4
+  Sekunden weich, bei uns schlägt er um. Teuer, weil die 150-Meter-Grenze
+  zugleich der Wechsel zwischen nativem Layer und gezeichnetem Widget ist; eine
+  Blende müsste beide Seiten kennen.
+
+### Erster vollständiger Gerätelauf, 29.08.2026 abends
+
+Nicht mehr nur der Stil über eine Wegwerf-Probe, sondern **die ganze App mit
+echten Daten**: Supabase verbunden, Standort erlaubt, Karte, Fakten,
+Näherungs-Animation.
+
+Aufbau: Pixel 8 als Emulator, 1080 × 2400 physisch, Dichte 420, also **411
+logische Pixel und Skalierungsfaktor 2,625**. Künstliche Position über
+`adb emu geo fix <lon> <lat>`, ohne die es keine Näherungs-Animation zu sehen
+gibt. Testfakt 3262 bei 48.14680, 11.56340.
+
+| Frage | Ergebnis |
+|---|---|
+| Liefert `toScreenLocation` logische oder Geräte-Pixel? | **Der Code stimmt, wie er ist.** Gegenprobe mit und ohne Division durch 2,625: die Ballons stehen beide Male an derselben Stelle. |
+| Bekommen die Gruppen ihre Zahlen? | **Ja**, 17, 2, 32, 4 und 5 gesehen. Der Glyphen-Endpunkt liefert, das war ungeprüft. |
+| Laufen Sky-Fall und GPS-Folgen? | **Ja.** Das Gate arbeitet nachweislich: `map.host.intent_suppressed reason=distanceDeadZone` im Log, die 12-Meter-Totzone greift. |
+| Läuft die Näherungs-Animation? | **Ja**, Größe, Glühen und Drehung, sechs Fakten gleichzeitig in Reichweite. |
+| Ist das Launcher-Symbol noch das Flutter-Logo (E-37)? | **Nein**, der native Startbildschirm zeigt das FACT-Symbol. E-37 ist insoweit veraltet. |
+
+**Noch offen und nur am Gerät zu klären:** ob `moveCamera` eine laufende
+`animateCamera` verwirft (davon hängt Vorrangregel 1 ab), ob die 200 ms
+`steeringGrace` tragen, was für einen Punkt hinter dem Horizont zurückkommt,
+und ob die Projektion bei schneller Kartenbewegung sichtbar hinterherhängt.
+
+**Zwei Datenfunde, die erst die redende Diagnose-Senke sichtbar gemacht hat:**
+
+- `discovery.facts.unknown_category categories=Archäologie,Geschichte,Kunst count=3`.
+  Drei Kategorien der echten Daten stehen in keiner der beiden
+  Kategorietabellen und fallen auf `hist` zurück, sind also rot statt in ihrer
+  Farbe. Der Rückfall ist Parität (`screen-map.jsx:259-262`), die Lücke in den
+  Daten ist neu und gehört ins andere Repository.
+- `facts.mapping_defects degraded=14 optionalFieldUnusable=14`, Felder
+  `puzzle_fit[0..2].question`. Vierzehn Fakten tragen unbrauchbare
+  Rätselfragen. Fällt in Phase 4 auf die Füße, nicht vorher.
+
+**Ein Fehler von mir, der hier steht, weil er lehrreich ist.** Der erste Lauf
+zeigte an der Nutzerposition keinen Ballon, und zwei Fotos hintereinander waren
+bytegleich. Daraus habe ich geschlossen, die Überlagerung zeichne nicht, und
+über zwei Runden eine Ursachenkette bis zur Einheitenverwechslung gebaut.
+**Der Zustand war ein Startzeit-Artefakt**, es waren schlicht noch keine Fakten
+geladen. Belegt hat es erst eine Wegwerf-Probe, die Zahlen ausgibt:
+`zoom=16.5 inRange=6 toDraw=6 screen=6`. Eine Beobachtung ist keine Messung,
+und genau diesen Vorwurf hatte ich in derselben Woche sechsmal an anderer
+Stelle erhoben. Merksatz für den nächsten Gerätelauf: **erst warten, bis die
+Daten da sind, dann messen**, und im Zweifel eine Zahl ausgeben lassen statt
+ein Bild zu deuten.
+
+### Der Kartenstil am Gerät, 29.08.2026
+
+Erster Gerätebuild **mit verdrahteter Karte**, Exit-Code 0. Das war nicht
+selbstverständlich: `maplibre_gl` ist ab diesem Commit zum ersten Mal in `lib/`
+wirklich importiert, und genau dieses Paket hat im Juli den Android-Build
+zerlegt. Die KGP-Warnung dazu steht unter „`maplibre_gl` ist eine Zeitbombe im
+Build".
+
+**Gesehen über eine Wegwerf-Probe**, die nur die Kartenfläche mountet, ohne
+Supabase und ohne Anmeldung: der gebackene Stil trifft. Grüne Grundfläche,
+sattere Parks, fast weiße Fahrbahnen mit sandfarbenem Saum, flache
+Klötzchen-Häuser mit Umriss, keine einzige Beschriftung. Der Attributions-Knopf
+unten rechts ist da und lässt sich nicht abschalten.
+
+**Der Gerätelauf der App selbst blieb blockiert**, nicht technisch: URL und
+Schlüssel für Supabase kommen über `--dart-define` und stehen bewusst nicht im
+Repository, ohne sie zeigt die App die Startfehler-Seite. Genau die hat einen
+Fehler offenbart, und der Rundgang danach einen zweiten:
+
+- **Gelbe Doppellinien** im Text der Startfehler-Seite. `MaterialApp(home:
+  ColoredBox(...))` hat keinen `Material`-Vorfahren, und beide Textstile setzen
+  Farbe und Größe, aber keine `decoration`, also überlebt die der Ersatzschrift
+  den Merge. Kein Test hat es gefunden, weil `takeException()` leer bleibt: es
+  ist kein Fehler, es ist Flutters absichtlich grelle Ersatzschrift.
+- **Zweite Stelle, für Nutzer sichtbar:** der Audio-Aktivierungsdialog. Er ist
+  eine eigene Route im Overlay, das `Scaffold` des Startbildschirms steht daneben
+  und nützt ihm nichts, und `DialogRoute` bringt selbst kein `Material` mit.
+- **Der Nebeneffekt der Behebung ist der Merksatz:** ein `Material` ohne eigenen
+  `textStyle` vererbt `theme.textTheme.bodyMedium` an jeden Text darunter, der es
+  nicht selbst setzt. Wer ein `Material` einzieht, um die Doppellinie
+  loszuwerden, holt sich Materials Typografie ins Haus, wenn er den Basisstil
+  nicht ausdrücklich hinschreibt.
+- **Nachgemessen, und eine naheliegende Annahme fiel:** die **Laufweite** kommt
+  **nicht** durch. `letterSpacing` ist unter dem `Material` überall `null`, auch
+  vor der Behebung, weil E-38 in `ThemeData.typography` sitzt und `bodyMedium`
+  deshalb schon keine Laufweite mehr trägt. Durchgekommen ist ausschließlich
+  `height: 1.43`. Wer „Materials Typografie" liest, muss wissen, welcher Teil
+  davon in dieser App noch scharf ist.
+
+### Fundstellen des Karten-Chrome: 41 von 138 waren falsch
+
+Ein vollständiger Rundgang über die zehn Chrome-Dateien und ihre Testdatei, am
+29.08.2026. **138 Fundstellen, 41 falsch**, also fast ein Drittel. Nur
+Kommentartext geändert, kein Verhalten, Testzahl unverändert 1198. Der Nachweis
+ist nicht der grüne Lauf: `git diff -U0`, gefiltert auf Zeilen ohne `//`, ist
+**leer**, und die Dateilängen sind unverändert.
+
+**Warum das kein Aufräumen war.** Fundstellen sind hier Vertragsfläche, die
+nächste Sitzung liest sie **statt** der Quelle. Eine falsche Angabe wird nie
+nachgeprüft, weil sie sich als belegt ausgibt.
+
+**Der Versatz war uneinheitlich**, ein bis drei Zeilen, mal zu hoch, mal zu
+tief. Es gibt keine Formel, jede Angabe muss einzeln aufgeschlagen werden. An
+drei Stellen zeigte die Angabe auf die schließende Klammer statt auf die
+Eigenschaft. Eine Vermutung zur Ursache, **nicht belegt**: im Lese-Repo liegen
+mehrere Arbeitskopien mit eigener `screen-map.jsx`; wer gegen eine andere als
+die in `CLAUDE.md` benannte liest, bekommt genau so einen wandernden Versatz.
+
+**Zwei Funde sind keine Zahlen, sondern Aussagen**, und deshalb stehen
+geblieben: `actBg` und `actText` zeigen buchstäblich richtig auf ihre
+**Verwendungsstelle**, die Farbwerte selbst stehen sieben Zeilen höher. Und eine
+Zahl trägt zwei Aussagen, von denen nur eine stimmt. Beides ist eine
+Formulierungsfrage und gehört in einen eigenen Durchgang.
+
+### Schritt 19 wurde vorgezogen
+
+Das Top-Chrome des Kartenbildschirms entstand **vor** Schritt 12, weil dieser an
+einer Architekturentscheidung hing und das Chrome über der Karte davon nicht
+abhängt. Damit wurden **sieben von neun Tutorial-Schritten** voll baubar statt
+vier (Korrektur 13 beschreibt den Stand davor). Dazu kamen vier neue Regeln ins
+Prüfskript, die `lib/map/` bewachen, bevor es entsteht.
+
+**Widerspruch, nicht geglättet:** das Kästchen in der Liste unten steht trotzdem
+auf offen, `HANDOFF.md` meldet den Schritt seit dem 28.08.2026 als fertig. Wer
+das nächste Mal an Phase 2 arbeitet, prüft, ob noch etwas fehlt, und setzt genau
+eine der beiden Stellen richtig.
+
 - [x] 12. MapLibre mit gebackenem Style · [x] 13. Kamera-Verhalten
 - [!] 14. Kompass-Rotation (Sensorpaket fehlt) · [x] 15. Cluster-Layer
   · [x] 16. Einzel-Marker
@@ -370,6 +698,44 @@ auch rechtlich hingehört.
 - [ ] 19. Top-Chrome · [ ] 20. Sammel-Erlebnis
 
 ## Phase 3, Fakt-Akte und Audio
+
+### Schritt 21, was daran gemessen ist
+
+Der größte einzelne Bildschirm des Neubaus bis hierher. 1421 → 1540 Tests, 41
+plus 19 Mutationen, alle gefallen.
+
+- **Der Zuschnitt kam aus einer Produktregel, nicht aus dem Plan.** Ein
+  Ballon-Tipp führt **nicht** in die Akte: innerhalb von 150 Metern löst er das
+  Sammeln aus, außerhalb zeigt er nur eine Mini-Kachel. Der Grund steht als
+  ausdrücklicher Fix in der Quelle (`screen-map.jsx:2137-2142`): „ohne GPS NIE
+  die Fakt-Detail-Seite direkt oeffnen. Sonst koennte man durch Antippen aus
+  1000 km Entfernung einen Fakt ‚lesen'". Es gab dort ein Schlupfloch, und ein
+  Nutzer in Italien bekam einen München-Fakt vollständig angezeigt.
+- **Die Akte ist deshalb ohne Einstieg gebaut**, und ein Test bewacht das: er
+  durchsucht `lib/` nach der Route und fällt, sobald jemand einen Einstieg legt.
+  Die Regel steht wörtlich an der Route. Öffnen darf sie erst Schritt 20.
+- **Die Akte zeigt eine andere Kategoriefarbe als die Karte, und das ist
+  Parität.** Die Quelle hat dort eine eigene, kleinere Tabelle
+  (`screen-fact.jsx:245-249` gegen `KAT_MAP`), und für `kult`, `dark` und
+  `kirche` gibt es in den erzeugten Sprachtabellen **gar keinen**
+  `cat.`-Eintrag; wer die große Tabelle einsetzt, zeigt dem Nutzer den nackten
+  Schlüssel. Sichtbare Folge: ein „Persönlichkeiten"-Fakt ist auf der Karte pink
+  und in der Akte rot.
+- **Zwei Anzeigefehler der Quelle sind nicht mitportiert.** Ohne Ortung schreibt
+  sie buchstäblich „null entfernt" in die Pille, weil JavaScript das `null` in
+  den String schreibt (`:395`), und der Ortsname hat „Passau" als fest
+  verdrahteten Ersatzwert (`:394`), was der Mehrstädtigkeit widerspricht. Gebaut
+  ist der Text, den die Quelle an derselben Bedingung wenige Zeilen später selbst
+  wählt.
+- **Zwei Sprachschlüssel über die Ergänzungs-Map (E-39)**, beide wortwörtlich
+  aus der Quelle: `fact.fileNumber` steht in **beiden** Sprachkarten deutsch,
+  weil die PWA „Akte #7" auch im englischen Modus so zeigt, genau wie
+  `tour.step9.meta`. `fact.sourceMissing` hat in der Quelle beide Sprachen.
+- **Aufräumarbeit, die Voraussetzung war:** `css_gradient_geometry.dart` ist von
+  `features/identity/presentation/widgets/` nach `lib/core/widgets/` gezogen. Die
+  Datei trug den Vermerk „sobald ein zweiter Bildschirm dieselbe Umrechnung
+  braucht, zieht diese Datei um", und `project-structure.md:200` nennt genau
+  diese Bedingung.
 
 - [x] 21. Fact-Detail-Sheet · [ ] 22. Collect-Reveal-Overlay
 - [ ] 23. Akte-Interaktion · [ ] 24. Damals/Heute · [!] 25. Audio-Service (TTS-Weg)
@@ -435,8 +801,8 @@ Nicht im REBUILD_PLAN, aber notwendig:
 - [x] **Echte Schriften in Widget-Tests.** `test/support/app_fonts.dart`.
   `flutter test` lädt die Schriften aus `pubspec.yaml` nicht und zeichnet jede
   Glyphe als Quadrat der Schriftgröße. Jede Maß- und Überlaufprüfung hat
-  vorher ein Layout geprüft, das es auf keinem Gerät gibt: „FACT" belegt dort
-  256 statt 166 Pixel, und die Knopfzeile des Audio-Dialogs lief schon bei
+  vorher ein Layout geprüft, das es auf keinem Gerät gibt: „FACT" in Nunito
+  Black 64 belegt dort 256 statt 166 Pixel, und die Knopfzeile des Audio-Dialogs lief schon bei
   Skalierung 1.0 um. Aufruf **nur aus `setUpAll`**, im Rumpf von `testWidgets`
   hängt `FontLoader` in der `FakeAsync`-Zone. Bytes werden synchron gelesen und
   in ein `SynchronousFuture` gepackt, `rootBundle` funktioniert nicht, weil
@@ -513,6 +879,37 @@ Nicht im REBUILD_PLAN, aber notwendig:
   weil das Paket in `lib/` an keiner Stelle importiert wird. Nicht gebaut,
   weil der Auftrag vier benannte Regeln umfasste und diese nicht; das ist
   eine Entscheidung, keine Auslassung aus Versehen.
+  **Widerspruch, ungeprüft:** die Protokolleinträge vom 29.08.2026 setzen
+  `maplibre_gl` als **Regel 20** voraus („nur unterhalb `lib/map/`") und nennen
+  sie erprobt. Entweder ist dieser Punkt seit dem 28.08.2026 erledigt und das
+  Kästchen falsch, oder die Regel deckt etwas anderes ab. Wer als Nächstes am
+  Prüfskript arbeitet, misst es und schließt den Punkt.
+- [x] **Regel 21: `geolocator` bekommt ein Heimatverzeichnis** (29.08.2026). Das
+  Paket gehört maschinell nach `lib/services/location/` und nirgendwo sonst.
+  Vorher durfte **jedes** Verzeichnis unterhalb von `lib/` außer einem
+  `domain/`-Segment es importieren, mit sieben Wegwerf-Proben vermessen;
+  `shared_preferences` verhält sich bis heute identisch. Im Bestand ändert die
+  Regel nichts, es gibt genau einen Import und der liegt richtig. Keine neue
+  Entscheidung, sondern die Durchsetzung einer akzeptierten: `domain-map.md:153-156`
+  führt den `geolocation provider` unter „not business domains". Der
+  Präzedenzfall steht im Skript: **Regel 19 entstand, bevor `webview_flutter`
+  überhaupt im Projekt war**, weil „hinter einer klaren Schnittstelle kapseln"
+  ohne so eine Zeile nur eine Absichtserklärung ist. **Das Verbot trifft die
+  ganze Paketfamilie** (`^package:geolocator`), weil `Position` und
+  `LocationAccuracy` in `geolocator_platform_interface` liegen; ein Verbot nur
+  auf den Hauptnamen ließe den naheliegendsten Umweg offen.
+  Drei Funde am Rand, alle behoben: *Regel 20 stand nie im Dokument*, sie
+  existierte seit dem 28.08.2026 ausschließlich im Skript, und
+  `dependency-rules.md` beschreibt genau diesen Fehler bei Regel 17 selbst
+  („The strictest rule of the project existed in a script and in no document,
+  which is the wrong way round."); jetzt stehen 20 und 21 dort. *Regel 19
+  meldete in einer Domäne doppelt*, weil `_ausserhalbAvatarHome` die
+  Domänen-Ausnahme nicht trug und `webview_flutter` in keinem `_domainBans`
+  stand, und in einer Domäne wäre die Regel-19-Meldung sogar **irreführend**,
+  weil sie auf `lib/map/presentation/avatar/` verweist, wohin eine Domäne nie
+  zeigen darf. *Regel 4 war im Dokument enger formuliert als im Skript*, das
+  Dokument nannte „routing, storage or analytics", das Skript hatte längst
+  Karten-, Geräte- und WebView-SDKs darunter.
 - [ ] **Vier bewusst offene Lücken**, je mit Begründung im Skript und einem
   Test, der den heutigen Zustand festhält: benannte Konstruktoren umgehen
   Regel 7, Direktiven werden nur am Zeilenanfang erkannt, `.go(variable)`
@@ -611,6 +1008,28 @@ jede Textbreite der App. Jetzt einmal im Theme statt später an jedem Bildschirm
 Bildschirmen, die festgenagelten Maße in den Tests müssen neu gemessen werden,
 und der erste Gerätelauf danach gehört wiederholt.
 
+**Der Eingriff sitzt woanders, als jeder erwartet, der sich `FactTheme`
+ansieht.** Materials `letterSpacing` steht **nicht** in dem `textTheme`, das
+`_textTheme` zusammenbaut, sondern in `ThemeData.typography`, und das
+`Theme`-Widget mischt es erst beim Lokalisieren ein, als **Basis** unter dem
+eigenen Stil (`theme_data.dart:1762`, `localTextGeometry.merge(baseTheme.textTheme)`).
+Ein `letterSpacing: null` in `_textTheme` hätte deshalb genau den Wert
+durchgelassen, den es entfernen soll; an einer Wegwerf-Probe gemessen, dort
+stand schon vorher `null`, und auch `fontSize` war `null`. Über `typography`
+sind `textTheme` und `primaryTextTheme` in einem erledigt.
+
+**Alle 15 hartcodierten Laufweiten der Identity-Bildschirme sind gegen
+`screen-auth.jsx` belegt und keine einzige wurde geändert.** Verdächtig waren
+0.1, 0.15 und 0.25, weil das genau die Material-2021-Werte sind; sie stehen
+trotzdem so in der Quelle, der Gleichklang ist Zufall. Wer hier pauschal
+aufgeräumt hätte, hätte die Parität zerstört.
+
+**Ein einziges festgenageltes Maß ist gefallen, aus dem umgekehrten Grund als
+vermutet:** bei 411 Pixeln gibt der Kopfhörer-Knopf nicht mehr nach, weil die
+Zeile aufgeht. Die Regel gilt weiter, sie ist bei 411 nur nicht mehr
+beobachtbar. Der Test liegt deshalb jetzt bei 390, dem Rahmenmaß der Quelle, mit
+unveränderten exakten Zusicherungen statt einer aufgeweichten Toleranz.
+
 *E-27, Anker-Registry:* der Mechanismus entsteht unter **`lib/core/anchors/`**,
 die Ankerkennungen bleiben bei der Oberfläche, die sie besitzt. Heute sind das
 die zwei Tab-Anker in `lib/app/shell/`, ab Phase 2 die fünf Kartenanker in
@@ -626,8 +1045,11 @@ oder so nachgezogen werden.
 **Was diese Entscheidung ausdrücklich nicht absichert:** Regel 11 des
 Prüfskripts zerlegt nur Pfade und sieht den Dateiinhalt nie. Eine Datei
 `lib/core/anchors/anchor_ids.dart` mit Fachkennungen darin würde das Gate
-passieren und trotzdem genau das verletzen, was E-27 verhindern soll. Die
-Trennung hält hier die Review, nicht die Maschine. Deshalb gehört ein Satz dazu
+passieren und trotzdem genau das verletzen, was E-27 verhindern soll. Umgekehrt
+ist `tour_anchor.dart` verboten, obwohl es harmlos wäre, und das ist
+ausgerechnet der Name, den die Quelle nahelegt (`data-tour-anchor`). Die Regel
+schützt hier nicht, sie täuscht Schutz vor. Die Trennung hält die Review, nicht
+die Maschine. Deshalb gehört ein Satz dazu
 in die „Placement rules" von `project-structure.md`.
 
 **Ebenfalls am 27.08.2026 freigegeben:** ein Edit an
@@ -715,6 +1137,15 @@ obwohl der Typ in einer `part`-Datei darunter deklariert ist. Deshalb bleiben
 Bei einer Aufteilung in eigene Bibliotheken hätten sie öffentlich werden
 müssen, aus zehn Namen wären zwölf geworden.
 
+**Der Beweis, dass die Verschiebung rein war, steckt nicht im grünen Testlauf:**
+acht der neun Teildateien sind gegen ihren Original-Zeilenbereich aus
+`git show HEAD:` **byte-identisch**, die neunte zeigt genau die vier Zeilen der
+Umbenennung. Dazu zwei Mutationsproben, die belegen, dass die Tests die
+verschobene Geometrie noch festhalten. Eine fünfte Zeile hat der Analyzer
+erzwungen: nach der Umbenennung meldete `unused_element_parameter` ein
+`super.key` an einer nun privaten Klasse, der nie ein Key übergeben wurde; ohne
+Entfernen wäre Gate 2 rot geblieben.
+
 Wortlaut der Entscheidung: „Chrome bitte als
 geschlossene Einheit wenn möglich, falls Claude es gar nicht schafft dann
 können Teile offen sein, aber nur in zwingend notwendigen Ausnahmen", mit der
@@ -801,7 +1232,16 @@ in der App an: **46 Absätze** erbten `height: 1.43` aus `bodyMedium`, dazu
 **sieben Eingabefelder** ein `height: 1.5` aus `bodyLarge`. `styles.css`
 enthält `line-height` **null Mal**, die Quelle setzt sie ausschließlich inline,
 40 Mal über vier Bildschirme; wo sie keine setzt, rendert der Browser mit den
-Schriftmetriken. Behoben am selben Hebel wie E-38, in `ThemeData.typography`.
+Schriftmetriken. Behoben am selben Hebel wie E-38, in `ThemeData.typography`,
+weil der Wert dort sitzt und nicht im `textTheme`, das `FactTheme` zusammenbaut.
+Für jeden der 46 Absätze wurde die Quelle nachgeschlagen: nirgends steht dort
+eine Zeilenhöhe, und jeder Text, für den die Quelle eine angibt, trug sie vorher
+wie nachher.
+
+**Sichtbar wird es als ein bis drei Pixel je Bauteil:** Eingabefelder 83 → 80,
+Stadt-Pille 52 → 51, Modus-Umschalter 43 → 42. **Am deutlichsten bei doppelter
+Systemschrift**, dort schrumpfen die Fremdanmeldungs-Knöpfe von 104 auf 100, und
+auf einem 360er Gerät sind vier Pixel im knappen Formular ein Unterschied.
 
 Zwei Funde daran betreffen das Testnetz und nicht den Code:
 
@@ -866,6 +1306,105 @@ eine Fundstelle.
 | E-35 | **`FactButton` kann nicht nach `core/widgets`.** Sein eigener Kommentar verlangt den Umzug, sobald ein zweiter Aufrufer existiert; der existiert seit Schritt 9. Regel 11 des Prüfskripts zerlegt aber den Pfad und meldet, dass `core` das Konzept `fact` nicht besitzen darf, nachgewiesen mit einer Wegwerf-Probe. Zu entscheiden: bei `identity` lassen, oder unter einem Namen ohne Fachbegriff umziehen. | 2 | wenn ein drittes Feature ihn braucht |
 | E-36 | **Bei 360 logischen Pixeln passt die Sprachzeile nicht einzeilig.** Gerechnet mit echten Schriftmetriken, neu gemessen nach E-38: zwei Karten à 125,35 plus Knopf-Untergrenze 63,96 plus 16 Abstände ergibt 330,66 gegen 316 verfügbare Pixel, Fehlbetrag rund 14,7. E-38 hat den Fehlbetrag also verkleinert, aber nicht beseitigt. Die vorher hier stehenden 337,5 waren im Übrigen auch vor E-38 nicht reproduzierbar, gemessen wurden 335,53. Die Quelle hat dasselbe Problem und schneidet mit `#root { overflow: hidden }` etwa vier Pixel des Knopfes ab. Zur Wahl: kleinere Flagge unter einer Breitenschwelle (Quelle: 30), kürzere Knopfbeschriftung oder nur das Emoji, die Zeile auf schmalen Geräten zweizeilig legen, oder abschneiden wie die Quelle. Aktuell entschieden ist nichts: die Titel brechen dort um, nichts läuft über, und ein Test hält die **Ursache** fest, damit die nächste Änderung dort anschlägt. | 2 | vor Auslieferung |
 | E-37 | **Das Launcher-Symbol ist noch das Flutter-Logo.** Android 12 und neuer zeichnet `@mipmap/ic_launcher` über die SplashScreen-API mitten in den nativen Startbildschirm. Der Hintergrund ist seit dem 27.08.2026 richtig (`#FF0F0D0A`), das Symbol nicht. Braucht das FACT-Symbol in allen Dichten, plus eine Entscheidung, ob der native Startbildschirm es überhaupt zeigen soll. | 2 | vor Auslieferung |
+
+## Wie Tests hier blind werden
+
+Jedes Muster unten ist in diesem Repository einmal aufgetreten und hat eine
+grüne Suite über eine falsche Aussage laufen lassen. Wer hier einen Test
+schreibt, liest das **vorher**, sonst kostet es beim nächsten Mal wieder einen
+halben Tag.
+
+1. **Ein Zeilenumbruch ist kein Überlauf.** Flutter meldet nichts, es bricht
+   einfach um, und `takeException()` bleibt leer. Beleg: die Sprachzeile des
+   Startbildschirms stand sichtbar als „Deutsc / h", obwohl Tests für genau
+   diese Zeile existierten. Ursache war `Row` mit `Expanded`, das die Breite
+   verteilt, bevor es die Kinder nach ihrem Bedarf fragt: eine Karte braucht
+   127,1 Pixel min-content, verfügbar waren 118. Zweiter Beleg: die
+   Fremdanmeldungs-Knöpfe waren bei Systemschrift 2.0 unterschiedlich hoch (64
+   gegen 104 Pixel), gesehen hat es keiner der vier Skalierungstests. Ein Test,
+   der Rechtecke misst, findet beides sofort.
+2. **Ein `Stack` clippt lautlos.** Beleg: `TourBubble` schnitt bei
+   Systemschrift 2.0 auf kleinen Geräten Text ab, ohne einen Überlauf zu melden.
+   Die richtige Lösung lag zweimal im selben Ordner, `TourHeroView` und das
+   Testmuster aus `signup_page_test.dart`, nur bei der Blase fehlte sie.
+3. **Ein Testrahmen ohne die Vorfahrenkette der App misst die falsche Sache.**
+   Beleg: E-40, `map_top_chrome_test.dart` pumpte ein nacktes `MaterialApp`. Der
+   Rahmen steht jetzt auf `FactTheme.light()` plus `Material`, und **keine
+   einzige Maßzahl hat sich dadurch geändert** — der Test hatte die ganze Zeit
+   recht und trotzdem über die falsche Sache.
+4. **Ein Bildtest, der die Fläche misst, sieht den Inhalt nicht.** Dreimal in
+   einer Woche passiert, zwei davon benannt: die Ballon- und Gruppenbilder in
+   den Schritten 15 und 16, die Nah-Animation in Schritt 17. Man konnte Emoji,
+   Rahmen, Farbring, Drehrichtung und Schattenlage ändern, ohne dass etwas
+   anschlug. Zahlen in den jeweiligen Abschnitten.
+5. **Ein Tipp, der außerhalb des Sichtfelds landet, trifft nichts, und Flutter
+   warnt nur.** Beleg: vier Skalierungstests in Schritt 21 tippten „Mehr
+   anzeigen" an, der Knopf lag bei doppelter Systemschrift außerhalb des
+   Sichtfelds, zwei der vier Kombinationen waren dadurch blind. Im Lauf standen
+   zwei Warnungen, und ein grünes Gate hat sie durchgewinkt. Gegenmittel, seitdem
+   in dieser Testdatei gesetzt: `WidgetController.hitTestWarningShouldBeFatal =
+   true`, damit ein Fehlgriff ein Fehler ist statt einer Zeile, die niemand
+   liest.
+6. **Umbruch, Ellipse und Überlauf sind drei verschiedene Dinge, und
+   `takeException()` sieht nur das dritte.** Beleg: in Schritt 21 überlebte eine
+   Mutation, weil der Ortsname bei gleichen Flex-Anteilen ein
+   **Auslassungszeichen** bekommt, ohne dass eine Ausnahme fällt. Jetzt misst
+   der Test `RenderParagraph.didExceedMaxLines`.
+7. **Dart kanonisiert `const`.** `expect(const FactId(7), const FactId(7))`
+   prüft nichts, beide Seiten sind dasselbe Objekt, und eine Mutation von `==`
+   auf `identical` überlebt. Beleg: zweimal in den Wertobjekt-Tests aus Schritt 5
+   und einmal bei `AuthSession.==`, wo mit dem Gleichheitstest zugleich der Test
+   gegen das Erneuerungs-Gewitter im Router wertlos war; nach der Korrektur
+   fällt die Mutation an fünf Stellen. Das richtige Muster steht in
+   `auth_city_test.dart:59`. Echte Sitzungen entstehen zur Laufzeit und sind
+   nicht konstant.
+8. **`SelectableText` und `EditableText` tauchen in `find.byType(RichText)` gar
+   nicht auf.** Wer Textstile über Finder einsammelt statt über einen Durchlauf
+   des Renderbaums, übersieht jedes Eingabefeld. Beleg: E-40, die zweite Quelle
+   `bodyLarge` blieb dadurch unbemerkt.
+9. **Eine Begründung, die sich als gemessen ausgibt, wird nie nachgeprüft.** Das
+   ist das teuerste Muster in diesem Projekt, sechs Fälle in einer Woche: die
+   Verkürzung von Vorrangregel 2 auf einen Zeitpunkt; das Steuerfenster von
+   200 ms, dessen Preis falsch beschrieben war; der leere Kompass-Befehl, dessen
+   Begründung die Auto-Neigung vergaß; die Gestenarena als angeblicher Grund für
+   bedingte Erkenner; die Zeilennummer `:451`, die auf eine Leerzeile zeigte und
+   eine technische Aussage trug; und vier Ballon-Zahlen, die aus `coinMakeEl`
+   korrekt abgeschrieben und trotzdem falsch waren. Dazu die 41 von 138 falschen
+   Fundstellen im Karten-Chrome. Fundstellen und Begründungen sind hier
+   Vertragsfläche, keine Zierde.
+10. **Zwei Stellen, gleiches Muster, nur eine geprüft.** Das ist die Stelle, an
+    der man in diesem Projekt suchen muss. Belege: die Anmeldung hätte E-Mail und
+    Passwort vertauschen können und alle 614 Tests wären grün geblieben, weil nur
+    der Notifier-Test `lastEmail` las, der Seiten-Test nie, während die
+    Registrierung an derselben Stelle dicht war; `MapCameraChange` hatte den
+    Gleichheitstest nicht, sein Zwilling `MapCameraView` schon; und die
+    Durchreichung im echten Karten-Host hatte null Tests, während alles um sie
+    herum vorbildlich getestet war.
+11. **Eine eigene `MediaQuery` um `FactApp` verdeckt die echte.** `pumpWidget`
+    steckt das Widget in ein `View`, und erst dieses legt `MediaQuery.fromView`
+    an; die eigene sitzt darunter, `size` und `padding` fallen auf Null, und jede
+    Layout-Zusicherung ist lautlos wertlos. Gemessen: 141 statt 0 als
+    `view.padding.top`. Der richtige Weg ist
+    `tester.platformDispatcher.accessibilityFeaturesTestValue`.
+12. **`flutter test` sieht kein XML.** Eine Mutationsprobe hat belegt, dass der
+    native Startbildschirm für die Suite vollständig unsichtbar ist: seine Farbe
+    auf Weiß zu setzen überlebte alle vier Gates. Dafür gibt es jetzt
+    Dateiprüfungen.
+13. **`rootBundle` cacht das `Future` über Testgrenzen hinweg.** Ein Test, der
+    einen Ladevorgang anstößt, ohne ihn abzuwarten, lässt ein totes `Future` in
+    seiner `FakeAsync`-Zone zurück, und **jeder folgende Test** bekommt genau
+    dieses. Beleg: vier Tests fielen mit „Bad state: No element", **ohne jede
+    Ausnahme**, und sahen eine Karte, die ewig lädt. `rootBundle.clear()` im
+    `setUp` behebt es.
+14. **Zwei Helfer hängen im Rumpf von `testWidgets` bis zur
+    Zeitüberschreitung:** `pumpEventQueue()` und `loadAppFonts()`. Der Aufruf
+    gehört in `setUpAll`, weil im Rumpf eine `FakeAsync`-Zone läuft, in der echte
+    Datei-Ein-/Ausgabe nie fortschreitet. Warum die Schriften überhaupt geladen
+    werden müssen, steht oben unter „Echte Schriften in Widget-Tests".
+15. **Ohne Mutationsproben sieht eine Testdatei vollständig aus und ist es
+    nicht.** Beleg: in Schritt 7 überlebte „der Knopf Anmelden öffnet die
+    Registrierung" die ganze Suite. Was einen guten Prüfauftrag ausmacht, steht
+    in `HANDOFF.md` unter „Arbeitsweise mit Claude".
 
 ## Datenvertrag: die bekannten Fallen
 
@@ -967,6 +1506,132 @@ Damit sie nicht später als Versehen „repariert" werden.
   inline am Element.
 - **`.go(variable)` wird vom Architektur-Check nicht gemeldet.** Genau so sehen
   typisierte Routen aus. Ein Verbot würde ADR-004-konformen Code melden.
+
+## Der Android-Build-Blocker, forensisch
+
+Gelöst am 27.08.2026. Die Umgehung und der Schnelltest stehen in `HANDOFF.md`
+unter „Rechner einrichten"; hier stehen die Belege, damit niemand die zwei Tage
+noch einmal bezahlt.
+
+**Ursache:** `Selector.open()` scheitert, weil Java dafür einen
+Unix-Domain-Socket im Temp-Verzeichnis anlegt, und AF_UNIX ist auf diesem
+Rechner unter `AppData` nicht verbindbar. Die Fehlermeldung „Unable to establish
+loopback connection" ist irreführend: der scheiternde Vorgang ist **kein
+Netzwerkaufruf**, sondern ein Verbindungsaufbau auf eine **Datei**.
+
+Der Weg dorthin, aus den JDK-Quellen (`lib/src.zip` von Temurin):
+
+```
+WEPollSelectorImpl.java:79   new PipeImpl(sp, /* AF_UNIX */ true, /*buffering*/ false)
+PipeImpl.java:127            createListener(preferUnixDomain)
+PipeImpl.java:132            SocketChannel.open(sa)      // sa ist eine UnixDomainSocketAddress
+```
+
+`Pipe.open()` ruft denselben Konstruktor mit `false` und geht über TCP, deshalb
+**gelingt `Pipe.open()` und scheitert `Selector.open()`**. Wer die beiden
+verwechselt, schließt aus einem erfolgreichen `Pipe.open()`, Java sei in
+Ordnung, und sucht danach an der falschen Stelle. Genau das ist hier zwei Tage
+passiert.
+
+Der Pfad der Socket-Datei kommt aus `jdk.net.unixdomain.tmpdir` und zeigt
+standardmäßig auf `java.io.tmpdir`, unter Windows also nach
+`%LOCALAPPDATA%\Temp`. Gemessen:
+
+| Verzeichnis für die Socket-Datei | AF_UNIX `connect` |
+|---|---|
+| `C:\Users\<user>\AppData\Local\Temp` (Standard) | **Fehler** |
+| `C:\Users\<user>\AppData\Local\<beliebig>` | **Fehler** |
+| `C:\Users\<user>\AppData\<beliebig>` | **Fehler** |
+| `C:\Users\<user>\<beliebig>` | OK |
+| `C:\Users\Public\<beliebig>` | OK |
+| `C:\Windows\Temp` | OK |
+| `C:\gtmp` | OK |
+
+**Alles unter `AppData` scheitert, alles andere funktioniert.** `bind` gelingt
+jeweils, die Socket-Datei entsteht, nur `connect` darauf nicht. Nicht die
+Ursache: Pfadlänge (61 Bytes am Wurzelpfad gehen, 54 unter `AppData` nicht), der
+8.3-Kurzname `JANEKP~1`, das Leerzeichen im Profilnamen, Reparse-Punkte, der
+Ordnerschutz von Defender. **Warum es früher funktionierte:** vermutlich hat
+sich die Bedingung unter `AppData` geändert, nicht Java und nicht Gradle. Der
+eigentliche Systemdefekt ist damit nicht behoben, nur umgangen.
+
+Belegt am leeren Testprojekt unter `C:\gtmp\gt`:
+
+```
+ohne die Variable : EXIT=1  java.io.IOException: Unable to establish loopback connection
+mit der Variable  : EXIT=0  BUILD SUCCESSFUL in 5s
+```
+
+Die Prüfschleife dauert eine Sekunde statt eines Builds. Als
+`SelectorProbe.java` ablegen und mit `java SelectorProbe.java` starten
+(Quelldatei-Modus, kein `javac` nötig); die Datei liegt unter
+`C:\gtmp\SelectorProbe.java`.
+
+```java
+import java.nio.channels.Pipe;
+import java.nio.channels.Selector;
+
+public class SelectorProbe {
+  public static void main(String[] a) {
+    try { Pipe p = Pipe.open(); p.source().close(); p.sink().close();
+      System.out.println("Pipe.open() OK");
+    } catch (Throwable t) { System.out.println("Pipe.open() FEHLER: " + t); }
+    try { Selector s = Selector.open(); s.close();
+      System.out.println("Selector.open() OK");
+    } catch (Throwable t) { System.out.println("Selector.open() FEHLER: " + t.getCause()); }
+  }
+}
+```
+
+Gesund: beide Zeilen `OK`. Defekt: `Pipe.open() OK`, dann
+`Selector.open() FEHLER: java.net.SocketException: Invalid argument: connect`.
+
+**Was vorher ausgeschlossen wurde.** Geschichte, kein Arbeitsvorrat. Sie steht
+hier, weil sie zeigt, wie teuer eine irreführende Fehlermeldung wird:
+**vierzehn Vermutungen, jede einzeln gemessen, alle im Netzwerk-Stack, alle
+richtig ausgeschlossen und alle am falschen Objekt.**
+
+Temp-Pfad mit Leerzeichen · Sandbox der Werkzeugumgebung · Loopback generell
+(Python verbindet 127.0.0.1 fehlerfrei) · `Pipe.open()` (gelingt, siehe oben) ·
+reservierte und ausgeschlossene Portbereiche · Speichermangel ·
+IPv6-Auflösung von `localhost` · hängender Gradle-Daemon · beschädigte
+Daemon-Registry · Neustart · TotalAV vollständig deinstalliert ·
+Selektor-Implementierung (auch der alte `WindowsSelectorProvider`) · das JDK
+(JBR 17, 21, 25 **und** Temurin 21) · `--no-daemon` · alle fünf
+JVM-Umgebungsvariablen · Winsock-Katalog (kein einziger Layered Service
+Provider) · Netzwerk-Filtertreiber (nur Microsoft) · Defender Network
+Protection · `hosts`-Datei · Reihenfolge im Prozess · **Winsock- und IP-Reset
+samt Neustart**.
+
+Eine Fehlspur ist erwähnenswert, weil sie überzeugend aussah: im WFP-Dump steht
+ein Filter von **Rivet Networks** (Killer Networking) auf
+`FWPM_LAYER_ALE_CONNECT_REDIRECT_V4`, ohne Bedingungen, mit Aktion
+`FWP_ACTION_CALLOUT_TERMINATING`, und die Software ist längst deinstalliert. Das
+passte perfekt zur Fehlermeldung und war trotzdem falsch. Widerlegt hat es ein
+einfacher Gegencheck: ein Filter ohne Bedingungen würde **jede** Verbindung
+treffen, und das Netz funktioniert. Drei Löschversuche über die
+WFP-Schnittstelle scheiterten ohnehin an `ERROR_NOT_SUPPORTED`, es wurde also
+nichts verändert.
+
+Die Lehre: **den Aufrufweg lesen, bevor man der Fehlermeldung glaubt.** Die
+vollständige Stapelspur (`--stacktrace`) und dreißig Zeilen JDK-Quelle haben
+gelöst, was vierzehn Systemmessungen nicht gelöst haben.
+
+### Nebenbefunde des ersten Gerätelaufs, 27.08.2026
+
+- Der wirksame native Startbildschirm ist `drawable-v21/`, nicht `drawable/`,
+  und `NormalTheme` wiegt schwerer als `LaunchTheme`, weil `FlutterActivity` in
+  `onCreate` darauf umstellt.
+- Der Emulator hatte 2 GB und schoss die App per `lowmemorykiller` ab, jetzt
+  4 GB.
+- Zweimal sind hier falsche Ergebnisse entstanden, weil Auswertung und Ausgabe
+  in einer `&&`-Kette gemischt waren: einmal kam ein Exit-Code 0 von `tail`,
+  während der Build mit 1 abbrach, einmal lief ein Build gar nicht, weil ein
+  vorgeschaltetes `grep` die Kette abbrach.
+- Ein frischer Worktree ohne `.dart_tool/` lässt `dart analyze` „Target of URI
+  doesn't exist" für **jede** Datei melden. Erst `flutter pub get` macht die
+  Gates aussagefähig; wer den ersten Lauf für ein Ergebnis hält, sucht den
+  Fehler an der falschen Stelle.
 
 ## Noch am Gerät zu verifizieren
 

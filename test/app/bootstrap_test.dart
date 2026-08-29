@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:fact_app/app/bootstrap.dart';
+import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
+import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
 import 'package:fact_app/features/facts/domain/repositories/fact_repository.dart';
 import 'package:fact_app/features/identity/domain/repositories/auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
+import 'package:fact_app/services/diagnostics/console_diagnostic_sink.dart';
 import 'package:fact_app/services/location/geolocator_location_service.dart';
 import 'package:fact_app/services/location/location_providers.dart';
 import 'package:fact_app/services/location/location_service.dart';
@@ -67,6 +72,65 @@ void main() {
       expect(
         container.read(authRepositoryProvider),
         same(unavailableAuthRepository),
+      );
+    });
+
+    test('bindet diagnosticSinkProvider an die meldende Senke', () {
+      // Der teuerste stille Ausfall der vier hier, weil er die anderen
+      // unsichtbar macht: ohne diesen Override bleibt `SilentDiagnosticSink`
+      // stehen, und dann verschwinden eine verworfene Kameraabsicht, eine
+      // unbekannte Stil-Kennung und eine gescheiterte Projektion spurlos.
+      // Genau daran ist der erste Kartenlauf am Emulator blind gewesen.
+      final scope = productionProviderScope(child: const SizedBox.shrink());
+      final container = ProviderContainer(overrides: scope.overrides);
+      addTearDown(container.dispose);
+
+      // `flutter test` läuft im Debug-Bau, `kDebugMode` ist hier also wahr.
+      // Wer `diagnosticSinkForBuild` in `bootstrap.dart` mit einem festen
+      // `false` aufruft, fällt hier auf.
+      expect(
+        container.read(diagnosticSinkProvider),
+        isA<ConsoleDiagnosticSink>(),
+      );
+    });
+
+    test('die eingesetzte Senke gibt Namen und Nutzlast aus', () {
+      // Die Zusicherung hinter der Typprüfung. Ohne sie wäre "die Senke ist
+      // eingesetzt" eine Aussage über einen Klassennamen, und eine
+      // `ConsoleDiagnosticSink`, deren Ausgabekanal ins Leere zeigt, käme
+      // damit durch.
+      final scope = productionProviderScope(child: const SizedBox.shrink());
+      final container = ProviderContainer(overrides: scope.overrides);
+      addTearDown(container.dispose);
+      final sink = container.read(diagnosticSinkProvider);
+      final lines = <String?>[];
+
+      runZoned(
+        () => sink.report(
+          DiagnosticEvent('map.overlay.unknown_style', const <String, String>{
+            'overlay': 'facts',
+          }),
+        ),
+        zoneSpecification: ZoneSpecification(
+          print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
+              lines.add(line),
+        ),
+      );
+
+      expect(lines, <String>[
+        'FACT-DIAG map.overlay.unknown_style overlay=facts',
+      ]);
+    });
+
+    test('ohne die Overrides bleibt die stumme Senke', () {
+      // Die Gegenprobe. `same` und nicht `isA`: Dart kanonisiert die
+      // Konstante, die Identität ist hier also die schärfere Zusicherung.
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(diagnosticSinkProvider),
+        same(const SilentDiagnosticSink()),
       );
     });
 
