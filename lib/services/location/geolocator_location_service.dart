@@ -1,11 +1,19 @@
 /// Die Fassung des Ortungsdienstes, die wirklich mit `geolocator` spricht.
 ///
-/// Der einzige Ort in `lib/`, an dem `package:geolocator` vorkommt. Dass das so
-/// bleibt, sichert heute **keine** Regel des Prüfskripts ab: Regel 20 gilt
-/// wörtlich nur für `package:maplibre_gl`, und die Domänen-Sperre („Regel 4:
-/// Domain darf keine Geräte-SDK importieren") greift nur in einer Domäne. Ein
-/// Import in `features/*/presentation/` liefe durch. Gemessen mit einer
-/// Wegwerf-Probe am 29.08.2026, siehe den Bericht zu Schritt 13.
+/// `package:geolocator` kommt in `lib/` nur unterhalb von
+/// `lib/services/location/` vor, und seit Regel 21 sichert das Prüfskript
+/// diesen Zustand maschinell ab. Das Verbot trifft die ganze Paketfamilie
+/// (`^package:geolocator`), also auch `geolocator_platform_interface`, wo
+/// `Position` und `LocationAccuracy` liegen; genau das wäre sonst der
+/// naheliegendste Umweg. Die Heimat ist das **Verzeichnis** und nicht diese
+/// Datei: eine zweite Datei daneben dürfte das Paket ebenfalls importieren,
+/// alles außerhalb bricht das Gate.
+///
+/// Was die Regel nicht leistet, und das ist das Wichtigere: sie prüft den
+/// **Import**, nicht den Inhalt. Ein Dienst, der die Nutzerposition an einen
+/// Ort weiterreicht, an den sie nicht gehört, passiert sie anstandslos. Wohin
+/// der Aufenthaltsort fließen darf, ist eine Frage von E-07 und bleibt Sache
+/// der Review.
 library;
 
 import 'package:fact_app/services/location/device_position.dart';

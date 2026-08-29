@@ -162,6 +162,10 @@ const _domainBans = <Ban>[
     r'^package:maplibre',
     'Regel 4: Domain darf keine Karten-SDK importieren',
   ),
+  Ban(
+    r'^package:webview_flutter',
+    'Regel 4: Domain darf keine WebView-SDK importieren',
+  ),
   // Gate 6 aus quality-gates.md nennt als Verstoß "Feature-domain imports
   // from core". Die Tabelle in dependency-rules.md bestätigt das: nur
   // Presentation und Application dürfen eng abgegrenztes Core benutzen.
@@ -283,6 +287,60 @@ const _mapSdkBans = <Ban>[
   ),
 ];
 
+/// Regel 21: das Geo-SDK kennt nur der Ortungsdienst.
+///
+/// `domain-map.md:153-156` führt den `geolocation provider` unter „The
+/// following are **not** business domains", in derselben Liste wie
+/// `map rendering`, und `lib/features/README.md` gibt `services/` als Ort für
+/// Vendor-Adapter ohne Oberfläche. Diese Regel entscheidet also nichts, sie
+/// setzt eine akzeptierte Entscheidung durch.
+///
+/// Die Lücke ist gemessen worden, nicht vermutet: am 29.08.2026 lief ein
+/// `import 'package:geolocator/geolocator.dart'` in
+/// `lib/features/discovery/presentation/`, in `lib/app/`, in `lib/core/` und in
+/// `lib/map/presentation/` mit Exit-Code 0 durch. [_domainBans] verbietet das
+/// Paket zwar als Regel 4, aber nur in einem `domain/`-Segment; jedes andere
+/// Verzeichnis unterhalb von `lib/` durfte es holen.
+///
+/// Heute ist die Regel nicht auslösbar: `lib/services/location/` enthält den
+/// einzigen `geolocator`-Import in `lib/`. Sie hält den Zustand, statt ihn
+/// herzustellen.
+///
+/// ## Warum das Präfix und nicht der volle Paketname
+///
+/// Regel 20 nennt `^package:maplibre_gl` vollständig, hier steht bewusst nur
+/// `^package:geolocator`. Der Grund ist die Bauform des Pakets: `Position` und
+/// `LocationAccuracy` stammen aus `geolocator_platform_interface`, dazu kommen
+/// `geolocator_android`, `geolocator_apple` und `geolocator_web`. Wer am
+/// Ortungsdienst vorbeigreift, holt sich mit hoher Wahrscheinlichkeit genau das
+/// Interface-Paket, weil dort die Typen liegen. Ein Verbot, das nur `geolocator`
+/// selbst kennt, ließe den naheliegendsten Umweg offen. Das Präfix trifft
+/// deshalb die ganze Paketfamilie, wie Regel 4 es mit `^package:maplibre` tut.
+///
+/// ## Was die Regel nicht kann
+///
+///  * Sie prüft den **Import**, nicht den Inhalt. Ein Dienst, der die Position
+///    an einen Ort weiterreicht, an den sie nicht gehört, passiert sie
+///    anstandslos. Wohin der Aufenthaltsort des Nutzers fließen darf, ist eine
+///    Frage von E-07 und bleibt Review-Sache.
+///  * Sie gilt nur unterhalb von `lib/`, wie Regel 19 und 20. Ein Test darf
+///    `geolocator` importieren, und
+///    `test/services/location/geolocator_location_service_test.dart` tut es.
+///  * `shared_preferences` verhält sich heute identisch: außerhalb einer Domäne
+///    darf es jedes Verzeichnis importieren. Dafür entsteht hier bewusst keine
+///    Regel. Das Paket steht nicht in pubspec.yaml, und anders als bei
+///    `webview_flutter` (Regel 19) gibt es keine getroffene Entscheidung, die
+///    ein Heimatverzeichnis benennt. Eine Regel wäre hier eine Entscheidung,
+///    keine Durchsetzung.
+const _geoSdkBans = <Ban>[
+  Ban(
+    r'^package:geolocator',
+    'Regel 21: das Geo-SDK gehört dem Ortungsdienst unter $_locationHome. Der '
+        'Rest der App kennt nur den Domain-Vertrag des Dienstes, nicht das '
+        'Vendor-Paket',
+  ),
+];
+
 /// Gate 7: ADR-005 verbietet ein zweites DI-System, projektweit.
 const _globalBans = <Ban>[
   Ban(r'^package:get_it', 'ADR-005: GetIt ist ausgeschlossen'),
@@ -352,6 +410,11 @@ final _layers = <LayerRule>[
     pathMatch: _ausserhalbMapHome,
     bans: _mapSdkBans,
   ),
+  LayerRule(
+    name: 'ortungs-sdk',
+    pathMatch: _ausserhalbLocationHome,
+    bans: _geoSdkBans,
+  ),
   // Gate 7 gilt projektweit, nicht nur im Produktionscode. Ein GetIt-Container
   // in einem Test, einem Integrationstest oder einem Werkzeugskript ist
   // derselbe Regelbruch.
@@ -403,6 +466,13 @@ const _avatarHome = 'lib/map/presentation/avatar/';
 /// Der Karten-Host, der einzige Ort, an dem das Karten-SDK vorkommen darf.
 const _mapHome = 'lib/map/';
 
+/// Der Ortungsdienst, der einzige Ort, an dem das Geo-SDK vorkommen darf.
+///
+/// `domain-map.md:153-156` zählt den `geolocation provider` zu den
+/// unterstützenden Techniken und nicht zu den Geschäftsdomänen, also gehört er
+/// nach `services/` und in kein Feature.
+const _locationHome = 'lib/services/location/';
+
 /// Alles unterhalb von `lib/`, außer [_mapHome] und außer jeder Domäne.
 ///
 /// Die erste Ausnahme ist der Zweck der Regel: der Host darf das SDK.
@@ -419,13 +489,46 @@ final _ausserhalbMapHome = RegExp(
   '^lib/(?!${_mapHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
 );
 
-/// Alles unterhalb von `lib/`, außer [_avatarHome].
+/// Alles unterhalb von `lib/`, außer [_locationHome] und außer jeder Domäne.
 ///
-/// Die Ausnahme steht als negative Vorausschau im Pfadmuster, weil eine
-/// Verbotsliste keine Ausnahme kennt. Aus [_avatarHome] abgeleitet, damit die
-/// Regel und ihr einziger erlaubter Ort nicht auseinanderlaufen können.
+/// Aufgebaut wie [_ausserhalbMapHome], und aus demselben Grund. Die erste
+/// Ausnahme ist der Zweck der Regel: der Dienst darf das SDK. Die zweite hält
+/// die Meldung einfach, denn `_domainBans` verbietet `^package:geolocator`
+/// bereits als Regel 4, und das ist in einer Domäne die genauere Aussage. Ohne
+/// sie bekäme eine Feature-Domäne für denselben Import **zwei** Meldungen,
+/// siehe den Test „Ä2: ein benanntes Verbot verdrängt die allgemeine Meldung":
+/// die schichtgenaue Regel gewinnt, die allgemeine schweigt.
+///
+/// Der Ausschluss wird aus [_locationHome] zusammengesetzt, damit die Regel und
+/// ihr einziger erlaubter Ort nicht auseinanderlaufen können.
+final _ausserhalbLocationHome = RegExp(
+  '^lib/(?!${_locationHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
+);
+
+/// Alles unterhalb von `lib/`, außer [_avatarHome] und außer jeder Domäne.
+///
+/// Die erste Ausnahme ist der Zweck der Regel: der Avatar darf die WebView.
+/// Sie steht als negative Vorausschau im Pfadmuster, weil eine Verbotsliste
+/// keine Ausnahme kennt, und ist aus [_avatarHome] abgeleitet, damit die Regel
+/// und ihr einziger erlaubter Ort nicht auseinanderlaufen können.
+///
+/// Die zweite ist wortgleich zu [_ausserhalbMapHome] und
+/// [_ausserhalbLocationHome] und aus demselben Grund da. Gemessen am
+/// 29.08.2026, nicht vermutet: ein `webview_flutter` in
+/// `lib/features/discovery/domain/` lieferte **zwei** Meldungen, einmal
+/// `[avatar-kapselung] Regel 19` und einmal die allgemeine
+/// `[domain] Domain-Erlaubnisliste`.
+///
+/// In einer Domäne wäre Regel 19 sogar **irreführend**. Sie sagt sinngemäß
+/// „leg es nach [_avatarHome]", und dorthin darf eine Domäne unter keinen
+/// Umständen zeigen. Die richtige Aussage ist dort die Domänenregel, nicht die
+/// Heimatverzeichnis-Regel; deshalb steht `^package:webview_flutter` seither
+/// auch in [_domainBans], damit eine Domäne die genaue Regelnummer bekommt und
+/// nicht nur die allgemeine Erlaubnislisten-Meldung. Siehe den Test
+/// „Ä2: ein benanntes Verbot verdrängt die allgemeine Meldung": die
+/// schichtgenaue Regel gewinnt, die allgemeine schweigt.
 final _ausserhalbAvatarHome = RegExp(
-  '^lib/(?!${_avatarHome.substring('lib/'.length)})',
+  '^lib/(?!${_avatarHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
 );
 
 /// Presentation-Schicht, überall unterhalb von `lib/`.

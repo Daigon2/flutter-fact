@@ -42,7 +42,12 @@ independent business domain.
 1. Domain must not import Flutter.
 2. Domain must not import Riverpod.
 3. Domain must not import Supabase.
-4. Domain must not import routing, storage or analytics SDKs.
+4. Domain must not import vendor SDKs: routing, storage, analytics, and
+   equally the map, location and WebView packages. The script has enforced the
+   wider reading since rules 19 to 21 were added; this line now says so. In a
+   domain the rule 4 message is the correct one, and the home-directory rules
+   19 to 21 stay silent there: they point at a directory a domain must never
+   reference.
 5. Presentation must not call Supabase directly.
 6. Presentation must not call local database APIs directly.
 7. Widgets must not instantiate repositories or vendor clients.
@@ -58,6 +63,27 @@ independent business domain.
 17. Presentation must not import a `data` directory, not even its own feature's. Access runs through application or a domain contract.
 18. A feature must not import `map/presentation` or `map/data`. The map host exposes only `map/domain`.
 19. `webview_flutter` may only be imported below `lib/map/presentation/avatar/`.
+20. `maplibre_gl` may only be imported below `lib/map/`.
+21. `geolocator` and its platform packages may only be imported below `lib/services/location/`.
+
+Rules 19 to 21 give a vendor SDK one home directory. They are not a ban, they
+are an assignment: the map SDK belongs to the map host, the geolocation SDK
+belongs to the location service, and the WebView belongs to the avatar. Rule 4
+already keeps the map and geolocation SDKs out of every `domain` directory, but
+only there, so before these rules a `presentation` or `app` file could reach the
+vendor package directly. Measured on 2026-08-28 for `maplibre_gl` and on
+2026-08-29 for `geolocator`, both with throwaway probes that passed the gate
+with exit code 0.
+
+Rule 21 follows `domain-map.md` §3, which lists the geolocation provider among
+the supporting technical capabilities and not among the business domains, in the
+same list as map rendering. The rule enforces that placement, it does not decide
+it. Rule 20 was enforced in `tool/check_architecture.dart` from 2026-08-28 and
+is written down here only now.
+
+All three check the import, not the content. A service that hands the user's
+position to somewhere it does not belong passes them, and where the position may
+flow is a question for E-07 and stays a review matter.
 
 Rule 17 was written down on 2026-08-28 (E-31). It is not new: it has shaped
 every feature with a repository since step 9, and `tool/check_architecture.dart`
@@ -90,6 +116,8 @@ core -> any feature
 feature -> map/presentation
 feature -> map/data
 anything outside lib/map/presentation/avatar -> webview_flutter
+anything outside lib/map -> maplibre_gl
+anything outside lib/services/location -> geolocator (and geolocator_*)
 ```
 
 `tool/check_architecture.dart` enforces all of these. The layer of a file is

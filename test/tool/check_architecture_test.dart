@@ -510,6 +510,32 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 class KartenSdkVersuch {}
 ''',
+  // Ä12: das Geo-SDK gehört dem Ortungsdienst. Regel 4 verbietet es nur in
+  // einer Domäne, jedes andere Verzeichnis unterhalb von lib/ durfte es vor
+  // Regel 21 holen. Gemessen am 29.08.2026, nicht vermutet.
+  'lib/features/discovery/presentation/ortung_versuch.dart': r'''
+import 'package:geolocator/geolocator.dart';
+
+class OrtungVersuch {}
+''',
+  // Ä12: auch der Karten-Host bekommt das Geo-SDK nicht. Die Nutzerposition
+  // gehört dem Ortungsdienst, nicht der Karte.
+  'lib/map/presentation/ortung_daneben.dart': r'''
+import 'package:geolocator/geolocator.dart';
+
+class OrtungDaneben {}
+''',
+  // Ä12: das Verbot trifft die ganze Paketfamilie, nicht nur `geolocator`
+  // selbst. `Position` und `LocationAccuracy` stammen aus
+  // `geolocator_platform_interface`, das ist also der naheliegendste Umweg.
+  // Bewusste Abweichung von Regel 20, die `^package:maplibre_gl` vollständig
+  // nennt; die Begründung steht bei _geoSdkBans im Skript.
+  'lib/features/discovery/presentation/ortung_familie.dart': r'''
+import 'package:geolocator_android/geolocator_android.dart';
+import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
+
+class OrtungFamilie {}
+''',
   // Ä10: webview_flutter ist auf lib/map/presentation/avatar/ beschränkt.
   'lib/features/discovery/presentation/avatar_versuch.dart': r'''
 import 'package:webview_flutter/webview_flutter.dart';
@@ -522,6 +548,15 @@ class AvatarVersuch {}
 import 'package:webview_flutter/webview_flutter.dart';
 
 class WebviewDaneben {}
+''',
+  // Ä10: dasselbe in einer Domäne. Hier muss genau **eine** Meldung stehen,
+  // und zwar die der Domäne. Regel 19 verweist auf
+  // lib/map/presentation/avatar/, und dorthin darf eine Domäne nie zeigen; die
+  // Meldung wäre dort also nicht nur doppelt, sondern irreführend.
+  'lib/features/discovery/domain/avatar_vertrag.dart': r'''
+import 'package:webview_flutter/webview_flutter.dart';
+
+class AvatarVertrag {}
 ''',
   // Ä8: core importiert eine Feature-Presentation. Regel 11 verbietet das
   // schon, deshalb muss hier genau eine Meldung stehen und nicht zwei.
@@ -682,6 +717,14 @@ class KartenAbsicht {}
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 class MapHostSdk {}
+''',
+  // Ä12 Gegenprobe: im Ortungsdienst ist das Geo-SDK erlaubt. Sonst wäre die
+  // Regel ein Verbot statt einer Zuordnung, und die App hätte keine Ortung
+  // mehr.
+  'lib/services/location/ortungsdienst.dart': r'''
+import 'package:geolocator/geolocator.dart';
+
+class Ortungsdienst {}
 ''',
   // Ä10 Gegenprobe: im Avatar-Ordner ist die WebView erlaubt, sonst wäre die
   // Regel ein Verbot statt einer Kapselung.
@@ -876,7 +919,11 @@ void main() {
         'lib/services/karten_adapter.dart',
         'lib/features/discovery/presentation/karten_zugriff.dart',
         'lib/features/discovery/presentation/avatar_versuch.dart',
+        'lib/features/discovery/domain/avatar_vertrag.dart',
         'lib/features/discovery/presentation/karten_sdk_versuch.dart',
+        'lib/features/discovery/presentation/ortung_versuch.dart',
+        'lib/features/discovery/presentation/ortung_familie.dart',
+        'lib/map/presentation/ortung_daneben.dart',
         'lib/core/greift_auf_feature.dart',
       }, reason: verstoss.bericht);
     });
@@ -1537,6 +1584,41 @@ void main() {
       );
     });
 
+    test('Ä10 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
+      // Gemessen, nicht vermutet: vor der Behebung standen hier **zwei**
+      // Meldungen, `[avatar-kapselung] Regel 19` und die allgemeine
+      // `[domain] Domain-Erlaubnisliste`. Dieselbe Abgrenzung wie bei Regel 20
+      // und 21, mit einem Zusatz: in einer Domäne wäre Regel 19 sogar
+      // irreführend, denn sie verweist auf lib/map/presentation/avatar/, und
+      // dorthin darf eine Domäne unter keinen Umständen zeigen.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/domain/avatar_vertrag.dart',
+        <(int, String)>[(1, 'Regel 4: Domain darf keine WebView-SDK')],
+      );
+
+      final funde = verstoss.fuer(
+        'lib/features/discovery/domain/avatar_vertrag.dart',
+      );
+      expect(funde, hasLength(1), reason: verstoss.bericht);
+      expect(
+        funde.single.regel,
+        isNot(contains('Regel 19')),
+        reason:
+            'Regel 19 muss in einer Domäne schweigen, sonst steht die '
+            'Heimatverzeichnis-Regel neben der Domänenregel.\n'
+            '${verstoss.bericht}',
+      );
+      expect(
+        funde.single.regel,
+        isNot(contains('Domain-Erlaubnisliste')),
+        reason:
+            'Das benannte Verbot muss die allgemeine Meldung verdrängen, '
+            'siehe „Ä2: ein benanntes Verbot verdrängt die allgemeine '
+            'Meldung".\n${verstoss.bericht}',
+      );
+    });
+
     test('Ä11: das Karten-SDK außerhalb des Karten-Hosts', () {
       // Regel 18 hält Features aus map/presentation/ heraus, Regel 20
       // verbietet den direkten Griff zum Paket. Ohne sie dürfte ein Feature
@@ -1556,6 +1638,62 @@ void main() {
             'Sonst hat die Karte keinen Ort, an dem sie gezeichnet werden '
             'darf.\n${still.bericht}',
       );
+    });
+
+    test('Ä12: das Geo-SDK außerhalb des Ortungsdienstes', () {
+      // Vor Regel 21 lief dieser Import überall unterhalb von lib/ durch,
+      // außer in einem domain/-Segment. `domain-map.md:153-156` zählt den
+      // geolocation provider zu den unterstützenden Techniken, damit ist
+      // lib/services/location/ sein Ort und kein anderer.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/ortung_versuch.dart',
+        <(int, String)>[(1, 'Regel 21: das Geo-SDK gehört dem Ortungsdienst')],
+      );
+      erwarteFunde(
+        verstoss,
+        'lib/map/presentation/ortung_daneben.dart',
+        <(int, String)>[(1, 'Regel 21: das Geo-SDK gehört dem Ortungsdienst')],
+      );
+    });
+
+    test('Ä12: das Verbot trifft die ganze geolocator-Familie', () {
+      // Absichtlich breiter als Regel 20: dort steht `^package:maplibre_gl`
+      // vollständig, hier nur `^package:geolocator`. Die Typen `Position` und
+      // `LocationAccuracy` liegen in `geolocator_platform_interface`, ein
+      // Verbot nur auf `geolocator` ließe den naheliegendsten Umweg offen.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/ortung_familie.dart',
+        <(int, String)>[
+          (1, 'Regel 21: das Geo-SDK gehört dem Ortungsdienst'),
+          (2, 'Regel 21: das Geo-SDK gehört dem Ortungsdienst'),
+        ],
+      );
+    });
+
+    test('Ä12 Gegenprobe: im Ortungsdienst ist das Geo-SDK erlaubt', () {
+      expect(
+        still.fuer('lib/services/location/ortungsdienst.dart'),
+        isEmpty,
+        reason:
+            'Sonst hat die Ortung keinen Ort mehr, an dem sie stattfinden '
+            'darf.\n${still.bericht}',
+      );
+    });
+
+    test('Ä12 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
+      // Dieselbe Abgrenzung wie bei Regel 20 und aus demselben Grund: Regel 4
+      // verbietet Geräte-SDKs in jeder Domäne und ist dort die genauere
+      // Aussage. Regel 21 lässt Domänen deshalb aus, sonst stünden für
+      // denselben Import zwei Meldungen da.
+      final zeile6 = verstoss
+          .fuer('lib/features/tours/domain/entities/technik_importe.dart')
+          .where((fund) => fund.zeile == 6)
+          .toList();
+
+      expect(zeile6, hasLength(1), reason: verstoss.bericht);
+      expect(zeile6.single.regel, contains('Regel 4: Domain darf keine'));
     });
 
     test('Ä11 Gegenprobe: in einer Domäne meldet nur Regel 4', () {

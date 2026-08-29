@@ -194,6 +194,43 @@ Laufweite mehr trägt, die weitergereicht werden könnte. Durchgekommen ist
 ausschließlich `height: 1.43`. Wer hier „Materials Typografie" liest, muss
 wissen, welcher Teil davon in dieser App noch scharf ist und welcher nicht.
 
+### 29.08.2026, Regel 21: der Ortungsdienst bekommt ein Heimatverzeichnis
+
+`geolocator` gehört ab jetzt maschinell nach `lib/services/location/` und
+nirgendwo sonst. Vorher durfte **jedes** Verzeichnis unterhalb von `lib/`
+außer einem `domain/`-Segment es importieren, mit sieben Wegwerf-Proben
+vermessen. Im Bestand ändert sich nichts, es gibt genau einen Import und der
+liegt richtig.
+
+Das war keine neue Entscheidung, sondern die Durchsetzung einer akzeptierten:
+`domain-map.md:153-156` führt den `geolocation provider` unter „not business
+domains". Der Präzedenzfall steht ausdrücklich im Skript: **Regel 19 entstand,
+bevor `webview_flutter` überhaupt im Projekt war**, weil „hinter einer klaren
+Schnittstelle kapseln" ohne so eine Zeile nur eine Absichtserklärung ist.
+
+**Das Verbot trifft die ganze Paketfamilie** (`^package:geolocator`), nicht
+nur `geolocator` selbst. Grund: `Position` und `LocationAccuracy` liegen in
+`geolocator_platform_interface`. Wer am Dienst vorbeigreift, holt sich mit
+hoher Wahrscheinlichkeit genau das, und ein Verbot nur auf den Hauptnamen
+ließe den naheliegendsten Umweg offen.
+
+**Drei Funde am Rand, alle vom selben Typ und alle behoben:**
+
+*Regel 20 stand nie im Dokument.* Sie existierte seit dem 28.08.2026
+ausschließlich im Skript. `dependency-rules.md` beschreibt genau diesen Fehler
+bei Regel 17 selbst: „The strictest rule of the project existed in a script
+and in no document, which is the wrong way round." Jetzt stehen 20 und 21 dort.
+
+*Regel 19 meldete in einer Domäne doppelt*, weil `_ausserhalbAvatarHome` die
+Domänen-Ausnahme nicht trug und `webview_flutter` in keinem `_domainBans`
+stand. In einer Domäne wäre die Regel-19-Meldung sogar **irreführend**: sie
+verweist auf `lib/map/presentation/avatar/`, und dorthin darf eine Domäne nie
+zeigen.
+
+*Regel 4 war im Dokument enger formuliert als im Skript.* Das Dokument nannte
+„routing, storage or analytics", das Skript hatte längst Karten-, Geräte- und
+WebView-SDKs darunter. Jetzt sagt die Zeile, was das Skript tut.
+
 ### 29.08.2026, Fundstellen des Karten-Chrome: 41 von 138 waren falsch
 
 Ein vollständiger Rundgang über die zehn Chrome-Dateien und ihre Testdatei.
