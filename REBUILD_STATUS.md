@@ -269,11 +269,12 @@ Leerzeile, der Eintrag steht auf `:450` und ein zweiter auf `:477`, in genau der
 Methode, die bei jeder Aktualisierung läuft. Richtig ist nur „vor dem ersten
 `setGeoJsonSource` nicht".
 
-**Ungemessen und beim nächsten Gerätelauf zu klären:** ob `moveCamera` eine
-laufende `animateCamera` auf maplibre-native wirklich verwirft. Wenn nicht,
-springt die Kamera beim harten Reset in die Reset-Pose und kriecht danach
-wieder weg. Prüfbar in Minuten: ein `jumpTo` mitten in ein 1500-ms-`flyTo`
-setzen und zusehen.
+**Am 30.08.2026 gemessen: ja, `moveCamera` verwirft eine laufende
+`animateCamera`** auf maplibre-native unter Android. Zwei unabhängige Signale,
+Belege unter „Die vier offenen Gerätemessungen". Vorrangregel 1 trägt damit,
+allerdings nur, solange der harte Reset eine **vollständige** Kamera setzt; die
+Bedingung steht dort als Fund B. Für iOS fehlt die Messung weiterhin, und dort
+fehlt auch das zweite Signal, weil `animateCamera` immer `null` liefert.
 
 ### Am 29.08.2026 von Janek entschieden: vier Fragen zur Karte
 
@@ -580,16 +581,17 @@ gibt. Testfakt 3262 bei 48.14680, 11.56340.
 
 | Frage | Ergebnis |
 |---|---|
-| Liefert `toScreenLocation` logische oder Geräte-Pixel? | **Der Code stimmt, wie er ist.** Gegenprobe mit und ohne Division durch 2,625: die Ballons stehen beide Male an derselben Stelle. |
+| Liefert `toScreenLocation` logische oder Geräte-Pixel? | ~~**Der Code stimmt, wie er ist.** Gegenprobe mit und ohne Division durch 2,625: die Ballons stehen beide Male an derselben Stelle.~~ **Am 30.08.2026 widerlegt**, siehe „Ungefragter Fund A". Es sind Gerätepixel, und die Division fehlt. Der Eintrag bleibt stehen, damit sichtbar ist, dass zwei verglichene Bilder eine abgelesene Zahl nicht ersetzen. |
 | Bekommen die Gruppen ihre Zahlen? | **Ja**, 17, 2, 32, 4 und 5 gesehen. Der Glyphen-Endpunkt liefert, das war ungeprüft. |
 | Laufen Sky-Fall und GPS-Folgen? | **Ja.** Das Gate arbeitet nachweislich: `map.host.intent_suppressed reason=distanceDeadZone` im Log, die 12-Meter-Totzone greift. |
 | Läuft die Näherungs-Animation? | **Ja**, Größe, Glühen und Drehung, sechs Fakten gleichzeitig in Reichweite. |
 | Ist das Launcher-Symbol noch das Flutter-Logo (E-37)? | **Nein**, der native Startbildschirm zeigt das FACT-Symbol. E-37 ist insoweit veraltet. |
 
-**Noch offen und nur am Gerät zu klären:** ob `moveCamera` eine laufende
-`animateCamera` verwirft (davon hängt Vorrangregel 1 ab), ob die 200 ms
-`steeringGrace` tragen, was für einen Punkt hinter dem Horizont zurückkommt,
-und ob die Projektion bei schneller Kartenbewegung sichtbar hinterherhängt.
+**Diese vier waren offen und sind es seit dem 30.08.2026 nicht mehr:** ob
+`moveCamera` eine laufende `animateCamera` verwirft (davon hängt Vorrangregel 1
+ab), ob die 200 ms `steeringGrace` tragen, was für einen Punkt hinter dem
+Horizont zurückkommt, und ob die Projektion bei schneller Kartenbewegung
+sichtbar hinterherhängt. Ergebnisse im nächsten Abschnitt.
 
 **Zwei Datenfunde, die erst die redende Diagnose-Senke sichtbar gemacht hat:**
 
@@ -613,6 +615,148 @@ und genau diesen Vorwurf hatte ich in derselben Woche sechsmal an anderer
 Stelle erhoben. Merksatz für den nächsten Gerätelauf: **erst warten, bis die
 Daten da sind, dann messen**, und im Zweifel eine Zahl ausgeben lassen statt
 ein Bild zu deuten.
+
+### Die vier offenen Gerätemessungen, 30.08.2026 nachts
+
+Alle vier beantwortet, dazu zwei ungefragte Funde. Gemessen mit einer
+Wegwerf-Probe, die **direkt mit dem SDK redet** und bewusst nicht über
+`MapCameraHost` oder `MapCameraDriver` läuft: gemessen werden sollte
+`maplibre_gl`, nicht der eigene Wrapper. Ein Host-Aufruf wäre durch das Gate
+gelaufen und hätte die Antwort verfälscht.
+
+Aufbau: Pixel 8 als Emulator, 1080 × 2400 physisch, 411 logische Pixel,
+Skalierungsfaktor 2,625. Gastmodus, Position über `adb emu geo fix 11.56340
+48.14680`, Kamera beim Start 48.146798 / 11.563398, Zoom 16,5, Neigung 58,
+Blickrichtung 0. Die Probe startet **14 Sekunden nach dem Kartenaufbau**, damit
+Sky-Fall und erstes GPS-Folgen durch sind; bei stehender Position unterdrückt
+die 12-Meter-Totzone danach jede weitere Dauerabsicht.
+
+**Jede Zeile trug eine laufende Nummer**, weil Logcat bei hoher Rate Zeilen
+verwirft und die Senke absichtlich nicht puffert. 79 von 79 sind angekommen,
+keine Lücke. Ohne diese Nummern wäre ein unvollständiges Protokoll nicht von
+einem vollständigen zu unterscheiden gewesen.
+
+| Frage | Ergebnis |
+|---|---|
+| Verwirft `moveCamera` eine laufende `animateCamera`? | **Ja**, auf Android. Zwei unabhängige Signale, beide einig. |
+| Tragen die 200 ms `steeringGrace`? | **Ja**, mit rund zwanzigfachem Abstand: 3,7 bis 9,6 ms. |
+| Was liefert ein Punkt hinter dem Horizont? | **Eine endliche Zahl, die gültig aussieht.** Kein `NaN`, keine Ausnahme, stattdessen eine stille Spiegelung. |
+| Hängt die Projektion bei schneller Bewegung hinterher? | **Nein, sie ist die frischere von beiden.** Hinterher hängt die gemeldete Kamera. |
+
+**1. `moveCamera` bricht ab, Vorrangregel 1 trägt.** Die Positionsspur: bei
+593 ms steht die Kamera mitten im Flug auf 48.153743, der Sprung geht raus, bei
+700 ms steht sie auf 48.126798, also exakt auf dem Sprungziel, und bleibt dort
+bis zum Ende der Messung. Unabhängig davon liefert `animateCamera` bei 607 ms
+`false` zurück, und das Paket sagt selbst „false if the movement was canceled"
+(`controller.dart:409-416`). Der harte Reset durch Überschreiben funktioniert
+also, obwohl es kein `stop()` gibt. **Gilt für Android. iOS ist nie compiliert
+worden, und dort liefert `animateCamera` laut Paketdoku ohnehin immer `null`;
+das zweite Signal fehlt dort also.**
+
+**2. Die 200 ms `steeringGrace` sind reichlich bemessen.** Gemessen wurde die
+Spanne zwischen dem eigenen `moveCamera` und der ersten Kamerarückmeldung, die
+die Position wirklich ändert, fünf Läufe: 6,9 / 3,7 / 5,3 / 9,6 / 4,8 ms. Der
+erste Lauf ist der langsamste, danach pendelt es sich ein. Das Fenster hat damit
+rund den Faktor 20 Luft. **Was die Messung nicht zeigt:** einen Emulator ohne
+Last. Auf einem belasteten Gerät kann die Spanne wachsen, und die Regel bleibt,
+dass sie nur unterhalb von 200 ms tragen darf.
+
+**3. Der gefährlichste Fund: hinter der Kamera wird still gespiegelt.** Zwei
+Leitern entlang des Meridians, Bildschirmlage in Gerätepixeln:
+
+| Entfernung | nach vorn (y) | nach hinten (y) |
+|---|---|---|
+| 0,1 km | 1533,23 | 1774,76 |
+| 1 km | 815,38 | 3825,91 |
+| 5 km | −215,73 | **−3241,45** |
+| 20 km | −779,01 | −1391,32 |
+| 100 km | −991,74 | −1112,72 |
+| 500 km | −1038,86 | −1063,01 |
+| 2000 km | −1047,95 | −1053,83 |
+
+Nach vorn ist alles plausibel: der Wert wandert nach oben aus dem Bild und
+läuft gegen etwa −1050, den Fluchtpunkt. **Nach hinten kippt das Vorzeichen
+zwischen 1 und 5 km**, und ab da liegen die Werte in genau demselben Bereich wie
+die weit vorne liegenden Punkte. Ein Punkt hinter der Kamera ist an seinen
+Koordinaten allein **nicht** von einem weit voraus liegenden zu unterscheiden.
+Es gibt kein `NaN`, keine Ausnahme und keinen Sonderwert, an dem ein Aufrufer
+das erkennen könnte. Wer der Projektion glaubt, zeichnet ein Bauteil an eine
+Stelle, an der es geometrisch nichts zu suchen hat.
+
+Heute trifft das die App nicht, weil nur Punkte innerhalb von 150 Metern
+gezeichnet werden und in dieser Nähe nichts hinter der Kamera liegen kann, was
+nicht ohnehin sichtbar wäre. **Es trifft Schritt 18**, sobald der Avatar
+geografisch verankert wird, und jeden künftigen Aufrufer der Projektion. Der
+Vertrag braucht deshalb eine Aussage darüber, was ein Punkt hinter der Kamera
+bedeutet, und die kann nicht aus dem Rückgabewert kommen.
+
+**4. Die Projektion hängt nicht hinterher, die gemeldete Kamera tut es.** In
+26 Stichproben über eine 1500-ms-Animation ändert sich die Bildschirmlage
+mehrfach, **während `cameraPosition` unverändert bleibt**: bei 140 ms wandert
+die Lage von 674,99 auf 441,93, die gemeldete Kameramitte steht beide Male auf
+48.150798. Dasselbe bei 763 ms. Umgekehrt gibt es keinen einzigen Fall. Beide
+Werte kommen über denselben Plattformkanal, aber `cameraPosition` ist ein in
+Dart zwischengespeicherter Wert aus `onCameraMove` und wird nur alle 70 bis
+140 ms nachgeführt, während `toScreenLocation` jedes Mal wirklich fragt.
+
+**Die Folge ist eine Regel und kein Fehler:** wer eine Bildschirmlage mit der
+gemeldeten Kamera **desselben Bildes** verrechnet, mischt zwei verschiedene
+Zeitpunkte. Für die Näherungs-Animation ist das heute folgenlos, sie benutzt nur
+die Projektion. Ein zweiter Verbraucher, der beides kombiniert, hätte einen
+Fehler, den kein Test dieser Art fände.
+
+**Was die Messung 4 ausdrücklich nicht kann:** sie trennt nicht, ob eine
+Abweichung von der Projektion selbst kommt oder von der Latenz des
+Plattformkanals, denn beide Werte werden nacheinander über denselben Kanal
+geholt. Sie zeigt die Richtung des Unterschieds, nicht seine Ursache.
+
+#### Ungefragter Fund A: `toScreenLocation` liefert Gerätepixel
+
+`controller.dart:1779` sagt „screen pixels (not display pixels)", und
+`map_surface.dart` hält seit Schritt 12 fest, dass dieser Satz beides heißen
+kann. **Er heißt das Geräteraster.** Zwei unabhängige Argumente aus demselben
+Datensatz, und keines hängt am anderen:
+
+- Alle vierzehn Punkte der Leiter liegen auf dem Meridian der Kameramitte und
+  bekommen dieselbe Bildschirmlage `x = 540,75`. Das ist die halbe **physische**
+  Breite (1080 / 2). Logisch müsste die Mitte bei 205,7 liegen (411 / 2).
+- Die Mitte liegt bei `y` zwischen 1533 und 1775, also bei rund 1650. Die
+  **ganze** logische Bildschirmhöhe beträgt 914. Ein Wert, der die Höhe der
+  Fläche übersteigt, kann in dieser Einheit nicht die Mitte sein. Dieses zweite
+  Argument braucht die Annahme „die Karte ist bildschirmbreit" gar nicht.
+
+**Das widerspricht dem Eintrag vom 29.08.2026**, der aus einer Gegenprobe mit
+und ohne Division durch 2,625 schloss, „der Code stimmt, wie er ist". Beide
+Aussagen können nicht zugleich gelten. Die hier gemessene ist die direktere: sie
+liest eine einzelne Zahl ab, statt zwei Bilder zu vergleichen, und genau dieser
+Unterschied steht seit dem 29.08.2026 als Merksatz im Dokument.
+
+**Die betroffene Stelle ist bekannt und benannt.**
+`fact_balloon_overlay.dart:383-388` sagt wörtlich: „Ergibt eine Gerätemessung,
+dass dort das Geräteraster liegt, gehört genau hier eine Division durch
+`MediaQuery.devicePixelRatioOf(context)` hin, und nirgendwo sonst." Heute steht
+dort keine Division, `at.xInScreenPixels` geht unverändert als logisches `left`
+in ein `Positioned`. **Die Behebung ändert, was der Nutzer sieht**, und gehört
+deshalb Janek vorgelegt, bevor sie passiert. Sie braucht außerdem eine eigene
+Gegenprüfung am Gerät: ein Ballon an einer bekannten Koordinate, verglichen mit
+der Stelle, an der er stehen müsste.
+
+#### Ungefragter Fund B: eine abgebrochene Flugbewegung lässt ihren Zoom stehen
+
+Beim Abbruch aus Messung 1 blieb der Zoom auf 14,94 statt der 16,5 vom Anfang.
+Ursache ist keine Eigenart des Abbruchs, sondern die Flugkurve: `animateCamera`
+zoomt für eine weite Strecke erst heraus und dann wieder herein, und wer sie in
+der Mitte abbricht, erwischt sie unten. Die Probe hat mit `newLatLng` nur den
+Mittelpunkt überschrieben, der Zwischen-Zoom blieb.
+
+**Die App ist davon nicht betroffen, und das ist gemessen, nicht angenommen:**
+`MapLibreCameraDriver.updateFor` baut immer ein
+`CameraUpdate.newCameraPosition` mit Mittelpunkt, Zoom, Blickrichtung und
+Neigung. Jeder Sprung des Hosts setzt also eine **vollständige** Kamera und
+räumt einen liegengebliebenen Zwischenzustand mit weg. Der Fund steht trotzdem
+hier, weil er die Bedingung benennt, unter der Vorrangregel 1 trägt: sie trägt,
+solange der harte Reset vollständig ist. Eine spätere Teiländerung an dieser
+Stelle wäre lautlos falsch.
 
 ### Der Kartenstil am Gerät, 29.08.2026
 

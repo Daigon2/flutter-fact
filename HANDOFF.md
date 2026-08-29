@@ -52,14 +52,13 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **Den Gerätelauf nachholen, und er ist dringender geworden.** Offen sind
-   Splash, Anmeldung, Registrierung, Tutorial und vor allem die Karte: von ihrer
-   SDK-Verdrahtung ist **nichts** auf einem Gerät gesehen, weil `onMapCreated`,
-   `onCameraMove` und `onCameraIdle` im Widget-Test nie laufen (ohne
-   Plattformkanal entsteht kein Controller). Zwei offene Messungen gleich
-   mitnehmen: ob `moveCamera` eine laufende `animateCamera` verwirft (davon hängt
-   Vorrangregel 1 ab, denn `stop()` gibt es nicht), und ob die 200 ms
-   `steeringGrace` tragen.
+1. **`toScreenLocation` liefert Gerätepixel, und die Division fehlt.** Am
+   30.08.2026 gemessen, Belege in `REBUILD_STATUS.md` unter „Ungefragter Fund A".
+   Die Stelle ist seit Schritt 17 benannt und wartet dort auf genau diese
+   Messung: `fact_balloon_overlay.dart:383-388`. **Die Behebung ändert, was der
+   Nutzer sieht**, geht also erst nach Janeks Kenntnisnahme, und sie braucht eine
+   eigene Gegenprüfung am Gerät statt eines grünen Gates. Die vier offenen
+   Gerätemessungen sind bei derselben Gelegenheit alle beantwortet worden.
 2. **Sechs Fragen liegen bei Dairen und sind unbeantwortet.** Wortlaut, Stand
    und Nachträge stehen seit dem 29.08.2026 in `REBUILD_STATUS.md` unter „Fragen
    an Dairen". Zwei davon blockieren: **D-12** das Antippen der Gruppen aus
@@ -84,6 +83,18 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 30.08.2026, Die vier Gerätemessungen, und eine Zahl kippt eine Gegenprobe
+
+Alle vier sind beantwortet: `moveCamera` bricht ab, die 200 ms `steeringGrace`
+haben Faktor 20 Luft, und die Projektion hängt nicht hinterher, sondern ist von
+beiden Werten der frischere. **Überraschend war, dass die zwei teuersten Funde
+gar nicht auf der Liste standen.** Hinter der Kamera liefert die Projektion
+keine Ausnahme und kein `NaN`, sondern eine still gespiegelte Zahl, die von
+einem weit voraus liegenden Punkt nicht zu unterscheiden ist. Und
+`toScreenLocation` liefert **Gerätepixel**: eine einzelne abgelesene Zahl kippt
+damit die Bildvergleichs-Gegenprobe vom Vortag, und zwar genau in der Richtung,
+vor der derselbe Eintrag gewarnt hatte.
 
 ### 29.08.2026, Die sechs Fragen an Dairen stehen endlich im Repository
 
