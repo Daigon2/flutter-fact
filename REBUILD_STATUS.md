@@ -214,6 +214,39 @@ springt die Kamera beim harten Reset in die Reset-Pose und kriecht danach
 wieder weg. Prüfbar in Minuten: ein `jumpTo` mitten in ein 1500-ms-`flyTo`
 setzen und zusehen.
 
+### Am 29.08.2026 von Janek entschieden: vier Fragen zur Karte
+
+**1. Die Karte bekommt eine Karenzzeit** (`manualMoveGrace`, Lesart B). Wer
+die Karte wegzieht, wird für N Sekunden nicht zurückgerissen. Sichtbare
+Abweichung von der PWA, und sie ist begründet: dort ist die Sperre für die
+Blickrichtung vorhanden, für den Mittelpunkt fehlt sie, weil `userInteracting`
+im Closure des Kompass-Effekts liegt und für `applyPos` gar nicht erreichbar
+ist (`screen-map.jsx:2807` gegen `:2668`). Ob das gewollt war, ist aus dem Code
+nicht ablesbar. **N ist noch zu wählen**, das Gate trägt beide Lesarten bereits.
+
+**2. Die Fakt-Ballons werden nativ gezeichnet**, mit einer ausdrücklichen
+Auflage: *„aber Animation und Glühen, Drehung müssen dann später aber
+kommen!!"*. Das ist eine **Zusage, keine Option.** Der native Weg ist damit
+eine Vertagung und kein Verzicht, und Schritt 17 ist nicht abgeschlossen,
+bevor der nächstgelegene Ballon wieder stufenlos wächst, sich dreht und glüht.
+Betroffen ist ohnehin nur einer, der nächste innerhalb 150 Metern
+(`screen-map.jsx:2217-2232`, dort selbst als Korrektur dokumentiert).
+
+**3. Die Ballon-Bilder entstehen zur Laufzeit**, nicht als Dateien im
+Repository. Sie folgen damit den Design-Tokens automatisch. Die Zahl der
+Bilder bleibt Kategorie mal Sammelzustand; die **Entfernungsstufe darf
+niemals** in die Bildfabrik, sie ist stufenlos (`:2252-2256`) und machte sie
+unbegrenzt.
+
+**4. Keine Deckelung über Zoom 16.** Die PWA zeigt dort nur die 25 nächsten,
+und ihr Kommentar nennt als Grund ausdrücklich den Lag-Schutz im Browser
+(`:2050`). Nativ gezeichnet gibt es diesen Grund nicht. Die App zeigt mehr
+Fakten als die PWA, das ist bewusst.
+
+**Selbst entschieden, Kleinkram:** ein Cluster heißt im Domänenvertrag
+**Gruppe**, nicht Cluster. „Cluster" ist Vokabular des Karten-SDK, und
+`map/domain` soll keine Vendor-Sprache tragen.
+
 ### Vor Schritt 15 geprüft: drei Paketfallen bei Markern und Clustern
 
 Alle drei am Pub-Cache belegt, alle drei lautlos, keine davon dokumentiert.
