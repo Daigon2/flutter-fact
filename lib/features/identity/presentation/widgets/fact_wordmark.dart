@@ -1,5 +1,5 @@
 import 'package:fact_app/app/theme/fact_typography.dart';
-import 'package:fact_app/features/identity/presentation/widgets/css_gradient_geometry.dart';
+import 'package:fact_app/core/widgets/css_gradient_geometry.dart';
 import 'package:flutter/widgets.dart';
 
 /// Die Wortmarke aus `02_Frontend/app/screen-auth.jsx:26-55`, Größe `lg`.

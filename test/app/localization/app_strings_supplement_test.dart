@@ -35,15 +35,19 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die drei belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die fünf belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
-      // dem Tutorial-Overlay dazu, `tour_steps.dart`.
+      // dem Tutorial-Overlay dazu, `tour_steps.dart`. Die beiden
+      // `fact.`-Schlüssel am 29.08.2026 mit der Fakt-Akte,
+      // `screen-fact.jsx:367` und `:474`.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
         'tour.stepCounter',
         'tour.step1.meta',
         'tour.step9.meta',
+        'fact.fileNumber',
+        'fact.sourceMissing',
       });
     });
 
@@ -117,6 +121,61 @@ void main() {
         AppStrings.of(AppLanguage.de).textKeys.contains('tour.stepCounter'),
         isFalse,
       );
+    });
+  });
+
+  group('Die Fakt-Akte', () {
+    test('die Aktennummer steht in beiden Sprachen deutsch da', () {
+      // `screen-fact.jsx:367`: `Akte #{fact.nr || fact.id}` steht wörtlich
+      // im JSX und wird auch im englischen Modus so gezeigt. Derselbe Fall
+      // wie `tour.step9.meta`. Fiele der englische Eintrag weg, käme über
+      // den Rückfall zwar derselbe Text heraus; die Zusicherung gilt
+      // deshalb der Karte selbst und nicht nur dem Ergebnis von `text()`.
+      for (final language in AppLanguage.values) {
+        expect(
+          supplementTextsFor(language)['fact.fileNumber'],
+          'Akte #{nr}',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(
+            language,
+          ).text('fact.fileNumber', params: {'nr': 'MUC_004'}),
+          'Akte #MUC_004',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('die Platzhalterzeile ist je Sprache eine andere', () {
+      // `screen-fact.jsx:474`, beide Wortlaute stehen dort. Gegenprobe zu
+      // einer Abschrift, die beide Karten gleich füllt wie bei der
+      // Aktennummer.
+      expect(
+        supplementTextsFor(AppLanguage.de)['fact.sourceMissing'],
+        'Quelle fehlt',
+      );
+      expect(
+        supplementTextsFor(AppLanguage.en)['fact.sourceMissing'],
+        'Source missing',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('fact.sourceMissing'),
+        'Source missing',
+      );
+    });
+
+    test('beide Schlüssel bleiben aus der PWA-Fläche heraus', () {
+      for (final language in AppLanguage.values) {
+        for (final key in <String>['fact.fileNumber', 'fact.sourceMissing']) {
+          expect(AppStrings.of(language).hasText(key), isTrue, reason: key);
+          expect(
+            AppStrings.of(language).textKeys.contains(key),
+            isFalse,
+            reason: key,
+          );
+        }
+      }
     });
   });
 

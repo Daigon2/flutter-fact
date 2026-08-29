@@ -1,6 +1,6 @@
 import 'package:fact_app/app/theme/fact_colors.dart';
 import 'package:fact_app/app/theme/fact_typography.dart';
-import 'package:fact_app/features/identity/presentation/widgets/css_gradient_geometry.dart';
+import 'package:fact_app/core/widgets/css_gradient_geometry.dart';
 import 'package:fact_app/features/identity/presentation/widgets/splash_pressable.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';

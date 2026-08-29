@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:fact_app/features/identity/presentation/widgets/css_gradient_geometry.dart';
+import 'package:fact_app/core/widgets/css_gradient_geometry.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 

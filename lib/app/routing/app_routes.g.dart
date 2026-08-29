@@ -22,6 +22,13 @@ RouteBase get $appShellRoute => StatefulShellRouteData.$route(
           path: '/map',
           hasOverriddenOnExit: false,
           factory: $MapRoute._fromState,
+          routes: [
+            GoRouteData.$route(
+              path: 'fact/:factId',
+              hasOverriddenOnExit: false,
+              factory: $FactRoute._fromState,
+            ),
+          ],
         ),
       ],
     ),
@@ -64,6 +71,31 @@ mixin $MapRoute on GoRouteData {
 
   @override
   String get location => GoRouteData.$location('/map');
+
+  @override
+  void go(BuildContext context) => context.go(location);
+
+  @override
+  Future<T?> push<T>(BuildContext context) => context.push<T>(location);
+
+  @override
+  void pushReplacement(BuildContext context) =>
+      context.pushReplacement(location);
+
+  @override
+  void replace(BuildContext context) => context.replace(location);
+}
+
+mixin $FactRoute on GoRouteData {
+  static FactRoute _fromState(GoRouterState state) =>
+      FactRoute(factId: int.parse(state.pathParameters['factId']!));
+
+  FactRoute get _self => this as FactRoute;
+
+  @override
+  String get location => GoRouteData.$location(
+    '/map/fact/${Uri.encodeComponent(_self.factId.toString())}',
+  );
 
   @override
   void go(BuildContext context) => context.go(location);

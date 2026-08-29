@@ -72,11 +72,41 @@ const Map<AppLanguage, Map<String, String>> supplementTextsByLanguage =
         // einmal und wird nicht pro Sprache gebaut. Deshalb derselbe Wert in
         // beiden Sprachkarten, keine Übersetzung.
         'tour.step9.meta': 'PUSH AUS DER HOSENTASCHE',
+
+        // Die Aktennummer im Kopfbereich der Fakt-Akte,
+        // `screen-fact.jsx:367`: `Akte #{fact.nr || fact.id}`. Der Text steht
+        // dort wörtlich im JSX und nicht in `translations.jsx`, also kein
+        // `t()`-Aufruf und kein Schlüssel.
+        //
+        // Derselbe Wert in beiden Sprachkarten, genau wie `tour.step9.meta`
+        // eine Zeile darüber: die Quelle hat nur diese eine Fassung und zeigt
+        // sie auch im englischen Modus deutsch. Das ist exakte Parität und
+        // keine vergessene Übersetzung.
+        //
+        // **Der englische Wortlaut ist offen.** Kommt er, wird hier eine
+        // einzige Zeichenkette ausgetauscht; weder der Schlüsselname noch die
+        // Aufrufstelle in `fact_page.dart` ändern sich dabei. Bekommt die PWA
+        // den Schlüssel selbst, meldet `tool/generate_i18n.dart` es und beide
+        // Einträge fallen ersatzlos weg.
+        //
+        // Der Platzhalter heißt `{nr}` wie die Spalte `facts.nr`, aus der der
+        // Wert im Regelfall kommt. Ist sie leer, setzt die Aufrufstelle die
+        // Kennung ein, wie `|| fact.id` in der Quelle.
+        'fact.fileNumber': 'Akte #{nr}',
+
+        // Die Platzhalterzeile der Quellenliste, `screen-fact.jsx:474`:
+        // `{ name: lang === 'en' ? 'Source missing' : 'Quelle fehlt', … }`.
+        // **Hier stehen beide Sprachen wörtlich in der Quelle**, anders als
+        // bei `fact.fileNumber`; übernommen ist genau dieser Wortlaut.
+        'fact.sourceMissing': 'Quelle fehlt',
       },
       AppLanguage.en: <String, String>{
         'tour.stepCounter': 'STEP {step} OF {total}',
         'tour.step1.meta': '— GOETHE',
         'tour.step9.meta': 'PUSH AUS DER HOSENTASCHE',
+        // Bewusst derselbe deutsche Wert wie in der DE-Karte, siehe dort.
+        'fact.fileNumber': 'Akte #{nr}',
+        'fact.sourceMissing': 'Source missing',
       },
     };
 

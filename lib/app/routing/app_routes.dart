@@ -46,7 +46,10 @@ import 'package:fact_app/app/onboarding/onboarding_host.dart';
 import 'package:fact_app/app/shell/app_shell.dart';
 import 'package:fact_app/features/challenges/presentation/pages/challenges_page.dart';
 import 'package:fact_app/features/collection/presentation/pages/collection_page.dart';
+import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
 import 'package:fact_app/features/discovery/presentation/pages/map_page.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
+import 'package:fact_app/features/facts/presentation/pages/fact_page.dart';
 import 'package:fact_app/features/identity/presentation/pages/login_page.dart';
 import 'package:fact_app/features/identity/presentation/pages/signup_page.dart';
 import 'package:fact_app/features/identity/presentation/pages/splash_page.dart';
@@ -54,6 +57,7 @@ import 'package:fact_app/features/profile/presentation/pages/profile_page.dart';
 import 'package:fact_app/features/settings/presentation/widgets/audio_activation_dialog.dart';
 import 'package:fact_app/map/presentation/map_surface.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 part 'app_routes.g.dart';
@@ -67,7 +71,14 @@ part 'app_routes.g.dart';
 @TypedStatefulShellRoute<AppShellRoute>(
   branches: <TypedStatefulShellBranch<StatefulShellBranchData>>[
     TypedStatefulShellBranch<MapBranch>(
-      routes: <TypedRoute<RouteData>>[TypedGoRoute<MapRoute>(path: '/map')],
+      routes: <TypedRoute<RouteData>>[
+        TypedGoRoute<MapRoute>(
+          path: '/map',
+          routes: <TypedRoute<RouteData>>[
+            TypedGoRoute<FactRoute>(path: 'fact/:factId'),
+          ],
+        ),
+      ],
     ),
     TypedStatefulShellBranch<CollectionBranch>(
       routes: <TypedRoute<RouteData>>[
@@ -151,6 +162,69 @@ class MapRoute extends GoRouteData with $MapRoute {
     // diese Zeile bei sich nachbaut, bricht den Architektur-Check.
     mapSurface: MapSurface(initialCamera: MapPage.placeholderCamera),
   );
+}
+
+/// Die Fakt-Akte, `/map/fact/:factId`.
+///
+/// ## Diese Route bekommt hier keinen Einstieg, und das ist Absicht
+///
+/// **Die Akte darf niemals ohne räumliche Nähe erreichbar sein.**
+/// `screen-map.jsx:2137-2142` hält den Fix wörtlich fest: „ohne GPS NIE die
+/// Fakt-Detail-Seite direkt oeffnen. Sonst koennte man durch Antippen aus
+/// 1000 km Entfernung einen Fakt lesen — was die Vor-Ort-Mechanik komplett
+/// aushebelt. Vorher gab es einen `!dist || dist <= 50` Escape-Hatch, der
+/// genau dieses Loch geoeffnet hat (Italien-User bekam Muenchen-Fakt voll
+/// angezeigt)."
+///
+/// Ein Ballon-Tipp führt deshalb **nicht** hierher: innerhalb von 150 Metern
+/// löst er das Sammeln aus, außerhalb zeigt er nur eine Mini-Kachel
+/// (`:2129-2145`). Der Weg in die Akte führt über das Sammeln, und das ist
+/// Schritt 20. Wer hier oder anderswo eine Navigation auf diese Route legt,
+/// muss die Näherungsbedingung mitbringen; ohne sie ist die Vor-Ort-Mechanik
+/// der ganzen App umgangen.
+///
+/// ## Warum unterhalb von `/map` und nicht daneben
+///
+/// Damit `context.pop()` auf der Karte landet und go_router beim Direktaufruf
+/// den Stapel darunter selbst aufbaut. Eine Route neben der Shell hätte weder
+/// das eine noch das andere, und die Tab-Leiste fehlte: die Quelle zeigt sie
+/// auf diesem Bildschirm (`screen-fact.jsx:686`).
+///
+/// ## Der Kompositions-Adapter
+///
+/// Die Nutzerposition gehört `discovery`, die Akte gehört `facts`, und Regel 8
+/// der `dependency-rules.md` verbietet dem einen Feature das `presentation/`
+/// des anderen. Regel 10 erlaubt dafür „an app-level composition adapter", und
+/// das ist diese Zeile, genau wie `mapSurface` oben und `onAudioGuidePressed`
+/// weiter unten.
+class FactRoute extends GoRouteData with $FactRoute {
+  /// Erzeugt die Route zum Fakt [factId].
+  const FactRoute({required this.factId});
+
+  /// Der Pfadabschnitt `:factId`, also `facts.id`.
+  ///
+  /// Ein `int` und kein `FactId`: `go_router_builder` kann nur die Typen der
+  /// Standardbibliothek aus einem Pfad lesen. Die Umwandlung passiert eine
+  /// Zeile tiefer und nirgendwo sonst.
+  final int factId;
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) {
+    return Consumer(
+      builder: (BuildContext context, WidgetRef ref, Widget? child) {
+        return FactPage(
+          factId: FactId(factId),
+          // `select` und nicht der ganze Zustand: `UserLocationState` hat
+          // bewusst keine Wertgleichheit, damit zwei Ortungen an derselben
+          // Stelle zwei Ereignisse bleiben. Ohne `select` baute diese Seite
+          // bei jeder Ortung neu, auch wenn sich nichts bewegt hat.
+          userPosition: ref.watch(
+            userLocationProvider.select((UserLocationState state) => state.fix),
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// Wurzelseite des Fakten-Tabs.

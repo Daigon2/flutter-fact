@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fact_app/app/localization/language_preference_store.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/routing/app_router.dart';
@@ -157,5 +159,49 @@ void main() {
       router.routeInformationProvider.value.uri.path,
       const MapRoute().location,
     );
+  });
+
+  group('Die Fakt-Akte', () {
+    test('liegt als Unterroute unter /map und nicht neben der Shell', () {
+      // Unter `/map`, damit `context.pop()` auf der Karte landet und die
+      // Tab-Leiste stehen bleibt (`screen-fact.jsx:686`).
+      final GoRoute map = shellRoute().branches.first.routes.single as GoRoute;
+
+      expect(map.path, '/map');
+      expect(map.routes, hasLength(1));
+      expect((map.routes.single as GoRoute).path, 'fact/:factId');
+
+      final Iterable<String> topLevelPaths = $appRoutes
+          .whereType<GoRoute>()
+          .map((GoRoute route) => route.path);
+      expect(topLevelPaths, isNot(contains('/map/fact/:factId')));
+    });
+
+    test('die typisierte Route baut den Pfad mit der Kennung', () {
+      expect(const FactRoute(factId: 42).location, '/map/fact/42');
+    });
+
+    test('kein Bildschirm im Bestand navigiert dorthin', () {
+      // **Produktregel, `screen-map.jsx:2137-2142`:** die Akte darf niemals
+      // ohne räumliche Nähe erreichbar sein. Bis die Näherungsbedingung aus
+      // Schritt 20 steht, gibt es bewusst keinen Einstieg. Fällt dieser Test,
+      // hat jemand einen gelegt, und die Frage ist dann, ob er die Bedingung
+      // mitgebracht hat.
+      final Iterable<File> dartFiles = Directory('lib')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((File file) => file.path.endsWith('.dart'));
+      final List<String> callers = <String>[];
+      for (final File file in dartFiles) {
+        final String source = file.readAsStringSync();
+        if (source.contains('FactRoute(') &&
+            !file.path.endsWith('app_routes.dart') &&
+            !file.path.endsWith('app_routes.g.dart')) {
+          callers.add(file.path);
+        }
+      }
+
+      expect(callers, isEmpty);
+    });
   });
 }

@@ -36,7 +36,7 @@ Dazu D-5, das Karten-Chrome ist jetzt eine geschlossene Einheit.
 
 **Damit sind 13 von 50 Schritten fertig** (1 bis 12 plus 19).
 
-**Kennzahlen:** 1421 Tests grün, alle vier Gates auf Exit-Code 0, dazu
+**Kennzahlen:** 1540 Tests grün, alle vier Gates auf Exit-Code 0, dazu
 `dart run tool/generate_i18n.dart --check` und
 `dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
 
@@ -193,6 +193,65 @@ Eingriff in `ThemeData.typography` sitzt und `bodyMedium` deshalb schon keine
 Laufweite mehr trägt, die weitergereicht werden könnte. Durchgekommen ist
 ausschließlich `height: 1.43`. Wer hier „Materials Typografie" liest, muss
 wissen, welcher Teil davon in dieser App noch scharf ist und welcher nicht.
+
+### 29.08.2026, Schritt 21: die Fakt-Akte, Anfang von Phase 3
+
+Der größte einzelne Bildschirm des Neubaus bis hierher. 1421 → 1540 Tests, 41
+plus 19 Mutationen, alle gefallen.
+
+**Der Zuschnitt kam aus einer Produktregel, nicht aus dem Plan.** Ein
+Ballon-Tipp führt **nicht** in die Akte: innerhalb von 150 Metern löst er das
+Sammeln aus, außerhalb zeigt er nur eine Mini-Kachel. Der Grund steht als
+ausdrücklicher Fix in der Quelle (`screen-map.jsx:2137-2142`): „ohne GPS NIE
+die Fakt-Detail-Seite direkt oeffnen. Sonst koennte man durch Antippen aus
+1000 km Entfernung einen Fakt ‚lesen'". Es gab dort ein Schlupfloch, und ein
+Nutzer in Italien bekam einen München-Fakt vollständig angezeigt.
+
+Die Akte ist deshalb gebaut, aber **ohne Einstieg**, und ein Test bewacht das:
+er durchsucht `lib/` nach der Route und fällt, sobald jemand einen legt. Die
+Regel steht wörtlich an der Route. Öffnen darf sie erst Schritt 20.
+
+**Die Akte zeigt eine andere Kategoriefarbe als die Karte, und das ist
+Parität.** Die Quelle hat dort eine eigene, kleinere Tabelle
+(`screen-fact.jsx:245-249` gegen `KAT_MAP`), und für `kult`, `dark` und
+`kirche` gibt es in den erzeugten Sprachtabellen **gar keinen** `cat.`-Eintrag.
+Wer die große Tabelle einsetzt, zeigt dem Nutzer den nackten Schlüssel.
+Sichtbare Folge: ein „Persönlichkeiten"-Fakt ist auf der Karte pink und in der
+Akte rot.
+
+**Zwei Anzeigefehler der Quelle sind nicht mitportiert.** Ohne Ortung schreibt
+sie buchstäblich „null entfernt" in die Pille, weil JavaScript das `null` in
+den String schreibt (`:395`), und der Ortsname hat „Passau" als fest
+verdrahteten Ersatzwert (`:394`), was der Mehrstädtigkeit widerspricht.
+Gebaut ist der Text, den die Quelle an derselben Bedingung wenige Zeilen
+später selbst wählt.
+
+**Zwei Sprachschlüssel über die Ergänzungs-Map (E-39)**, beide wortwörtlich
+aus der Quelle: `fact.fileNumber` steht in **beiden** Sprachkarten deutsch,
+weil die PWA „Akte #7" auch im englischen Modus so zeigt, genau wie
+`tour.step9.meta`. `fact.sourceMissing` hat in der Quelle beide Sprachen.
+
+**Der lehrreichste Fund ist wieder ein blinder Test, und diesmal hat Flutter
+es sogar gesagt.** Vier Skalierungstests tippten „Mehr anzeigen" an, und der
+Knopf lag bei doppelter Systemschrift außerhalb des Sichtfelds. `tap()` warnt
+dann und trifft nichts, der Test läuft grün weiter. Im Lauf standen **zwei**
+Warnungen, und ein grünes Gate hat sie durchgewinkt. Nachgemessen waren
+tatsächlich zwei der vier Kombinationen blind, belegt mit einer Mutation, die
+nur im aufgeklappten Zustand sichtbar ist. Seitdem steht in dieser Testdatei
+`WidgetController.hitTestWarningShouldBeFatal = true`: ein Fehlgriff ist dort
+jetzt ein Fehler statt einer Zeile, die niemand liest.
+
+Zweiter Fund derselben Art: eine Mutation überlebte, weil bei gleichen
+Flex-Anteilen der Ortsname ein **Auslassungszeichen** bekommt, ohne dass eine
+Ausnahme fällt. Umbruch, Ellipse und Überlauf sind drei verschiedene Dinge,
+und `takeException()` sieht nur das dritte. Jetzt misst der Test
+`RenderParagraph.didExceedMaxLines`.
+
+**Kleine Aufräumarbeit, die Voraussetzung war:** `css_gradient_geometry.dart`
+ist von `features/identity/presentation/widgets/` nach `lib/core/widgets/`
+gezogen. Die Datei trug den Vermerk „sobald ein zweiter Bildschirm dieselbe
+Umrechnung braucht, zieht diese Datei um", und `project-structure.md:200`
+nennt genau diese Bedingung.
 
 ### 29.08.2026, Schritt 17: die Münzen reagieren auf Nähe
 

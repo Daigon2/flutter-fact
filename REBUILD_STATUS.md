@@ -371,7 +371,7 @@ auch rechtlich hingehört.
 
 ## Phase 3, Fakt-Akte und Audio
 
-- [ ] 21. Fact-Detail-Sheet · [ ] 22. Collect-Reveal-Overlay
+- [x] 21. Fact-Detail-Sheet · [ ] 22. Collect-Reveal-Overlay
 - [ ] 23. Akte-Interaktion · [ ] 24. Damals/Heute · [!] 25. Audio-Service (TTS-Weg)
 - [ ] 26. Map-Audio-Kopplung
 

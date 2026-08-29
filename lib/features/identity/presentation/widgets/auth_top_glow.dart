@@ -1,4 +1,4 @@
-import 'package:fact_app/features/identity/presentation/widgets/css_gradient_geometry.dart';
+import 'package:fact_app/core/widgets/css_gradient_geometry.dart';
 import 'package:flutter/widgets.dart';
 
 /// Der rote Lichtkegel am oberen Rand von Anmeldung und Registrierung,

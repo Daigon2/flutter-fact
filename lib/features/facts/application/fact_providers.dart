@@ -31,7 +31,10 @@
 /// dort.
 library;
 
+import 'package:fact_app/features/facts/domain/entities/fact.dart';
+import 'package:fact_app/features/facts/domain/entities/fact_batch.dart';
 import 'package:fact_app/features/facts/domain/repositories/fact_repository.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Woher die App ihre Fakten bekommt.
@@ -42,3 +45,44 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Override wäre sonst eine App mit leerer Karte und ohne jede Meldung.
 final Provider<FactRepository> factRepositoryProvider =
     Provider<FactRepository>((ref) => unavailableFactRepository);
+
+/// Ein einzelner Fakt, für die Akte-Ansicht.
+///
+/// `null` heißt **nicht gefunden oder nicht sichtbar** und ist kein Fehlschlag:
+/// die RLS-Policy „read facts" verbirgt unveröffentlichte Fakten
+/// erwartungsgemäß, siehe [FactRepository.fetchFactById]. Ein
+/// Infrastrukturfehlschlag kommt dagegen als `AsyncError` heraus, weil
+/// `fetchFactById` dann eine `FactFailure` wirft.
+///
+/// ## Warum `FactId` und nicht `int`
+///
+/// Weil der Parameter einer Familie der Schlüssel des Caches ist. Ein nacktes
+/// `int` träfe hier auf `zone`, `bewertungen` und `quality_score`, und
+/// vertauschte Zahlen sähen im Aufruf gleich aus. `FactId` hat Wertgleichheit
+/// (`fact_id.dart:20`), taugt also als Schlüssel.
+///
+/// ## Riverpod wiederholt einen Fehlschlag von selbst
+///
+/// Zehnmal über rund 38 Sekunden, und ausgenommen sind nur `Error` und
+/// `ProviderException`. `FactFailure implements Exception` und wird deshalb
+/// wiederholt, genau wie bei `factOverlayProvider`. Für Tests heißt das: **wer
+/// diesen Provider werfen lässt, statt ihn zu überschreiben, hinterlässt einen
+/// Zeitgeber, der den Widget-Baum überlebt** („A Timer is still pending").
+///
+/// ## Warum der Typ hier nicht ausgeschrieben steht
+///
+/// `FutureProviderFamily` liegt in `package:flutter_riverpod/misc.dart` und
+/// nicht in der Hauptbibliothek. Ein zweiter Import nur für eine Annotation
+/// wäre der teurere Weg, und die Inferenz liefert exakt denselben Typ.
+// ignore: strict_top_level_inference
+final factByIdProvider = FutureProvider.family<Fact?, FactId>((
+  Ref ref,
+  FactId id,
+) async {
+  // Vor dem `await` gelesen, aus demselben Grund wie in
+  // `fact_overlay_providers.dart`: nach einer Unterbrechung ist ein
+  // `ref.watch` nicht mehr dasselbe wie davor.
+  final FactRepository repository = ref.watch(factRepositoryProvider);
+  final FactBatch batch = await repository.fetchFactById(id);
+  return batch.singleOrNull;
+});

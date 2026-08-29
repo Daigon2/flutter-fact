@@ -4,10 +4,13 @@ import 'package:flutter/widgets.dart';
 
 /// Umrechnung der CSS-Gradienten-Geometrie in Flutters Alignment-Raum.
 ///
-/// Liegt bewusst noch beim Startbildschirm und nicht in `core/widgets`:
-/// `docs/architecture/project-structure.md` lässt wiederverwendbare Oberfläche
-/// erst nach belegter Wiederverwendung nach `core`. Sobald ein zweiter
-/// Bildschirm dieselbe Umrechnung braucht, zieht diese Datei um.
+/// Lag bis Schritt 21 bei den Identity-Bildschirmen, mit dem Vermerk „sobald
+/// ein zweiter Bildschirm dieselbe Umrechnung braucht, zieht diese Datei um".
+/// Die Fakt-Akte braucht sie für den Hero-Verlauf (`screen-fact.jsx:269`) und
+/// die Kategorie-Tönung (`:282`), und Regel 8 der `dependency-rules.md` lässt
+/// sie das `presentation/` von `identity` nicht lesen. Damit ist die
+/// Bedingung aus `docs/architecture/project-structure.md:200` erfüllt:
+/// bewiesene Wiederverwendung, keine fachliche Bedeutung.
 
 /// Anfang und Ende eines CSS-`linear-gradient(<angle>, …)` in Alignment-Koordinaten.
 ///
