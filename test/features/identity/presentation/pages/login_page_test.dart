@@ -6,6 +6,7 @@ import 'package:fact_app/app/localization/app_language.dart';
 import 'package:fact_app/app/localization/language_preference_store.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/routing/app_routes.dart';
+import 'package:fact_app/core/widgets/primary_button.dart';
 import 'package:fact_app/features/discovery/presentation/pages/map_page.dart';
 import 'package:fact_app/features/identity/domain/failures/auth_failure.dart';
 import 'package:fact_app/features/identity/domain/first_launch_store.dart';
@@ -183,7 +184,6 @@ void main() {
         'PASSWORT',
         '••••••••',
         'ZEIGEN',
-        'Angemeldet bleiben',
         'Anmelden →',
         'ODER',
         'Mit Apple',
@@ -207,7 +207,6 @@ void main() {
         'name@example.com',
         'PASSWORD',
         'SHOW',
-        'Stay signed in',
         'Sign in →',
         'With Apple',
         'With Google',
@@ -216,7 +215,12 @@ void main() {
       ]) {
         expect(find.text(text), findsOneWidget, reason: text);
       }
-      expect(find.text('Angemeldet bleiben'), findsNothing);
+      // Dass die Sprache wirklich gewechselt hat, hängt an einer Verneinung:
+      // ohne sie wäre die Liste oben auch dann grün, wenn beide Sprachen
+      // dieselben Texte lieferten.
+      expect(find.text('Wieder da?'), findsNothing);
+      // E-33 gilt in beiden Sprachen, nicht nur in der deutschen.
+      expect(find.text('Stay signed in'), findsNothing);
     });
 
     testWidgets('der Trenner steht hartcodiert auf Deutsch', (tester) async {
@@ -268,20 +272,55 @@ void main() {
       expect(passwordField().obscureText, isFalse);
     });
 
-    testWidgets('"Angemeldet bleiben" ist gesetzt und lässt sich kippen', (
+    testWidgets('"Angemeldet bleiben" steht nicht auf dem Bildschirm', (
       tester,
     ) async {
-      // Parität ohne Wirkung: `stayIn` wird in der Quelle gesetzt und
-      // **nirgends gelesen**. Geprüft wird deshalb nur, dass das Kästchen sich
-      // wie ein Kästchen verhält.
+      // E-33: das Kästchen ist entfernt, nicht nur unbeschriftet. Die
+      // Begründung steht im Kopfkommentar von `LoginPage`; kurz: über
+      // `persistSession` entscheidet `Supabase.initialize` beim Start, ein
+      // Kästchen auf dieser Seite könnte es nicht umlegen.
+      //
+      // Zwei Zusicherungen und nicht eine: nach dem Typ, damit ein
+      // wiedereingebautes Kästchen mit anderer Beschriftung auffällt, und nach
+      // dem Text, damit auch ein anderes Bauteil mit demselben Wortlaut
+      // auffällt.
       await pumpLogin(tester);
-      AuthCheckbox checkbox() =>
-          tester.widget<AuthCheckbox>(find.byType(AuthCheckbox));
-      expect(checkbox().checked, isTrue);
 
-      await tapText(tester, 'Angemeldet bleiben');
+      expect(find.byType(AuthCheckbox), findsNothing);
+      expect(find.text('Angemeldet bleiben'), findsNothing);
+      // Die Gegenprobe zum Finder: dieselbe Suche findet auf der
+      // Registrierung sehr wohl ein Kästchen, das Bauteil lebt also weiter.
+      await tapText(tester, 'Konto erstellen');
+      expect(find.byType(AuthCheckbox), findsOneWidget);
+    });
 
-      expect(checkbox().checked, isFalse);
+    testWidgets('unter dem Passwortfeld steht der Feldabstand der Quelle', (
+      tester,
+    ) async {
+      // Der Abstand ist mit dem Kästchen weggefallen und **nicht** durch eine
+      // gewählte Zahl ersetzt worden. Am Kästchen hing `margin: '6px 0 22px'`;
+      // was in der Quelle ohne das Kästchen dort stünde, ist der
+      // `marginBottom: 12` des Feldes (`screen-auth.jsx:82`). Die 12 stehen
+      // hier als Literal aus der Quelle und nicht als `AuthField.bottomSpacing`
+      // — eine Zusicherung gegen die Konstante, die sie festnageln soll, wäre
+      // immer wahr.
+      await pumpLogin(tester);
+
+      Finder boxOf(int index) => find.descendant(
+        of: find.byType(AuthField).at(index),
+        matching: find.byType(AnimatedContainer),
+      );
+
+      final passwordBottom = tester.getBottomLeft(boxOf(1)).dy;
+      final buttonTop = tester.getTopLeft(find.byType(PrimaryButton).first).dy;
+      expect(buttonTop - passwordBottom, 12);
+
+      // Die Gegenprobe: derselbe Abstand liegt zwischen den beiden Feldern.
+      // Ohne sie wäre der Test auch dann grün, wenn die 12 zufällig aus einer
+      // ganz anderen Quelle stammten.
+      final emailBottom = tester.getBottomLeft(boxOf(0)).dy;
+      final passwordLabelTop = tester.getTopLeft(find.text('PASSWORT')).dy;
+      expect(passwordLabelTop - emailBottom, 12);
     });
   });
 

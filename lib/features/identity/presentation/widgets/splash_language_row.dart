@@ -31,8 +31,52 @@ class SplashLanguageRow extends StatelessWidget {
   /// Eckenradius von Karten und Audio-Knopf, `borderRadius: 16`.
   static const double cornerRadius = 16;
 
-  /// Breite der Flaggen, `<Flag size={30}/>`.
+  /// Breite der Flaggen ab [compactBelowWidth], `<Flag size={30}/>`
+  /// (`screen-auth.jsx:348`).
   static const double flagSize = 30;
+
+  /// Breite der Flaggen unterhalb von [compactBelowWidth].
+  ///
+  /// **Die Quelle kennt diese Regel nicht.** Sie hat genau einen Umbruchpunkt,
+  /// `@media (max-width: 500px)` (`styles.css:269`, dieselbe Zahl in
+  /// `chrome.jsx:128`), und der schaltet den Telefonrahmen auf Vollbild, nicht
+  /// die Flagge. Ihre Flaggen sind überall 30 breit; ihr zweiter Wert, die
+  /// Vorgabe 28 der Komponenten (`screen-auth.jsx:179` und `:192`), wird von
+  /// der Sprachauswahl nie benutzt. Schwelle und Größe sind hier deshalb
+  /// **hergeleitet und nicht übernommen** (E-36, entschieden am 30.08.2026).
+  ///
+  /// Hergeleitet aus einer Messung mit echten Schriften, nicht gewählt: bei 360
+  /// logischen Pixeln stehen der Zeile 316 Pixel zur Verfügung, gebraucht
+  /// werden 2 × 125,348 für die Karten, 63,961 für den Knopf und 16 für die
+  /// Abstände, zusammen 330,657. Der Fehlbetrag von 14,657 verteilt sich auf
+  /// zwei Karten, jede Karte muss also um 7,33 Pixel schmaler werden, und weil
+  /// die Flagge mit ihrer vollen Breite in die Mindestbreite der Karte eingeht,
+  /// heißt das: höchstens 22,67 Pixel Flagge.
+  ///
+  /// **Warum trotzdem 20 und nicht 22.** Bei 22 geht die Rechnung mit 0,039
+  /// Pixeln Rest auf, das ist kein Spielraum, sondern ein Zufall: eine neue
+  /// Schriftfassung, ein anderes Wort oder ein Pixel mehr Innenabstand kippt
+  /// die Titel wieder auf zwei Zeilen. Bei 20 bleiben 4,04 Pixel, und die
+  /// Beschriftung des Kopfhörer-Knopfes fällt von drei Zeilen auf zwei. Beides
+  /// gemessen, nicht gerechnet.
+  static const double compactFlagSize = 20;
+
+  /// Unterhalb dieser Gerätebreite gilt [compactFlagSize].
+  ///
+  /// 390 ist das Rahmenmaß der Quelle (`chrome.jsx:135`, `width: isMobile ?
+  /// '100vw' : 390`) und damit die schmalste Breite, für die die Quelle
+  /// überhaupt entworfen hat. Ab dort aufwärts bleibt alles, wie es war; nur
+  /// schmaler, als je entworfen wurde, gibt die Flagge nach.
+  ///
+  /// Die Schwelle liegt auf der **Gerätebreite** und nicht auf der Breite
+  /// dieser Zeile. Der Grund ist kein Geschmack: ein `LayoutBuilder` ist hier
+  /// nicht benutzbar, weil der Startbildschirm seine Inhaltsspalte in ein
+  /// `IntrinsicHeight` legt. Siehe die Begründung an [_FieldRow].
+  static const double compactBelowWidth = 390;
+
+  /// Die Flaggenbreite für eine Gerätebreite von [width] logischen Pixeln.
+  static double flagSizeFor(double width) =>
+      width < compactBelowWidth ? compactFlagSize : flagSize;
 
   /// Abstand zwischen Flagge und Textspalte einer Karte, `gap: 10`.
   static const double cardContentSpacing = 10;
@@ -69,6 +113,7 @@ class SplashLanguageRow extends StatelessWidget {
     // Kein `Row` mit `Expanded` und kein `IntrinsicHeight`: die Verteilung der
     // Breite und die gleiche Höhe der drei Felder macht [_FieldRow] selbst.
     // Warum, steht dort.
+    final flagWidth = flagSizeFor(MediaQuery.sizeOf(context).width);
     return _FieldRow(
       spacing: fieldSpacing,
       children: <Widget>[
@@ -77,12 +122,14 @@ class SplashLanguageRow extends StatelessWidget {
           kind: FlagKind.de,
           label: 'Deutsch',
           subtitle: 'Weiter auf Deutsch',
+          flagWidth: flagWidth,
         ),
         _languageCard(
           language: AppLanguage.en,
           kind: FlagKind.gb,
           label: 'English',
           subtitle: 'Continue in English',
+          flagWidth: flagWidth,
         ),
         _audioGuideButton(),
       ],
@@ -94,6 +141,7 @@ class SplashLanguageRow extends StatelessWidget {
     required FlagKind kind,
     required String label,
     required String subtitle,
+    required double flagWidth,
   }) {
     final selected = language == activeLanguage;
     return SplashPressable(
@@ -131,7 +179,7 @@ class SplashLanguageRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           spacing: cardContentSpacing,
           children: <Widget>[
-            FlagMark(kind: kind, size: flagSize),
+            FlagMark(kind: kind, size: flagWidth),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -272,12 +320,16 @@ class SplashLanguageRow extends StatelessWidget {
 /// Die Quelle bricht sie dort ebenfalls um; bei 390 reicht es selbst ihr nicht,
 /// dort schneidet `#root { overflow: hidden }` den Knopf um vier Pixel ab.
 ///
-/// **Bei 360 logischen Pixeln geht es in keiner Aufteilung auf:** zwei Karten
-/// à 128, ein Knopf mit 65 und 16 Pixel Abstand sind 337, verfügbar sind 316.
-/// Dann schrumpfen die Karten weiter und die Titel brechen wieder um. Was dann
-/// nachgeben soll (kleinere Flagge, kürzere Beschriftung, zweite Zeile), ist
-/// eine Gestaltungsfrage und keine Layout-Frage. Die Quelle schneidet an dieser
-/// Stelle ab. Hier bewusst nicht entschieden.
+/// **Bei 360 logischen Pixeln ging es mit der Flagge der Quelle in keiner
+/// Aufteilung auf:** zwei Karten à 125,348, ein Knopf mit 63,961 und 16 Pixel
+/// Abstand sind 330,657, verfügbar sind 316. Die Karten schrumpften dann unter
+/// ihre Mindestbreite, und beide Titel brachen um. Was nachgeben soll, war eine
+/// Gestaltungsfrage und keine Layout-Frage, und sie ist seit dem 30.08.2026
+/// entschieden (E-36): unterhalb von [SplashLanguageRow.compactBelowWidth] wird
+/// die Flagge kleiner. Die Verteilung unten ist davon unberührt, sie rechnet
+/// weiter mit den intrinsischen Breiten ihrer Kinder; die Flagge ist eine davon.
+/// Gemessen bei 360 nach der Änderung: Karten 116, Knopf 68, beide Titel
+/// einzeilig.
 ///
 /// Bei Systemschriftgröße 2.0 gilt dasselbe auf jedem Format: die Untergrenze
 /// des Knopfes bindet, die Karten bekommen den Rest, die Texte brechen um.

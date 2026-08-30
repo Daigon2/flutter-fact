@@ -14,6 +14,7 @@ import 'package:fact_app/features/identity/presentation/pages/signup_page.dart';
 import 'package:fact_app/features/identity/presentation/pages/splash_page.dart';
 import 'package:fact_app/features/identity/presentation/widgets/bubble_pin.dart';
 import 'package:fact_app/features/identity/presentation/widgets/fact_wordmark.dart';
+import 'package:fact_app/features/identity/presentation/widgets/flag_mark.dart';
 import 'package:fact_app/features/identity/presentation/widgets/splash_language_row.dart';
 import 'package:fact_app/features/identity/presentation/widgets/splash_pin_field.dart';
 import 'package:fact_app/features/identity/presentation/widgets/splash_pressable.dart';
@@ -741,25 +742,84 @@ void main() {
       expect(renderedLines(tester, 'Audio-Guide'), 1);
     });
 
-    testWidgets('bei 360 Pixeln reicht die Breite in keiner Aufteilung', (
+    testWidgets('bei 360 Pixeln passt die Zeile wieder in ihre Breite', (
       tester,
     ) async {
-      // **Das ist eine offene Gestaltungsfrage, kein grüner Zustand.** Auf 360
-      // logischen Pixeln passen die drei Felder nicht nebeneinander, gleich wie
-      // man die Breite verteilt: zwei Karten mit ihrer Mindestbreite, der Knopf
-      // mit seiner Untergrenze und zweimal 8 Pixel Abstand sind mehr als die
-      // Zeile hergibt. Die Quelle hat dasselbe Problem und schneidet den Knopf
-      // mit `#root { overflow: hidden }` ab.
+      // E-36, entschieden am 30.08.2026: unterhalb einer Breitenschwelle wird
+      // die Flagge kleiner. Vorher passten die drei Felder auf 360 logischen
+      // Pixeln in **keiner** Aufteilung nebeneinander: zwei Karten mit ihrer
+      // Mindestbreite von je 125,348, der Knopf mit seiner Untergrenze 63,961
+      // und zweimal 8 Pixel Abstand (`gap: 8`, `screen-auth.jsx:331`) sind
+      // 330,657 gegen 316 verfügbare Pixel. Die Karten schrumpften unter ihre
+      // Mindestbreite, und beide Titel brachen um.
       //
-      // Geprüft wird die Ursache und nicht nur die Folge: wer die Zeile später
-      // auch dort einzeilig bekommt, muss eine Maßangabe der Quelle ändern, und
-      // dann fällt dieser Test und will gelesen werden.
-      //
-      // E-38 hat den Fehlbetrag verkleinert und nicht beseitigt. Neu gemessen:
-      // 2 mal 125,35 plus 63,96 plus 16 sind 330,66 gegen 316 verfügbare Pixel,
-      // also rund 14,7 zu viel. Vorher waren es 335,53 und rund 19,5. Die
-      // Aussage dieses Tests bleibt damit bestehen, E-36 ist weiter offen.
+      // **Geprüft wird die Ursache und nicht die Folge.** "Es läuft nichts
+      // über" wäre wertlos, ein Umbruch ist kein Überlauf; hier steht, dass die
+      // gebrauchte Breite wieder in die Zeile passt, und um wie viel. Wer eine
+      // Maßangabe der Quelle oder die Flaggenregel ändert, sieht es an dieser
+      // Zahl und nicht erst am Gerät.
       await pumpWidth(tester, 360);
+
+      final row = tester.getSize(find.byType(SplashLanguageRow)).width;
+      final card = fieldOf(tester, 'Deutsch');
+      final audio = fieldOf(tester, '🎧');
+      // Die 8 kommen aus der Quelle und nicht aus
+      // `SplashLanguageRow.fieldSpacing`: eine Zusicherung gegen die Konstante,
+      // die sie festnageln soll, ist immer wahr.
+      final needed =
+          2 * card.getMinIntrinsicWidth(double.infinity) +
+          audio.getMinIntrinsicWidth(double.infinity) +
+          2 * 8;
+
+      expect(row, 360 - SplashPage.contentPadding.horizontal);
+      expect(needed, lessThan(row));
+      expect(
+        row - needed,
+        greaterThan(4),
+        reason:
+            'und zwar mit Spielraum: bei einer Flagge von 22 ginge die Rechnung '
+            'mit 0,039 Pixeln auf, das wäre Zufall und kein Ergebnis',
+      );
+      expect(renderedLines(tester, 'Deutsch'), 1);
+      expect(renderedLines(tester, 'English'), 1);
+    });
+
+    testWidgets('die kleinere Flagge gilt nur unterhalb der Schwelle', (
+      tester,
+    ) async {
+      // Die zweite Hälfte von E-36: der Eingriff darf nur schmale Geräte
+      // betreffen. Die 30 ist der Wert der Quelle (`<Flag size={30}/>`,
+      // `screen-auth.jsx:348`) und steht hier als Literal; gegen
+      // `SplashLanguageRow.flagSize` geprüft wäre die Zusicherung immer wahr.
+      //
+      // Gemessen wird das gezeichnete Rechteck und nicht der Parameter, damit
+      // auch eine Änderung in `FlagMark` selbst anschlägt.
+      double flagWidth() => tester.getSize(find.byType(FlagMark).first).width;
+
+      await pumpWidth(tester, 411);
+      expect(flagWidth(), 30, reason: 'Emulatormaß, unverändert');
+
+      await pumpWidth(tester, 390);
+      expect(flagWidth(), 30, reason: 'Rahmenmaß der Quelle, unverändert');
+      // Und "unverändert" heißt hier das ganze Bild und nicht nur die Flagge.
+      // Die drei Zahlen sind **vor** E-36 gemessen worden.
+      expect(fieldOf(tester, 'Deutsch').size.width, 126);
+      expect(fieldOf(tester, '🎧').size.width, 78);
+      expect(renderedLines(tester, 'Audio-Guide'), 2);
+
+      await pumpWidth(tester, 360);
+      expect(flagWidth(), lessThan(30), reason: 'erst hier gibt sie nach');
+    });
+
+    testWidgets('bei 320 Pixeln reicht auch die kleinere Flagge nicht', (
+      tester,
+    ) async {
+      // Die Grenze der Entscheidung, damit niemand sie für allgemein hält.
+      // E-36 löst 360, nicht jedes Format: auf 320 bleiben nach Abzug der
+      // Ränder 276 Pixel, gebraucht werden mit der kleineren Flagge immer noch
+      // 2 × 115,348 + 63,961 + 16 = 310,657. Die Quelle schneidet an dieser
+      // Stelle mit `#root { overflow: hidden }` ab.
+      await pumpWidth(tester, 320);
 
       final row = tester.getSize(find.byType(SplashLanguageRow)).width;
       final card = fieldOf(tester, 'Deutsch');
@@ -767,15 +827,11 @@ void main() {
       final needed =
           2 * card.getMinIntrinsicWidth(double.infinity) +
           audio.getMinIntrinsicWidth(double.infinity) +
-          2 * SplashLanguageRow.fieldSpacing;
+          2 * 8;
 
-      expect(row, 360 - SplashPage.contentPadding.horizontal);
+      expect(row, 320 - SplashPage.contentPadding.horizontal);
       expect(needed, greaterThan(row));
-      expect(
-        renderedLines(tester, 'Deutsch'),
-        greaterThan(1),
-        reason: 'Folge davon: der Titel bricht um',
-      );
+      expect(renderedLines(tester, 'Deutsch'), greaterThan(1));
     });
   });
 

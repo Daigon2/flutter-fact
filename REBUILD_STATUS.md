@@ -1876,6 +1876,65 @@ Zwei Funde daran betreffen das Testnetz und nicht den Code:
   des Renderbaums, übersieht jedes Eingabefeld. Deshalb ist die zweite Quelle
   `bodyLarge` bis dahin unbemerkt geblieben.
 
+**E-33 und E-36 sind am 30.08.2026 entschieden**, beide sichtbare
+Verhaltensänderungen in bereits gebauten Bildschirmen.
+
+*E-33, „Angemeldet bleiben":* **entfernt.** Janek hat nicht zwischen den zwei
+vorgelegten Möglichkeiten gewählt, sondern die Vorfrage gestellt, ob ein
+solches Kästchen überhaupt sinnvoll ist. Die Prüfung sagt nein, aus drei
+gemessenen und zwei inhaltlichen Gründen.
+
+Gemessen: `_staySignedIn` wurde ausser zum Zeichnen **nirgends gelesen**, genau
+wie `stayIn` in der Quelle (`screen-auth.jsx:431`, kein Leser). `persistSession`
+ist eine Option von `FlutterAuthClientOptions` (`supabase_flutter 2.17.2`,
+`lib/src/flutter_go_true_client_options.dart:28`, Vorgabe `true` in `:37`) und
+wird an `Supabase.initialize` übergeben, das daraufhin
+`SharedPreferencesLocalStorage` oder `EmptyLocalStorage` wählt
+(`lib/src/supabase.dart:128-136`). Die Frage ist damit **beim App-Start
+entschieden**, in `lib/app/bootstrap.dart:55`; ein Kästchen auf der
+Anmeldeseite kann sie gar nicht mehr umlegen. Und ein Abmelden gibt es
+heute nicht, das kommt laut `auth_repository.dart:34` mit Schritt 20.
+
+Inhaltlich: das Kästchen ist ein **Web-Muster**, entstanden für geteilte
+Rechner. Ein Telefon ist ein persönliches Gerät, und für einen Stadtführer, an
+dessen Konto Münzen, Punkte und Trophäen hängen, wäre ein Abmelden bei jedem
+Start feindselig. Der Fall „auf diesem Gerät nicht angemeldet sein" ist durch
+den **Gastmodus** schon besser gelöst.
+
+**Der Abstand darunter war keine gewählte Zahl.** Am Kästchen hing
+`margin: '6px 0 22px'` (`screen-auth.jsx:523`); ohne es bleibt der
+`marginBottom: 12` des Feldes selbst (`:82`), und den trägt `AuthField`
+bereits. Es war also nichts einzusetzen, nur ein `Padding` zu löschen.
+Der Schlüssel `login.stayIn` bleibt in den erzeugten Tabellen stehen, weil der
+Generator jeden Schlüssel der PWA übernimmt; ein Satz im Kopfkommentar von
+`LoginPage` sagt, dass er absichtlich unbenutzt ist.
+
+*E-36, die Sprachzeile bei 360 Pixeln:* **unterhalb von 390 logischen Pixeln
+wird die Flagge von 30 auf 20 verkleinert.**
+
+**Korrektur an diesem Eintrag, und sie betrifft seine Begründung.** E-36 nannte
+als eine der Möglichkeiten „kleinere Flagge unter einer Breitenschwelle
+(Quelle: 30)" und legte damit nahe, die Quelle tue das auch. **Sie tut es
+nicht.** Nachgeschlagen: `screen-auth.jsx:348` zeichnet unbedingt
+`<Flag size={30}/>`, eine Breitenschwelle für die Flagge gibt es in der ganzen
+PWA nicht; der einzige Umbruchpunkt ist `@media (max-width: 500px)` in
+`styles.css:269` und schaltet den Telefonrahmen auf Vollbild. Die 30 war die
+Grösse, nicht eine Regel. **Die Verkleinerung ist damit eine bewusste
+Abweichung von der Quelle und kein Nachbau**, und sie wurde Janek mit der
+falschen Begründung vorgelegt.
+
+Schwelle und Grösse sind hergeleitet und gemessen, mit echten Schriften: der
+Fehlbetrag von 14,657 Pixeln verteilt sich auf zwei Karten, jede muss 7,33
+schmaler werden, die Flagge darf also höchstens 22,67 breit sein. **22 wäre das
+Maximum und geht mit 0,039 Pixeln Rest auf**, also ein Zufallstreffer; gewählt
+ist 20 mit 5,343 Pixeln Rest. Die Schwelle 390 ist das Rahmenmass der Quelle
+(`chrome.jsx:135`) und damit die schmalste Breite, für die sie je entworfen
+hat; ab 390 ist jede gemessene Zahl unverändert.
+
+**E-36 ist damit für 360 gelöst und für 320 nicht.** Ein eigener Test hält das
+ausdrücklich fest, damit niemand die Entscheidung für allgemeiner hält, als sie
+ist.
+
 **E-43, E-45 und E-46 sind am 30.08.2026 von Janek entschieden.**
 
 *E-43, wo die Solo-Jagd läuft:* **auf der Karte, wie die Quelle.** Der
@@ -1991,9 +2050,7 @@ eine Fundstelle.
 | E-28 | **Text für `audio.dialog.volumeHint`.** Der Schlüssel wird in `screen-auth.jsx:251` benutzt und existiert **in der PWA nicht**; sie zeigt dem Nutzer wörtlich `🔊 audio.dialog.volumeHint`. Beide Vorlagen beschreiben den Kasten, als hätte er Text. **Die technische Sperre ist seit E-39 weg:** ein handgeschriebener Schlüssel überlebt den Generator jetzt, die Ergänzungs-Map ist der vorgesehene Ort dafür. Offen ist nur noch der Wortlaut, je ein Satz DE und EN. Solange er fehlt, entfällt der Kasten im Neubau weiter, denn erfundener Nutzertext ist keine Lösung. Die bessere Behebung bleibt ein Schlüssel in der PWA; dann räumt die Gegenprüfung des Generators den lokalen Eintrag von selbst wieder ab.<br><br>**Vorschlag, am 28.08.2026 hergeleitet, nicht freigegeben:** DE „Dreh die Lautstärke vorher auf. Der Guide spricht laut los, sobald du in der Nähe einer Sehenswürdigkeit bist.", EN „Turn your volume up first. The guide speaks out loud when you approach a landmark." Bewusst ohne Stummschalter-Hinweis: das ist ein iOS-Begriff und steuert auf keiner der beiden Plattformen die Medienlautstärke, ein Hinweis darauf wäre für die halbe Zielgruppe falsch. Das 🔊-Symbol rendert die PWA außerhalb des Strings, gehört also nicht in den Wert. | 2 | vor Auslieferung |
 | E-29 | **DM Sans Kursiv und 700 fehlen als Asset.** Das Goethe-Zitat auf dem Startbildschirm ist kursiv, das letzte Wort fett. `assets/fonts/` hat nur 400, 500 und 600, alle aufrecht. Die PWA hat dasselbe Loch (`styles.css:3` lädt weder Italic noch 700) und lässt den Browser synthetisieren; Flutter tut das für Asset-Schriften nicht. `fontStyle: italic` und `w700` stehen im Code, damit die Absicht stimmt, sobald die Dateien da sind. | 2 | vor Auslieferung |
 | E-30 | **`reference-features/settings.md` widerspricht `dependency-rules.md`.** `settings.md:19-27` zeigt einen Notifier in `presentation/notifiers/` neben einem `data/settings_store.dart`, Zeile 33-38 sagt „persists through `SettingsStore`", Zeile 42-44 begründet ausdrücklich, dass es **keine** Domänenschicht gibt. Es gibt keine Verdrahtung, die das erfüllt: den direkten Import meldet `tool/check_architecture.dart` als Regel 17, und ohne Domänenschicht gibt es keinen Ort für den Vertrag. Der gebaute Code weicht deshalb ab und legt den Vertrag nach `lib/features/settings/domain/audio_mode_store.dart`. Zu entscheiden: `settings.md` korrigieren, oder die Ausnahme im Abschnitt „Exceptions" der `dependency-rules.md` schriftlich fassen. | 3 | vor dem Ausbau von `features/settings` |
-| E-33 | **„Angemeldet bleiben" ist wirkungslos.** In der PWA wird `stayIn` gesetzt und **nirgends gelesen**, `persistSession` kommt dort nicht vor. Das Kästchen ist im Neubau nachgebaut, die Semantik nicht: Sitzungspersistenz wäre eine Auth-Verhaltensänderung. Zu entscheiden: implementieren, oder das Kästchen entfernen. Ein Haken, der nichts tut, ist gegenüber dem Nutzer eine Unwahrheit. | 3 | vor Auslieferung |
 | E-34 | **Passwort-Reset ist nicht angeboten.** `supabase_flutter 2.17.2` fährt standardmäßig `AuthFlowType.pkce`, und `resetPasswordForEmail` legt den Code-Verifier **auf dem Gerät** ab. Ohne `redirectTo` ginge der Link an die Site-URL, also in die PWA, die den Verifier nicht hat: der Tausch scheitert. Eine Mail zu schicken, deren Link niemand einlösen kann, ist schlechter als kein Angebot. Der Nutzer sieht deshalb kein „Vergessen?" über dem Passwortfeld, Zurücksetzen läuft über die PWA. Die Behebung braucht ein Deep-Link-Ziel und damit eine **neue öffentliche Vertragsfläche**. | 3 | vor Auslieferung |
-| E-36 | **Bei 360 logischen Pixeln passt die Sprachzeile nicht einzeilig.** Gerechnet mit echten Schriftmetriken, neu gemessen nach E-38: zwei Karten à 125,35 plus Knopf-Untergrenze 63,96 plus 16 Abstände ergibt 330,66 gegen 316 verfügbare Pixel, Fehlbetrag rund 14,7. E-38 hat den Fehlbetrag also verkleinert, aber nicht beseitigt. Die vorher hier stehenden 337,5 waren im Übrigen auch vor E-38 nicht reproduzierbar, gemessen wurden 335,53. Die Quelle hat dasselbe Problem und schneidet mit `#root { overflow: hidden }` etwa vier Pixel des Knopfes ab. Zur Wahl: kleinere Flagge unter einer Breitenschwelle (Quelle: 30), kürzere Knopfbeschriftung oder nur das Emoji, die Zeile auf schmalen Geräten zweizeilig legen, oder abschneiden wie die Quelle. Aktuell entschieden ist nichts: die Titel brechen dort um, nichts läuft über, und ein Test hält die **Ursache** fest, damit die nächste Änderung dort anschlägt. | 2 | vor Auslieferung |
 | E-37 | **Das Launcher-Symbol ist noch das Flutter-Logo.** Android 12 und neuer zeichnet `@mipmap/ic_launcher` über die SplashScreen-API mitten in den nativen Startbildschirm. Der Hintergrund ist seit dem 27.08.2026 richtig (`#FF0F0D0A`), das Symbol nicht. Braucht das FACT-Symbol in allen Dichten, plus eine Entscheidung, ob der native Startbildschirm es überhaupt zeigen soll. | 2 | vor Auslieferung |
 | E-41 | **Drei Rätseltypen rendern eine leere Auswahl mit totem Antwortknopf.** `puzzle-sheet.jsx:255-257` und `:268-269` schicken `klang-sinnes-check`, `verstecktes-detail` und `zeitreise` auf `PszMcq`. Diese Zweige sind aber **nur mit leerer Optionenliste erreichbar**, weil `:247` alles mit Optionen vorher abfängt. `PszMcq` erzeugt dann null Antwortknöpfe (`:353-358`), `pick` bleibt `null`, `canSubmit` (`:344`) ist dauerhaft falsch, und das Rätsel ist nur über „Überspringen (0 Punkte)" (`:230-236`) verlassbar. Wie viele Datensätze das trifft, ist **nicht gezählt**: die Markdown-Quellen in `05_Content/facts/` tragen eine andere Typkodierung (`T2`, `T3`, `T9`) als die Datenbank, es braucht die Live-Daten. Zu entscheiden ist, welche Form ein solches Rätsel im Neubau bekommt. Der Zustand ist an `ChoicePuzzle.choices` ablesbar. | 3, verwandt mit E-08 | Phase 4, Schritt 28 |
 | E-42 | **Der 150-Meter-Radius der Foto-Rätsel wirkt in der PWA nie.** `screen-map.jsx:3915` übergibt die Nutzerposition als `userPos`, `puzzle-sheet.jsx:50` erwartet sie als `userPosition`. Folge in `PszPhoto`: `:373` liefert immer `null`, `:374` setzt `inRange = true`, und die Näherungsprüfung `:378` läuft nie. `foto-beweis` und `perspektiven` sind damit von überall mit einem beliebigen Foto lösbar, obwohl `gpsRadius` (`:372`) in den Daten durchgehend auf 150 steht. Dieselbe Klasse wie E-08: ein Defekt der Quelle, der wie Parität aussieht, und wie E-07 einer, der eine Ortsprüfung aushebelt. **Ändert sichtbares Verhalten, geht deshalb an Janek.** | 3, verwandt mit E-07 | Phase 4, Schritt 28 |

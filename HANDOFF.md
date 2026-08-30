@@ -30,7 +30,7 @@ Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schrit
 steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
 Kästchen war das Veraltete, nicht der Stand.
 
-**Kennzahlen:** 1726 Tests grün, alle vier Gates auf Exit-Code 0, dazu
+**Kennzahlen:** 1729 Tests grün, alle vier Gates auf Exit-Code 0, dazu
 `dart run tool/generate_i18n.dart --check` und
 `dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
 
@@ -106,6 +106,20 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 30.08.2026, E-33 und E-36, und eine Begründung von mir, die nicht stimmte
+
+Das Kästchen „Angemeldet bleiben" ist raus, und unter 390 logischen Pixeln
+schrumpft die Flagge der Sprachzeile von 30 auf 20, damit die Zeile bei 360
+einzeilig bleibt. 1726 → 1729 Tests. **Überraschend war die Vorfrage:** Janek
+hat nicht zwischen den vorgelegten Möglichkeiten gewählt, sondern gefragt, ob
+so ein Kästchen überhaupt sinnvoll ist, und beim Nachmessen fiel die Antwort
+eindeutig aus. `persistSession` wird beim App-Start entschieden, ein Kästchen
+auf der Anmeldeseite kann es gar nicht mehr umlegen. **Und der zweite Fund war
+mein eigener Fehler:** E-36 schrieb der Quelle eine Regel zu, die sie nicht
+hat. Sie zeichnet ihre Flaggen unbedingt mit 30, eine Breitenschwelle gibt es
+dort nirgends. Ich hatte die Option mit dieser falschen Begründung vorgelegt;
+die Verkleinerung ist eine bewusste Abweichung und kein Nachbau.
 
 ### 30.08.2026, Schritte 33 und 34, und ein Plan, der den falschen Pfad beschreibt
 

@@ -10,7 +10,6 @@ import 'package:fact_app/core/widgets/primary_button.dart';
 import 'package:fact_app/features/identity/presentation/formatting/auth_failure_text.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/login_notifier.dart';
-import 'package:fact_app/features/identity/presentation/widgets/auth_checkbox.dart';
 import 'package:fact_app/features/identity/presentation/widgets/auth_divider.dart';
 import 'package:fact_app/features/identity/presentation/widgets/auth_error_box.dart';
 import 'package:fact_app/features/identity/presentation/widgets/auth_field.dart';
@@ -50,13 +49,52 @@ import 'package:go_router/go_router.dart';
 /// PWA zurück. Das ist eine offene Stelle und gehört als solche in den
 /// Statusbericht, nicht als Kommentar an einen tauben Knopf.
 ///
-/// ## "Angemeldet bleiben" hat keine Wirkung, in der Quelle genauso
+/// ## "Angemeldet bleiben" gibt es hier nicht
 ///
-/// `stayIn` wird in `screen-auth.jsx:431` gesetzt und **nirgends gelesen**;
-/// `persistSession` kommt in der ganzen PWA nicht vor. Das Kästchen ist hier
-/// nachgebaut, weil es sichtbarer Teil des Bildschirms ist, aber es steuert
-/// nichts. Eine echte Sitzungspersistenz-Semantik einzuführen wäre eine
-/// Auth-Verhaltensänderung und braucht eine Freigabe.
+/// Die Quelle zeigt zwischen Passwortfeld und Knopf ein Kästchen
+/// (`screen-auth.jsx:523-525`). Hier steht keins, und das ist entschieden
+/// (E-33, 30.08.2026), nicht vergessen. Wer es wiederherstellen will, liest
+/// zuerst die fünf Gründe:
+///
+/// 1. **Das SDK entscheidet die Frage, bevor dieser Bildschirm existiert.**
+///    `persistSession` ist eine Option von `FlutterAuthClientOptions`
+///    (`supabase_flutter 2.17.2`,
+///    `flutter_go_true_client_options.dart:28`, Vorgabe `true` in Zeile 37)
+///    und wird `Supabase.initialize` als `authOptions` übergeben
+///    (`supabase.dart:92`). Erst dort fällt die Wahl zwischen
+///    `SharedPreferencesLocalStorage` und `EmptyLocalStorage`
+///    (`supabase.dart:128-136`). Im Neubau passiert das beim App-Start:
+///    `lib/app/bootstrap.dart:55` ruft `initializeSupabase`
+///    (`lib/services/supabase/supabase_initializer.dart:19`), also lange bevor
+///    es eine Anmeldeseite gibt. Ein Kästchen hier kann daran nichts mehr
+///    drehen; `persistSession` bleibt bewusst auf der Vorgabe.
+/// 2. **Wirksam machen hieße, absichtlich das schlechtere Verhalten zu
+///    bauen:** entweder die Sitzungsspeicherung selbst nachbauen oder beim
+///    Schließen der App abmelden.
+/// 3. **Es ist ein Web-Muster.** Das Kästchen existiert, weil Rechner geteilt
+///    werden. Ein Telefon ist ein persönliches Gerät, und beide Plattformen
+///    halten den Nutzer von sich aus angemeldet.
+/// 4. **Für diese App wäre es feindselig.** Münzen, Punkte, Trophäen und
+///    gesammelte Fakten hängen am Konto, benutzt wird sie draußen und oft im
+///    Mobilfunknetz.
+/// 5. **Der Fall ist schon besser gelöst.** "Ich will auf diesem Gerät nicht
+///    angemeldet sein" deckt der Gastmodus des Startbildschirms ab, und ein
+///    echtes Abmelden kommt mit Schritt 20, siehe `auth_repository.dart`.
+///
+/// Niemand hat das Verhalten je erlebt: die Quelle setzt `stayIn`
+/// (`screen-auth.jsx:431`) und liest es nirgends wieder, und hier wurde
+/// `_staySignedIn` außer zum Zeichnen des Hakens nie gelesen.
+///
+/// **Der Sprachschlüssel `login.stayIn` bleibt in den erzeugten Tabellen
+/// stehen.** Er kommt aus der PWA, `tool/generate_i18n.dart` übernimmt jeden
+/// Schlüssel von dort, und `--check` würde anschlagen, wenn er fehlte. Er ist
+/// also kein vergessener Schlüssel, sondern einer, den wir nicht mehr
+/// benutzen.
+///
+/// **Der Abstand darunter ist keine gewählte Zahl.** Am Kästchen hing
+/// `margin: '6px 0 22px'`. Fällt es weg, steht zwischen Passwortfeld und Knopf
+/// das, was in der Quelle dann ebenfalls dort stünde: der `marginBottom: 12`
+/// des Feldes selbst (`screen-auth.jsx:82`), hier [AuthField.bottomSpacing].
 ///
 /// ## `joinDate` wird nicht gesetzt
 ///
@@ -113,8 +151,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
 
-  /// `React.useState(true)`: das Kästchen ist beim Öffnen gesetzt.
-  bool _staySignedIn = true;
   bool _passwordVisible = false;
 
   @override
@@ -169,8 +205,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     // im Stapel liegen.
     const MapRoute().go(context);
   }
-
-  void _toggleStaySignedIn() => setState(() => _staySignedIn = !_staySignedIn);
 
   void _togglePasswordVisibility() =>
       setState(() => _passwordVisible = !_passwordVisible);
@@ -254,8 +288,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  /// `screen-auth.jsx:495-546`. Reihenfolge wie dort: Fehlerbox, E-Mail,
-  /// Passwort, Kästchen, Primärknopf, Trenner, Fremdanmeldungen.
+  /// `screen-auth.jsx:495-546`. Reihenfolge wie dort, abzüglich des
+  /// Kästchens: Fehlerbox, E-Mail, Passwort, Primärknopf, Trenner,
+  /// Fremdanmeldungen. Warum das Kästchen fehlt, steht oben.
   Widget _form(AppStrings strings, AsyncValue<void> submission) {
     final submitting = submission.isLoading;
     return Padding(
@@ -283,15 +318,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             obscureText: !_passwordVisible,
             autofillHints: const <String>[AutofillHints.password],
             trailing: _passwordVisibilityToggle(strings),
-          ),
-          // `margin: '6px 0 22px'` am Kästchen.
-          Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 22),
-            child: AuthCheckbox(
-              checked: _staySignedIn,
-              label: strings.text('login.stayIn'),
-              onChanged: _toggleStaySignedIn,
-            ),
           ),
           Opacity(
             opacity: submitting ? LoginPage.submittingOpacity : 1,
