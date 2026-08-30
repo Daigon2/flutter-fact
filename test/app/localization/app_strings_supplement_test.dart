@@ -35,19 +35,25 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die fünf belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die neun belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
       // dem Tutorial-Overlay dazu, `tour_steps.dart`. Die beiden
       // `fact.`-Schlüssel am 29.08.2026 mit der Fakt-Akte,
-      // `screen-fact.jsx:367` und `:474`.
+      // `screen-fact.jsx:367` und `:474`. Die vier `puzzle.`-Schlüssel am
+      // 30.08.2026 mit dem Rätsel-Sheet, `puzzle-sheet.jsx:150`, `:165`,
+      // `:176` und `:194`.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
         'tour.stepCounter',
         'tour.step1.meta',
         'tour.step9.meta',
         'fact.fileNumber',
         'fact.sourceMissing',
+        'puzzle.stationCounter',
+        'puzzle.riddleCounter',
+        'puzzle.taskLabel',
+        'puzzle.photoCaption',
       });
     });
 
@@ -168,6 +174,84 @@ void main() {
     test('beide Schlüssel bleiben aus der PWA-Fläche heraus', () {
       for (final language in AppLanguage.values) {
         for (final key in <String>['fact.fileNumber', 'fact.sourceMissing']) {
+          expect(AppStrings.of(language).hasText(key), isTrue, reason: key);
+          expect(
+            AppStrings.of(language).textKeys.contains(key),
+            isFalse,
+            reason: key,
+          );
+        }
+      }
+    });
+  });
+
+  group('Das Rätsel-Sheet', () {
+    test('die Stationszeile ist in beiden Sprachen dieselbe', () {
+      // `puzzle-sheet.jsx:150`:
+      // `(lang === 'de' ? 'Station ' : 'Station ') + (stopIdx + 1)`. Der
+      // Ternär hat in beiden Zweigen dasselbe Wort. Derselbe Fall wie
+      // `fact.fileNumber`; die Zusicherung gilt der Karte selbst, weil über
+      // den Rückfall sonst zufällig dasselbe herauskäme.
+      for (final language in AppLanguage.values) {
+        expect(
+          supplementTextsFor(language)['puzzle.stationCounter'],
+          'Station {station}',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(
+            language,
+          ).text('puzzle.stationCounter', params: {'station': '3'}),
+          'Station 3',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('die Überschrift ist je Sprache eine andere', () {
+      // `:165`, beide Wortlaute stehen dort. Gegenprobe zu einer Abschrift,
+      // die beide Karten gleich füllt wie bei der Stationszeile.
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('puzzle.riddleCounter', params: {'number': '3'}),
+        'Rätsel 3',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('puzzle.riddleCounter', params: {'number': '3'}),
+        'Riddle 3',
+      );
+    });
+
+    test('Aufgaben-Beschriftung und Foto-Leiste bleiben deutsch', () {
+      // `:194` und `:176` sind nackte Textknoten ohne Ternär; die Quelle
+      // zeigt sie auch im englischen Modus deutsch.
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(language).text('puzzle.taskLabel'),
+          'Aufgabe',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('puzzle.photoCaption'),
+          // Der Gedankenstrich steht so in der Verhaltensquelle und wird
+          // wortgleich übernommen.
+          'Damals — was hat sich verändert?',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('die vier Schlüssel bleiben aus der PWA-Fläche heraus', () {
+      for (final language in AppLanguage.values) {
+        for (final key in <String>[
+          'puzzle.stationCounter',
+          'puzzle.riddleCounter',
+          'puzzle.taskLabel',
+          'puzzle.photoCaption',
+        ]) {
           expect(AppStrings.of(language).hasText(key), isTrue, reason: key);
           expect(
             AppStrings.of(language).textKeys.contains(key),

@@ -949,7 +949,57 @@ plus 19 Mutationen, alle gefallen.
 
 ## Phase 4, Rätsel-Engine
 
-- [ ] 27. Puzzle-Sheet mit vollem Mapping · [!] 28. Alle Rätseltypen
+### Schritt 27, was daran gemessen ist
+
+1554 → 1625 Tests. Gebaut ist der typisierte Rätselvertrag und der Rahmen des
+Sheets, **ohne jeden Einstieg**, wie die Fakt-Akte in Schritt 21.
+
+- **Der Zuschnitt ist gemessen und nicht abgeleitet.** Zwei Wegwerf-Proben,
+  angelegt, ausgeführt, gelöscht: `puzzles/domain` mit einem Import aus
+  `facts/domain` bricht den Architektur-Check mit **Exit-Code 1** ab, genau eine
+  Meldung („Domain-Erlaubnisliste"); derselbe Import aus `puzzles/application`
+  läuft auf **Exit-Code 0** durch und `dart analyze` bleibt sauber. Deshalb
+  liegt der Übersetzer in `application` und ist die **einzige** Datei des
+  Features, die `FactPuzzle` kennt.
+- **Der naheliegende Entwurf wäre falsch gewesen.** Eine versiegelte Klasse,
+  deren Auswahl an `type` hängt, trifft die Quelle nicht: `puzzle-sheet.jsx:247`
+  liefert bedingungslos die Auswahlform, sobald Antwortoptionen vorliegen, und
+  zwar **bevor** `type` gelesen wird; erst danach kommt `switch` ab `:250` und
+  ein ausdrücklicher Standardzweig bei `:270`. Der Kommentar der Quelle
+  (`:243-246`) nennt den Grund selbst: der Typ wird im Konverter geraten und
+  trägt das mcq-Signal nicht zuverlässig.
+- **Der Standardzweig ist der Mengenschwerpunkt, keine Ausnahme.** Von elf
+  Typwerten der Live-Daten kennt die Tabelle der Quelle sechs nicht, zusammen
+  1469 Vorkommen (`fact_puzzle.dart:88-93`). Eine Aufzählung über `type` hätte
+  sie verworfen oder umbenannt.
+- **Zwei Typkopien, und das ist D-9 zum zweiten Mal.** `PuzzleDifficulty` und
+  `PuzzleOperand` entstehen wortgleich neu, weil Gate 6 die Domäne sperrt.
+  Beide tragen den Verweis im Kopfkommentar. Nachtrag bei D-9.
+- **Der teuerste Fund der Review war eine Wache mit einem Loch.** Die
+  Einstiegs-Sperre schnitt jede Zeile ab dem ersten `//` ab, um ihren eigenen
+  Kommentar nicht zu finden. Damit war sie umgehbar: ein Konstruktoraufruf muss
+  nicht **in** einer Zeichenkette stehen, sondern nur dahinter auf derselben
+  Zeile, ein Kartenschlüssel `'//r':` reicht. Die Probe kam durch Format,
+  Analyzer, Architektur-Check **und** die Wache. Nach der Behebung meldet die
+  Wache genau diese Datei, während der Architektur-Check im selben Zustand
+  weiter auf 0 durchläuft: **hier ist der Test die Regel und nicht die
+  Maschine**, zum zweiten Mal gemessen nach E-27.
+- **Elf Mutationen an der Optik überlebten die erste Fassung**, darunter die
+  hergeleitete Verlauf-Endfarbe, der Schimmer, die Lichtkante und alle drei
+  Zierkreise. Nach einem Bildtest der Marken-Blase fallen **elf von elf**.
+  Gemessen wird dabei die gezeichnete Fläche und nicht das Rechteck, siehe
+  Muster 4.
+- **Zwei neue Blindstellen sind beim Bauen selbst entstanden**, beide jetzt als
+  Muster 18 und 19 festgehalten: eine Zusicherung gegen die Konstante, die sie
+  festnageln soll, und `toImage()`, das im Rumpf von `testWidgets` bis zur
+  Zeitüberschreitung hängt.
+- **Vier hartcodierte Texte der Quelle** kommen über die Ergänzungs-Map aus
+  E-39: Stationszeile, Rätselüberschrift, die Beschriftung „Aufgabe" und die
+  Bildunterschrift des Zeitreise-Fotos. Der Gedankenstrich in
+  „Damals — was hat sich verändert?" bleibt stehen, weil es Text der
+  Verhaltensquelle ist und keiner, den wir schreiben.
+
+- [x] 27. Puzzle-Sheet mit vollem Mapping · [!] 28. Alle Rätseltypen
   (sprachneutrale Auswertung) · [ ] 29. In-Puzzle-Hint · [ ] 30. Reveal-Screen
 - [!] 31. Hinweis-Ökonomie (Reward-Ledger) · [!] 32. Punkte gegen Coins
 
@@ -1194,6 +1244,10 @@ Tests. Was sich seither geändert hat, steht als **Nachtrag** unter der jeweilig
 Frage. Der Fragetext selbst wird nicht nachgeführt, denn Dairen hat genau ihn
 bekommen.
 
+**Verschickt sind D-9 bis D-14, also sechs.** D-15 ist am 30.08.2026 beim Bau
+von Schritt 27 dazugekommen und liegt **noch bei niemandem**. Wer den nächsten
+Block schickt, nimmt sie mit.
+
 | Nr | Frage in einem Satz | Blockiert | Nachtrag seit dem Absenden |
 |---|---|---|---|
 | D-9 | Ein gemeinsamer Geo-Typ oder weiter je ein lokaler | nichts, wird teurer | Der angekündigte vierte Typ ist **nicht** entstanden |
@@ -1202,6 +1256,7 @@ bekommen.
 | D-12 | Wie klappt eine Gruppe ohne `getClusterExpansionZoom` auf | Antippen in Schritt 15 | Schritt 15 ist **ohne** Antippen gebaut, die Ergänzung ist jetzt die Vertragsänderung, vor der die Frage warnte |
 | D-13 | Welches Sensorpaket für die Kompass-Drehung, und ist es frei | Schritt 14 | Der eingefrorene Port nennt `flutter_compass ^0.8.1` |
 | D-14 | Darf `presentation` direkt aus `lib/services/` lesen | nichts | Aus einer Lesestelle sind vier geworden |
+| D-15 | Ist `puzzles` als Feature bestätigt, damit `tours` und `challenges` später davon abhängen dürfen | nichts, blockiert aber Phase 5 | Am 30.08.2026 mit Schritt 27 entstanden |
 
 ### D-9, gemeinsamer Geo-Typ
 
@@ -1227,6 +1282,23 @@ vier: `features/facts/domain/value_objects/fact_coordinates.dart`,
 `map/domain/map_position.dart` und `services/location/device_position.dart`. Die
 Überlagerung kam ohne einen eigenen aus. Der Druck ist damit kleiner als beim
 Absenden angenommen, die Abwägung selbst unverändert.
+
+**Zweiter Nachtrag, 30.08.2026, und er erweitert die Frage.** Schritt 27 hat
+dieselbe Sperre ein zweites Mal ausgelöst, diesmal nicht bei Koordinaten:
+`puzzles/domain` darf `facts/domain` nicht importieren, deshalb entstehen dort
+eine zweite Schwierigkeitsstufe (`PuzzleDifficulty`) und ein zweites
+Operanden-Wertobjekt (`PuzzleOperand`), beide wortgleich zu ihren Originalen in
+`facts`. **Das ist mit einer Wegwerf-Probe gemessen**, angelegt, ausgeführt,
+gelöscht: der Import aus `puzzles/domain` bricht den Architektur-Check mit
+Exit-Code 1 und genau einer Meldung ab („Domain-Erlaubnisliste"), derselbe
+Import aus `puzzles/application` läuft auf Exit-Code 0 durch.
+
+D-9 ist damit nicht mehr die Frage nach **einem Geo-Typ**, sondern die nach
+Wertobjekten einer fremden Feature-Domäne allgemein. Eine Antwort, die nur
+Koordinaten regelt, lässt die zwei neuen Kopien stehen; eine, die
+verallgemeinert, löscht sie ersatzlos, so wie sie `device_position.dart`
+löschen würde. Die Kopien tragen den Verweis auf D-9 in ihrem Kopfkommentar,
+damit sie beim Aufräumen gefunden werden.
 
 ### D-10, `lib/map/application/`
 
@@ -1353,6 +1425,29 @@ lesen heute `features/discovery/presentation/fact_proximity.dart`,
 `features/facts/presentation/pages/fact_page.dart` aus `lib/services/location/`.
 Ein Umbau kostet damit mehr als beim Absenden, und die Frage wird mit jedem
 Schritt, der die Nutzerposition braucht, teurer statt billiger.
+
+### D-15, ist `puzzles` als Feature bestätigt
+
+**Am 30.08.2026 mit Schritt 27 entstanden, noch nicht verschickt. Blockiert
+Schritt 27 nicht, blockiert Phase 5.**
+
+`lib/features/README.md` führt `puzzles` unter „Über die Domain-Map hinaus" und
+sagt dort selbst: „Der Zuschnitt ist ein Vorschlag und **wartet auf
+Bestätigung**." Drei akzeptierte Dokumente kennen das Wort nicht:
+`domain-map.md` (§2 nennt zehn Domänen), `architecture-overview.md` §5 und
+`project-structure.md`. Alle drei tragen `status: accepted`.
+
+**Zu bestätigen ist nicht, ob `puzzles` existieren darf, sondern ob `tours` und
+`challenges` später davon abhängen dürfen.** Diese Abhängigkeit entsteht in
+Schritt 33 und folgenden, nicht heute: Schritt 27 baut das Sheet ohne jeden
+Einstieg, und der einzige Verbraucher des Vertrags liegt im selben Feature.
+Deshalb ist der Schritt gebaut worden, und deshalb ist keines der drei
+Dokumente angefasst. Präzedenzfall für die Zurückhaltung ist E-26: das Tutorial
+ging nach `lib/app/onboarding/`, ausdrücklich damit `domain-map.md` und
+`lib/features/README.md` nicht geändert werden müssen.
+
+Mit zu entscheiden: ob dieselben drei Dokumente auch `library` und `creator`
+nachtragen sollen, die unter demselben Vorbehalt stehen.
 
 ### Zwei Punkte aus demselben Block, die keine Fragen sind
 
@@ -1700,6 +1795,8 @@ eine Fundstelle.
 | E-35 | **`FactButton` kann nicht nach `core/widgets`.** Sein eigener Kommentar verlangt den Umzug, sobald ein zweiter Aufrufer existiert; der existiert seit Schritt 9. Regel 11 des Prüfskripts zerlegt aber den Pfad und meldet, dass `core` das Konzept `fact` nicht besitzen darf, nachgewiesen mit einer Wegwerf-Probe. Zu entscheiden: bei `identity` lassen, oder unter einem Namen ohne Fachbegriff umziehen. | 2 | wenn ein drittes Feature ihn braucht |
 | E-36 | **Bei 360 logischen Pixeln passt die Sprachzeile nicht einzeilig.** Gerechnet mit echten Schriftmetriken, neu gemessen nach E-38: zwei Karten à 125,35 plus Knopf-Untergrenze 63,96 plus 16 Abstände ergibt 330,66 gegen 316 verfügbare Pixel, Fehlbetrag rund 14,7. E-38 hat den Fehlbetrag also verkleinert, aber nicht beseitigt. Die vorher hier stehenden 337,5 waren im Übrigen auch vor E-38 nicht reproduzierbar, gemessen wurden 335,53. Die Quelle hat dasselbe Problem und schneidet mit `#root { overflow: hidden }` etwa vier Pixel des Knopfes ab. Zur Wahl: kleinere Flagge unter einer Breitenschwelle (Quelle: 30), kürzere Knopfbeschriftung oder nur das Emoji, die Zeile auf schmalen Geräten zweizeilig legen, oder abschneiden wie die Quelle. Aktuell entschieden ist nichts: die Titel brechen dort um, nichts läuft über, und ein Test hält die **Ursache** fest, damit die nächste Änderung dort anschlägt. | 2 | vor Auslieferung |
 | E-37 | **Das Launcher-Symbol ist noch das Flutter-Logo.** Android 12 und neuer zeichnet `@mipmap/ic_launcher` über die SplashScreen-API mitten in den nativen Startbildschirm. Der Hintergrund ist seit dem 27.08.2026 richtig (`#FF0F0D0A`), das Symbol nicht. Braucht das FACT-Symbol in allen Dichten, plus eine Entscheidung, ob der native Startbildschirm es überhaupt zeigen soll. | 2 | vor Auslieferung |
+| E-41 | **Drei Rätseltypen rendern eine leere Auswahl mit totem Antwortknopf.** `puzzle-sheet.jsx:255-257` und `:268-269` schicken `klang-sinnes-check`, `verstecktes-detail` und `zeitreise` auf `PszMcq`. Diese Zweige sind aber **nur mit leerer Optionenliste erreichbar**, weil `:247` alles mit Optionen vorher abfängt. `PszMcq` erzeugt dann null Antwortknöpfe (`:353-358`), `pick` bleibt `null`, `canSubmit` (`:344`) ist dauerhaft falsch, und das Rätsel ist nur über „Überspringen (0 Punkte)" (`:230-236`) verlassbar. Wie viele Datensätze das trifft, ist **nicht gezählt**: die Markdown-Quellen in `05_Content/facts/` tragen eine andere Typkodierung (`T2`, `T3`, `T9`) als die Datenbank, es braucht die Live-Daten. Zu entscheiden ist, welche Form ein solches Rätsel im Neubau bekommt. Der Zustand ist an `ChoicePuzzle.choices` ablesbar. | 3, verwandt mit E-08 | Phase 4, Schritt 28 |
+| E-42 | **Der 150-Meter-Radius der Foto-Rätsel wirkt in der PWA nie.** `screen-map.jsx:3915` übergibt die Nutzerposition als `userPos`, `puzzle-sheet.jsx:50` erwartet sie als `userPosition`. Folge in `PszPhoto`: `:373` liefert immer `null`, `:374` setzt `inRange = true`, und die Näherungsprüfung `:378` läuft nie. `foto-beweis` und `perspektiven` sind damit von überall mit einem beliebigen Foto lösbar, obwohl `gpsRadius` (`:372`) in den Daten durchgehend auf 150 steht. Dieselbe Klasse wie E-08: ein Defekt der Quelle, der wie Parität aussieht, und wie E-07 einer, der eine Ortsprüfung aushebelt. **Ändert sichtbares Verhalten, geht deshalb an Janek.** | 3, verwandt mit E-07 | Phase 4, Schritt 28 |
 
 ## Wie Tests hier blind werden
 
@@ -1799,6 +1896,40 @@ halben Tag.
     nicht.** Beleg: in Schritt 7 überlebte „der Knopf Anmelden öffnet die
     Registrierung" die ganze Suite. Was einen guten Prüfauftrag ausmacht, steht
     in `HANDOFF.md` unter „Arbeitsweise mit Claude".
+16. **Ein Test, der `lib/` nach einer Zeichenkette durchsucht, findet zuerst
+    sich selbst, und wer das behebt, reisst ein Loch auf.** Beide Hälften sind
+    in Schritt 27 passiert. Die Einstiegs-Wache des Rätsel-Sheets schlug im
+    ersten Lauf an, weil in **ihrem eigenen Kopfkommentar** das Wort steht, nach
+    dem sie sucht. Die naheliegende Behebung, vor dem Vergleich alles ab dem
+    ersten `//` einer Zeile abzuschneiden, hat die Wache dann umgehbar gemacht:
+    ein Konstruktoraufruf muss nicht **in** einer Zeichenkette stehen, sondern
+    nur **dahinter auf derselben Zeile**, und ein Kartenschlüssel wie `'//r':`
+    reicht. Die Review hat genau das als Probe gebaut, ein echter benutzbarer
+    Einstieg, und er kam durch `dart format`, `dart analyze`, den
+    Architektur-Check **und** die Wache. Wer eine Textsuche als Zusicherung
+    benutzt, schreibt ihre bekannte Grenze in ihren Kommentar, sonst entschärft
+    sie der Nächste beim ersten Fehlalarm.
+17. **`MaterialApp` legt ein `AnimatedTheme` über seinen Inhalt.** Ein
+    Themenwechsel im laufenden Baum blendet über `kThemeAnimationDuration`
+    hinüber, und nach einem einzelnen `pump()` steht
+    `Theme.of(context).brightness` noch auf dem alten Wert. Der Test sieht dann
+    aus wie ein Fehler im Widget und ist einer im Rahmen. Beleg: der
+    Themen-Test des Rätsel-Sheets, seitdem in zwei getrennten `testWidgets`
+    statt einem.
+18. **Eine Zusicherung gegen die Konstante, die sie festnageln soll, prüft
+    nichts.** `expect(station.color, PuzzleSheet.stationLineColor)` ist immer
+    wahr, egal welchen Wert die Konstante trägt; wer sie ändert, ändert beide
+    Seiten der Gleichung. Beleg: beim ersten Mutationsdurchlauf von Schritt 27
+    überlebten „Textschattenfarbe" und „Stationszeilen-Farbe", obwohl gerade
+    Zusicherungen dafür geschrieben worden waren, und dieselbe Form steckte in
+    zwei älteren Zeilen. Der Wert muss aus der **Quelle** kommen, nicht aus dem
+    Code, den er bewachen soll. Verwandt mit Muster 9: die Zusicherung sieht
+    gemessen aus und ist es nicht.
+19. **`toImage()` hängt im Rumpf von `testWidgets` bis zur Zeitüberschreitung.**
+    Zehn Minuten ohne eine einzige Meldung. Das ist Muster 14 mit einem dritten
+    Helfer neben `pumpEventQueue()` und `loadAppFonts()`, und der Ausweg ist
+    hier ein anderer: nicht `setUpAll`, sondern `tester.runAsync`. Der
+    Unterschied zu Muster 13 ist die **Zone**, nicht die Zeit.
 
 ## Datenvertrag: die bekannten Fallen
 

@@ -175,7 +175,7 @@ class FactPuzzle {
   /// Rechenvorschrift eines Kombi-Rätsels, etwa `b - a` oder `a * b`.
   ///
   /// Roh weitergegeben. Wer das auswertet, darf **nicht** wie die PWA
-  /// (`puzzle-sheet.jsx:511`) einen `new Function`-Ausdruck daraus bauen. In
+  /// (`puzzle-sheet.jsx:512`) einen `new Function`-Ausdruck daraus bauen. In
   /// Dart geht das ohnehin nicht, aber der Hinweis steht hier, damit niemand
   /// nach einem Ersatz dafür sucht.
   final String? formula;

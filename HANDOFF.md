@@ -17,19 +17,19 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 
 ## Stand
 
-**Zuletzt aktualisiert:** 29.08.2026
+**Zuletzt aktualisiert:** 30.08.2026
 
 Phase 0 und Phase 1 sind abgeschlossen. Aus Phase 2 sind laut Protokoll die
 Schritte 12, 13, 15, 16, 17 und 19 fertig, offen bleiben dort 14, 18 und 20.
-Phase 3 hat mit Schritt 21 begonnen.
+Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27.
 
-**Fertig sind 18 von 50:** 1 bis 13, dazu 15, 16, 17, 19 und 21. Der
+**Fertig sind 19 von 50:** 1 bis 13, dazu 15, 16, 17, 19, 21 und 27. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
 steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
 Kästchen war das Veraltete, nicht der Stand.
 
-**Kennzahlen:** 1553 Tests grün, alle vier Gates auf Exit-Code 0, dazu
+**Kennzahlen:** 1625 Tests grün, alle vier Gates auf Exit-Code 0, dazu
 `dart run tool/generate_i18n.dart --check` und
 `dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
 
@@ -40,7 +40,8 @@ Kartenbildschirm mit Top-Chrome, der gebackene Stil, Gruppen **mit ihren
 Zahlen**, Sky-Fall, GPS-Folgen und die Näherungs-Animation samt Glühen und
 Drehung. Ungeprüft bleiben iOS (nie compiliert), echte Hardware, 360 und 320
 Pixel und Systemschrift 2.0; alle Aussagen dazu sind weiterhin strukturell.
-Belege und die vier noch offenen Gerätemessungen in `REBUILD_STATUS.md`.
+Die vier offenen Gerätemessungen sind am 30.08.2026 alle beantwortet, Belege in
+`REBUILD_STATUS.md`.
 
 **Der Gerätelauf braucht Konfiguration, keine Arbeit:** URL und Schlüssel für
 Supabase kommen über `--dart-define-from-file=env.json`, die Datei steht in
@@ -52,21 +53,21 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **Schritt 27, das Rätsel-Sheet.** Der einzige Schritt, der weder an Dairen
-   noch an der Belohnungsökonomie hängt und zugleich in der Reihenfolge dran
-   ist: `FactPuzzle` trägt seit Schritt 5 alle 21 Felder,
-   `lib/features/puzzles/` ist ein leerer Ordner. Gebaut wird der typisierte
-   Rätselvertrag und der Rahmen des Sheets, **ohne Einstieg**, wie die
-   Fakt-Akte. Nicht dazu gehören die Auswertung der Typen (28, hängt an E-08),
-   der Hinweis-Preis (29), der Reveal (30) und die Ökonomie (31 und 32, hängen
-   an E-06). Vorher der `architecture-guardian`, weil hier die Struktur die
-   ganze Phase 4 trägt.
-2. **Sechs Fragen liegen bei Dairen und sind unbeantwortet.** Wortlaut, Stand
-   und Nachträge stehen seit dem 29.08.2026 in `REBUILD_STATUS.md` unter „Fragen
-   an Dairen". Zwei davon blockieren: **D-12** das Antippen der Gruppen aus
-   Schritt 15, **D-13** den ganzen Schritt 14. Die anderen vier kosten mit jedem
-   Schritt mehr, ohne etwas zu sperren. Wer eine Antwort bekommt, trägt sie dort
-   ein und nicht hier. Nicht Teil des Blocks und weiter offen: ob der Karten-Host
+1. **Ohne Antworten wird die Luft dünn.** Nach Schritt 27 hängt in der
+   Reihenfolge alles: 28 an E-08, 29 bis 32 an E-06, Phase 5 zusätzlich an
+   D-15. Baubar bleiben Teilstücke ohne Einstieg aus Phase 7, also das
+   Reiseregal (45) oder die Trophäenansicht (49). Beide sind ein Sprung nach
+   vorn, keiner braucht eine Antwort.
+
+2. **Sieben Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
+   Wortlaut, Stand und Nachträge stehen in `REBUILD_STATUS.md` unter „Fragen an
+   Dairen". Zwei blockieren heute: **D-12** das Antippen der Gruppen aus
+   Schritt 15, **D-13** den ganzen Schritt 14. **D-15 ist am 30.08.2026 neu
+   dazugekommen und liegt noch bei niemandem:** ob `puzzles` als Feature
+   bestätigt ist, damit `tours` und `challenges` später davon abhängen dürfen.
+   Sie blockiert Phase 5. Die übrigen vier sperren nichts, kosten aber mit
+   jedem Schritt mehr. Wer eine Antwort bekommt, trägt sie dort ein und nicht
+   hier. Nicht Teil des Blocks und weiter offen: ob der Karten-Host
    im **unsichtbaren Tab** weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht,
    das ist gemessen; die PWA kennt keine Tabs, es gibt also keine Quelle.
 3. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` führt
@@ -85,6 +86,20 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 30.08.2026, Schritt 27: das Rätsel-Sheet, Anfang von Phase 4
+
+Typisierter Rätselvertrag, Übersetzer und Sheet-Rahmen, ohne Einstieg wie die
+Fakt-Akte, 1554 → 1625 Tests. **Der naheliegende Entwurf wäre falsch gewesen:**
+die Quelle wählt die Rätselform nicht am Feld `type`, sondern sieht zuerst
+darauf, ob Antwortoptionen vorliegen, und ihr Standardzweig trägt 1469 der
+Datensätze. Eine Aufzählung über `type` hätte sie verworfen. **Der teuerste Fund
+kam wieder aus der Review und betraf eine Wache, nicht den Code:** die
+Einstiegs-Sperre schnitt jede Zeile ab dem ersten `//` ab, um ihren eigenen
+Kommentar nicht zu finden, und war damit hinter einem Kartenschlüssel `'//r':`
+umgehbar. Die Probe kam durch alle vier Gates **und** durch die Wache. Elf
+Mutationen an der Optik überlebten zunächst; nach einem Bildtest der
+Marken-Blase fallen elf von elf.
 
 ### 30.08.2026, Die Ballons standen außerhalb des Bildschirms
 
