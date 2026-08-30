@@ -47,6 +47,7 @@
 ///   [generateHuntRoute].
 library;
 
+import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
@@ -90,7 +91,11 @@ class HuntStop {
 /// Eine fertig erzeugte Schnitzeljagd.
 class HuntPlan {
   /// Erzeugt einen Plan.
-  const HuntPlan({required this.stops, required this.difficulty});
+  const HuntPlan({
+    required this.stops,
+    required this.difficulty,
+    required this.duration,
+  });
 
   /// Die Stationen in Laufreihenfolge, mindestens eine.
   final List<HuntStop> stops;
@@ -102,19 +107,39 @@ class HuntPlan {
   /// zeigt sie im Kopf des Pause-Bildschirms an.
   final FactPuzzleDifficulty difficulty;
 
-  /// Die geschätzte Dauer in Minuten, `hunt-generator.jsx:354`:
-  /// `estimatedDurationMin: stops.length * 14`.
+  /// Die Dauer, die der Nutzer im Assistenten gewählt hat.
   ///
-  /// ## Diese Zahl widerspricht der Dauer, die der Nutzer gewählt hat
+  /// Sie steht im Plan und nicht nur im Assistenten, weil eine laufende Jagd
+  /// sie überlebt: der Pause-Bildschirm zeigt sie nach einem Neustart der App
+  /// wieder an, und dann ist der Assistent längst weg.
+  final HuntDuration duration;
+
+  /// Die Dauer, die dem Nutzer angesagt wird, in Minuten.
   ///
-  /// Der Assistent lässt 30, 60 oder 90 Minuten wählen und übersetzt das in 5,
-  /// 7 oder 9 Stationen (`screen-challenge.jsx:4332`). Der Generator rechnet
-  /// danach 14 Minuten pro Station und kommt damit auf 70, 98 beziehungsweise
-  /// 126 Minuten. Aus „30 min" werden 70.
+  /// ## Hier weicht der Neubau bewusst von der Quelle ab (E-45)
   ///
-  /// **Das ist die Quelle, nicht ein Fehler beim Portieren.** Es bleibt so
-  /// stehen, bis Janek entscheidet, welche der beiden Zahlen gilt: die
-  /// gewählte Dauer oder die geschätzte. Wer hier still 14 durch 6 ersetzt,
-  /// ändert sichtbares Verhalten und verliert die Spur zur Quelle.
-  int get estimatedDurationMinutes => stops.length * 14;
+  /// `hunt-generator.jsx:354` rechnet `estimatedDurationMin: stops.length * 14`
+  /// und kommt damit auf 70, 98 beziehungsweise 126 Minuten, während der
+  /// Nutzer unmittelbar davor 30, 60 oder 90 gewählt hat
+  /// (`screen-challenge.jsx:4332`). Aus „30 min" werden dort 70.
+  ///
+  /// **Janek hat das am 30.08.2026 entschieden:** die gewählte Dauer gilt.
+  /// Die 30, 60 oder 90 Minuten sind die Ansage an den Nutzer, und ein Wert,
+  /// der ihm unmittelbar nach seiner eigenen Wahl etwas anderes sagt, ist ein
+  /// Fehler und keine Parität. Deshalb liefert dieser Wert [HuntDuration] und
+  /// nicht die Rechnung der Quelle.
+  ///
+  /// Die Spur dorthin bleibt absichtlich stehen: wer die Quelle liest, findet
+  /// dort eine andere Zahl, und hier den Grund.
+  ///
+  /// ## Der Rest bleibt offen, und dafür gibt es keine Formel
+  ///
+  /// Findet der Generator weniger Stationen als die Dauer vorsieht, steht die
+  /// Ansage über dem, was die Jagd wirklich kostet: 30 Minuten angesagt,
+  /// aber nur drei statt fünf Stationen gebaut. Der Fall ist an
+  /// `stops.length` gegenüber `duration.stopCount` ablesbar und wird hier
+  /// **nicht** überschlagen. Eine heruntergerechnete Minutenzahl wäre eine
+  /// erfundene Größe; was der Nutzer in dieser Lage sehen soll, ist eine
+  /// Produktfrage und keine Rechenaufgabe.
+  int get estimatedDurationMinutes => duration.minutes;
 }

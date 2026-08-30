@@ -30,7 +30,7 @@ Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schrit
 steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
 Kästchen war das Veraltete, nicht der Stand.
 
-**Kennzahlen:** 1725 Tests grün, alle vier Gates auf Exit-Code 0, dazu
+**Kennzahlen:** 1726 Tests grün, alle vier Gates auf Exit-Code 0, dazu
 `dart run tool/generate_i18n.dart --check` und
 `dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
 
@@ -54,32 +54,37 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **E-43 beantworten, sonst steht Phase 5 nach 34 still.** Die Solo-Jagd läuft
-   in der Quelle auf der **Karte**, nicht im Challenge-Reiter; die Plan-Schritte
-   36 und 37 beschreiben deshalb den Demo-Pfad, der die Ausgabe des Generators
-   nie zu sehen bekommt. Belege bei E-43. Solange das offen ist, sind 36 und 37
-   nicht baureif.
+1. **Schritt 35, der Startpunkt-Picker.** Baubar ohne jede Antwort, und er
+   **braucht keine Karte**: er ist eine Liste mit höchstens vier Radioknöpfen,
+   das ist an der Quelle gemessen. Was er mitbringt: eine kuratierte Datendatei
+   nach deutschem Stadtnamen verschlüsselt (E-11), ein `--check`-Werkzeug
+   dagegen nach dem Vorbild von `bake_map_style.dart`, und die hergeleiteten
+   Wortlaute aus E-46, die als nicht freigegeben zu markieren sind.
 
-2. **Baubar ohne jede Antwort:** Schritt 35, der Startpunkt-Picker, der
-   **keine Karte braucht** (eine Liste mit höchstens vier Radioknöpfen, gemessen),
-   dafür aber eine kuratierte Datendatei, ein `--check`-Werkzeug dagegen, E-11
-   und E-46 mitbringt. Danach 45, 46 und 49 aus Phase 7. Ausserdem der
-   `balloon`-Anker (Punkt 4) und die sieben Punkte ausserhalb der 50 Schritte,
-   von denen der CI-Workflow der grösste ist: `.github/workflows/` existiert
-   nicht, kein Gate läuft automatisch.
+2. **Die Schritte 36 und 37 warten auf D-16, nicht mehr auf Janek.** E-43 ist am
+   30.08.2026 entschieden: die Solo-Jagd läuft auf der **Karte**, wie die
+   Quelle. Damit ist der Plan an dieser Stelle überholt und der Zuschnitt neu zu
+   machen. Was fehlt, ist die technische Antwort, **wie `discovery` an den
+   Jagdzustand kommt**, denn das wäre die fünfte Cross-Feature-Kante. Siehe
+   D-16.
 
-3. **Sieben Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
+3. **Danach 45, 46 und 49 aus Phase 7**, dazu der `balloon`-Anker und die
+   Punkte ausserhalb der 50 Schritte. Der grösste davon ist der CI-Workflow:
+   `.github/workflows/` existiert nicht, kein Gate läuft automatisch.
+
+4. **Acht Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
    Wortlaut, Stand und Nachträge stehen in `REBUILD_STATUS.md` unter „Fragen an
    Dairen". Zwei blockieren heute: **D-12** das Antippen der Gruppen aus
    Schritt 15, **D-13** den ganzen Schritt 14. **D-15 ist am 30.08.2026 neu
    dazugekommen und liegt noch bei niemandem:** ob `puzzles` als Feature
    bestätigt ist, damit `tours` und `challenges` später davon abhängen dürfen.
-   Sie blockiert Phase 5. Die übrigen vier sperren nichts, kosten aber mit
+   Sie blockiert Phase 5, **D-16** die Schritte 36 und 37. Die übrigen vier
+   sperren nichts, kosten aber mit
    jedem Schritt mehr. Wer eine Antwort bekommt, trägt sie dort ein und nicht
    hier. Nicht Teil des Blocks und weiter offen: ob der Karten-Host
    im **unsichtbaren Tab** weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht,
    das ist gemessen; die PWA kennt keine Tabs, es gibt also keine Quelle.
-4. **Zwei Kartenanker fehlen noch, nicht fünf.** Diese Zeile stand bis zum
+5. **Zwei Kartenanker fehlen noch, nicht fünf.** Diese Zeile stand bis zum
    30.08.2026 falsch hier: `discovery_anchors.dart:24-30` sagt, dass `coins`,
    `modeFactFinder`, `modeTour` und `compass` sich seit dem Top-Chrome aus
    Schritt 19 selbst anmelden. Übrig sind **`balloon`** und **`userMarker`**.
@@ -90,7 +95,7 @@ siehe „Rechner einrichten".
    im Code noch gar nicht, und der hängt an E-10. Wer einen baut, streicht die
    Kennung aus `knownMissing`, sonst schlägt
    `discovery_anchors_test.dart` an.
-5. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
+6. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
    technische Sperre ist seit E-39 weg. Vorschlag DE/EN liegt in
    `REBUILD_STATUS.md` bei E-28, hergeleitet und nicht freigegeben.
 
@@ -105,7 +110,7 @@ dazu stehen in `REBUILD_STATUS.md`.
 ### 30.08.2026, Schritte 33 und 34, und ein Plan, der den falschen Pfad beschreibt
 
 Der Assistent der Schnitzeljagd ersetzt den Platzhalter im Reiter, dazu der
-reine Routengenerator, 1625 → 1725 Tests. **Überraschend war, was die
+reine Routengenerator, 1625 → 1726 Tests. **Überraschend war, was die
 Vorprüfung im Plan gefunden hat:** die Solo-Jagd läuft in der Quelle auf der
 Karte, nicht im Reiter, und die Plan-Schritte 36 und 37 beschreiben deshalb den
 Demo-Pfad, der seine Stationen aus rund 650 Zeilen hartcodierter Beispieldaten

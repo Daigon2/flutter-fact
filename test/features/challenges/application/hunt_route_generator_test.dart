@@ -35,7 +35,7 @@ void main() {
           _fact(1, north: 0, east: 0, puzzles: const <FactPuzzle>[]),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 3,
+        duration: HuntDuration.thirty,
         seed: 'probe',
       );
 
@@ -46,7 +46,7 @@ void main() {
       final HuntPlan? plan = generateHuntRoute(
         facts: <Fact>[_fact(1, north: 0, east: 0).copyWithoutCoordinates()],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 3,
+        duration: HuntDuration.thirty,
         seed: 'probe',
       );
 
@@ -58,7 +58,7 @@ void main() {
         generateHuntRoute(
           facts: const <Fact>[],
           difficulty: FactPuzzleDifficulty.leicht,
-          stopCount: 5,
+          duration: HuntDuration.thirty,
           seed: 'probe',
         ),
         isNull,
@@ -76,7 +76,7 @@ void main() {
         final HuntPlan? plan = generateHuntRoute(
           facts: _gridFacts(),
           difficulty: FactPuzzleDifficulty.leicht,
-          stopCount: duration.stopCount,
+          duration: duration,
           startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
         );
 
@@ -89,7 +89,7 @@ void main() {
       final HuntPlan? plan = generateHuntRoute(
         facts: _gridFacts(),
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 9,
+        duration: HuntDuration.ninety,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -107,7 +107,7 @@ void main() {
           _fact(2, north: 300, east: 0),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 5,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -127,7 +127,7 @@ void main() {
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 5,
+        duration: HuntDuration.thirty,
         genres: const <String>['Geschichte'],
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -151,7 +151,7 @@ void main() {
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 5,
+        duration: HuntDuration.thirty,
         genres: const <String>['Geschichte'],
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -172,7 +172,7 @@ void main() {
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 5,
+        duration: HuntDuration.thirty,
         genres: const <String>['Geschichte'],
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -185,59 +185,79 @@ void main() {
   });
 
   group('Kreisbogen statt Linie', () {
+    // Beide Regeln hängen an der **Position** im Lauf: die vorletzte Station
+    // wird auf 900 Meter um den Anfang eingeschränkt, die letzte auf 600
+    // (`:279-290`). Seit der Generator nur noch die Dauer entgegennimmt, ist
+    // diese Position bei 30 Minuten der vierte und der fünfte Stopp. Die
+    // Fakten liegen deshalb so, dass der Lauf sie deterministisch erreicht;
+    // die Zwischenschritte stehen im Kommentar, damit man den Lauf nachrechnen
+    // kann, ohne ihn auszufuehren.
+
     test('die letzte Station liegt wieder nah am Anfang', () {
-      // Eine Kette nach Norden, dazu ein einzelner Fakt 500 Meter östlich des
-      // Anfangs. Ohne den Zwang aus `:285-290` liefe die Jagd die Kette weiter
-      // hinaus; mit ihm endet sie beim Nachbarn des ersten Stopps.
+      // Lauf: 1 (Start) → 2 (420 m) → 3 (420 m) → 4 (424 m).
+      //
+      // Beim fünften Stopp stehen noch Fakt 5 (550 m vom Anfang, 716 m vom
+      // letzten Stopp) und Fakt 6 (1260 m vom Anfang, 688 m vom letzten
+      // Stopp). **Ohne** den Zwang gewänne 6, weil er näher am Gipfel der
+      // Kurve liegt (0,407 gegen 0,335). Mit ihm bleibt nur 5 übrig.
       final List<Fact> facts = <Fact>[
         _fact(1, north: 0, east: 0),
-        _fact(2, north: 400, east: 0),
-        _fact(3, north: 800, east: 0),
-        _fact(4, north: 1200, east: 0),
-        _fact(5, north: 1600, east: 0),
-        _fact(6, north: 0, east: 500),
+        _fact(2, north: 420, east: 0),
+        _fact(3, north: 840, east: 0),
+        _fact(4, north: 700, east: 400),
+        _fact(5, north: 0, east: 550),
+        _fact(6, north: 1260, east: 0),
       ];
 
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 4,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 2, 3, 6]);
-      final double back = plan.stops.first.position.distanceInMetersTo(
+      expect(_ids(plan!), <int>[1, 2, 3, 4, 5]);
+      final double zurueckWeg = plan.stops.first.position.distanceInMetersTo(
         plan.stops.last.position,
       );
       // `:286`: höchstens 600 Meter zurück zum Anfang.
-      expect(back, lessThanOrEqualTo(600));
+      expect(zurueckWeg, lessThanOrEqualTo(600));
     });
 
     test('auch die vorletzte Station wird schon zurückgezogen', () {
-      // `:279-284`, die Stufe **vor** der letzten: höchstens 900 Meter vom
-      // ersten Stopp. Der Fakt 4 läge 950 Meter draußen und würde wegen seines
-      // Gütebonus sonst gewinnen; mit dem Zwang gewinnt der nähere Fakt 3.
+      // Lauf: 1 (Start) → 2 (420 m) → 3 (420 m).
+      //
+      // Beim vierten Stopp, dem vorletzten, stehen Fakt 4 (1260 m vom Anfang,
+      // 420 m vom letzten Stopp, Wert 1,0) und Fakt 5 (533 m vom Anfang, 500 m
+      // vom letzten Stopp, Wert 0,923). **Ohne** den Zwang gewänne 4. Mit ihm
+      // fällt 4 heraus, und er kommt erst als letzter Stopp dran, wo alle
+      // Stufen leerlaufen und die Bedingung fallengelassen wird (`:288`).
       final List<Fact> facts = <Fact>[
         _fact(1, north: 0, east: 0),
-        _fact(2, north: 400, east: 0),
-        _fact(3, north: 800, east: 0),
-        _fact(4, north: 950, east: 0, qualityScore: 3),
-        _fact(5, north: 0, east: 500),
+        _fact(2, north: 420, east: 0),
+        _fact(3, north: 840, east: 0),
+        _fact(4, north: 1260, east: 0),
+        _fact(5, north: 440, east: 300),
       ];
 
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 4,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 2, 3, 5]);
+      expect(_ids(plan!), <int>[1, 2, 3, 5, 4]);
     });
 
     test('gibt es nichts in Startnähe, läuft die Jagd trotzdem weiter', () {
-      // Dieselbe Kette ohne den östlichen Fakt: `:288` lässt die Bedingung
-      // fallen, statt die Station wegzulassen.
+      // Eine Kette ohne jeden Fakt in Startnähe: `:282` und `:288` lassen die
+      // Bedingung fallen, statt die Station wegzulassen.
+      //
+      // Zugleich der Fall, den `HuntPlan.estimatedDurationMinutes` im
+      // Kommentar offen lässt: angesagt sind 30 Minuten und fünf Stationen,
+      // gebaut werden vier, weil der Bestand nicht mehr hergibt. Die Ansage
+      // bleibt trotzdem die gewählte Dauer, es wird nichts heruntergerechnet.
       final List<Fact> facts = <Fact>[
         _fact(1, north: 0, east: 0),
         _fact(2, north: 400, east: 0),
@@ -248,11 +268,13 @@ void main() {
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 4,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
       expect(_ids(plan!), <int>[1, 2, 3, 4]);
+      expect(plan.stops.length, lessThan(plan.duration.stopCount));
+      expect(plan.estimatedDurationMinutes, 30);
     });
   });
 
@@ -271,7 +293,7 @@ void main() {
             for (int i = 0; i < 10; i++) _fact(i + 1, north: i * 400, east: 0),
           ],
           difficulty: FactPuzzleDifficulty.leicht,
-          stopCount: 3,
+          duration: HuntDuration.thirty,
           seed: 'probe',
         );
 
@@ -284,7 +306,7 @@ void main() {
         generateHuntRoute(
           facts: _gridFacts(),
           difficulty: FactPuzzleDifficulty.leicht,
-          stopCount: 5,
+          duration: HuntDuration.thirty,
           seed: 'muc-1',
         )!,
       );
@@ -301,7 +323,7 @@ void main() {
             for (int i = 0; i < 10; i++) _fact(i + 1, north: i * 400, east: 0),
           ],
           difficulty: FactPuzzleDifficulty.leicht,
-          stopCount: 3,
+          duration: HuntDuration.thirty,
           seed: seed,
         )!,
       );
@@ -319,7 +341,7 @@ void main() {
           _fact(3, north: 460, east: 0),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -335,7 +357,7 @@ void main() {
           _fact(2, north: 1400, east: 0),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 1,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -357,7 +379,7 @@ void main() {
           _fact(2, north: 420, east: 0, puzzles: both),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -382,7 +404,7 @@ void main() {
           ),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -409,7 +431,7 @@ void main() {
           _fact(3, north: 840, east: 0),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 3,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -437,7 +459,7 @@ void main() {
           ),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -459,7 +481,7 @@ void main() {
           _fact(3, north: 840, east: 0),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 3,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -468,6 +490,13 @@ void main() {
   });
 
   group('Bewertung', () {
+    // **Zu den drei Kennungen in den Erwartungen.** Angefordert sind 30
+    // Minuten, also fünf Stationen, im Bestand liegen aber nur drei Fakten.
+    // Der Lauf setzt deshalb den Startpunkt, den Gewinner des Vergleichs und
+    // danach den Verlierer, der als einziger Kandidat übrig ist und im
+    // Ausweichfenster von 1400 Metern liegt (`:295`). Die Aussage jedes Tests
+    // steckt in der **zweiten** Kennung; die dritte steht mit da, damit
+    // auffällt, wenn sich sonst etwas an der Reihenfolge ändert.
     test('unter dem Mindestabstand ist der Entfernungswert 0', () {
       // `:132`, die harte Untergrenze von 220 Metern.
       expect(huntDistanceScore(219.9), 0);
@@ -498,11 +527,11 @@ void main() {
             _fact(3, north: -420, east: 0, qualityScore: 3),
           ],
           difficulty: FactPuzzleDifficulty.leicht,
-          stopCount: 2,
+          duration: HuntDuration.thirty,
           startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
         );
 
-        expect(_ids(plan!), <int>[1, 3]);
+        expect(_ids(plan!), <int>[1, 3, 2]);
       },
     );
 
@@ -522,11 +551,11 @@ void main() {
           ),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 3]);
+      expect(_ids(plan!), <int>[1, 3, 2]);
     });
 
     test('ohne Güte gewinnt der zuerst gelistete Kandidat', () {
@@ -539,11 +568,11 @@ void main() {
           _fact(3, north: -420, east: 0),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 2]);
+      expect(_ids(plan!), <int>[1, 2, 3]);
     });
 
     test('das primäre Fenster schlägt jeden Bonus außerhalb davon', () {
@@ -559,7 +588,7 @@ void main() {
           _fact(3, north: -900, east: 0, qualityScore: 3),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -597,11 +626,11 @@ void main() {
           ),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 3]);
+      expect(_ids(plan!), <int>[1, 3, 2]);
     });
 
     test('und unter 0,3211', () {
@@ -620,11 +649,11 @@ void main() {
           ),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 2]);
+      expect(_ids(plan!), <int>[1, 2, 3]);
     });
 
     test('der Gold-Bonus liegt über 0,3995', () {
@@ -639,7 +668,7 @@ void main() {
           _fact(4, north: 0, east: 300),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 3,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -657,7 +686,7 @@ void main() {
           _fact(4, north: 0, east: 300),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 3,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -673,11 +702,11 @@ void main() {
           _fact(3, north: -534, east: 0, qualityScore: 2),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 3]);
+      expect(_ids(plan!), <int>[1, 3, 2]);
     });
 
     test('und unter 0,2508', () {
@@ -690,11 +719,11 @@ void main() {
           _fact(3, north: -572, east: 0, qualityScore: 2),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 2]);
+      expect(_ids(plan!), <int>[1, 2, 3]);
     });
 
     test('Bronze bringt gar nichts', () {
@@ -709,16 +738,19 @@ void main() {
           _fact(3, north: -420, east: 0, qualityScore: 1),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 2]);
+      expect(_ids(plan!), <int>[1, 2, 3]);
     });
 
     test('ein Fakt näher als 220 Meter kommt nicht als Nächstes dran', () {
       // `:293`. Der nahe Fakt ist nur 150 Meter entfernt und wird übersprungen,
-      // obwohl er der nächste wäre.
+      // obwohl er der nächste wäre. Als dritte Station kommt er trotzdem dran:
+      // vom zweiten Stopp aus liegt er 270 Meter weg und damit über der
+      // Untergrenze. Die Regel gilt dem Abstand zwischen zwei Stationen, nicht
+      // dem Fakt.
       final HuntPlan? plan = generateHuntRoute(
         facts: <Fact>[
           _fact(1, north: 0, east: 0),
@@ -726,37 +758,56 @@ void main() {
           _fact(3, north: 420, east: 0),
         ],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 2,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(_ids(plan!), <int>[1, 3]);
+      expect(_ids(plan!), <int>[1, 3, 2]);
     });
   });
 
   group('Der Plan', () {
-    test('die geschätzte Dauer widerspricht der gewählten', () {
-      // `hunt-generator.jsx:354`: 14 Minuten je Station. Wer 30 Minuten wählt,
-      // bekommt fünf Stationen (`screen-challenge.jsx:4332`) und damit eine
-      // Schätzung von 70. Das ist die Quelle und keine Portierungsschwäche;
-      // welche der beiden Zahlen gilt, ist eine offene Produktfrage.
+    test('die angesagte Dauer ist die gewählte, nicht die geschätzte', () {
+      // **E-45, entschieden am 30.08.2026.** Die Quelle rechnet
+      // `estimatedDurationMin: stops.length * 14` (`hunt-generator.jsx:354`)
+      // und sagt dem Nutzer damit 70 Minuten an, obwohl er unmittelbar davor
+      // 30 gewaehlt hat. Der Neubau weicht hier bewusst ab: die gewählte
+      // Dauer gilt.
+      //
+      // Die 70 steht in der Zusicherung mit, weil genau sie herauskäme, wenn
+      // jemand die Rechnung der Quelle wieder einsetzt.
       final HuntPlan? plan = generateHuntRoute(
         facts: _gridFacts(),
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: HuntDuration.thirty.stopCount,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
       expect(plan!.stops.length, 5);
-      expect(plan.estimatedDurationMinutes, 70);
-      expect(HuntDuration.thirty.minutes, 30);
+      expect(plan.estimatedDurationMinutes, 30);
+      expect(plan.estimatedDurationMinutes, isNot(plan.stops.length * 14));
+      expect(plan.duration, HuntDuration.thirty);
+    });
+
+    test('sie folgt der Dauer und nicht der Zahl der Stationen', () {
+      // Gegenprobe mit einer anderen Dauer: eine Zusicherung allein gegen 30
+      // ließe sich auch mit einer festverdrahteten 30 erfüllen.
+      final HuntPlan? plan = generateHuntRoute(
+        facts: _gridFacts(),
+        difficulty: FactPuzzleDifficulty.leicht,
+        duration: HuntDuration.ninety,
+        startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
+      );
+
+      expect(plan!.stops.length, 9);
+      expect(plan.estimatedDurationMinutes, 90);
     });
 
     test('die Stufe der Anfrage steht im Plan', () {
       final HuntPlan? plan = generateHuntRoute(
         facts: _gridFacts(),
         difficulty: FactPuzzleDifficulty.mittel,
-        stopCount: 3,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
@@ -767,7 +818,7 @@ void main() {
       final HuntPlan? plan = generateHuntRoute(
         facts: <Fact>[_fact(1, north: 0, east: 0)],
         difficulty: FactPuzzleDifficulty.leicht,
-        stopCount: 1,
+        duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 

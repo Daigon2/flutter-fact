@@ -53,6 +53,7 @@ library;
 import 'dart:math' as math;
 
 import 'package:fact_app/features/challenges/application/hunt_plan.dart';
+import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
@@ -148,16 +149,34 @@ double huntDistanceScore(double distanceInMeters) {
 /// Rätsel und eine Koordinate hat (`:226`). Eine **zu kurze** Jagd ist
 /// dagegen kein Fehlschlag: die Greedy-Schleife bricht ab, sobald kein
 /// Kandidat mehr in Reichweite liegt (`:298`), und liefert dann weniger als
-/// [stopCount] Stationen. Die Quelle prüft danach nur noch auf „gar keine"
-/// (`screen-challenge.jsx:4347`).
+/// [duration]`.stopCount` Stationen. Die Quelle prüft danach nur noch auf
+/// „gar keine" (`screen-challenge.jsx:4347`).
+///
+/// ## Warum die Dauer hereinkommt und nicht die Stationszahl
+///
+/// Die Quelle übergibt beides getrennt: der Bildschirm rechnet die gewählte
+/// Dauer in eine Stationszahl um (`screen-challenge.jsx:4332`) und gibt nur
+/// diese weiter, während der Generator am Ende eine **dritte** Zahl
+/// dazuschreibt (`hunt-generator.jsx:354`). Genau daraus entsteht der
+/// Widerspruch, den E-45 beendet.
+///
+/// Hier gibt es deshalb nur eine Eingabe. Die Stationszahl ist daraus
+/// abgeleitet und nicht setzbar; damit können Ansage und Länge nicht
+/// auseinanderlaufen, auch nicht durch einen künftigen Aufrufer. Der Preis
+/// steht in den Tests: eine Regel, die an der Position im Lauf hängt
+/// (vorletzte und letzte Station), muss ihre Fakten so legen, dass die Position
+/// bei fünf, sieben oder neun Stationen erreicht wird.
 HuntPlan? generateHuntRoute({
   required List<Fact> facts,
   required FactPuzzleDifficulty difficulty,
-  required int stopCount,
+  required HuntDuration duration,
   MapPosition? startNear,
   List<String> genres = const <String>[],
   String? seed,
 }) {
+  // Die einzige Stelle, an der aus der Ansage eine Länge wird.
+  final int stopCount = duration.stopCount;
+
   // `:155-159`, ohne den Stadt-Teil: nur Fakten mit mindestens einem Rätsel
   // und einer Koordinate sind spielbar.
   List<Fact> pool = facts
@@ -369,7 +388,7 @@ HuntPlan? generateHuntRoute({
     usedTypes.add(stop.puzzle.type);
   }
 
-  return HuntPlan(stops: stops, difficulty: difficulty);
+  return HuntPlan(stops: stops, difficulty: difficulty, duration: duration);
 }
 
 /// Die Auffindbarkeit eines Fakts, `hunt-generator.jsx:185`.

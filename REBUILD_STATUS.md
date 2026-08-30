@@ -1064,7 +1064,8 @@ Ausgang von Schritt 2. 1625 → 1725 Tests.
   der Weg dorthin nicht. Siehe E-35.
 
 - [x] 33. Wizard · [x] 34. Solo-Setup · [ ] 35. Hotspot-Picker
-- [!] 36. Phasen-Maschine (E-43) · [!] 37. Active-UI (E-43) · [!] 38. Rätsel und Ökonomie
+- [!] 36. Phasen-Maschine (E-43 entschieden, wartet auf D-16) · [!] 37. Active-UI (dito)
+  · [!] 38. Rätsel und Ökonomie
 - [ ] 39. Pause und Results · [!] 40. Gruppen-Flow (Realtime-Entscheidung)
 
 ## Phase 6, Tour
@@ -1302,9 +1303,10 @@ Tests. Was sich seither geändert hat, steht als **Nachtrag** unter der jeweilig
 Frage. Der Fragetext selbst wird nicht nachgeführt, denn Dairen hat genau ihn
 bekommen.
 
-**Verschickt sind D-9 bis D-14, also sechs.** D-15 ist am 30.08.2026 beim Bau
-von Schritt 27 dazugekommen und liegt **noch bei niemandem**. Wer den nächsten
-Block schickt, nimmt sie mit.
+**Verschickt sind D-9 bis D-14, also sechs.** D-15 und D-16 sind am 30.08.2026
+dazugekommen und liegen **noch bei niemandem**: D-15 beim Bau von Schritt 27,
+D-16 als technische Folge von Janeks Entscheidung zu E-43. Wer den nächsten
+Block schickt, nimmt beide mit.
 
 | Nr | Frage in einem Satz | Blockiert | Nachtrag seit dem Absenden |
 |---|---|---|---|
@@ -1315,6 +1317,7 @@ Block schickt, nimmt sie mit.
 | D-13 | Welches Sensorpaket für die Kompass-Drehung, und ist es frei | Schritt 14 | Der eingefrorene Port nennt `flutter_compass ^0.8.1` |
 | D-14 | Darf `presentation` direkt aus `lib/services/` lesen | nichts | Aus einer Lesestelle sind vier geworden |
 | D-15 | Ist `puzzles` als Feature bestätigt, damit `tours` und `challenges` später davon abhängen dürfen | nichts, blockiert aber Phase 5 | Am 30.08.2026 mit Schritt 27 entstanden |
+| D-16 | Wie liest `discovery` den Zustand der laufenden Jagd, wenn sie auf der Karte läuft | die Umsetzung von E-43, also Schritt 36 und 37 | Am 30.08.2026 aus E-43 entstanden |
 
 ### D-9, gemeinsamer Geo-Typ
 
@@ -1538,6 +1541,43 @@ ging nach `lib/app/onboarding/`, ausdrücklich damit `domain-map.md` und
 
 Mit zu entscheiden: ob dieselben drei Dokumente auch `library` und `creator`
 nachtragen sollen, die unter demselben Vorbehalt stehen.
+
+### D-16, wie `discovery` an den Jagdzustand kommt
+
+**Am 30.08.2026 aus E-43 entstanden, noch nicht verschickt. Blockiert die
+Umsetzung von E-43, also die Schritte 36 und 37.**
+
+Janek hat entschieden, dass die Solo-Jagd auf der **Karte** läuft, wie in der
+Quelle. Damit braucht der Kartenbildschirm, der `discovery` gehört, Lesezugriff
+auf den Zustand der laufenden Jagd, der `challenges` gehört: welche Station
+gerade dran ist, wie weit sie entfernt ist, wie viele Hinweise schon gekauft
+sind.
+
+**Das wäre die fünfte Cross-Feature-Kante des Repositories.** Die vier
+bestehenden sind `discovery → facts`, `facts → discovery`, `puzzles → facts`
+und seit Schritt 34 `challenges → facts`. Regel 10 verlangt dafür einen
+öffentlichen Domänen- oder Application-Vertrag, und das Prüfskript sieht diese
+Regel ausdrücklich **nicht**, das steht im Skript selbst; es bleibt Review-Sache.
+
+Was die Quelle tut, ist gemessen und hilft bei der Antwort nur halb: sie hält
+`activeHunt` eine Ebene höher im App-Zustand (`app.jsx:90`) und schreibt sie
+bei jeder Änderung in den lokalen Speicher (`:198`), damit ein Neuladen sie
+nicht verliert. Drei Bildschirme lesen sie. Eine App-Komposition als
+Eigentümerin wäre also quellentreu, widerspricht aber der Feature-Ordnung, die
+`challenges` den Sitzungszustand gibt.
+
+Zur Wahl stehen mindestens: ein Vertrag in `challenges/domain` plus ein
+Provider in `challenges/application`, den `discovery/presentation` liest; oder
+ein Adapter in der App-Komposition, der beide Seiten entkoppelt; oder der
+Jagdzustand wandert als geteilte Anwendungsschicht aus beiden Features heraus.
+Die erste Variante ist die kleinste und liegt auf der Linie von
+`dependency-rules.md:180-187` („Placement follows the consumer, not taste"),
+die dritte die sauberste und teuerste.
+
+**Mit zu beantworten:** ob die Jagd einen Neustart der App überleben muss. Die
+Quelle sagt ja und legt sie im lokalen Speicher ab; im Neubau gibt es dafür
+Präzedenzfälle (`FirstLaunchStore`, `TourStore`, `AudioModeStore`), aber keinen
+Vertrag.
 
 ### Zwei Punkte aus demselben Block, die keine Fragen sind
 
@@ -1836,6 +1876,57 @@ Zwei Funde daran betreffen das Testnetz und nicht den Code:
   des Renderbaums, übersieht jedes Eingabefeld. Deshalb ist die zweite Quelle
   `bodyLarge` bis dahin unbemerkt geblieben.
 
+**E-43, E-45 und E-46 sind am 30.08.2026 von Janek entschieden.**
+
+*E-43, wo die Solo-Jagd läuft:* **auf der Karte, wie die Quelle.** Der
+Challenge-Reiter zeigt bei laufender Jagd nur Pause und Ergebnis, gespielt wird
+auf dem Kartenbildschirm. Damit ist der Plan an dieser Stelle überholt, und die
+Schritte 36 und 37 werden neu zugeschnitten: was dort als „Phasen-Maschine" und
+„Active-UI" steht, beschreibt `SnjdActiveView`, also den Demo- und Gruppenpfad
+auf hartcodierten Beispieldaten. Gebaut wird stattdessen, was
+`screen-map.jsx` für die laufende Jagd tut: Stationspille, Stationszähler,
+Navigations-Gating nach Schwierigkeit, gestufte Hinweise und die Öffnung des
+Rätsel-Sheets.
+
+**Die technische Folge ist noch offen und geht an Dairen, siehe D-16:** liegt
+die laufende Jagd auf der Karte, muss `discovery` den Jagdzustand lesen, und
+das wäre die fünfte Cross-Feature-Kante des Repositories. Die Entscheidung
+selbst ist damit nicht blockiert, ihre Umsetzung schon.
+
+*E-45, gewählte gegen geschätzte Dauer:* **die gewählte gilt.** 30, 60 oder 90
+Minuten sind die Ansage an den Nutzer, und ein Wert, der ihm unmittelbar nach
+seiner eigenen Wahl etwas anderes sagt, ist ein Fehler und keine Parität.
+`HuntPlan.estimatedDurationMinutes` trägt deshalb die gewählte Dauer statt
+`stops.length * 14`. **Bewusste Abweichung von der Quelle**, dokumentiert an
+der Stelle. Offen bleibt der Randfall, dass der Generator weniger Stationen
+findet als die Dauer vorsieht; dann steht die Ansage über dem, was die Jagd
+wirklich kostet. Sichtbar ist das an der Stationszahl, erfunden wird dafür
+keine Formel.
+
+**Beim Umsetzen kam heraus, dass die Abweichung nichts kostet, und das ist
+gemessen:** `grep` über das ganze PWA-Verzeichnis findet für
+`estimatedDuration` **genau einen** Treffer, und das ist die Zuweisung selbst
+(`hunt-generator.jsx:354`). Kein Bildschirm liest sie. Die 70 Minuten wurden dem
+Nutzer also nie gezeigt; der Widerspruch entsteht erst dadurch, dass der Neubau
+die Zahl an einen Bildschirm gäbe. Die Entscheidung weicht damit von einer
+Zeile ab, die in der Quelle tote Fläche ist.
+
+**Die Umsetzung hat die Signatur geändert, und zwar so, dass der Widerspruch
+nicht wieder entstehen kann:** `generateHuntRoute` nimmt jetzt die gewählte
+Dauer und leitet die Stationszahl daraus ab, statt beides einzeln zu bekommen.
+Eine Eingabe, keine Hintertür für Tests. Der Preis waren 37 Testaufrufe, von
+denen 28 mit Stationszahlen ausserhalb von 5, 7 und 9 arbeiteten; 25 davon
+kosteten nur eine längere Erwartungsliste, weil die Schleife bei kleinem
+Bestand ohnehin von selbst abbricht. Die drei Tests, die eine Regel an ihrer
+**Position im Lauf** prüfen, sind neu gelegt und ihre Läufe vorher mit einem
+Simulator aus der **Quelle** ausgerechnet statt aus dem Dart-Code.
+
+*E-46, der unübersetzte Startpunkt-Picker:* **ich leite Wortlaute her und lege
+sie als nicht freigegeben vor**, so wie bei E-28. Sie gehen in die
+Ergänzungs-Map nach E-39 und tragen den Vermerk, dass sie auf Bestätigung
+warten. Der Bildschirm ist damit in beiden Sprachen vollständig, und der
+erfundene Anteil ist als solcher markiert statt sich als Quelle auszugeben.
+
 **E-35 ist am 30.08.2026 entschieden**, beim Bau von Schritt 33, und die Wahl
 war beim Nachmessen gar keine mehr. Der Startknopf der Schnitzeljagd ist
 derselbe wie in der Anmeldung; damit brauchte ihn ein zweites Feature. Die
@@ -1906,10 +1997,7 @@ eine Fundstelle.
 | E-37 | **Das Launcher-Symbol ist noch das Flutter-Logo.** Android 12 und neuer zeichnet `@mipmap/ic_launcher` über die SplashScreen-API mitten in den nativen Startbildschirm. Der Hintergrund ist seit dem 27.08.2026 richtig (`#FF0F0D0A`), das Symbol nicht. Braucht das FACT-Symbol in allen Dichten, plus eine Entscheidung, ob der native Startbildschirm es überhaupt zeigen soll. | 2 | vor Auslieferung |
 | E-41 | **Drei Rätseltypen rendern eine leere Auswahl mit totem Antwortknopf.** `puzzle-sheet.jsx:255-257` und `:268-269` schicken `klang-sinnes-check`, `verstecktes-detail` und `zeitreise` auf `PszMcq`. Diese Zweige sind aber **nur mit leerer Optionenliste erreichbar**, weil `:247` alles mit Optionen vorher abfängt. `PszMcq` erzeugt dann null Antwortknöpfe (`:353-358`), `pick` bleibt `null`, `canSubmit` (`:344`) ist dauerhaft falsch, und das Rätsel ist nur über „Überspringen (0 Punkte)" (`:230-236`) verlassbar. Wie viele Datensätze das trifft, ist **nicht gezählt**: die Markdown-Quellen in `05_Content/facts/` tragen eine andere Typkodierung (`T2`, `T3`, `T9`) als die Datenbank, es braucht die Live-Daten. Zu entscheiden ist, welche Form ein solches Rätsel im Neubau bekommt. Der Zustand ist an `ChoicePuzzle.choices` ablesbar. | 3, verwandt mit E-08 | Phase 4, Schritt 28 |
 | E-42 | **Der 150-Meter-Radius der Foto-Rätsel wirkt in der PWA nie.** `screen-map.jsx:3915` übergibt die Nutzerposition als `userPos`, `puzzle-sheet.jsx:50` erwartet sie als `userPosition`. Folge in `PszPhoto`: `:373` liefert immer `null`, `:374` setzt `inRange = true`, und die Näherungsprüfung `:378` läuft nie. `foto-beweis` und `perspektiven` sind damit von überall mit einem beliebigen Foto lösbar, obwohl `gpsRadius` (`:372`) in den Daten durchgehend auf 150 steht. Dieselbe Klasse wie E-08: ein Defekt der Quelle, der wie Parität aussieht, und wie E-07 einer, der eine Ortsprüfung aushebelt. **Ändert sichtbares Verhalten, geht deshalb an Janek.** | 3, verwandt mit E-07 | Phase 4, Schritt 28 |
-| E-43 | **Die Solo-Jagd läuft auf der Karte, nicht im Challenge-Tab, und der Plan sagt das Gegenteil.** Am 30.08.2026 in der Quelle nachgeschlagen: `handleSetupStart` (`screen-challenge.jsx:4319-4329`) schickt Solo nach `hotspot` und Gruppe nach `invite`, mit dem Kommentar „Neuer Flow (Phase 1): solo + generierte Hunt. Gruppen-Flow bleibt vorerst auf altem Pfad." Läuft eine Jagd, zeigt der Challenge-Tab nur noch `HuntPauseScreen` oder `HuntResultScreen` (`:4293-4317`), und der Knopf dort heisst `onBackToMap`. Gespielt wird auf dem Kartenbildschirm. **Folge für den Plan:** dessen Schritte 36 (Phasen-Maschine) und 37 (Active-UI) beschreiben `SnjdActiveView`, und die schneidet ihre Stationen aus den hartcodierten Demodaten `SNJD_FACTS` (ab `:309`) über `SNJD_ROUTES` (`:179`) und `SNJD_SLICE` (`:307`). Sie sieht eine erzeugte Jagd **nie**, hat Bot-Punktestände im Sekundentakt und einen Knopf „Demo: Ankunft simulieren". Wer 36 und 37 wie geplant baut, baut ein bis zwei Tausend Zeilen für einen Pfad, den Schritt 40 ohnehin ersetzt. **Zu entscheiden: läuft die Solo-Jagd im Neubau auf der Karte, wie in der Quelle, oder im Tab, wie im Plan?** Bis dahin sind 36 und 37 nicht baureif; 33, 34 und 35 sind davon nicht betroffen. | **3** | vor Schritt 36 |
 | E-44 | **Der Faktor 1,5 am letzten Stopp wird angezeigt, aber nicht gutgeschrieben.** `screen-challenge.jsx:2479` übergibt dem Nächster-Fakt-Abzeichen `isLast ? Math.round(diff.points * 1.5) : diff.points`. Die tatsächlich vergebenen Punkte rechnet `handleChallengeComplete` (`:2295-2299`), und dort kommt der Faktor nicht vor. Das Abzeichen verspricht am letzten Stopp das Anderthalbfache, gutgeschrieben wird der einfache Satz. Widerspruch in der Quelle, nicht in E-19. Sichtbares Verhalten. | 3 | Schritt 37 |
-| E-45 | **Gewählte und geschätzte Dauer widersprechen sich.** Der Nutzer wählt 30, 60 oder 90 Minuten (`screen-challenge.jsx:4332`, `stopCountByDuration`), der Generator schreibt danach `estimatedDurationMin: stops.length * 14` (`hunt-generator.jsx:354`). Aus 30 Minuten werden 70, aus 60 werden 98, aus 90 werden 126. Beide Zahlen stehen in der Quelle. Sichtbares Verhalten. | 3 | Schritt 34 oder 39 |
-| E-46 | **Der Startpunkt-Picker ist nicht übersetzt, obwohl die Sprache hereinkommt.** `HotspotPickView` bekommt `lang` und benutzt es nirgends: „Hohe Faktendichte ✓", „Sehr hohe Faktendichte 💎", „Schritt 3 von 3", „Wo startest du?", „Hunt starten →" und „Zurück" stehen hartcodiert deutsch da (`screen-challenge.jsx:3005-3099`). Auf Englisch ist der Bildschirm halb deutsch. Gleiche Klasse wie E-08. Erfundener Text ist keine Lösung, es braucht Schlüssel in der PWA oder Einträge in der Ergänzungs-Map nach E-39. | 3 | Schritt 35 |
 | E-47 | **Drei Bedienelemente im Challenge-Reiter tun bis Schritt 35 nichts.** Seit Schritt 33 zeigt der Reiter den Assistenten. Wer ihn zu Ende bedient, drückt einen vollflächigen roten Knopf „Starten", sieht die Drück-Animation und danach passiert nichts, weil der Startpunkt-Picker fehlt. Dasselbe gilt für die Kachel „Gruppe" und für „Mit Code beitreten", deren Formulare Sitzungen über Supabase anlegen müssten, die es im Neubau nicht gibt. **Eine Sackgasse ist es nicht**, der Zurück-Knopf und die Tab-Leiste bleiben erreichbar, gemessen im Widget-Test. Aber es ist derselbe Zustand, den E-33 beim Kästchen „Angemeldet bleiben" beanstandet, und der Bau begründet an anderer Stelle ausdrücklich, warum die Zufallskarte **nicht** antippbar ist („ein Tipp, der nichts ändert, ist ein Bedienelement, das nichts tut"). Die Ungleichbehandlung ist bewusst, weil eine erfundene Navigation schlechter wäre als keine, aber sie gehört gewusst. Löst sich mit den Schritten 35 und 40 von selbst auf. | 2 | Schritt 35 |
 
 ## Wie Tests hier blind werden
