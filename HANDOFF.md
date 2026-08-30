@@ -53,11 +53,14 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **Ohne Antworten wird die Luft dünn.** Nach Schritt 27 hängt in der
-   Reihenfolge alles: 28 an E-08, 29 bis 32 an E-06, Phase 5 zusätzlich an
-   D-15. Baubar bleiben Teilstücke ohne Einstieg aus Phase 7, also das
-   Reiseregal (45) oder die Trophäenansicht (49). Beide sind ein Sprung nach
-   vorn, keiner braucht eine Antwort.
+1. **Der Rest von Phase 4 ist zu, der Kern von Phase 5 nicht.** 28 hängt an
+   E-08, 30 bis 32 an E-06, 29 nur zur Hälfte (der Hinweistext ist baubar, der
+   Punktabzug nicht). **Frei sind dagegen die Schritte 33 bis 37**, also
+   Wizard, Solo-Setup mit Routengenerator, Startpunkt-Picker, Phasen-Maschine
+   und die Active-UI. Keiner davon fasst die Rätsel-Engine an, das tut erst 38,
+   und **D-15 sperrt nur die Abhängigkeit von `puzzles`, nicht die Schritte
+   davor**. Danach kommen 45, 46 und 49 aus Phase 7. Wer hier weitermacht,
+   springt in der Nummer, nicht in der Architektur.
 
 2. **Sieben Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
    Wortlaut, Stand und Nachträge stehen in `REBUILD_STATUS.md` unter „Fragen an
@@ -70,11 +73,17 @@ siehe „Rechner einrichten".
    hier. Nicht Teil des Blocks und weiter offen: ob der Karten-Host
    im **unsichtbaren Tab** weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht,
    das ist gemessen; die PWA kennt keine Tabs, es gibt also keine Quelle.
-3. **Fünf Kartenanker warten auf ihre Anmeldung.** `DiscoveryAnchors` führt
-   `balloon`, `user-marker`, `coins`, `mode-tour` und `compass` bereits als
-   Kennungen. Sobald die Kartenwidgets sie mit `AnchorTarget` einhüllen, werden
-   die fünf degradierenden Tutorial-Schritte voll baubar, ohne dass
-   `lib/app/onboarding/` sich ändert.
+3. **Zwei Kartenanker fehlen noch, nicht fünf.** Diese Zeile stand bis zum
+   30.08.2026 falsch hier: `discovery_anchors.dart:24-30` sagt, dass `coins`,
+   `modeFactFinder`, `modeTour` und `compass` sich seit dem Top-Chrome aus
+   Schritt 19 selbst anmelden. Übrig sind **`balloon`** und **`userMarker`**.
+   `balloon` ist heute baubar und hängt an nichts: die Quelle sucht dafür den
+   Marker nächst der **Rahmenmitte** (nicht nächst dem Nutzer) und nimmt bei
+   Fehlanzeige ein festes Ersatzrechteck, `screen-tour.jsx:193-224`.
+   `userMarker` dagegen wartet auf Schritt 18, denn den Marker selbst gibt es
+   im Code noch gar nicht, und der hängt an E-10. Wer einen baut, streicht die
+   Kennung aus `knownMissing`, sonst schlägt
+   `discovery_anchors_test.dart` an.
 4. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
    technische Sperre ist seit E-39 weg. Vorschlag DE/EN liegt in
    `REBUILD_STATUS.md` bei E-28, hergeleitet und nicht freigegeben.
