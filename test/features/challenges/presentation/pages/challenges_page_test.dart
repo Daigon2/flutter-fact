@@ -14,7 +14,15 @@ import 'package:fact_app/features/challenges/presentation/widgets/challenge_bubb
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_genre_filter.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_player_badge.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_setup_view.dart';
+import 'package:fact_app/features/challenges/presentation/widgets/hunt_start_point_view.dart';
+import 'package:fact_app/features/facts/application/fact_providers.dart';
+import 'package:fact_app/features/facts/domain/entities/fact.dart';
+import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_city.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_coordinates.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,6 +52,7 @@ void main() {
     Size size = const Size(390, 844),
     double textScale = 1,
     AppLanguage language = AppLanguage.de,
+    List<Fact> facts = const <Fact>[],
   }) async {
     tester.view
       ..physicalSize = size * 3
@@ -58,6 +67,13 @@ void main() {
           languagePreferenceStoreProvider.overrideWithValue(
             InMemoryLanguagePreferenceStore(language),
           ),
+          // **Pflicht, kein Beiwerk.** Ohne Override liefert
+          // `unavailableFactRepository` eine `FactBackendUnreachable`, und
+          // Riverpod wiederholt einen gescheiterten Provider zehnmal über rund
+          // 38 Sekunden. Der erste dieser Zeitgeber überlebt den Widget-Baum
+          // und der Test endet mit „A Timer is still pending". Derselbe Grund,
+          // aus dem `map_page_test.dart` `factOverlayProvider` überschreibt.
+          allFactsProvider.overrideWith((ref) async => facts),
         ],
         child: MaterialApp(
           theme: FactTheme.light(),
@@ -84,6 +100,20 @@ void main() {
 
   Future<void> goToStepTwo(WidgetTester tester) =>
       tapAt(tester, find.byKey(ChallengeSetupView.soloKey));
+
+  /// Bedient den Assistenten bis zum Startpunkt-Picker.
+  Future<void> goToPicker(WidgetTester tester) async {
+    await goToStepTwo(tester);
+    await tapAt(
+      tester,
+      find.byKey(ChallengeSetupView.difficultyKey(FactPuzzleDifficulty.leicht)),
+    );
+    await tapAt(
+      tester,
+      find.byKey(ChallengeSetupView.durationKey(HuntDuration.thirty)),
+    );
+    await tapAt(tester, find.byKey(ChallengeSetupView.startKey));
+  }
 
   group('Schritt 1', () {
     testWidgets('zeigt den Hero, beide Abzeichen und den Beitritt', (
@@ -305,27 +335,16 @@ void main() {
       expect(_startOpacity(tester), 1);
     });
 
-    testWidgets('startet heute keine Jagd', (WidgetTester tester) async {
-      // Die Seite lässt den Rückruf bewusst leer, siehe `challenges_page.dart`.
-      // Der Startpunkt-Picker ist Schritt 35. Diese Zusicherung hält den
-      // heutigen Stand fest: der Assistent bleibt stehen, und es fliegt nichts.
+    testWidgets('führt in den Startpunkt-Picker', (WidgetTester tester) async {
+      // `setView('hotspot')`, `:4325`. Seit Schritt 35 tut der Knopf etwas;
+      // der Teil von E-47, der ihn betraf, ist damit erledigt.
       await pump(tester);
-      await goToStepTwo(tester);
-      await tapAt(
-        tester,
-        find.byKey(
-          ChallengeSetupView.difficultyKey(FactPuzzleDifficulty.leicht),
-        ),
-      );
-      await tapAt(
-        tester,
-        find.byKey(ChallengeSetupView.durationKey(HuntDuration.thirty)),
-      );
-      await tapAt(tester, find.byKey(ChallengeSetupView.startKey));
+      await goToPicker(tester);
 
       expect(tester.takeException(), isNull);
-      expect(find.text('2/3'), findsOneWidget);
-      expect(find.byKey(ChallengeSetupView.startKey), findsOneWidget);
+      expect(find.byType(HuntStartPointView), findsOneWidget);
+      expect(find.byKey(ChallengeSetupView.startKey), findsNothing);
+      expect(find.text('SCHRITT 3 VON 3'), findsOneWidget);
     });
 
     testWidgets('Gruppe und Beitritt führen heute nirgendwohin', (
@@ -825,6 +844,148 @@ void main() {
     });
   });
 
+  group('Startpunkt-Picker', () {
+    testWidgets('ohne Ortung stehen die drei Münchner Hotspots da', (
+      WidgetTester tester,
+    ) async {
+      // Der Ortungsdienst ist im Test der untätige Standard, also gibt es
+      // keine Position: „Hier wo ich bin" entfällt, und die Hotspots stehen in
+      // Dateireihenfolge, auf drei geschnitten (`:3012`).
+      await pump(tester);
+      await goToPicker(tester);
+
+      expect(find.text('Hier wo ich bin'), findsNothing);
+      expect(find.text('Marienplatz'), findsOneWidget);
+      expect(find.text('Viktualienmarkt'), findsOneWidget);
+      expect(find.text('Odeonsplatz'), findsOneWidget);
+      // Der vierte Münchner Hotspot fällt weg.
+      expect(find.text('Englischer Garten / Chinesischer Turm'), findsNothing);
+    });
+
+    testWidgets('„Zurück" führt in den Assistenten und setzt ihn zurück', (
+      WidgetTester tester,
+    ) async {
+      // `onBack={() => setView('setup')}`, `:4444`. Der Assistent wird dabei
+      // neu aufgebaut und steht wieder auf Schritt 1, wie in der Quelle.
+      await pump(tester);
+      await goToPicker(tester);
+      await tapAt(tester, find.byKey(HuntStartPointView.backKey));
+
+      expect(find.byType(HuntStartPointView), findsNothing);
+      expect(find.text('1/3'), findsOneWidget);
+    });
+
+    testWidgets('ohne Fakten meldet der Picker und schickt zurück', (
+      WidgetTester tester,
+    ) async {
+      // `:4347-4352`: liefert der Generator nichts, zeigt die Quelle eine
+      // kurze Meldung und stellt den Assistenten wieder her.
+      await pump(tester);
+      await goToPicker(tester);
+      await tapAt(tester, find.byKey(HuntStartPointView.startKey));
+
+      expect(find.byKey(ChallengesPage.toastKey), findsOneWidget);
+      expect(
+        find.text(stringsOf().text('challenge.hotspot.noFacts')),
+        findsOneWidget,
+      );
+      expect(find.byType(HuntStartPointView), findsNothing);
+      expect(find.text('1/3'), findsOneWidget);
+    });
+
+    testWidgets('die Meldung verschwindet nach 2800 Millisekunden', (
+      WidgetTester tester,
+    ) async {
+      // `setTimeout(() => setChalToast(null), 2800)`, `:4166`.
+      //
+      // **Ohne `pumpAndSettle` nach dem Tipp.** Das würde die Uhr um die
+      // Einblendung weiterdrehen, und die 2800 wären danach nicht mehr von
+      // diesem Zeitpunkt aus gemessen. Die Zahl steht hier ausgeschrieben und
+      // nicht als `ChallengeToast.visibleFor`: eine Zusicherung gegen die
+      // Konstante, die sie festnageln soll, prüft nichts (Muster 18).
+      await pump(tester);
+      await goToPicker(tester);
+      await tester.ensureVisible(find.byKey(HuntStartPointView.startKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(HuntStartPointView.startKey));
+      await tester.pump();
+
+      await tester.pump(const Duration(milliseconds: 2799));
+      expect(find.byKey(ChallengesPage.toastKey), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 2));
+      expect(find.byKey(ChallengesPage.toastKey), findsNothing);
+    });
+
+    testWidgets('die Meldung sitzt 64 Pixel unter der Oberkante, nicht 300', (
+      WidgetTester tester,
+    ) async {
+      // `top: 64`, `:4410`. Farbe und Einblendezeit prüft
+      // `challenge_toast_test.dart` isoliert; die Position ist Sache dieser
+      // Seite, die den Toast dort platziert.
+      await pump(tester);
+      await goToPicker(tester);
+      await tapAt(tester, find.byKey(HuntStartPointView.startKey));
+
+      final Rect page = tester.getRect(find.byType(ChallengesPage));
+      final Rect toast = tester.getRect(find.byKey(ChallengesPage.toastKey));
+
+      expect(toast.top - page.top, closeTo(64, 0.5));
+    });
+
+    testWidgets('mit genug Fakten erscheint keine Meldung', (
+      WidgetTester tester,
+    ) async {
+      // Der Gegenbeweis zur Meldung: derselbe Weg mit einem Bestand, aus dem
+      // der Generator eine Jagd bauen kann. Sichtbar passiert danach
+      // **nichts**, und das ist kein Versehen: wohin die fertige Jagd geht,
+      // ist D-16 und liegt bei Dairen. Diese Zusicherung ist die Stelle, die
+      // auffällt, sobald jemand den Empfänger einhängt.
+      await pump(tester, facts: _munichFacts());
+      await goToPicker(tester);
+      await tapAt(tester, find.byKey(HuntStartPointView.startKey));
+
+      expect(find.byKey(ChallengesPage.toastKey), findsNothing);
+      expect(find.byType(HuntStartPointView), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('ein Fakt ohne Stadt landet nicht im Kandidatenpool', (
+      WidgetTester tester,
+    ) async {
+      // `facts.city` darf `NULL` sein, und die Quelle rät dann mit
+      // `detectCity` die nächste Pilotstadt (`hunt-generator.jsx:110-121`).
+      // Dieses Raten ist E-11 und wird hier nicht nachgebaut: derselbe
+      // Bestand ohne Stadt ergibt keine Jagd.
+      await pump(tester, facts: _munichFacts(withCity: false));
+      await goToPicker(tester);
+      await tapAt(tester, find.byKey(HuntStartPointView.startKey));
+
+      expect(find.byKey(ChallengesPage.toastKey), findsOneWidget);
+    });
+
+    for (final String spelling in <String>['münchen', 'muenchen', 'MÜNCHEN']) {
+      testWidgets(
+        'ein Kandidatenpool mit der Schreibweise "$spelling" fällt nicht weg '
+        '(E-11)',
+        (WidgetTester tester) async {
+          // `_factsOfCity` vergleicht über `FactCity.matchesSlug` und nicht
+          // über einen reinen Anzeigenamen-Vergleich. Dreht man das zurück,
+          // bleibt der Kandidatenpool für jede Schreibweise außer der exakten
+          // `München` leer, und der Nutzer sieht nur die Meldung, obwohl
+          // Fakten da wären. Dieselben drei Schreibweisen prüft
+          // `hunt_hotspot_test.dart` schon für die Hotspots.
+          await pump(tester, facts: _munichFacts(citySpelling: spelling));
+          await goToPicker(tester);
+          await tapAt(tester, find.byKey(HuntStartPointView.startKey));
+
+          expect(find.byKey(ChallengesPage.toastKey), findsNothing);
+          expect(find.byType(HuntStartPointView), findsOneWidget);
+        },
+      );
+    }
+  });
+
   group('Maße', () {
     // Muster 1 und 2 aus `REBUILD_STATUS.md`: ein Umbruch ist kein Überlauf,
     // und ein `Stack` beschneidet lautlos. Deshalb wird hier beides geprüft,
@@ -902,4 +1063,44 @@ void _expectInsideScreen(WidgetTester tester, Size size) {
   }
 
   walk(tester.renderObject(find.byType(ChallengesPage)));
+}
+
+/// Ein Bestand, aus dem der Generator eine Jagd über fünf Stationen bauen kann.
+///
+/// Fünf mal fünf Fakten im Abstand von 300 Metern um den Marienplatz, also
+/// diagonal 424 und damit fast genau der bevorzugte Abstand des Generators
+/// (`hunt-generator.jsx:126`). Dieselbe Anlage wie in
+/// `hunt_route_generator_test.dart`.
+List<Fact> _munichFacts({
+  bool withCity = true,
+  String citySpelling = 'München',
+}) {
+  const double metersPerDegreeLatitude = 2 * 3.141592653589793 * 6371000 / 360;
+  final List<Fact> facts = <Fact>[];
+  int id = 1;
+  for (int row = -2; row <= 2; row++) {
+    for (int column = -2; column <= 2; column++) {
+      facts.add(
+        Fact(
+          id: FactId(id),
+          content: FactText(title: 'Fakt $id'),
+          city: withCity ? FactCity(citySpelling) : null,
+          coordinates: FactCoordinates(
+            latitude: 48.1374 + row * 300 / metersPerDegreeLatitude,
+            longitude:
+                11.5755 + column * 300 / (metersPerDegreeLatitude * 0.6675),
+          ),
+          puzzles: const <FactPuzzle>[
+            FactPuzzle(
+              question: 'Wie viele Löwen bewachen das Tor?',
+              type: 'inschrift',
+              confidence: 'curated',
+            ),
+          ],
+        ),
+      );
+      id++;
+    }
+  }
+  return facts;
 }

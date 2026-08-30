@@ -1063,7 +1063,49 @@ Ausgang von Schritt 2. 1625 → 1725 Tests.
   Exit-Code 1 ab. Zweimal unabhängig gemessen. Die Schlussfolgerung stimmte,
   der Weg dorthin nicht. Siehe E-35.
 
-- [x] 33. Wizard · [x] 34. Solo-Setup · [ ] 35. Hotspot-Picker
+### Schritt 35, was daran gemessen ist
+
+1729 → 1813 Tests. Der Picker schliesst den Ausgang des Assistenten an: „Starten"
+führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
+
+- **Er braucht keine Karte, und das ist gemessen.** `HotspotPickView` ist eine
+  Liste mit höchstens vier Radioknöpfen; die zwei `map`-Treffer darin sind
+  `Array.map`. Die Regel aus Schritt 12, dass ein Feature den Karten-Host nie
+  selbst mountet, ist gar nicht berührt, und am Kameravertrag fehlt nichts.
+- **Zwei verschiedene Dichten, nicht eine.** Für „Hier wo ich bin" werden Fakten
+  im Umkreis von 600 Metern gezählt, für die Hotspots wird das Feld `density`
+  gelesen. Beide Wege ergeben eine Beschriftung „Hohe Faktendichte", aber mit
+  verschiedenen Zeichen, `✓` gezählt und `💎` gelesen. Wortgleich übernommen und
+  als zwei getrennte Werte modelliert.
+- **Die kuratierten Datendateien haben jetzt ein Muster statt einer Lösung.**
+  `tool/generate_curated_data.dart` liest die PWA direkt, schreibt eine
+  eingecheckte Dart-Datei und meldet mit `--check` Drift. Es trägt eine
+  **Registrierung**: `wallet-colors.jsx`, `hunt-routes.jsx`, `damals-heute.jsx`
+  und `city-intros.jsx` kosten je einen Listeneintrag, kein zweites Werkzeug.
+  Fünf Werkzeuge mit fünf Aufrufen vergisst nach dem dritten Mal jemand.
+- **E-11 kostet damit eine Stelle statt zehn.** Die erzeugte Tabelle trägt den
+  Schlüssel wörtlich wie die Quelle, normalisiert wird über `FactCity.slug`. Der
+  Stadtname geht nirgends als roher String durch. Nebenbei belegt: es sind
+  **drei** Schreibweisen im Umlauf, nicht zwei, denn `wallet-colors.jsx` nimmt
+  Kleinschreibung mit Umlauten.
+- **Der lehrreichste Teil sind die zwei Mutationsläufe.** Der Bauende fuhr zwölf
+  Mutationen, zwölf fielen. Die Review fuhr zwölf andere, **zwölf überlebten**.
+  Wer seine eigenen Zusicherungen mutiert, misst, wie gut er getroffen hat, was
+  er ohnehin im Blick hatte; erst ein fremder Blick misst, was fehlt. Nach der
+  Nachbesserung fallen alle zwölf, dazu zwei Lücken, die beim Messen auffielen.
+- **Der schwerste Fund war eine Wiederholung von Schritt 15.** Die Faktenliste
+  der Kartenüberlagerung auf leer zu setzen liess **kein einziges Fakt** auf der
+  Karte erscheinen, bei 1792 grünen Tests. Dieser Block hatte genau diese Ebene
+  angefasst, mit der Begründung „sichtbar ändert sich nichts", die stimmte und
+  nirgends belegt war. Belegt ist sie jetzt: gemessen bleibt die Wiederholkette
+  bei elf Repository-Aufrufen, vorher wie nachher.
+- **Eine Grenze liess sich nicht so prüfen, wie sie dasteht.** Der 600-Meter-Fall
+  ist mit einem Punkt „genau 600 Meter nördlich" nicht messbar, weil die
+  Umrechnung real 599,9999999999262 Meter ergibt und die Zusicherung dann mit
+  `<=` **und** mit `<` grün wäre. Geprüft wird deshalb gegen die gemessene
+  Entfernung selbst.
+
+- [x] 33. Wizard · [x] 34. Solo-Setup · [x] 35. Hotspot-Picker
 - [!] 36. Phasen-Maschine (E-43 entschieden, wartet auf D-16) · [!] 37. Active-UI (dito)
   · [!] 38. Rätsel und Ökonomie
 - [ ] 39. Pause und Results · [!] 40. Gruppen-Flow (Realtime-Entscheidung)

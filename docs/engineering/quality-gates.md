@@ -122,12 +122,31 @@ dart run tool/check_architecture.dart
 
 Critical backend migrations additionally run Supabase policy/function tests.
 
-Two gates are absent from that list on purpose and must not be reported as
+### Drift checks for generated files
+
+Three tools verify that checked-in generated files still match their source.
+All three must exit 0 before a change is merged:
+
+```text
+dart run tool/generate_i18n.dart --check
+dart run tool/bake_map_style.dart --check
+dart run tool/generate_curated_data.dart --check
+```
+
+They are **not** part of the CI gate list above, and that is a limitation, not
+an oversight: `generate_i18n` and `generate_curated_data` read the PWA in the
+read-only repository, which CI has no access to. Both exit 2 with instructions
+when the source is unreachable. `flutter test` runs without it, because the
+generated files are versioned. Until CI has the source, these three run
+locally, and a hand-edited generated file would pass CI.
+
+Two gates are absent from the CI list on purpose and must not be reported as
 running:
 
 - Riverpod lint, see "Accepted deviation: no Riverpod lint" above;
-- the generated-code consistency check, because `tool/check_generated_code.dart`
-  does not exist yet.
+- a single generated-code consistency check. There is no
+  `tool/check_generated_code.dart`; the three tools above cover that ground
+  file by file instead.
 
 ## Pull request architecture section
 

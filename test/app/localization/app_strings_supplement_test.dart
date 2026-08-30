@@ -35,7 +35,7 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die einundzwanzig belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die sechsunddreißig belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
@@ -46,7 +46,12 @@ void main() {
       // `:176` und `:194`. Die zwölf `challenge.`-Schlüssel mit dem
       // Schnitzeljagd-Assistenten, `screen-challenge.jsx:1545`, `:1551`,
       // `:1574-1576`, `:1660`, `:1851-1867`, `:1896`, `:1900-1902`, `:1912`
-      // und `:1986`.
+      // und `:1986`. Die fünfzehn `challenge.hotspot.`-Schlüssel am
+      // 30.08.2026 mit dem Startpunkt-Picker, `screen-challenge.jsx:3005-3007`,
+      // `:3015-3018`, `:3025`, `:3034`, `:3046`, `:3055`, `:3057`, `:3059`,
+      // `:3093` und `:4348-4350`. **Vierzehn davon sind auf Englisch
+      // hergeleitet und warten auf Freigabe (E-46)**, nur
+      // `challenge.hotspot.noFacts` steht in beiden Sprachen in der Quelle.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
         'tour.stepCounter',
         'tour.step1.meta',
@@ -69,6 +74,21 @@ void main() {
         'challenge.setup.topicsHintOne',
         'challenge.setup.topicsHintMany',
         'challenge.setup.startCta',
+        'challenge.hotspot.here',
+        'challenge.hotspot.densityLocalHigh',
+        'challenge.hotspot.densityLocalMedium',
+        'challenge.hotspot.densityLocalLow',
+        'challenge.hotspot.densityVeryHigh',
+        'challenge.hotspot.densityHigh',
+        'challenge.hotspot.densityMedium',
+        'challenge.hotspot.density',
+        'challenge.hotspot.walkMinutes',
+        'challenge.hotspot.stepCounter',
+        'challenge.hotspot.title',
+        'challenge.hotspot.subtitle',
+        'challenge.hotspot.startCta',
+        'challenge.hotspot.empty',
+        'challenge.hotspot.noFacts',
       });
     });
 

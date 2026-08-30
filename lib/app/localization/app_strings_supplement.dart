@@ -230,6 +230,89 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // also einen anderen Text mit Pfeil, und gehört zum alten
     // Setup-Bildschirm.
     'challenge.setup.startCta': 'Starten',
+
+    // ── Startpunkt-Picker, `screen-challenge.jsx:2979-3102` ────────────
+    //
+    // E-46: **der deutsche Teil ist Abschrift, der englische ist
+    // hergeleitet.** Die Quelle schreibt jeden dieser Texte hartcodiert
+    // ins JSX, ohne `t()` und ohne englische Fassung; der Picker ist im
+    // englischen Modus also vollständig deutsch. Die deutschen Werte
+    // stehen deshalb wortgleich hier, einschließlich Zeichen und
+    // Gedankenstrich.
+    //
+    // **Die englischen Fassungen unten warten auf Janeks Bestätigung.**
+    // Sie sind hergeleitet und nicht freigegeben, wie bei E-28. Bis dahin
+    // ist der Bildschirm in beiden Sprachen vollständig und der erfundene
+    // Anteil als solcher markiert. Die einzige Ausnahme ist
+    // `challenge.hotspot.noFacts`: dafür stehen **beide** Sprachen in der
+    // Quelle (`:4348-4350`), der Wert ist also Abschrift.
+    //
+    // Zum Präfix `challenge.hotspot.`: der Picker heißt in der Quelle
+    // `HotspotPickView` und wird über `view === 'hotspot'` eingeblendet
+    // (`:4441`). Die Schlüssel sitzen damit sichtbar bei
+    // `challenge.setup.*` und sind trotzdem vom Assistenten getrennt.
+
+    // Die erste Zeile der Auswahl, `:3025`. Sie erscheint nur, wenn eine
+    // Nutzerposition vorliegt.
+    'challenge.hotspot.here': 'Hier wo ich bin',
+
+    // Die drei **gezählten** Dichten, `:3005-3007`.
+    //
+    // Nicht mit den drei gelesenen darunter verwechseln: „Hohe
+    // Faktendichte" steht zweimal in der Quelle, einmal mit `✓` und
+    // einmal mit `💎`. Gleiche Worte, anderes Zeichen, und beide werden
+    // gezeigt. Wer hier zusammenlegt, ändert sichtbares Verhalten.
+    'challenge.hotspot.densityLocalHigh': 'Hohe Faktendichte ✓',
+    'challenge.hotspot.densityLocalMedium': 'Mittlere Dichte 🟡',
+    // Der Gedankenstrich steht so in der Quelle; die Schreibregel gegen
+    // Gedankenstriche gilt für selbst formulierten Text, nicht für eine
+    // Abschrift. Dieselbe Begründung wie bei `puzzle.photoCaption`.
+    'challenge.hotspot.densityLocalLow':
+        'Wenig Fakten ⚠ — empfohlen sind dichte Gebiete',
+
+    // Die vier **gelesenen** Dichten, `:3015-3018`. Der letzte ist der
+    // Rückfall der Quelle für jeden Wert, den sie nicht kennt.
+    'challenge.hotspot.densityVeryHigh': 'Sehr hohe Faktendichte 💎',
+    'challenge.hotspot.densityHigh': 'Hohe Faktendichte 💎',
+    'challenge.hotspot.densityMedium': 'Mittlere Faktendichte ✨',
+    'challenge.hotspot.density': 'Faktendichte',
+
+    // Der Zusatz hinter der Dichte, `:3034`:
+    // `` · ~${walkMin(h.dist)} Min Fußweg``. Das Trennzeichen ` · ` steht
+    // in der Quelle **außerhalb** dieses Textes und deshalb auch hier im
+    // Widget: ein Trennzeichen am Anfang eines Sprachwerts überlebt die
+    // erste Übersetzung nicht.
+    'challenge.hotspot.walkMinutes': '~{minutes} Min Fußweg',
+
+    // Die Kickerzeile, `:3055`. Die Quelle schreibt „Schritt 3 von 3"
+    // wörtlich hin; die Großschreibung kommt aus
+    // `textTransform: 'uppercase'` am Element (`:3054`) und steht deshalb
+    // nicht im Wert, sondern im Widget.
+    //
+    // Nicht `tour.stepCounter` benutzen: das gehört dem Tutorial, trägt
+    // die Großschreibung im Wert und würde beim nächsten Umbau des
+    // Tutorials still diesen Bildschirm ändern.
+    'challenge.hotspot.stepCounter': 'Schritt {step} von {total}',
+
+    // Überschrift und Unterzeile, `:3057` und `:3059`.
+    'challenge.hotspot.title': 'Wo startest du?',
+    'challenge.hotspot.subtitle':
+        'Wir setzen die ersten Rätsel in der Nähe deines Startpunkts.',
+
+    // Der Startknopf, `:3093`. Der Pfeil steht im Text, wie in der
+    // Quelle.
+    'challenge.hotspot.startCta': 'Hunt starten →',
+
+    // Der Zustand ohne jede Auswahl, `:3046`. Er tritt nur ein, wenn es
+    // **weder** eine Nutzerposition **noch** einen Hotspot der Stadt
+    // gibt.
+    'challenge.hotspot.empty':
+        'Für diese Stadt sind noch keine Hotspots vorhanden.',
+
+    // Der Hinweis, wenn der Generator nichts liefert, `:4348-4350`.
+    // **Beide Sprachen stehen in der Quelle**, hier ist nichts erfunden.
+    'challenge.hotspot.noFacts':
+        'Für diese Stadt sind noch keine klassifizierten Fakten verfügbar.',
   },
   AppLanguage.en: <String, String>{
     'tour.stepCounter': 'STEP {step} OF {total}',
@@ -270,6 +353,42 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'challenge.setup.topicsHintMany':
         'Filtering by {count} topics — fewer facts available',
     'challenge.setup.startCta': 'Start',
+
+    // ── Startpunkt-Picker ──────────────────────────────────────────────
+    //
+    // **Alles hier außer `noFacts` wartet auf Janeks Bestätigung (E-46).**
+    // Die Quelle hat für diesen Bildschirm keine englische Fassung, sie
+    // zeigt ihn auch im englischen Modus deutsch. Diese Werte sind
+    // hergeleitet, nicht abgeschrieben, und dürfen ersetzt werden, ohne
+    // dass sich ein Schlüsselname oder eine Aufrufstelle ändert.
+    // Begründungen zu Schlüsselnamen und Zeichen stehen in der DE-Karte.
+    // Die drei Werte dieses Blocks, die am weitesten vom Original
+    // abweichen, für die Freigabe einzeln markiert: hier ist nichts
+    // übersetzt, sondern frei formuliert, weil die Quelle für diesen
+    // Bildschirm gar keine englische Fassung hat.
+    'challenge.hotspot.here': 'Right where I am', // am freiesten formuliert
+    'challenge.hotspot.densityLocalHigh': 'High fact density ✓',
+    'challenge.hotspot.densityLocalMedium': 'Medium density 🟡',
+    // Am freiesten formuliert. Ohne Gedankenstrich, anders als die
+    // deutsche Zeile: die deutsche ist Abschrift aus der Quelle
+    // (`screen-challenge.jsx:3007`) und behält ihren, diese hier ist eigene
+    // Formulierung und folgt deshalb der Schreibregel des Projekts.
+    'challenge.hotspot.densityLocalLow': 'Few facts ⚠: dense areas work better',
+    'challenge.hotspot.densityVeryHigh': 'Very high fact density 💎',
+    'challenge.hotspot.densityHigh': 'High fact density 💎',
+    'challenge.hotspot.densityMedium': 'Medium fact density ✨',
+    'challenge.hotspot.density': 'Fact density',
+    'challenge.hotspot.walkMinutes': '~{minutes} min walk',
+    'challenge.hotspot.stepCounter': 'Step {step} of {total}',
+    'challenge.hotspot.title': 'Where do you start?',
+    'challenge.hotspot.subtitle':
+        'We place the first riddles near your starting point.',
+    'challenge.hotspot.startCta': 'Start hunt →', // am freiesten formuliert
+    'challenge.hotspot.empty': 'No hotspots available for this city yet.',
+    // Der einzige Wert dieses Blocks, den die Quelle selbst auf Englisch
+    // hat, `:4349`. Abschrift, keine Herleitung.
+    'challenge.hotspot.noFacts':
+        'No classified facts available for this city yet.',
   },
 };
 

@@ -20,7 +20,7 @@
 ///
 /// ## Mehrstädtigkeit
 ///
-/// Geladen wird mit [FactQuery.all], also **ohne Stadtfilter**. Das ist kein
+/// Geladen wird **ohne Stadtfilter**, siehe [allFactsProvider]. Das ist kein
 /// Versäumnis: die Stadtauswahl gehört `features/city`, die es noch nicht
 /// gibt, und eine hier fest verdrahtete Stadt wäre genau die Annahme, die die
 /// globale Invariante verbietet. Die Quelle lädt aus demselben Grund alle
@@ -32,9 +32,7 @@ import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
-import 'package:fact_app/features/facts/domain/entities/fact_batch.dart';
-import 'package:fact_app/features/facts/domain/repositories/fact_repository.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_query.dart';
+import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -68,8 +66,15 @@ final FutureProvider<MapOverlay> factOverlayProvider =
       // Vor dem `await` gelesen: nach einer Unterbrechung ist ein `ref.watch`
       // nicht mehr das, was es vorher war, und die Abhängigkeit soll an diesem
       // Provider hängen und nicht an der Reihenfolge der Mikrotasks.
-      final FactRepository repository = ref.watch(factRepositoryProvider);
+      //
+      // **Seit Schritt 35 wird nicht mehr selbst geladen.** Der zweite
+      // Verbraucher der vollständigen Faktenliste ist der Startpunkt-Picker
+      // in `challenges`, und Regel 8 lässt ihn nicht an diesen Provider
+      // heran. Das Laden ist deshalb nach
+      // `features/facts/application/fact_providers.dart` gewandert; hier
+      // bleibt allein die Umformung zur Überlagerung. Sichtbar ändert das
+      // nichts: dieselbe Abfrage, dasselbe Ergebnis, ein Abruf statt zweien.
+      final Future<List<Fact>> facts = ref.watch(allFactsProvider.future);
       final DiagnosticSink diagnostics = ref.watch(diagnosticSinkProvider);
-      final FactBatch batch = await repository.fetchFacts(query: FactQuery.all);
-      return factOverlayOf(batch.facts, diagnostics: diagnostics);
+      return factOverlayOf(await facts, diagnostics: diagnostics);
     });

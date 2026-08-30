@@ -35,6 +35,7 @@ import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/entities/fact_batch.dart';
 import 'package:fact_app/features/facts/domain/repositories/fact_repository.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_query.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Woher die App ihre Fakten bekommt.
@@ -45,6 +46,43 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Override wäre sonst eine App mit leerer Karte und ohne jede Meldung.
 final Provider<FactRepository> factRepositoryProvider =
     Provider<FactRepository>((ref) => unavailableFactRepository);
+
+/// Alle veröffentlichten Fakten, einmal geladen und von allen Features geteilt.
+///
+/// ## Warum es diesen Provider ab Schritt 35 gibt
+///
+/// Bis dahin gab es genau einen Verbraucher der vollständigen Liste,
+/// `factOverlayProvider` in `discovery`, und der lud sie selbst. Der
+/// Startpunkt-Picker ist der zweite: er zählt die Fakten im Umkreis von 600
+/// Metern (`screen-challenge.jsx:2995-3001`) und übergibt dem Routengenerator
+/// seinen Kandidatenpool. Regel 8 lässt ihn nicht an den Provider von
+/// `discovery`, und ein zweiter eigener Ladevorgang wären zwei vollständige
+/// Abrufe derselben Tabelle beim ersten Öffnen des Reiters.
+///
+/// Deshalb steht das Laden hier, in der Application-Schicht des Features, dem
+/// die Daten gehören, und beide Verbraucher hängen daran. Das ist derselbe
+/// Zwang, aus dem [factRepositoryProvider] entstanden ist, siehe Kopf dieser
+/// Datei.
+///
+/// ## Ohne Stadtfilter, und das ist kein Versäumnis
+///
+/// [FactQuery.all], wie `api.jsx:119` in der Quelle. Die Stadtauswahl gehört
+/// `features/city`, das es nicht gibt; eine hier verdrahtete Stadt wäre genau
+/// die Annahme, die die Mehrstadt-Invariante verbietet. Wer eine Stadt
+/// braucht, filtert selbst über [FactCity.matchesSlug], und der
+/// Startpunkt-Picker tut genau das.
+///
+/// **Eine leere Liste ist hier nicht dasselbe wie ein Fehlschlag.**
+/// `FactRepository` wirft bei Infrastrukturproblemen, und der `AsyncError`
+/// bleibt sichtbar; eine Stadt ohne Fakten sähe sonst aus wie ein Netzfehler.
+final FutureProvider<List<Fact>> allFactsProvider = FutureProvider<List<Fact>>((
+  ref,
+) async {
+  // Vor dem `await` gelesen, aus demselben Grund wie unten.
+  final FactRepository repository = ref.watch(factRepositoryProvider);
+  final FactBatch batch = await repository.fetchFacts(query: FactQuery.all);
+  return batch.facts;
+});
 
 /// Ein einzelner Fakt, für die Akte-Ansicht.
 ///

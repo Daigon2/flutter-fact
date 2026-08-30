@@ -17,22 +17,22 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 
 ## Stand
 
-**Zuletzt aktualisiert:** 30.08.2026
+**Zuletzt aktualisiert:** 31.08.2026
 
 Phase 0 und Phase 1 sind abgeschlossen. Aus Phase 2 sind laut Protokoll die
 Schritte 12, 13, 15, 16, 17 und 19 fertig, offen bleiben dort 14, 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
-den Schritten 33 und 34.
+den Schritten 33, 34 und 35.
 
-**Fertig sind 21 von 50:** 1 bis 13, dazu 15, 16, 17, 19, 21, 27, 33 und 34. Der
+**Fertig sind 22 von 50:** 1 bis 13, dazu 15, 16, 17, 19, 21, 27, 33, 34 und 35. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
 steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
 Kästchen war das Veraltete, nicht der Stand.
 
-**Kennzahlen:** 1729 Tests grün, alle vier Gates auf Exit-Code 0, dazu
-`dart run tool/generate_i18n.dart --check` und
-`dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
+**Kennzahlen:** 1813 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
+`generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
 **Stand der optischen Prüfung:** am 29.08.2026 zum ersten Mal **mit echter
 Karte und echten Daten** am Emulator gesehen (Pixel 8, 411 logische Pixel,
@@ -54,12 +54,13 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **Schritt 35, der Startpunkt-Picker.** Baubar ohne jede Antwort, und er
-   **braucht keine Karte**: er ist eine Liste mit höchstens vier Radioknöpfen,
-   das ist an der Quelle gemessen. Was er mitbringt: eine kuratierte Datendatei
-   nach deutschem Stadtnamen verschlüsselt (E-11), ein `--check`-Werkzeug
-   dagegen nach dem Vorbild von `bake_map_style.dart`, und die hergeleiteten
-   Wortlaute aus E-46, die als nicht freigegeben zu markieren sind.
+1. **Der `balloon`-Anker und der CI-Workflow**, beide ohne jede Antwort baubar.
+   Der Anker macht zwei Tutorial-Schritte voll baubar, siehe Punkt 5. Der
+   CI-Workflow ist der grösste Punkt ausserhalb der 50 Schritte:
+   `.github/workflows/` existiert nicht, **kein einziges Gate läuft
+   automatisch**. Eine Einschränkung gehört dazu und steht in
+   `quality-gates.md`: zwei der drei Drift-Werkzeuge lesen die PWA im Lese-Repo
+   und können in CI nicht laufen. Vier der sieben Prüfungen wären automatisch.
 
 2. **Die Schritte 36 und 37 warten auf D-16, nicht mehr auf Janek.** E-43 ist am
    30.08.2026 entschieden: die Solo-Jagd läuft auf der **Karte**, wie die
@@ -106,6 +107,20 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Schritt 35, und zwei Mutationsläufe mit gegensätzlichem Ergebnis
+
+Der Startpunkt-Picker steht, „Starten" führt jetzt irgendwohin, und die
+kuratierten Datendateien der PWA haben ein Muster bekommen statt einer Lösung:
+ein Werkzeug mit Registrierung, die nächste Datei kostet einen Listeneintrag.
+1729 → 1813 Tests. **Überraschend war der Vergleich der beiden
+Mutationsläufe:** der Bauende fuhr zwölf Mutationen und zwölf fielen, die
+Review fuhr zwölf andere und **zwölf überlebten**. Wer seine eigenen
+Zusicherungen mutiert, misst nur, wie gut er getroffen hat, was er ohnehin im
+Blick hatte. Der schwerste Fund daraus war eine Wiederholung: die Faktenliste
+der Kartenüberlagerung auf leer zu setzen liess keinen einzigen Fakt auf der
+Karte erscheinen, bei 1792 grünen Tests, genau wie in Schritt 15 eine Ebene
+tiefer.
 
 ### 30.08.2026, E-33 und E-36, und eine Begründung von mir, die nicht stimmte
 
@@ -546,11 +561,12 @@ Flag wird nur mit einer Warnung ignoriert. Erzeugte Dateien **sind versioniert**
 
 ### Drift der erzeugten Dateien prüfen
 
-Zwei Werkzeuge, beide mit `--check`, beide müssen auf 0 stehen:
+**Drei** Werkzeuge, alle mit `--check`, alle müssen auf 0 stehen:
 
 ```
 dart run tool/generate_i18n.dart --check
 dart run tool/bake_map_style.dart --check
+dart run tool/generate_curated_data.dart --check
 ```
 
 Das zweite gibt es seit Schritt 12: der Kartenstil wird **gebacken**, nicht zur
@@ -559,6 +575,19 @@ Laufzeit umgefärbt, und das ist gemessen und nicht gewählt, siehe „Was
 (`tool/map_style/liberty_upstream.json`) und wird **nicht** bei jedem Lauf aus
 dem Netz geholt: ein Werkzeug, das lädt, erzeugt still bei jedem Lauf ein anderes
 Ergebnis, und niemand sieht, wann sich der Anbieter geändert hat.
+
+Das dritte gibt es seit Schritt 35 und es ist **eine Registrierung, kein
+Einzelfall**: die PWA hat mehrere kuratierte Datendateien, die der Neubau
+braucht, und vier davon liegen auf dem Weg der nächsten Schritte
+(`hunt-hotspots.js` 45 Zeilen, `wallet-colors.jsx` 155, `hunt-routes.jsx` 229,
+`damals-heute.jsx` 112, dazu `city-intros.jsx` mit 747). Eine weitere kostet
+einen Listeneintrag und eine Render-Funktion, **kein zweites Werkzeug**. Fünf
+Werkzeuge mit fünf `--check`-Aufrufen vergisst nach dem dritten Mal jemand.
+
+Anders als `bake_map_style.dart` liest dieses Werkzeug die **PWA direkt**, wie
+`generate_i18n.dart`, weil sein Ursprung kein Anbieter im Netz ist, sondern
+das Lese-Repo. Ohne Zugang dorthin bricht es mit einer Anleitung ab, und
+`flutter test` läuft trotzdem durch: die erzeugten Dateien sind versioniert.
 
 ---
 
