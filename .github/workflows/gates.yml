@@ -1,0 +1,82 @@
+# Die vier Gates aus `docs/engineering/quality-gates.md`, maschinell.
+#
+# Warum es das gibt: bis zum 31.08.2026 lief kein einziges Gate automatisch.
+# Alle vier hingen daran, dass jemand vier Befehle startet, und `HANDOFF.md`
+# hielt ausdrücklich fest: „Es gibt **keinen** CI-Workflow, diese vier Befehle
+# laufen nur, wenn jemand sie startet."
+#
+# ## Was hier bewusst NICHT läuft, und warum
+#
+# Die drei Drift-Werkzeuge (`generate_i18n`, `bake_map_style`,
+# `generate_curated_data`) stehen nicht in diesem Workflow. Zwei davon lesen die
+# PWA im **Lese-Repo**, und das liegt auf einem privaten Rechner, nicht im
+# Repository. Sie brechen ohne Quelle mit Exit-Code 2 und einer Anleitung ab.
+# `flutter test` läuft trotzdem, weil die erzeugten Dateien versioniert sind.
+#
+# **Folge, die man kennen muss:** eine von Hand bearbeitete erzeugte Datei
+# kommt durch diesen Workflow. Das ist gemessen und nicht vermutet, ein
+# verfälschter Hotspot-Name ließ am 31.08.2026 alle 1792 Tests grün und schlug
+# nur im Drift-Werkzeug an. Die drei Prüfungen bleiben lokal, bis CI Zugang zur
+# Quelle hat, und `quality-gates.md` sagt das auch dort.
+#
+# ## Warum keine Fremd-Action für das SDK
+#
+# Der Flutter-Stand wird per `git clone` auf ein **Tag** festgenagelt, statt
+# eine Action eines Dritten zu benutzen. Eine Action ist eine Abhängigkeit wie
+# jede andere, und `CLAUDE.md` macht neue Abhängigkeiten zustimmungspflichtig.
+# `actions/checkout` ist GitHubs eigene und ohne sie geht nichts.
+#
+# Der Stand ist derselbe, mit dem lokal geprüft wird: Flutter 3.44.1, Dart
+# 3.12.1. Wer ihn hebt, hebt ihn hier und in `HANDOFF.md` unter „Rechner
+# einrichten" gemeinsam, sonst prüfen zwei verschiedene Stände.
+
+name: Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Ein laufender Durchgang wird abgebrochen, wenn derselbe Zweig neu geschoben
+# wird. Bei einer Kette kleiner Commits zählt nur der letzte.
+concurrency:
+  group: gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: Format, Analyze, Architektur, Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Quelltext holen
+        uses: actions/checkout@v4
+
+      - name: Flutter-SDK auf 3.44.1 festnageln
+        run: |
+          git clone --depth 1 --branch 3.44.1 \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Stand ausgeben
+        run: flutter --version
+
+      - name: Pakete holen
+        run: flutter pub get
+
+      # Ab hier die vier Gates, in derselben Reihenfolge wie in
+      # `quality-gates.md`. Jeder Schritt bricht den Lauf bei einem Fehler ab,
+      # das ist der Standard und hier ausdrücklich gewollt.
+
+      - name: Gate 1, Format
+        run: dart format --output=none --set-exit-if-changed lib test tool
+
+      - name: Gate 2, Analyzer
+        run: dart analyze
+
+      - name: Gate 3, Architektur
+        run: dart run tool/check_architecture.dart
+
+      - name: Gate 4, Tests
+        run: flutter test

@@ -544,8 +544,18 @@ ansehen.
 
 **Hänge kein `| tail` an einen dieser Befehle, wenn du den Exit-Code
 auswertest.** Die Pipe maskiert ihn, und genau dadurch wurde hier schon ein rotes
-Gate stillschweigend durchgewinkt. Es gibt **keinen CI-Workflow**, diese vier
-Befehle laufen nur, wenn jemand sie startet.
+Gate stillschweigend durchgewinkt.
+
+**Seit dem 31.08.2026 laufen die vier auch maschinell**,
+`.github/workflows/gates.yml`, bei jedem Push nach `main` und bei jedem Pull
+Request. Der Flutter-Stand ist dort auf dasselbe Tag festgenagelt wie lokal,
+3.44.1; wer ihn hebt, hebt ihn an beiden Stellen, sonst prüfen zwei
+verschiedene Stände. **Die drei Drift-Werkzeuge laufen dort nicht**, zwei davon
+lesen die PWA im Lese-Repo, und das liegt auf einem privaten Rechner. Eine von
+Hand bearbeitete erzeugte Datei kommt also durch CI, und das ist gemessen: ein
+verfälschter Hotspot-Name ließ alle 1792 Tests grün und schlug nur im
+Drift-Werkzeug an. Diese drei bleiben lokal, und **grün in CI heißt deshalb
+nicht, dass alles geprüft ist**.
 
 ### Generierten Code neu erzeugen
 
