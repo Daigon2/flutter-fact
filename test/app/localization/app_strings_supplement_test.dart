@@ -35,7 +35,7 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die neun belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die einundzwanzig belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
@@ -43,7 +43,10 @@ void main() {
       // `fact.`-Schlüssel am 29.08.2026 mit der Fakt-Akte,
       // `screen-fact.jsx:367` und `:474`. Die vier `puzzle.`-Schlüssel am
       // 30.08.2026 mit dem Rätsel-Sheet, `puzzle-sheet.jsx:150`, `:165`,
-      // `:176` und `:194`.
+      // `:176` und `:194`. Die zwölf `challenge.`-Schlüssel mit dem
+      // Schnitzeljagd-Assistenten, `screen-challenge.jsx:1545`, `:1551`,
+      // `:1574-1576`, `:1660`, `:1851-1867`, `:1896`, `:1900-1902`, `:1912`
+      // und `:1986`.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
         'tour.stepCounter',
         'tour.step1.meta',
@@ -54,6 +57,18 @@ void main() {
         'puzzle.riddleCounter',
         'puzzle.taskLabel',
         'puzzle.photoCaption',
+        'challenge.bubbleTitle',
+        'challenge.setup.easyDesc',
+        'challenge.setup.mediumDesc',
+        'challenge.setup.hardDesc',
+        'challenge.setup.durationLabel',
+        'challenge.setup.durationCard',
+        'challenge.setup.stopsSuffix',
+        'challenge.setup.topicsLabel',
+        'challenge.setup.topicsClear',
+        'challenge.setup.topicsHintOne',
+        'challenge.setup.topicsHintMany',
+        'challenge.setup.startCta',
       });
     });
 
@@ -252,6 +267,211 @@ void main() {
           'puzzle.taskLabel',
           'puzzle.photoCaption',
         ]) {
+          expect(AppStrings.of(language).hasText(key), isTrue, reason: key);
+          expect(
+            AppStrings.of(language).textKeys.contains(key),
+            isFalse,
+            reason: key,
+          );
+        }
+      }
+    });
+  });
+
+  group('Der Schnitzeljagd-Assistent', () {
+    // Zwölf Schlüssel, und für elf davon hat die Quelle **zwei**
+    // Wortlaute. Geprüft wird deshalb jeder einzeln und in beiden Sprachen:
+    // die beiden teuersten Verwechslungen dieses Bildschirms sind Schlüssel,
+    // die es schon gibt und die etwas anderes sagen.
+
+    test('der Titel der Blase ist in beiden Sprachen derselbe', () {
+      // `screen-challenge.jsx:964` als Vorgabewert und `:1660` beim Aufruf,
+      // beide Male wörtlich `'Challenge'`. Die Zusicherung gilt der Karte
+      // selbst, weil über den Rückfall sonst zufällig dasselbe
+      // herauskäme.
+      for (final language in AppLanguage.values) {
+        expect(
+          supplementTextsFor(language)['challenge.bubbleTitle'],
+          'Challenge',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('der Titel ist nicht die Beschriftung des Reiters', () {
+      // `tab.challenge` trägt dasselbe Wort für ein anderes Element. Fällt
+      // der Ergänzungs-Schlüssel weg und jemand nimmt den Reiter, ist das
+      // heute unsichtbar und beim ersten Umbenennen ein Fehler.
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).textKeys.contains('challenge.bubbleTitle'),
+        isFalse,
+      );
+      expect(AppStrings.of(AppLanguage.de).hasText('tab.challenge'), isTrue);
+    });
+
+    test('die drei Schwierigkeitsbeschreibungen im Wortlaut der Quelle', () {
+      // `:1851-1853`, `:1858-1860`, `:1865-1867`.
+      const Map<String, String> de = <String, String>{
+        'challenge.setup.easyDesc':
+            'Pfeil und Distanz weisen dir den Weg. Ideal für die erste '
+            'Erkundung.',
+        'challenge.setup.mediumDesc':
+            'Nur Distanz, kein Pfeil. Für neugierige Stadtkenner.',
+        'challenge.setup.hardDesc':
+            'Nur das Rätsel, keine Navi. Pro Station kannst du Hinweise '
+            'kaufen. Nur für echte Locals.',
+      };
+      const Map<String, String> en = <String, String>{
+        'challenge.setup.easyDesc':
+            'Arrow and distance guide you. Perfect for a first exploration.',
+        'challenge.setup.mediumDesc':
+            'Distance only, no arrow. For the curious city-savvy.',
+        'challenge.setup.hardDesc':
+            'Riddles only, no navigation. Buy hints per stop if stuck. Only '
+            'for true locals.',
+      };
+      de.forEach((String key, String value) {
+        expect(AppStrings.of(AppLanguage.de).text(key), value, reason: key);
+      });
+      en.forEach((String key, String value) {
+        expect(AppStrings.of(AppLanguage.en).text(key), value, reason: key);
+      });
+    });
+
+    test('die langen Beschreibungen sind nicht die kurzen aus der Quelle', () {
+      // `challenge.easyDesc` und Geschwister gehören zur Tabelle `SNJD_DIFF`
+      // (`:153-169`), also zum alten Demo-Pfad, und tragen kürzere Sätze.
+      // Beide Fassungen stehen gleichzeitig in der PWA.
+      for (final String stamm in <String>['easy', 'medium', 'hard']) {
+        expect(
+          AppStrings.of(AppLanguage.de).text('challenge.setup.${stamm}Desc'),
+          isNot(AppStrings.of(AppLanguage.de).text('challenge.${stamm}Desc')),
+          reason: stamm,
+        );
+      }
+    });
+
+    test('Dauer-Überschrift und Dauer-Karte', () {
+      // `:1896` und `:1900-1902`. Die Karte trägt in beiden Sprachen `min`.
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.setup.durationLabel'),
+        'Dauer',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.setup.durationLabel'),
+        'Duration',
+      );
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(
+            language,
+          ).text('challenge.setup.durationCard', params: {'minutes': '60'}),
+          '60 min',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('die Schnitzeljagd zählt Stationen, nicht Stopps', () {
+      // `:1912` gegen `tour.stopsSuffix`. Die beiden Wörter zu vertauschen
+      // ändert kein Layout und keine Zahl, nur den Text.
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.setup.stopsSuffix'),
+        'Stationen',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.setup.stopsSuffix'),
+        'stops',
+      );
+      expect(AppStrings.of(AppLanguage.de).text('tour.stopsSuffix'), 'Stopps');
+    });
+
+    test('der Kopf des Themen-Filters und der Alle-Knopf', () {
+      // `:1545` und `:1551`.
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.setup.topicsLabel'),
+        'Themen (optional)',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.setup.topicsLabel'),
+        'Topics (optional)',
+      );
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.setup.topicsClear'),
+        'Alle',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.setup.topicsClear'),
+        'All',
+      );
+    });
+
+    test('Einzahl und Mehrzahl der Hinweiszeile', () {
+      // `:1574-1576`. Der Gedankenstrich steht so in der Quelle.
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.setup.topicsHintOne', params: {'count': '1'}),
+        '1 Thema ausgewählt — weniger Fakten verfügbar',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.setup.topicsHintMany', params: {'count': '3'}),
+        '3 Themen ausgewählt — weniger Fakten verfügbar',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.setup.topicsHintOne', params: {'count': '1'}),
+        'Filtering by 1 topic — fewer facts available',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.setup.topicsHintMany', params: {'count': '3'}),
+        'Filtering by 3 topics — fewer facts available',
+      );
+    });
+
+    test('der Startknopf sagt Starten und nicht Schnitzeljagd starten', () {
+      // `:1986` gegen `challenge.cta.start`, das die lange Fassung mit Pfeil
+      // trägt und zum alten Setup-Bildschirm gehört.
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.setup.startCta'),
+        'Starten',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.setup.startCta'),
+        'Start',
+      );
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.cta.start'),
+        'Schnitzeljagd starten →',
+      );
+    });
+
+    test('ein vergessener Platzhalter fällt im Debug-Lauf auf', () {
+      expect(
+        () =>
+            AppStrings.of(AppLanguage.de).text('challenge.setup.durationCard'),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.setup.topicsHintMany'),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('die zwölf Schlüssel bleiben aus der PWA-Fläche heraus', () {
+      for (final language in AppLanguage.values) {
+        for (final key in supplementTextsFor(
+          language,
+        ).keys.where((String key) => key.startsWith('challenge.'))) {
           expect(AppStrings.of(language).hasText(key), isTrue, reason: key);
           expect(
             AppStrings.of(language).textKeys.contains(key),

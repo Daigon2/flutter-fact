@@ -1005,8 +1005,66 @@ Sheets, **ohne jeden Einstieg**, wie die Fakt-Akte in Schritt 21.
 
 ## Phase 5, Challenge
 
-- [ ] 33. Wizard · [ ] 34. Solo-Setup · [ ] 35. Hotspot-Picker
-- [ ] 36. Phasen-Maschine · [ ] 37. Active-UI · [!] 38. Rätsel und Ökonomie
+### Schritte 33 und 34, was daran gemessen ist
+
+Zusammen gebaut, weil sie in der Quelle **derselbe Bildschirm** sind: der
+Assistent hält seine Schritte selbst, Schritt 1 ist die Solo- und Gruppenwahl,
+Schritt 2 sind Schwierigkeit, Dauer und Genres, und der Generator hängt am
+Ausgang von Schritt 2. 1625 → 1725 Tests.
+
+- **Der grösste Fund kam vor dem Bau und betrifft den Plan, nicht den Code.**
+  Die Solo-Jagd läuft in der Quelle auf der **Karte**, nicht im Challenge-Reiter.
+  Damit beschreiben die Plan-Schritte 36 und 37 den Demo-Pfad. Steht als E-43,
+  und deshalb endet dieser Block nach 34 statt nach 37.
+- **Der Generator löst D-9 nicht zum dritten Mal aus.** Zwei Wegwerf-Proben:
+  `challenges/domain` mit Importen auf `facts/domain` **und** `map/domain`
+  bricht mit **Exit-Code 1** und zwei Verstössen ab, dieselben zwei Importe aus
+  `challenges/application` laufen auf **0** durch. Er benutzt deshalb die
+  vorhandene Haversine-Rechnung aus `map/domain/map_position.dart`, und es
+  entsteht kein vierter Koordinatentyp. Der Preis ist eine andere Ausnahme,
+  Datenklassen in `application`, dritter Nachtrag bei D-9.
+- **Drei der vier Auswahlstufen des Generators laufen im echten Bestand nie.**
+  `confidence` steht durchgehend auf `curated`, `quality` und `findability`
+  kommen im ausgelieferten Bestand gar nicht vor; gemessen in Schritt 5, zitiert
+  in `fact_puzzle.dart`. Die Stufen sind trotzdem gebaut, weil die Pipeline die
+  Felder setzen kann, und jede trägt den Vermerk, dass sie heute kein Nutzer
+  erreicht.
+- **Eine vierte tote Stelle, diesmal in der Quelle selbst.** Die gestufte
+  Auswahl der ersten Station trägt den Kommentar „FIX (Daniel-Feedback): erste
+  Station muss nah am Startpunkt sein" und **kann das Ergebnis nicht ändern**:
+  die Liste ist aufsteigend sortiert, die beiden engeren Stufen sind
+  Anfangsstücke davon, genommen wird immer das erste Element. Alle drei Zweige
+  liefern denselben Kandidaten. Nachgerechnet und bestätigt. Der Nachbau lässt
+  die Stufung weg und trägt den Beweis im Kommentar, mit dem Satz, dass drei
+  Zweige, die kein Test trennen kann, drei Zweige sind, die niemand prüft.
+- **Auch der Zufallszweig ist unerreichbar**, weil die einzige Aufrufstelle des
+  Generators immer einen Startpunkt übergibt. Gebaut ist er trotzdem, sonst wäre
+  der Generator vor Schritt 35 gar nicht prüfbar; der Vermerk steht dran.
+- **Die Themenrouten sind ganz herausgefallen, und das ist Parität.** Sie sind
+  eine kuratierte Datendatei nach deutschem Stadt-Anzeigenamen verschlüsselt,
+  mit den Texten in den Daten statt in den Sprachtabellen, und der Tourplaner
+  benutzt sie mit. Ihr Ort ist damit eine feature-übergreifende Frage und
+  berührt E-11. Ausschlaggebend war aber die Quelle selbst: sie blendet den
+  ganzen Routenblock aus, wenn eine Stadt keine kuratierten Routen hat. Was
+  dasteht, ist also der vorgesehene Zustand und kein Platzhalter. Gemessen
+  nebenbei: das `stopCount` einer Route liest der Generator nirgends, es gewinnt
+  die Stationszahl aus der Dauer. Der Tourplaner liest es sehr wohl, es ist also
+  keine Altlast.
+- **Die Review hat 51 Mutationen gefahren, 22 haben überlebt**, davon vier
+  verhaltenswirksam: die Bonuswerte des Scorings waren nur in ihrer **Richtung**
+  geprüft, nie in ihrem **Wert**. Sie sind jetzt gegen ihre Kippgrenze
+  eingegrenzt, jeweils mit einem Test „gewinnt" und einem „verliert", und die
+  Grenzen stehen als Intervall im Kommentar. Dazu der Genre-Code, der gegen
+  `facts.genre` in der geteilten Datenbank läuft und dessen Tippfehler still
+  ausfiele. Nach der Behebung fallen alle dreizehn benannten Mutationen.
+- **Der teuerste Einzelfund war wieder eine Begründung, nicht Code.** Der
+  Kommentar am umgezogenen Knopf behauptete Regel 10 und dass das Prüfskript
+  den Verstoss nicht meldet. Es ist Regel 8, und das Skript bricht mit
+  Exit-Code 1 ab. Zweimal unabhängig gemessen. Die Schlussfolgerung stimmte,
+  der Weg dorthin nicht. Siehe E-35.
+
+- [x] 33. Wizard · [x] 34. Solo-Setup · [ ] 35. Hotspot-Picker
+- [!] 36. Phasen-Maschine (E-43) · [!] 37. Active-UI (E-43) · [!] 38. Rätsel und Ökonomie
 - [ ] 39. Pause und Results · [!] 40. Gruppen-Flow (Realtime-Entscheidung)
 
 ## Phase 6, Tour
@@ -1299,6 +1357,38 @@ Koordinaten regelt, lässt die zwei neuen Kopien stehen; eine, die
 verallgemeinert, löscht sie ersatzlos, so wie sie `device_position.dart`
 löschen würde. Die Kopien tragen den Verweis auf D-9 in ihrem Kopfkommentar,
 damit sie beim Aufräumen gefunden werden.
+
+**Dritter Nachtrag, 30.08.2026, Schritt 34, und diesmal weicht der Bau aus
+statt zu kopieren.** Der Routengenerator der Schnitzeljagd rechnet Entfernungen
+zwischen Fakten und ist damit eine Geschäftsregel. In `challenges/domain` wäre
+er nicht baubar: eine Wegwerf-Probe mit Importen auf `facts/domain` **und**
+`map/domain` lässt den Architektur-Check mit **Exit-Code 1** und **zwei**
+Verstössen abbrechen, beide „Domain-Erlaubnisliste". Aus `challenges/application`
+laufen dieselben zwei Importe auf **Exit-Code 0** durch, Analyzer sauber. Beide
+Proben angelegt, ausgeführt, gelöscht.
+
+Statt vier wortgleicher Kopien (Fakt-Kennung, Koordinate, Rätsel, Stufe) liegen
+`HuntPlan` und `HuntStop` deshalb **in `challenges/application/`** und halten
+`Fact` und `FactPuzzle` direkt. Der Generator benutzt die vorhandene
+Haversine-Rechnung aus `map/domain/map_position.dart`, es entsteht also **kein**
+vierter Koordinatentyp.
+
+**Das ist trotzdem eine Ausnahme, und sie gehört benannt.**
+`architecture-overview.md` §7 gibt Entitäten der Domäne und nennt genau eine
+dokumentierte Ausnahme, nämlich `map/application/` für die Komposition des
+Karten-Hosts. Hier liegen zum ersten Mal **Datenklassen** in `application`. Es
+ist nicht dieselbe Bauform wie bei den Rätseln, wo in `application` ein
+Übersetzer liegt, also ein Anwendungsfall. `dependency-rules.md:189-197`
+verlangt für jede Ausnahme einen Grund, eine enge Schnittstelle, einen
+Eigentümer und eine Rücknahmebedingung; die ersten drei stehen im Kopfkommentar
+von `hunt_plan.dart`, die vierte ist genau diese Frage: **wird D-9 zugunsten
+eines geteilten Typs beantwortet, zieht die Datei ohne Feldänderung nach
+`domain/` um.**
+
+Nebenbei ist damit die vierte Cross-Feature-Kante des Repositories entstanden,
+`challenges → facts`. Die drei bestehenden sind `discovery → facts`,
+`facts → discovery` und `puzzles → facts`. Regel 10 sieht das Prüfskript
+ausdrücklich nicht, das steht im Skript selbst; es bleibt Review-Sache.
 
 ### D-10, `lib/map/application/`
 
@@ -1746,6 +1836,26 @@ Zwei Funde daran betreffen das Testnetz und nicht den Code:
   des Renderbaums, übersieht jedes Eingabefeld. Deshalb ist die zweite Quelle
   `bodyLarge` bis dahin unbemerkt geblieben.
 
+**E-35 ist am 30.08.2026 entschieden**, beim Bau von Schritt 33, und die Wahl
+war beim Nachmessen gar keine mehr. Der Startknopf der Schnitzeljagd ist
+derselbe wie in der Anmeldung; damit brauchte ihn ein zweites Feature. Die
+Alternative „bei `identity` lassen" ist damit technisch tot: eine Wegwerf-Probe,
+die aus `challenges/presentation` nach `identity/presentation` importiert,
+lässt `tool/check_architecture.dart` mit **Exit-Code 1** abbrechen, Meldung
+„Regel 8: presentation von `identity` darf nur dieses Feature selbst
+importieren". Angelegt, ausgeführt, gelöscht.
+
+Der Knopf liegt jetzt als `PrimaryButton` in `lib/core/widgets/primary_button.dart`.
+**Umbenannt werden musste er auch**, und zwar von der Maschine erzwungen: Regel
+11 zerlegt Pfade in Wortbestandteile, `fact_button.dart` fiel über den Begriff
+„fact", obwohl der Knopf nach der App heisst und nicht nach der Entität.
+Ebenfalls mit einer Probe gemessen. Die Wache wurde dafür **nicht** aufgeweicht.
+
+**Die Fälligkeitsangabe des alten Eintrags war falsch gesetzt** und das ist der
+lehrreiche Teil: dort stand „wenn ein drittes Feature ihn braucht". Regel 8
+schlägt schon beim **zweiten** zu. Wer eine Fälligkeit an eine Zahl hängt, statt
+an die Regel, die sie auslöst, verschiebt sie um eine Runde.
+
 **E-31 und E-32 sind am 28.08.2026 geschlossen**, beide durch einen Edit an
 akzeptierten Architekturdokumenten.
 
@@ -1792,11 +1902,15 @@ eine Fundstelle.
 | E-30 | **`reference-features/settings.md` widerspricht `dependency-rules.md`.** `settings.md:19-27` zeigt einen Notifier in `presentation/notifiers/` neben einem `data/settings_store.dart`, Zeile 33-38 sagt „persists through `SettingsStore`", Zeile 42-44 begründet ausdrücklich, dass es **keine** Domänenschicht gibt. Es gibt keine Verdrahtung, die das erfüllt: den direkten Import meldet `tool/check_architecture.dart` als Regel 17, und ohne Domänenschicht gibt es keinen Ort für den Vertrag. Der gebaute Code weicht deshalb ab und legt den Vertrag nach `lib/features/settings/domain/audio_mode_store.dart`. Zu entscheiden: `settings.md` korrigieren, oder die Ausnahme im Abschnitt „Exceptions" der `dependency-rules.md` schriftlich fassen. | 3 | vor dem Ausbau von `features/settings` |
 | E-33 | **„Angemeldet bleiben" ist wirkungslos.** In der PWA wird `stayIn` gesetzt und **nirgends gelesen**, `persistSession` kommt dort nicht vor. Das Kästchen ist im Neubau nachgebaut, die Semantik nicht: Sitzungspersistenz wäre eine Auth-Verhaltensänderung. Zu entscheiden: implementieren, oder das Kästchen entfernen. Ein Haken, der nichts tut, ist gegenüber dem Nutzer eine Unwahrheit. | 3 | vor Auslieferung |
 | E-34 | **Passwort-Reset ist nicht angeboten.** `supabase_flutter 2.17.2` fährt standardmäßig `AuthFlowType.pkce`, und `resetPasswordForEmail` legt den Code-Verifier **auf dem Gerät** ab. Ohne `redirectTo` ginge der Link an die Site-URL, also in die PWA, die den Verifier nicht hat: der Tausch scheitert. Eine Mail zu schicken, deren Link niemand einlösen kann, ist schlechter als kein Angebot. Der Nutzer sieht deshalb kein „Vergessen?" über dem Passwortfeld, Zurücksetzen läuft über die PWA. Die Behebung braucht ein Deep-Link-Ziel und damit eine **neue öffentliche Vertragsfläche**. | 3 | vor Auslieferung |
-| E-35 | **`FactButton` kann nicht nach `core/widgets`.** Sein eigener Kommentar verlangt den Umzug, sobald ein zweiter Aufrufer existiert; der existiert seit Schritt 9. Regel 11 des Prüfskripts zerlegt aber den Pfad und meldet, dass `core` das Konzept `fact` nicht besitzen darf, nachgewiesen mit einer Wegwerf-Probe. Zu entscheiden: bei `identity` lassen, oder unter einem Namen ohne Fachbegriff umziehen. | 2 | wenn ein drittes Feature ihn braucht |
 | E-36 | **Bei 360 logischen Pixeln passt die Sprachzeile nicht einzeilig.** Gerechnet mit echten Schriftmetriken, neu gemessen nach E-38: zwei Karten à 125,35 plus Knopf-Untergrenze 63,96 plus 16 Abstände ergibt 330,66 gegen 316 verfügbare Pixel, Fehlbetrag rund 14,7. E-38 hat den Fehlbetrag also verkleinert, aber nicht beseitigt. Die vorher hier stehenden 337,5 waren im Übrigen auch vor E-38 nicht reproduzierbar, gemessen wurden 335,53. Die Quelle hat dasselbe Problem und schneidet mit `#root { overflow: hidden }` etwa vier Pixel des Knopfes ab. Zur Wahl: kleinere Flagge unter einer Breitenschwelle (Quelle: 30), kürzere Knopfbeschriftung oder nur das Emoji, die Zeile auf schmalen Geräten zweizeilig legen, oder abschneiden wie die Quelle. Aktuell entschieden ist nichts: die Titel brechen dort um, nichts läuft über, und ein Test hält die **Ursache** fest, damit die nächste Änderung dort anschlägt. | 2 | vor Auslieferung |
 | E-37 | **Das Launcher-Symbol ist noch das Flutter-Logo.** Android 12 und neuer zeichnet `@mipmap/ic_launcher` über die SplashScreen-API mitten in den nativen Startbildschirm. Der Hintergrund ist seit dem 27.08.2026 richtig (`#FF0F0D0A`), das Symbol nicht. Braucht das FACT-Symbol in allen Dichten, plus eine Entscheidung, ob der native Startbildschirm es überhaupt zeigen soll. | 2 | vor Auslieferung |
 | E-41 | **Drei Rätseltypen rendern eine leere Auswahl mit totem Antwortknopf.** `puzzle-sheet.jsx:255-257` und `:268-269` schicken `klang-sinnes-check`, `verstecktes-detail` und `zeitreise` auf `PszMcq`. Diese Zweige sind aber **nur mit leerer Optionenliste erreichbar**, weil `:247` alles mit Optionen vorher abfängt. `PszMcq` erzeugt dann null Antwortknöpfe (`:353-358`), `pick` bleibt `null`, `canSubmit` (`:344`) ist dauerhaft falsch, und das Rätsel ist nur über „Überspringen (0 Punkte)" (`:230-236`) verlassbar. Wie viele Datensätze das trifft, ist **nicht gezählt**: die Markdown-Quellen in `05_Content/facts/` tragen eine andere Typkodierung (`T2`, `T3`, `T9`) als die Datenbank, es braucht die Live-Daten. Zu entscheiden ist, welche Form ein solches Rätsel im Neubau bekommt. Der Zustand ist an `ChoicePuzzle.choices` ablesbar. | 3, verwandt mit E-08 | Phase 4, Schritt 28 |
 | E-42 | **Der 150-Meter-Radius der Foto-Rätsel wirkt in der PWA nie.** `screen-map.jsx:3915` übergibt die Nutzerposition als `userPos`, `puzzle-sheet.jsx:50` erwartet sie als `userPosition`. Folge in `PszPhoto`: `:373` liefert immer `null`, `:374` setzt `inRange = true`, und die Näherungsprüfung `:378` läuft nie. `foto-beweis` und `perspektiven` sind damit von überall mit einem beliebigen Foto lösbar, obwohl `gpsRadius` (`:372`) in den Daten durchgehend auf 150 steht. Dieselbe Klasse wie E-08: ein Defekt der Quelle, der wie Parität aussieht, und wie E-07 einer, der eine Ortsprüfung aushebelt. **Ändert sichtbares Verhalten, geht deshalb an Janek.** | 3, verwandt mit E-07 | Phase 4, Schritt 28 |
+| E-43 | **Die Solo-Jagd läuft auf der Karte, nicht im Challenge-Tab, und der Plan sagt das Gegenteil.** Am 30.08.2026 in der Quelle nachgeschlagen: `handleSetupStart` (`screen-challenge.jsx:4319-4329`) schickt Solo nach `hotspot` und Gruppe nach `invite`, mit dem Kommentar „Neuer Flow (Phase 1): solo + generierte Hunt. Gruppen-Flow bleibt vorerst auf altem Pfad." Läuft eine Jagd, zeigt der Challenge-Tab nur noch `HuntPauseScreen` oder `HuntResultScreen` (`:4293-4317`), und der Knopf dort heisst `onBackToMap`. Gespielt wird auf dem Kartenbildschirm. **Folge für den Plan:** dessen Schritte 36 (Phasen-Maschine) und 37 (Active-UI) beschreiben `SnjdActiveView`, und die schneidet ihre Stationen aus den hartcodierten Demodaten `SNJD_FACTS` (ab `:309`) über `SNJD_ROUTES` (`:179`) und `SNJD_SLICE` (`:307`). Sie sieht eine erzeugte Jagd **nie**, hat Bot-Punktestände im Sekundentakt und einen Knopf „Demo: Ankunft simulieren". Wer 36 und 37 wie geplant baut, baut ein bis zwei Tausend Zeilen für einen Pfad, den Schritt 40 ohnehin ersetzt. **Zu entscheiden: läuft die Solo-Jagd im Neubau auf der Karte, wie in der Quelle, oder im Tab, wie im Plan?** Bis dahin sind 36 und 37 nicht baureif; 33, 34 und 35 sind davon nicht betroffen. | **3** | vor Schritt 36 |
+| E-44 | **Der Faktor 1,5 am letzten Stopp wird angezeigt, aber nicht gutgeschrieben.** `screen-challenge.jsx:2479` übergibt dem Nächster-Fakt-Abzeichen `isLast ? Math.round(diff.points * 1.5) : diff.points`. Die tatsächlich vergebenen Punkte rechnet `handleChallengeComplete` (`:2295-2299`), und dort kommt der Faktor nicht vor. Das Abzeichen verspricht am letzten Stopp das Anderthalbfache, gutgeschrieben wird der einfache Satz. Widerspruch in der Quelle, nicht in E-19. Sichtbares Verhalten. | 3 | Schritt 37 |
+| E-45 | **Gewählte und geschätzte Dauer widersprechen sich.** Der Nutzer wählt 30, 60 oder 90 Minuten (`screen-challenge.jsx:4332`, `stopCountByDuration`), der Generator schreibt danach `estimatedDurationMin: stops.length * 14` (`hunt-generator.jsx:354`). Aus 30 Minuten werden 70, aus 60 werden 98, aus 90 werden 126. Beide Zahlen stehen in der Quelle. Sichtbares Verhalten. | 3 | Schritt 34 oder 39 |
+| E-46 | **Der Startpunkt-Picker ist nicht übersetzt, obwohl die Sprache hereinkommt.** `HotspotPickView` bekommt `lang` und benutzt es nirgends: „Hohe Faktendichte ✓", „Sehr hohe Faktendichte 💎", „Schritt 3 von 3", „Wo startest du?", „Hunt starten →" und „Zurück" stehen hartcodiert deutsch da (`screen-challenge.jsx:3005-3099`). Auf Englisch ist der Bildschirm halb deutsch. Gleiche Klasse wie E-08. Erfundener Text ist keine Lösung, es braucht Schlüssel in der PWA oder Einträge in der Ergänzungs-Map nach E-39. | 3 | Schritt 35 |
+| E-47 | **Drei Bedienelemente im Challenge-Reiter tun bis Schritt 35 nichts.** Seit Schritt 33 zeigt der Reiter den Assistenten. Wer ihn zu Ende bedient, drückt einen vollflächigen roten Knopf „Starten", sieht die Drück-Animation und danach passiert nichts, weil der Startpunkt-Picker fehlt. Dasselbe gilt für die Kachel „Gruppe" und für „Mit Code beitreten", deren Formulare Sitzungen über Supabase anlegen müssten, die es im Neubau nicht gibt. **Eine Sackgasse ist es nicht**, der Zurück-Knopf und die Tab-Leiste bleiben erreichbar, gemessen im Widget-Test. Aber es ist derselbe Zustand, den E-33 beim Kästchen „Angemeldet bleiben" beanstandet, und der Bau begründet an anderer Stelle ausdrücklich, warum die Zufallskarte **nicht** antippbar ist („ein Tipp, der nichts ändert, ist ein Bedienelement, das nichts tut"). Die Ungleichbehandlung ist bewusst, weil eine erfundene Navigation schlechter wäre als keine, aber sie gehört gewusst. Löst sich mit den Schritten 35 und 40 von selbst auf. | 2 | Schritt 35 |
 
 ## Wie Tests hier blind werden
 

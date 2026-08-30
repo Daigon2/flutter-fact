@@ -21,15 +21,16 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 
 Phase 0 und Phase 1 sind abgeschlossen. Aus Phase 2 sind laut Protokoll die
 Schritte 12, 13, 15, 16, 17 und 19 fertig, offen bleiben dort 14, 18 und 20.
-Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27.
+Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
+den Schritten 33 und 34.
 
-**Fertig sind 19 von 50:** 1 bis 13, dazu 15, 16, 17, 19, 21 und 27. Der
+**Fertig sind 21 von 50:** 1 bis 13, dazu 15, 16, 17, 19, 21, 27, 33 und 34. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
 steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
 Kästchen war das Veraltete, nicht der Stand.
 
-**Kennzahlen:** 1625 Tests grün, alle vier Gates auf Exit-Code 0, dazu
+**Kennzahlen:** 1725 Tests grün, alle vier Gates auf Exit-Code 0, dazu
 `dart run tool/generate_i18n.dart --check` und
 `dart run tool/bake_map_style.dart --check` auf Exit-Code 0.
 
@@ -53,16 +54,21 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **Der Rest von Phase 4 ist zu, der Kern von Phase 5 nicht.** 28 hängt an
-   E-08, 30 bis 32 an E-06, 29 nur zur Hälfte (der Hinweistext ist baubar, der
-   Punktabzug nicht). **Frei sind dagegen die Schritte 33 bis 37**, also
-   Wizard, Solo-Setup mit Routengenerator, Startpunkt-Picker, Phasen-Maschine
-   und die Active-UI. Keiner davon fasst die Rätsel-Engine an, das tut erst 38,
-   und **D-15 sperrt nur die Abhängigkeit von `puzzles`, nicht die Schritte
-   davor**. Danach kommen 45, 46 und 49 aus Phase 7. Wer hier weitermacht,
-   springt in der Nummer, nicht in der Architektur.
+1. **E-43 beantworten, sonst steht Phase 5 nach 34 still.** Die Solo-Jagd läuft
+   in der Quelle auf der **Karte**, nicht im Challenge-Reiter; die Plan-Schritte
+   36 und 37 beschreiben deshalb den Demo-Pfad, der die Ausgabe des Generators
+   nie zu sehen bekommt. Belege bei E-43. Solange das offen ist, sind 36 und 37
+   nicht baureif.
 
-2. **Sieben Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
+2. **Baubar ohne jede Antwort:** Schritt 35, der Startpunkt-Picker, der
+   **keine Karte braucht** (eine Liste mit höchstens vier Radioknöpfen, gemessen),
+   dafür aber eine kuratierte Datendatei, ein `--check`-Werkzeug dagegen, E-11
+   und E-46 mitbringt. Danach 45, 46 und 49 aus Phase 7. Ausserdem der
+   `balloon`-Anker (Punkt 4) und die sieben Punkte ausserhalb der 50 Schritte,
+   von denen der CI-Workflow der grösste ist: `.github/workflows/` existiert
+   nicht, kein Gate läuft automatisch.
+
+3. **Sieben Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
    Wortlaut, Stand und Nachträge stehen in `REBUILD_STATUS.md` unter „Fragen an
    Dairen". Zwei blockieren heute: **D-12** das Antippen der Gruppen aus
    Schritt 15, **D-13** den ganzen Schritt 14. **D-15 ist am 30.08.2026 neu
@@ -73,7 +79,7 @@ siehe „Rechner einrichten".
    hier. Nicht Teil des Blocks und weiter offen: ob der Karten-Host
    im **unsichtbaren Tab** weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht,
    das ist gemessen; die PWA kennt keine Tabs, es gibt also keine Quelle.
-3. **Zwei Kartenanker fehlen noch, nicht fünf.** Diese Zeile stand bis zum
+4. **Zwei Kartenanker fehlen noch, nicht fünf.** Diese Zeile stand bis zum
    30.08.2026 falsch hier: `discovery_anchors.dart:24-30` sagt, dass `coins`,
    `modeFactFinder`, `modeTour` und `compass` sich seit dem Top-Chrome aus
    Schritt 19 selbst anmelden. Übrig sind **`balloon`** und **`userMarker`**.
@@ -84,7 +90,7 @@ siehe „Rechner einrichten".
    im Code noch gar nicht, und der hängt an E-10. Wer einen baut, streicht die
    Kennung aus `knownMissing`, sonst schlägt
    `discovery_anchors_test.dart` an.
-4. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
+5. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
    technische Sperre ist seit E-39 weg. Vorschlag DE/EN liegt in
    `REBUILD_STATUS.md` bei E-28, hergeleitet und nicht freigegeben.
 
@@ -95,6 +101,21 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 30.08.2026, Schritte 33 und 34, und ein Plan, der den falschen Pfad beschreibt
+
+Der Assistent der Schnitzeljagd ersetzt den Platzhalter im Reiter, dazu der
+reine Routengenerator, 1625 → 1725 Tests. **Überraschend war, was die
+Vorprüfung im Plan gefunden hat:** die Solo-Jagd läuft in der Quelle auf der
+Karte, nicht im Reiter, und die Plan-Schritte 36 und 37 beschreiben deshalb den
+Demo-Pfad, der seine Stationen aus rund 650 Zeilen hartcodierter Beispieldaten
+schneidet und die Ausgabe des Generators nie sieht. Der zweite Fund liegt in
+der Quelle selbst: eine dreistufige Auswahl mit dem Kommentar „FIX
+(Daniel-Feedback)" **kann das Ergebnis nicht ändern**, weil die engeren Stufen
+Anfangsstücke derselben sortierten Liste sind. Und zum zweiten Mal in dieser
+Nacht war der teuerste Reviewfund keine falsche Zeile Code, sondern eine
+Begründung, die sich als gemessen ausgab und beim Nachmessen zwei Aussagen
+daneben lag.
 
 ### 30.08.2026, Schritt 27: das Rätsel-Sheet, Anfang von Phase 4
 

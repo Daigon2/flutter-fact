@@ -5,8 +5,8 @@ import 'package:fact_app/app/localization/app_strings.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/routing/app_routes.dart';
 import 'package:fact_app/core/async/detached_work.dart';
+import 'package:fact_app/core/widgets/primary_button.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
-import 'package:fact_app/features/identity/presentation/widgets/fact_button.dart';
 import 'package:fact_app/features/identity/presentation/widgets/fact_wordmark.dart';
 import 'package:fact_app/features/identity/presentation/widgets/splash_backdrop.dart';
 import 'package:fact_app/features/identity/presentation/widgets/splash_ghost_button.dart';
@@ -326,7 +326,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                     onAudioGuidePressed: widget.onAudioGuidePressed,
                   ),
                   const SizedBox(height: 14),
-                  FactButton(
+                  PrimaryButton(
                     label: strings.text('splash.createAccountCta'),
                     onPressed: _openSignup,
                     // `padding: '16px', fontSize: 18, letterSpacing: 0.02`

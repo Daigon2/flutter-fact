@@ -147,6 +147,89 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // Verhaltensquelle; die Schreibregel gegen Gedankenstriche gilt für
     // Text, den wir selbst formulieren, nicht für eine Abschrift.
     'puzzle.photoCaption': 'Damals — was hat sich verändert?',
+
+    // ── Schnitzeljagd-Assistent, `screen-challenge.jsx` ────────────────
+    //
+    // Zwölf sichtbare Texte des Assistenten, keiner mit Schlüssel in der
+    // PWA. Sie stehen dort als Ternär `lang === 'de' ? … : …` oder als
+    // literaler Vorgabewert im JSX. **Beide Sprachen stehen jeweils in
+    // der Quelle**, außer bei `challenge.bubbleTitle`, das nur einmal
+    // existiert.
+    //
+    // Zum Präfix: `challenge.` trägt in den erzeugten Tabellen bereits
+    // die Schlüssel dieses Bildschirms. Die elf Namen mit
+    // `challenge.setup.` sitzen damit bei ihren Nachbarn und sind
+    // zugleich als „gehört zum Assistenten" erkennbar.
+
+    // Der Titel der Marken-Blase, `:964` als Vorgabewert
+    // (`title = 'Challenge'`) und `:1660` beim Aufruf noch einmal
+    // wörtlich gesetzt. Kein `t()`-Aufruf.
+    //
+    // **Nicht `tab.challenge` benutzen**, obwohl dort dasselbe Wort
+    // steht: das ist die Beschriftung des Reiters in `chrome.jsx`. Wer
+    // den Reiter umbenennt, würde sonst die Überschrift des Bildschirms
+    // mit umbenennen, ohne es zu merken.
+    'challenge.bubbleTitle': 'Challenge',
+
+    // Die drei Beschreibungen der Schwierigkeitskarten, `:1851-1853`,
+    // `:1858-1860` und `:1865-1867`.
+    //
+    // **Nicht zu verwechseln mit `challenge.easyDesc`,
+    // `challenge.mediumDesc` und `challenge.hardDesc`**, die es in den
+    // erzeugten Tabellen gibt. Die tragen kürzere Sätze („Ideal für
+    // erste Erkundung.") und gehören zur Tabelle `SNJD_DIFF`
+    // (`:153-169`), also zum alten Demo-Pfad. Der Assistent zeigt die
+    // langen Fassungen, und beide Varianten stehen gleichzeitig in der
+    // Quelle. Wer hier die kurzen Schlüssel einsetzt, zeigt einen
+    // anderen Text, als die PWA zeigt.
+    'challenge.setup.easyDesc':
+        'Pfeil und Distanz weisen dir den Weg. Ideal für die erste '
+        'Erkundung.',
+    'challenge.setup.mediumDesc':
+        'Nur Distanz, kein Pfeil. Für neugierige Stadtkenner.',
+    'challenge.setup.hardDesc':
+        'Nur das Rätsel, keine Navi. Pro Station kannst du Hinweise '
+        'kaufen. Nur für echte Locals.',
+
+    // Die Überschrift über den drei Dauer-Karten, `:1896`.
+    'challenge.setup.durationLabel': 'Dauer',
+
+    // Die Beschriftung einer Dauer-Karte, `:1900-1902`: dort steht
+    // `label: '30 min'` je Karte wörtlich, in beiden Sprachen gleich.
+    // Hier eine Vorlage statt dreier Zeichenketten, damit die Zahl aus
+    // `HuntDuration.minutes` kommt und nicht zweimal im Code steht.
+    'challenge.setup.durationCard': '{minutes} min',
+
+    // Die Zeile unter der Zahl, `:1912`:
+    // `{d.stops} {lang === 'de' ? 'Stationen' : 'stops'}`.
+    //
+    // Nicht `tour.stopsSuffix`: das trägt „Stopps" und „stops", also im
+    // Deutschen ein anderes Wort. Der Tour-Planer zählt Stopps, die
+    // Schnitzeljagd Stationen.
+    'challenge.setup.stopsSuffix': 'Stationen',
+
+    // Der Kopf des Themen-Filters, `:1545`.
+    'challenge.setup.topicsLabel': 'Themen (optional)',
+
+    // Der Knopf, der die Auswahl leert, `:1551`. Er heißt „Alle", weil
+    // danach wieder alle Themen gelten, nicht weil er alle auswählt.
+    'challenge.setup.topicsClear': 'Alle',
+
+    // Die Zeile unter dem Themen-Gitter, `:1574-1576`. Die Quelle
+    // unterscheidet Einzahl und Mehrzahl mit `selected.length > 1`,
+    // deshalb zwei Schlüssel statt eines mit Platzhalter-Grammatik.
+    // Der Gedankenstrich steht so in der Quelle.
+    'challenge.setup.topicsHintOne':
+        '{count} Thema ausgewählt — weniger Fakten verfügbar',
+    'challenge.setup.topicsHintMany':
+        '{count} Themen ausgewählt — weniger Fakten verfügbar',
+
+    // Der Startknopf des Solo-Pfads, `:1986`.
+    //
+    // Nicht `challenge.cta.start`: das trägt „Schnitzeljagd starten →",
+    // also einen anderen Text mit Pfeil, und gehört zum alten
+    // Setup-Bildschirm.
+    'challenge.setup.startCta': 'Starten',
   },
   AppLanguage.en: <String, String>{
     'tour.stepCounter': 'STEP {step} OF {total}',
@@ -164,6 +247,29 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'puzzle.taskLabel': 'Aufgabe',
     // Nackter Textknoten, `:176`, auch auf Englisch deutsch.
     'puzzle.photoCaption': 'Damals — was hat sich verändert?',
+
+    // ── Schnitzeljagd-Assistent ────────────────────────────────────────
+    // Begründungen stehen in der DE-Karte. Bis auf den Titel der Blase
+    // hat die Quelle für jeden dieser Texte eine eigene englische
+    // Fassung, sie sind also übersetzt und nicht kopiert.
+    'challenge.bubbleTitle': 'Challenge',
+    'challenge.setup.easyDesc':
+        'Arrow and distance guide you. Perfect for a first exploration.',
+    'challenge.setup.mediumDesc':
+        'Distance only, no arrow. For the curious city-savvy.',
+    'challenge.setup.hardDesc':
+        'Riddles only, no navigation. Buy hints per stop if stuck. Only '
+        'for true locals.',
+    'challenge.setup.durationLabel': 'Duration',
+    'challenge.setup.durationCard': '{minutes} min',
+    'challenge.setup.stopsSuffix': 'stops',
+    'challenge.setup.topicsLabel': 'Topics (optional)',
+    'challenge.setup.topicsClear': 'All',
+    'challenge.setup.topicsHintOne':
+        'Filtering by {count} topic — fewer facts available',
+    'challenge.setup.topicsHintMany':
+        'Filtering by {count} topics — fewer facts available',
+    'challenge.setup.startCta': 'Start',
   },
 };
 

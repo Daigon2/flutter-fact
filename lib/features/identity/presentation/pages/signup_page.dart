@@ -6,6 +6,7 @@ import 'package:fact_app/app/routing/app_routes.dart';
 import 'package:fact_app/app/theme/fact_colors.dart';
 import 'package:fact_app/app/theme/fact_typography.dart';
 import 'package:fact_app/core/async/detached_work.dart';
+import 'package:fact_app/core/widgets/primary_button.dart';
 import 'package:fact_app/features/identity/presentation/formatting/auth_failure_text.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/signup_notifier.dart';
@@ -21,7 +22,6 @@ import 'package:fact_app/features/identity/presentation/widgets/auth_notice_box.
 import 'package:fact_app/features/identity/presentation/widgets/auth_oauth_row.dart';
 import 'package:fact_app/features/identity/presentation/widgets/auth_top_glow.dart';
 import 'package:fact_app/features/identity/presentation/widgets/city_picker.dart';
-import 'package:fact_app/features/identity/presentation/widgets/fact_button.dart';
 import 'package:fact_app/features/identity/presentation/widgets/password_strength_meter.dart';
 import 'package:fact_app/features/identity/presentation/widgets/signup_progress_bar.dart';
 import 'package:fact_app/features/identity/presentation/widgets/splash_pressable.dart';
@@ -35,7 +35,7 @@ import 'package:go_router/go_router.dart';
 ///
 /// Benutzt die geteilten Bausteine aus Schritt 9 (`AuthHeader`, `AuthField`,
 /// `AuthCheckbox`, `AuthDivider`, `AuthOAuthRow`, `AuthErrorBox`,
-/// `AuthTopGlow`, `FactButton`) und ergänzt vier eigene: `SignupProgressBar`,
+/// `AuthTopGlow`, `PrimaryButton`) und ergänzt vier eigene: `SignupProgressBar`,
 /// `UsernameField`, `PasswordStrengthMeter` und `CityPicker`. Jeder davon ist
 /// dort begründet, wo er steht.
 ///
@@ -388,7 +388,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
           ),
           Opacity(
             opacity: submitting ? SignupPage.submittingOpacity : 1,
-            child: FactButton(
+            child: PrimaryButton(
               label: strings.text(
                 submitting ? 'onboarding.loading' : 'splash.createAccountCta',
               ),

@@ -275,7 +275,7 @@ class ProfileRoute extends GoRouteData with $ProfileRoute {
 /// Öffnen-Funktion.
 ///
 /// Der Dialog ist eine Route (`showAudioActivationDialog`), keine Ebene im
-/// `Stack` des Bildschirms. `architecture-overview.md:250`:
+/// `Stack` des Bildschirms. `architecture-overview.md:274`:
 /// "Modals and full-screen pages are routing decisions".
 @TypedGoRoute<SplashRoute>(path: '/splash')
 class SplashRoute extends GoRouteData with $SplashRoute {

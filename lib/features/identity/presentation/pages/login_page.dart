@@ -6,6 +6,7 @@ import 'package:fact_app/app/routing/app_routes.dart';
 import 'package:fact_app/app/theme/fact_colors.dart';
 import 'package:fact_app/app/theme/fact_typography.dart';
 import 'package:fact_app/core/async/detached_work.dart';
+import 'package:fact_app/core/widgets/primary_button.dart';
 import 'package:fact_app/features/identity/presentation/formatting/auth_failure_text.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/login_notifier.dart';
@@ -16,7 +17,6 @@ import 'package:fact_app/features/identity/presentation/widgets/auth_field.dart'
 import 'package:fact_app/features/identity/presentation/widgets/auth_header.dart';
 import 'package:fact_app/features/identity/presentation/widgets/auth_oauth_row.dart';
 import 'package:fact_app/features/identity/presentation/widgets/auth_top_glow.dart';
-import 'package:fact_app/features/identity/presentation/widgets/fact_button.dart';
 import 'package:fact_app/features/identity/presentation/widgets/splash_pressable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -295,7 +295,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
           Opacity(
             opacity: submitting ? LoginPage.submittingOpacity : 1,
-            child: FactButton(
+            child: PrimaryButton(
               label: strings.text(
                 submitting ? 'onboarding.loading' : 'onboarding.loginBtn',
               ),

@@ -5,17 +5,45 @@ import 'package:flutter/widgets.dart';
 /// Der Standardknopf der PWA, CSS-Klasse `.btn` aus
 /// `02_Frontend/app/styles.css:135-145`.
 ///
-/// Einziger Ort auf diesem Bildschirm, der Theme-Tokens statt Literalen nutzt:
 /// `.btn` arbeitet mit den CSS-Variablen `--red`, `--red-dk` und `--red-glow`,
 /// also mit [FactColors.red], [FactColors.redDark] und [FactColors.redGlow].
-/// Alles andere auf dem Startbildschirm zeichnet die Quelle mit literalen
-/// Farben und themenunabhängig.
+/// Auf dem Startbildschirm, für den der Knopf entstanden ist, war er damit die
+/// einzige Stelle mit Tokens statt Literalen.
 ///
-/// Liegt noch bei `identity` und nicht in `core/widgets`: laut
-/// `docs/architecture/project-structure.md` zieht wiederverwendbare Oberfläche
-/// erst nach belegter Wiederverwendung um. `.btn` wird in der PWA app-weit
-/// benutzt, der zweite Aufrufer kommt also bald, und dann gehört diese Datei
-/// nach `core/widgets`.
+/// ## Der Umzug nach `core/widgets` ist eingetreten, nicht vorweggenommen
+///
+/// Diese Datei lag bis Schritt 33 unter `identity/presentation/widgets/`, mit
+/// dem Vermerk, dass `docs/architecture/project-structure.md` einen Umzug erst
+/// **nach belegter Wiederverwendung** vorsieht. Der Beleg ist der Startknopf
+/// des Schnitzeljagd-Assistenten (`02_Frontend/app/screen-challenge.jsx:1979`,
+/// `className="btn"`): ein vierter Aufrufer, und der erste außerhalb von
+/// `identity`.
+///
+/// Der Umzug war damit nicht optional, und das ist gemessen und nicht
+/// hergeleitet. Eine Wegwerf-Probe unter
+/// `lib/features/challenges/presentation/`, die
+/// `identity/presentation/widgets/auth_field.dart` importiert, lässt
+/// `dart run tool/check_architecture.dart` mit **Exit-Code 1** abbrechen:
+///
+/// > Regel 8: presentation von "identity" darf nur dieses Feature selbst
+/// > importieren, außerhalb davon nur die App-Komposition unter lib/app/
+///
+/// Es ist also **Regel 8** und nicht Regel 10, und die Maschine fängt es. Der
+/// Wortlaut der Regel steht in `dependency-rules.md:54`: „Nobody outside a
+/// feature may import that feature's `presentation` directory." Die zweite
+/// Bedingung des Dokuments ist ebenfalls erfüllt: der Knopf trägt keine
+/// fachliche Bedeutung, nur die Optik von `.btn`.
+///
+/// ## Warum er nicht mehr `FactButton` heißt
+///
+/// Regel 11 verbietet unterhalb von `core/` jeden Geschäftsbegriff im Pfad und
+/// prüft das an den Wortbestandteilen des Dateinamens. `fact_button.dart` fiel
+/// damit über den Begriff „fact", obwohl der Knopf nach der **App** benannt
+/// war und nicht nach der Entität; der Prüfer sieht diesen Unterschied nicht
+/// und soll ihn auch nicht sehen müssen. Statt die Wache für einen Fehlalarm
+/// aufzuweichen, hat der Knopf einen Namen bekommen, der sagt, was er ist. Die
+/// Prüfung sieht nur Pfade, der Klassenname ist trotzdem mitgewandert: zwei
+/// Namen für dieselbe Sache wären der schlechtere Zustand.
 ///
 /// Die Maße von `.btn` selbst (`padding: 14px 22px`, `font-size: 16`) sind hier
 /// überschreibbar, weil der Startbildschirm sie überschreibt
@@ -29,9 +57,9 @@ import 'package:flutter/widgets.dart';
 /// Bedienung samt Drück-Animation und Knopf-Semantik, und die Deckkraft bleibt
 /// Sache des Aufrufers. Ein festverdrahteter Wert hier wäre eine Zahl aus einem
 /// Bildschirm in einem Baustein, den mehrere Bildschirme benutzen.
-class FactButton extends StatefulWidget {
+class PrimaryButton extends StatefulWidget {
   /// Erzeugt den Knopf.
-  const FactButton({
+  const PrimaryButton({
     required this.label,
     required this.onPressed,
     this.padding = const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
@@ -65,10 +93,10 @@ class FactButton extends StatefulWidget {
   final double? letterSpacing;
 
   @override
-  State<FactButton> createState() => _FactButtonState();
+  State<PrimaryButton> createState() => _PrimaryButtonState();
 }
 
-class _FactButtonState extends State<FactButton> {
+class _PrimaryButtonState extends State<PrimaryButton> {
   bool _pressed = false;
 
   @override
@@ -113,17 +141,17 @@ class _FactButtonState extends State<FactButton> {
         onTap: onPressed,
         child: TweenAnimationBuilder<double>(
           tween: Tween<double>(end: _pressed ? 1 : 0),
-          duration: FactButton.pressDuration,
+          duration: PrimaryButton.pressDuration,
           // CSS setzt als Zeitfunktion einer `transition` standardmäßig `ease`,
           // und `Curves.ease` ist genau `cubic-bezier(0.25, 0.1, 0.25, 1)`.
           curve: Curves.ease,
           builder: (context, t, _) => Transform.translate(
-            offset: Offset(0, FactButton.pressDepth * t),
+            offset: Offset(0, PrimaryButton.pressDepth * t),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: colors.red,
                 borderRadius: const BorderRadius.all(
-                  Radius.circular(FactButton.cornerRadius),
+                  Radius.circular(PrimaryButton.cornerRadius),
                 ),
                 boxShadow: BoxShadow.lerpList(rest, pressed, t),
               ),
