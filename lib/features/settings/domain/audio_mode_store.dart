@@ -54,8 +54,8 @@
 /// Symbole). Ein Aufflackern der visuellen Variante wäre genau für die
 /// Zielgruppe dieses Modus die schlechteste Reihenfolge.
 ///
-/// Wer später persistiert, lädt in `bootstrap()` vor und überschreibt
-/// `audioModeStoreProvider` mit einer gefüllten Implementierung.
+/// Seit dem 31.08.2026 ist die Persistenz gebaut: `bootstrap()` lädt vor und
+/// überschreibt `audioModeStoreProvider` mit `KeyValueAudioModeStore`.
 ///
 /// Das ist eine Bequemlichkeits-Präferenz, **keine Sicherheitsgrenze**.
 abstract interface class AudioModeStore {
@@ -74,12 +74,12 @@ abstract interface class AudioModeStore {
   Future<void> setEnabled(bool enabled);
 }
 
-/// Flüchtiger Standard, solange nichts persistiert, und Vorgabe für Tests.
+/// Flüchtiger Speicher, Vorgabe für Tests.
 ///
-/// Die Präferenz überlebt den Neustart nicht. Gewollt, aus demselben Grund wie
-/// bei `InMemoryFirstLaunchStore`: eine halbe Persistenz wäre schwerer zu
-/// erkennen als gar keine. Praktische Folge im aktuellen Stand: der Audio-Modus
-/// ist bei jedem Start aus.
+/// Die Präferenz überlebt den Neustart nicht. **Bis zum 31.08.2026 hieß das für
+/// die laufende App: der Audio-Modus war bei jedem Start aus.** Seither
+/// überschreibt `bootstrap()` diesen Provider mit `KeyValueAudioModeStore`, und
+/// der flüchtige bleibt die Vorgabe für Tests.
 class InMemoryAudioModeStore implements AudioModeStore {
   /// [enabled] setzt einen bereits eingeschalteten Audio-Modus, etwa in einem
   /// Test.

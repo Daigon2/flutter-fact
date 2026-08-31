@@ -10,19 +10,20 @@
 ///
 /// ## Der fünfte Speicher, und der erste mit einem Grund zu persistieren
 ///
-/// Vier Speicher dieser Bauart gibt es schon, und **alle vier sind flüchtig**:
-/// `FirstLaunchStore`, `TourStore`, `AudioModeStore` und
-/// `LanguagePreferenceStore`. Dieser hier ist genauso gebaut und aus demselben
-/// Grund heute genauso flüchtig, aber er ist der erste, bei dem das flüchtige
-/// Verhalten **falsch** ist: die anderen vier kosten beim Neustart eine
-/// Unbequemlichkeit, dieser kostet einen Spielstand.
+/// Vier Speicher dieser Bauart gab es schon: `FirstLaunchStore`, `TourStore`,
+/// `AudioModeStore` und `LanguagePreferenceStore`. **Bis zum 31.08.2026 waren
+/// alle vier flüchtig, und dieser hier war es mit ihnen.** Er ist trotzdem der
+/// einzige, bei dem das falsch war und nicht bloß unbequem: die anderen vier
+/// kosteten beim Neustart eine Unbequemlichkeit, dieser einen Spielstand.
 ///
-/// Die Speichertechnik ist deshalb ausdrücklich **nicht** hier entschieden.
-/// ADR-007 empfiehlt `shared_preferences` und führt dazu eine Messung an: das
-/// Paket steht ohnehin schon als transitive Abhängigkeit von
-/// `supabase_flutter` in `pubspec.lock`. Ein neues direktes Paket ist nach
-/// `CLAUDE.md` trotzdem zustimmungspflichtig, also wandert ohne Freigabe
-/// nichts in `pubspec.yaml`, und dieser Vertrag hängt an keiner Technik.
+/// Die Speichertechnik ist weiterhin **nicht** hier entschieden, und dieser
+/// Vertrag hängt an keiner. Entschieden ist sie in ADR-007 und freigegeben am
+/// 31.08.2026: `shared_preferences`, aufgenommen in `pubspec.yaml`, gekapselt
+/// hinter `KeyValueStore` aus `lib/core/preferences/` und auf
+/// `lib/services/preferences/` beschränkt (Regel 22). Die Messung aus ADR-007
+/// hat gehalten: `flutter pub get` meldete „from transitive dependency to
+/// direct dependency" und „Changed 1 dependency", es ist also kein Byte neuer
+/// Code in den Bau gekommen.
 ///
 /// ## Was der Vertrag von einer persistenten Umsetzung verlangt
 ///
@@ -108,14 +109,14 @@ abstract interface class ActiveHuntStore {
   Future<void> clearActiveHunt();
 }
 
-/// Flüchtiger Standard, solange nichts persistiert, und Vorgabe für Tests.
+/// Flüchtiger Speicher, Vorgabe für Tests.
 ///
-/// Die Jagd überlebt den Neustart nicht. Das ist gewollt, aus demselben Grund
-/// wie bei den vier bestehenden Speichern: eine halbe Persistenz wäre schwerer
-/// zu erkennen als gar keine. **Praktische Folge im aktuellen Stand: eine
-/// laufende Jagd ist nach einem Neustart der App weg**, und das ist genau der
-/// Fall, den ADR-007 mit der Produktvorgabe ausgeschlossen hat. Der Vertrag
-/// steht, die Technik fehlt, und diese Lücke ist bekannt statt versteckt.
+/// Die Jagd überlebt den Neustart nicht. **Bis zum 31.08.2026 war das der
+/// Zustand der laufenden App**, und damit genau der Fall, den ADR-007 mit
+/// seiner Produktvorgabe ausgeschlossen hatte. Seither überschreibt
+/// `bootstrap()` den Provider mit `KeyValueActiveHuntStore` aus
+/// `challenges/data`, und dieser hier bleibt, was er immer sein sollte: die
+/// Vorgabe für Tests.
 final class InMemoryActiveHuntStore implements ActiveHuntStore {
   /// [hunt] setzt eine bereits laufende Jagd, etwa in einem Test.
   InMemoryActiveHuntStore({ActiveHunt? hunt}) : _hunt = hunt;

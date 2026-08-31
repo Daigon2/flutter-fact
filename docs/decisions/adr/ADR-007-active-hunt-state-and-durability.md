@@ -188,6 +188,36 @@ difficulty. Recorded as D-18 in `REBUILD_STATUS.md`, with the three candidate
 ways and why none of them is cheap. This ADR does not decide it: it is the same
 family as D-9 and touches the gate, not the hunt.
 
+### 2026-08-31: the mechanism is decided, approved and built
+
+The approval-bound step above happened on the same day. `shared_preferences` was
+approved by name and is now a direct dependency. The measurement in **Decision**
+held: `flutter pub get` reported `from transitive dependency to direct
+dependency` and `Changed 1 dependency`, so no new code entered the build.
+
+Three details the ADR did not anticipate, all of them structure rather than
+mechanism:
+
+- **The store contract sits one layer lower than the package.** Five stores want
+  the same thing, so `KeyValueStore` in `lib/core/preferences/` is the seam and
+  `lib/services/preferences/` the only place that knows the vendor package. The
+  pattern is the one `core/diagnostics` and `services/diagnostics` already use.
+  `challenges/data` still holds the persistent hunt store, as this ADR requires;
+  it depends on the core contract instead of the package.
+- **The package got a home directory, enforced as rule 22.**
+  `tool/check_architecture.dart` had carried `shared_preferences` as an
+  explicitly deliberate gap, with two conditions: not in `pubspec.yaml`, and no
+  decision naming a home. Both fell away here.
+- **`bootstrap()` now awaits before the first frame**, which the ADR called for,
+  and `productionProviderScope` takes the loaded store as a **required**
+  parameter. A default would have rebuilt the silent failure the whole file
+  exists to prevent: an app that starts, looks healthy and remembers nothing.
+
+One branch stays unproven and is named rather than hidden: the path where
+`setBool` answers `false` instead of throwing. Reaching it needs a custom
+`SharedPreferencesStorePlatform` from `shared_preferences_platform_interface`,
+which is another approval-bound package for one branch.
+
 ## Review triggers
 
 - A second feature needs write access to a running hunt.

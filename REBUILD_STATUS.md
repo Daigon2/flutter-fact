@@ -1391,6 +1391,106 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
 
+## Die erste Persistenz, 31.08.2026
+
+Nicht einer der 50 Schritte, aber Voraussetzung für die Schritte 36 und 37 und
+für ADR-007. 2048 → 2112 Tests, alle vier Gates auf Exit-Code 0, die drei
+Drift-Werkzeuge mit `--check` auf 0.
+
+**Was entstanden ist.** Fünf neue Dateien in `lib/`, sieben neue Testdateien.
+
+| Datei | Rolle |
+|---|---|
+| `core/preferences/key_value_store.dart` | Vertrag, plus flüchtige Umsetzung |
+| `services/preferences/shared_preferences_key_value_store.dart` | Vendor-Adapter, `loadKeyValueStore` |
+| `features/identity/data/key_value_first_launch_store.dart` | `fact_has_launched` |
+| `app/onboarding/key_value_tour_store.dart` | `fact_tour_shown` |
+| `features/settings/data/key_value_audio_mode_store.dart` | `fact_audio_mode` |
+| `features/settings/data/key_value_language_preference_store.dart` | `fact_lang` |
+| `features/challenges/data/key_value_active_hunt_store.dart` | `fact_active_challenge` |
+
+### Warum ein Vertrag in `core` und nicht fünfmal das Paket
+
+Selbst entschieden, Stufe 2, und hier begründet, damit widersprochen werden kann.
+
+ADR-007 nennt für den Jagd-Speicher `challenges/data` als Ort, und die vier
+anderen Verträge sagen wortgleich, wer sie füllt. Fünf Umsetzungen an fünf Orten,
+die alle `shared_preferences` holen, wären fünf Stellen mit Speichertechnik
+gewesen. Ein Vertrag in `core/preferences/` ist ein Ort weniger, und das Vorbild
+stand schon im Projekt: `core/diagnostics/diagnostic_sink.dart` hält den Vertrag,
+`services/diagnostics/` die Umsetzung.
+
+Drei Dinge trägt die Variante, die fünf direkte Paketnutzungen nicht getragen
+hätten:
+
+1. **Ein Heimatverzeichnis**, also Regel 22, in derselben Bauart wie 19 bis 21.
+   Mit fünf Aufrufern gäbe es fünf Heimaten und damit keine.
+2. **Tests ohne Plattformkanal.** Die fünf Speicher-Tests brauchen weder
+   `setMockInitialValues` noch eine initialisierte Bindung.
+3. **Regel 11 bleibt gewahrt.** Der Vertrag kennt Schlüssel und Werte, keine
+   Jagd, keine Sprache, kein Audio.
+
+ADR-007 ist damit nicht verletzt: die persistente Jagd-Umsetzung liegt in
+`challenges/data`, sie hängt nur am Core-Vertrag statt am Paket.
+
+### Regel 22 war schon geschrieben, als sie noch nicht galt
+
+Der Doku-Block von `_geoSdkBans` in `tool/check_architecture.dart` führte
+`shared_preferences` unter „Was die Regel nicht kann", und zwar mit **zwei
+ausdrücklich benannten Bedingungen**: das Paket stehe nicht in `pubspec.yaml`,
+und es gebe „keine getroffene Entscheidung, die ein Heimatverzeichnis benennt.
+Eine Regel wäre hier eine Entscheidung, keine Durchsetzung."
+
+Diese Änderung hebt beide Bedingungen auf. Regel 22 ist deshalb keine neue
+Entscheidung, sondern die Durchsetzung, auf die derselbe Kommentar gewartet hat.
+Die Lehre ist allgemein: ein Kommentar, der seine eigene Ablaufbedingung nennt,
+ist mehr wert als einer, der nur begründet. Er wird nämlich von selbst fällig.
+
+### `getBool` wirft, und gelesen wird vor dem ersten Bild
+
+Der teuerste Fund, gemessen und nicht vermutet. `SharedPreferences.getBool`
+castet den Wert aus dem Zwischenspeicher hart (`_preferenceCache[key] as bool?`)
+und **wirft** eine Ausnahme, wenn dort ein Wert anderen Typs liegt. Genau das
+entsteht bei einem Formatwechsel, also bei einer Änderung wie der, die als
+Nächstes ansteht.
+
+Gelesen wird in `bootstrap()`, vor dem ersten Bild. Ohne das `try` im Adapter
+wäre ein Formatwechsel also nicht eine verworfene Präferenz, sondern ein Absturz
+beim Start, und zwar auf jedem Gerät, das den alten Wert noch liegen hat. Der
+Test dazu ist grün
+(`shared_preferences_key_value_store_test.dart`, „ein falsch typisierter Wert
+liefert null statt einer Ausnahme").
+
+### Was ungeprüft bleibt, und warum es benannt statt versteckt ist
+
+Der Zweig in `_write`, der auf ein `false` als Rückgabewert von `setBool`
+reagiert statt auf eine Ausnahme. Die Test-Plattform
+(`InMemorySharedPreferencesStore`) antwortet immer mit `true`. Erreichbar wäre
+der Zweig nur über ein eigenes `SharedPreferencesStorePlatform`, und das liegt in
+`shared_preferences_platform_interface`, einem Paket, das heute nur transitiv im
+Baum steht. Ein weiteres Paket in `dev_dependencies` ist zustimmungspflichtig und
+für einen Zweig dieser Größe nicht beantragt.
+
+**Der Zweig bleibt damit eine Behauptung.** Er steht im Kopf der Testdatei und in
+ADR-007, statt unbemerkt mitzulaufen.
+
+### Zwei Nebenwirkungen, die nicht bestellt waren
+
+**`productionProviderScope` hat einen Pflichtparameter mehr.** Ein Standardwert
+wäre bequem gewesen und hätte genau den stillen Ausfall gebaut, gegen den diese
+Funktion samt `bootstrap_test.dart` überhaupt existiert: eine App, die startet,
+heil aussieht und sich nichts merkt. Der Preis sind zehn angepasste Aufrufe im
+Test, gelöst über einen Helfer `_scope()`.
+
+**Sieben Vertrags-Dokumente waren nach dieser Änderung falsch.** Alle fünf
+Speicher-Verträge sagten „Flüchtiger Standard, solange nichts persistiert" und
+nannten die praktische Folge („das Tutorial erscheint bei jedem Start erneut"),
+`language_preference_store.dart` behauptete zusätzlich, `shared_preferences` sei
+„im Projekt bewusst nicht installiert", und `active_hunt_store.dart` führte alle
+vier anderen als flüchtig. Das ist mit derselben Änderung nachgezogen, weil ein
+stehen gelassener Satz dieser Art die nächste Sitzung in die falsche Richtung
+schickt.
+
 ## Arbeit außerhalb der 50 Schritte
 
 Nicht im REBUILD_PLAN, aber notwendig:

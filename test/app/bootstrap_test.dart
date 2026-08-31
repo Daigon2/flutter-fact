@@ -1,12 +1,32 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:fact_app/app/bootstrap.dart';
+import 'package:fact_app/app/localization/app_language.dart';
+import 'package:fact_app/app/localization/language_preference_store.dart';
+import 'package:fact_app/app/localization/localization_providers.dart';
+import 'package:fact_app/app/onboarding/key_value_tour_store.dart';
+import 'package:fact_app/app/onboarding/onboarding_providers.dart';
+import 'package:fact_app/app/onboarding/tour_store.dart';
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
+import 'package:fact_app/core/preferences/key_value_store.dart';
+import 'package:fact_app/features/challenges/application/active_hunt_providers.dart';
+import 'package:fact_app/features/challenges/data/key_value_active_hunt_store.dart';
+import 'package:fact_app/features/challenges/domain/active_hunt_store.dart';
+import 'package:fact_app/features/challenges/domain/entities/active_hunt.dart';
+import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
 import 'package:fact_app/features/facts/domain/repositories/fact_repository.dart';
+import 'package:fact_app/features/identity/data/key_value_first_launch_store.dart';
+import 'package:fact_app/features/identity/domain/first_launch_store.dart';
 import 'package:fact_app/features/identity/domain/repositories/auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
+import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
+import 'package:fact_app/features/settings/data/key_value_audio_mode_store.dart';
+import 'package:fact_app/features/settings/data/key_value_language_preference_store.dart';
+import 'package:fact_app/features/settings/domain/audio_mode_store.dart';
+import 'package:fact_app/features/settings/presentation/notifiers/audio_mode_providers.dart';
 import 'package:fact_app/services/diagnostics/console_diagnostic_sink.dart';
 import 'package:fact_app/services/location/geolocator_location_service.dart';
 import 'package:fact_app/services/location/location_providers.dart';
@@ -16,6 +36,19 @@ import 'package:fact_app/services/supabase/supabase_providers.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// Baut die Scope des Betriebs mit einem flüchtigen Gerätespeicher.
+///
+/// [productionProviderScope] verlangt den Speicher seit dem 31.08.2026, und
+/// zwar ohne Standardwert: ein Standard dort wäre genau der stille Ausfall, den
+/// diese Datei überall sonst nachweist. Der Preis ist dieser Helfer.
+ProviderScope _scope({
+  KeyValueStore? preferences,
+  Widget child = const SizedBox.shrink(),
+}) => productionProviderScope(
+  preferences: preferences ?? InMemoryKeyValueStore(),
+  child: child,
+);
 
 /// Die Overrides des Betriebs.
 ///
@@ -31,7 +64,7 @@ void main() {
       // `Override`-Objekts: mit dem Override braucht das Repository die
       // Supabase-Konfiguration, ohne ihn nicht. Genau daran ist zu erkennen,
       // dass nicht mehr der untätige Standard antwortet.
-      final scope = productionProviderScope(child: const SizedBox.shrink());
+      final scope = _scope();
       final container = ProviderContainer(
         overrides: [
           ...scope.overrides,
@@ -81,7 +114,7 @@ void main() {
       // stehen, und dann verschwinden eine verworfene Kameraabsicht, eine
       // unbekannte Stil-Kennung und eine gescheiterte Projektion spurlos.
       // Genau daran ist der erste Kartenlauf am Emulator blind gewesen.
-      final scope = productionProviderScope(child: const SizedBox.shrink());
+      final scope = _scope();
       final container = ProviderContainer(overrides: scope.overrides);
       addTearDown(container.dispose);
 
@@ -99,7 +132,7 @@ void main() {
       // eingesetzt" eine Aussage über einen Klassennamen, und eine
       // `ConsoleDiagnosticSink`, deren Ausgabekanal ins Leere zeigt, käme
       // damit durch.
-      final scope = productionProviderScope(child: const SizedBox.shrink());
+      final scope = _scope();
       final container = ProviderContainer(overrides: scope.overrides);
       addTearDown(container.dispose);
       final sink = container.read(diagnosticSinkProvider);
@@ -139,7 +172,7 @@ void main() {
       // ohne diesen Override liefert der Standard nie eine Position, die Karte
       // bliebe für immer auf der Rückfallstadt stehen, und es gäbe weder einen
       // Fehler noch ein Log. Auffallen würde es erst auf einem Gerät.
-      final scope = productionProviderScope(child: const SizedBox.shrink());
+      final scope = _scope();
       final container = ProviderContainer(overrides: scope.overrides);
       addTearDown(container.dispose);
 
@@ -165,7 +198,7 @@ void main() {
       // Seit Schritt 15 hängt die Karte daran. Nachgewiesen wieder über die
       // Wirkung: mit dem Override braucht das Repository die
       // Supabase-Konfiguration, ohne ihn nicht.
-      final scope = productionProviderScope(child: const SizedBox.shrink());
+      final scope = _scope();
       final container = ProviderContainer(
         overrides: [
           ...scope.overrides,
@@ -202,22 +235,165 @@ void main() {
       );
     });
 
+    // ── Die fünf Speicher ─────────────────────────────────────────────
+    //
+    // Geprüft wird jeweils über die **Wirkung** und nicht über den Typ: der
+    // vorgesetzte Speicher trägt einen Wert, und der muss durch den Provider
+    // hindurch ankommen. Eine Typprüfung allein käme auch dann durch, wenn
+    // `bootstrap.dart` einen frisch gebauten, leeren Speicher übergäbe, und
+    // genau das wäre der Fehler, der auf dem Gerät wie „nichts wird
+    // gespeichert" aussieht.
+
+    test('bindet firstLaunchStoreProvider an den übergebenen Speicher', () {
+      final container = ProviderContainer(
+        overrides: _scope(
+          preferences: InMemoryKeyValueStore(<String, Object>{
+            KeyValueFirstLaunchStore.storageKey: true,
+          }),
+        ).overrides,
+      );
+      addTearDown(container.dispose);
+
+      expect(container.read(firstLaunchStoreProvider).hasLaunched(), isTrue);
+    });
+
+    test('bindet tourStoreProvider an den übergebenen Speicher', () {
+      final container = ProviderContainer(
+        overrides: _scope(
+          preferences: InMemoryKeyValueStore(<String, Object>{
+            KeyValueTourStore.storageKey: true,
+          }),
+        ).overrides,
+      );
+      addTearDown(container.dispose);
+
+      expect(container.read(tourStoreProvider).hasSeenTour(), isTrue);
+    });
+
+    test('bindet audioModeStoreProvider an den übergebenen Speicher', () {
+      final container = ProviderContainer(
+        overrides: _scope(
+          preferences: InMemoryKeyValueStore(<String, Object>{
+            KeyValueAudioModeStore.storageKey: true,
+          }),
+        ).overrides,
+      );
+      addTearDown(container.dispose);
+
+      expect(container.read(audioModeStoreProvider).isEnabled(), isTrue);
+    });
+
+    test(
+      'bindet languagePreferenceStoreProvider an den übergebenen Speicher',
+      () {
+        final container = ProviderContainer(
+          overrides: _scope(
+            preferences: InMemoryKeyValueStore(<String, Object>{
+              KeyValueLanguagePreferenceStore.storageKey: 'en',
+            }),
+          ).overrides,
+        );
+        addTearDown(container.dispose);
+
+        expect(
+          container.read(languagePreferenceStoreProvider).readLanguage(),
+          AppLanguage.en,
+        );
+      },
+    );
+
+    test('bindet activeHuntStoreProvider an den übergebenen Speicher', () {
+      // Der teuerste der fünf: ohne diesen Override ist eine laufende Jagd
+      // nach einem Neustart weg, und genau das schließt ADR-007 als
+      // Produktvorgabe aus.
+      final ActiveHunt hunt = ActiveHunt.tryFrom(
+        stationOrdinal: 3,
+        stationCount: 7,
+        stationTitle: 'Station 3',
+        stationLatitude: 48.1467,
+        stationLongitude: 11.5661,
+        purchasedHintCount: 0,
+        duration: HuntDuration.sixty,
+      )!;
+      final container = ProviderContainer(
+        overrides: _scope(
+          preferences: InMemoryKeyValueStore(<String, Object>{
+            KeyValueActiveHuntStore.storageKey: jsonEncode(hunt.toPayload()),
+          }),
+        ).overrides,
+      );
+      addTearDown(container.dispose);
+
+      expect(container.read(activeHuntStoreProvider).readActiveHunt(), hunt);
+    });
+
+    test('ohne die Overrides bleiben alle fünf Speicher flüchtig', () {
+      // Die Gegenprobe zu den fünf Tests darüber, in einem. Ohne sie könnten
+      // sie auch grün sein, wenn die Standards selbst schon persistierten.
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(firstLaunchStoreProvider),
+        isA<InMemoryFirstLaunchStore>(),
+      );
+      expect(container.read(tourStoreProvider), isA<InMemoryTourStore>());
+      expect(
+        container.read(audioModeStoreProvider),
+        isA<InMemoryAudioModeStore>(),
+      );
+      expect(
+        container.read(languagePreferenceStoreProvider),
+        isA<InMemoryLanguagePreferenceStore>(),
+      );
+      expect(
+        container.read(activeHuntStoreProvider),
+        isA<InMemoryActiveHuntStore>(),
+      );
+    });
+
+    test('der Jagd-Speicher meldet an die überschriebene Senke', () {
+      // Der einzige der fünf, der `overrideWith` statt `overrideWithValue`
+      // braucht, weil er die Diagnosesenke liest. Ohne `ref.watch` bekäme er
+      // eine zweite, selbst gebaute Senke, und eine verworfene Nutzlast wäre
+      // auf dem Gerät nicht zu sehen. Nachgewiesen über die erzeugte Zeile.
+      final container = ProviderContainer(
+        overrides: _scope(
+          preferences: InMemoryKeyValueStore(<String, Object>{
+            KeyValueActiveHuntStore.storageKey: 'kein json',
+          }),
+        ).overrides,
+      );
+      addTearDown(container.dispose);
+      final lines = <String?>[];
+
+      final ActiveHunt? restored = runZoned(
+        () => container.read(activeHuntStoreProvider).readActiveHunt(),
+        zoneSpecification: ZoneSpecification(
+          print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
+              lines.add(line),
+        ),
+      );
+
+      expect(restored, isNull);
+      expect(lines, <String>[
+        'FACT-DIAG ${KeyValueActiveHuntStore.discardedEventName}',
+      ]);
+    });
+
     test('wertet Supabase beim Aufbau noch nicht aus', () {
       // `overrideWith` und nicht `overrideWithValue`: Letzteres bräuchte die
       // Instanz sofort, und die braucht `supabaseClientProvider`, der
       // `Supabase.instance.client` liest. Der Aufbau der Scope allein darf
       // deshalb nichts auswerten, sonst scheitert der Start, bevor
       // `bootstrap()` seine eigene Fehlermeldung zeigen kann.
-      expect(
-        () => productionProviderScope(child: const SizedBox.shrink()),
-        returnsNormally,
-      );
+      expect(() => _scope(), returnsNormally);
     });
 
     test('reicht das Kind unverändert durch', () {
       const child = SizedBox.shrink();
 
-      expect(productionProviderScope(child: child).child, same(child));
+      expect(_scope(child: child).child, same(child));
     });
   });
 }

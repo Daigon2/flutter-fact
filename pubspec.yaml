@@ -33,6 +33,17 @@ dependencies:
   # Wieder anheben, sobald `app_links` oder Flutters Gradle-Plugin nachgezogen
   # hat, und dann den ersten Geraetebuild erneut fahren.
   maplibre_gl: ^0.26.1
+  # Der Gerätespeicher der fünf Präferenz- und Zustandsspeicher. Am 31.08.2026
+  # freigegeben; ADR-007 hatte es empfohlen und die Aufnahme ausdrücklich der
+  # Zustimmung überlassen.
+  #
+  # Es kommt kein neuer Code in den Bau: das Paket lag schon als transitive
+  # Abhängigkeit von `supabase_flutter` im Baum (`pubspec.lock`, 2.5.5). Hier
+  # steht nur noch, dass die App es direkt braucht.
+  #
+  # Ein Heimatverzeichnis hat es auch: `lib/services/preferences/`, durchgesetzt
+  # als Regel 22 in `docs/architecture/dependency-rules.md`.
+  shared_preferences: ^2.5.5
   supabase_flutter: ^2.17.2
 
 dev_dependencies:

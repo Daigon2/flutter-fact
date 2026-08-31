@@ -1,14 +1,26 @@
 import 'package:fact_app/app/app.dart';
+import 'package:fact_app/app/localization/localization_providers.dart';
+import 'package:fact_app/app/onboarding/key_value_tour_store.dart';
+import 'package:fact_app/app/onboarding/onboarding_providers.dart';
 import 'package:fact_app/app/startup_failure_app.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
+import 'package:fact_app/core/preferences/key_value_store.dart';
+import 'package:fact_app/features/challenges/application/active_hunt_providers.dart';
+import 'package:fact_app/features/challenges/data/key_value_active_hunt_store.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
 import 'package:fact_app/features/facts/data/repositories/supabase_fact_repository.dart';
 import 'package:fact_app/features/identity/data/datasources/remote/supabase_auth_remote_data_source.dart';
+import 'package:fact_app/features/identity/data/key_value_first_launch_store.dart';
 import 'package:fact_app/features/identity/data/repositories/supabase_auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
+import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
+import 'package:fact_app/features/settings/data/key_value_audio_mode_store.dart';
+import 'package:fact_app/features/settings/data/key_value_language_preference_store.dart';
+import 'package:fact_app/features/settings/presentation/notifiers/audio_mode_providers.dart';
 import 'package:fact_app/services/diagnostics/console_diagnostic_sink.dart';
 import 'package:fact_app/services/location/geolocator_location_service.dart';
 import 'package:fact_app/services/location/location_providers.dart';
+import 'package:fact_app/services/preferences/shared_preferences_key_value_store.dart';
 import 'package:fact_app/services/supabase/supabase_config.dart';
 import 'package:fact_app/services/supabase/supabase_initializer.dart';
 import 'package:fact_app/services/supabase/supabase_providers.dart';
@@ -58,7 +70,23 @@ Future<void> bootstrap() async {
     return;
   }
 
-  runApp(productionProviderScope(child: const FactApp()));
+  // Der Gerätespeicher wird **einmal** geladen, vor `runApp`. Das ist die
+  // Bedingung dafür, dass die fünf Speicher synchron lesen dürfen: ihre
+  // Verträge begründen das je einzeln, und die Begründung lautet überall, dass
+  // `bootstrap()` vorlädt und den Provider überschreibt.
+  //
+  // Die Senke wird hier ein zweites Mal gebaut und ist trotzdem dieselbe:
+  // `diagnosticSinkForBuild` liefert eine `const`-Instanz, Dart kanonisiert
+  // sie, und `productionProviderScope` bekommt damit identisch dasselbe Objekt.
+  // Ohne die Senke hier wäre ein gescheiterter Ladevorgang die einzige Stelle
+  // des Starts, die niemandem etwas sagt.
+  final KeyValueStore preferences = await loadKeyValueStore(
+    sink: diagnosticSinkForBuild(debugBuild: kDebugMode),
+  );
+
+  runApp(
+    productionProviderScope(preferences: preferences, child: const FactApp()),
+  );
 }
 
 /// Die `ProviderScope` der laufenden App: [child] plus alles, was der Betrieb
@@ -87,13 +115,28 @@ Future<void> bootstrap() async {
 /// bleibt faul: solange niemand die Anmeldung anfasst, entsteht nichts.
 /// Vorbild ist `factRemoteDataSourceProvider`.
 ///
+/// ## Warum [preferences] ein Pflichtparameter ist
+///
+/// Weil ein Standardwert hier genau den Ausfall baute, gegen den diese Funktion
+/// samt Test überhaupt existiert. Ein `KeyValueStore preferences =
+/// InMemoryKeyValueStore()` wäre bequem und würde bedeuten: wer den Aufruf in
+/// [bootstrap] einmal falsch ergänzt, bekommt eine App, die startet, heil
+/// aussieht und sich nichts merkt. Dasselbe Muster wie bei
+/// `unavailableAuthRepository`, nur ohne Fehlermeldung.
+///
+/// Der Preis ist, dass jeder Testaufruf den Speicher mitgeben muss. Das ist der
+/// richtige Preis: er ist einmal zu zahlen und im Test sichtbar.
+///
 /// ## Warum die Kette hier steht und nicht neben der Implementierung
 ///
 /// `dependency-rules.md` gibt der App-Komposition Zugriff auf "all public
 /// feature entry points and services", und nur ihr. Ein Provider neben der
 /// Supabase-Implementierung wäre für `presentation` unerreichbar (Regel: kein
 /// Import aus `data`) und damit eine Falle für den nächsten Aufrufer.
-ProviderScope productionProviderScope({required Widget child}) {
+ProviderScope productionProviderScope({
+  required Widget child,
+  required KeyValueStore preferences,
+}) {
   return ProviderScope(
     overrides: [
       // Ohne diesen Override bleibt `SilentDiagnosticSink` stehen, und die
@@ -131,6 +174,40 @@ ProviderScope productionProviderScope({required Widget child}) {
       // Zugriff.
       factRepositoryProvider.overrideWith(
         (ref) => ref.watch(supabaseFactRepositoryProvider),
+      ),
+      // Die fünf Speicher. Ohne diese Overrides bleiben die flüchtigen
+      // Standards stehen, und dann tut die App vier Unbequemlichkeiten und
+      // einen echten Schaden: Startbildschirm, Tutorial, Sprachauswahl und
+      // Audio-Modus kämen bei jedem Start zurück, und **eine laufende Jagd
+      // wäre nach einem Neustart weg**. Genau diesen letzten Fall schließt
+      // ADR-007 als Produktvorgabe aus.
+      //
+      // Jeder der fünf Verträge hat diesen Weg vorgeschrieben: „Wer später
+      // persistiert, lädt in `bootstrap()` vor und überschreibt den Provider
+      // mit einer gefüllten Implementierung." Dies ist diese Stelle.
+      //
+      // `overrideWithValue` und nicht `overrideWith` bei den ersten vier: die
+      // Instanzen brauchen nur [preferences], das schon geladen ist. Es gibt
+      // nichts, was faul bleiben müsste.
+      firstLaunchStoreProvider.overrideWithValue(
+        KeyValueFirstLaunchStore(preferences),
+      ),
+      tourStoreProvider.overrideWithValue(KeyValueTourStore(preferences)),
+      audioModeStoreProvider.overrideWithValue(
+        KeyValueAudioModeStore(preferences),
+      ),
+      languagePreferenceStoreProvider.overrideWithValue(
+        KeyValueLanguagePreferenceStore(preferences),
+      ),
+      // Der fünfte braucht `overrideWith`, und zwar nicht aus Faulheit, sondern
+      // weil er die Diagnosesenke braucht. Über `ref.watch` bekommt er die
+      // **überschriebene** Senke aus dem Eintrag ganz oben; eine hier direkt
+      // gebaute wäre eine zweite Wahrheit darüber, wohin Meldungen gehen.
+      activeHuntStoreProvider.overrideWith(
+        (ref) => KeyValueActiveHuntStore(
+          preferences,
+          sink: ref.watch(diagnosticSinkProvider),
+        ),
       ),
     ],
     child: child,

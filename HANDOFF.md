@@ -37,9 +37,14 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2048 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2112 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
+
+**Seit dem 31.08.2026 merkt sich die App etwas.** `shared_preferences` ist
+aufgenommen, und alle fünf Speicher sind dauerhaft: Startbildschirm, Tutorial,
+Audio-Modus, Sprachwahl und **die laufende Jagd**. Das war die erste Persistenz
+im Projekt überhaupt.
 
 **Stand der optischen Prüfung:** am 29.08.2026 zum ersten Mal **mit echter
 Karte und echten Daten** am Emulator gesehen (Pixel 8, 411 logische Pixel,
@@ -129,11 +134,16 @@ ist die Reihenfolge danach.
 1. **Die Antworten in Code umsetzen. Das ist jetzt der Hauptweg, nicht mehr das
    Warten.** In dieser Reihenfolge, weil jede Zeile die nächste billiger macht:
 
-   a. **`shared_preferences` aufnehmen** und die vier bestehenden `InMemory`
-      Speicher plus den Jagd-Speicher dauerhaft machen. Steht schon transitiv im
-      Bau, kostet keine neue Zeile Abhängigkeit. **Achtung:** `readActiveHunt`
-      ist synchron, `bootstrap()` braucht dafür ein `await` vor dem ersten Bild.
-   b. **Das Hinweis-Feld auf Indizes umstellen.** Siehe den zweiten Nachtrag in
+   a. ~~**`shared_preferences` aufnehmen**~~ **fertig am 31.08.2026.** Alle
+      fünf Speicher sind dauerhaft, `bootstrap()` lädt einmal vor dem ersten
+      Bild, das Paket sitzt hinter `KeyValueStore` und hat mit Regel 22 ein
+      Heimatverzeichnis. Belege im Protokoll unten.
+   b. **Das Hinweis-Feld auf Indizes umstellen.** Das ist jetzt der nächste
+      Schritt, und er ist durch (a) teurer und wichtiger geworden: ab jetzt
+      liegen echte Nutzlasten auf echten Geräten, und eine Formänderung trifft
+      sie. Der Zweig, der sie verwirft, ist geprüft
+      (`key_value_active_hunt_store_test.dart`, „eine Nutzlast der falschen
+      Fassung wird verworfen"). Siehe den zweiten Nachtrag in
       ADR-007. Heute heißt es `purchasedHintCount` und trägt eine Anzahl; es soll
       die Indizes der freigeschalteten Hinweise tragen. Ändert einen
       Nutzlastschlüssel, dafür ist `payloadVersion` da.
@@ -216,6 +226,35 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Die erste Persistenz, und eine Lücke, die zur Regel wurde
+
+`shared_preferences` ist aufgenommen, und alle fünf Speicher sind dauerhaft:
+Startbildschirm, Tutorial, Audio-Modus, Sprachwahl und die laufende Jagd.
+2048 → 2112 Tests. Der Vertrag `KeyValueStore` liegt in `core/preferences/`, das
+Vendor-Paket ausschließlich in `services/preferences/`, wie bei
+`core/diagnostics` und `services/diagnostics`.
+
+**Überraschend war, dass das Skript seine eigene nächste Regel schon
+aufgeschrieben hatte.** `check_architecture.dart` führte `shared_preferences`
+ausdrücklich als bewusste Lücke, mit zwei Bedingungen: das Paket stehe nicht in
+`pubspec.yaml`, und es gebe keine Entscheidung, die ein Heimatverzeichnis
+benennt. Diese Änderung hat beide Bedingungen aufgehoben, und damit war Regel 22
+keine Entscheidung mehr, sondern eine Durchsetzung. Ein Kommentar, der seine
+eigene Ablaufbedingung nennt, ist mehr wert als einer, der nur begründet.
+
+**Der zweite Fund war ein Absturzweg, den niemand bestellt hatte.**
+`SharedPreferences.getBool` castet hart (`_preferenceCache[key] as bool?`) und
+**wirft** bei einem Typwechsel unter demselben Schlüssel. Gelesen wird in
+`bootstrap()` vor dem ersten Bild; ohne das `try` im Adapter wäre ein
+Formatwechsel also kein verworfener Wert, sondern ein Absturz beim Start. Das ist
+gemessen, der Test dazu ist grün.
+
+**Und eine Kleinigkeit, die ein Standardwert fast versteckt hätte.**
+`productionProviderScope` bekommt den Speicher als **Pflichtparameter**. Bequem
+wäre ein `InMemoryKeyValueStore()` als Vorgabe gewesen, und das hätte genau den
+stillen Ausfall gebaut, gegen den diese Funktion samt Test überhaupt existiert:
+eine App, die startet, heil aussieht und sich nichts merkt.
 
 ### 31.08.2026, Die Aufnahme des Backends, und was daran fehlt
 

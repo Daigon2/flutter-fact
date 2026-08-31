@@ -48,6 +48,7 @@ lib/
 │   ├── notifications/
 │   ├── permissions/
 │   ├── location/
+│   ├── preferences/
 │   ├── deep_links/
 │   └── background_tasks/
 │
@@ -157,6 +158,15 @@ features/settings/
   the most obvious detour open. As with `map/`, the rule checks the import and
   never the content. A service that hands the user's whereabouts somewhere it
   does not belong passes it; that is E-07 and stays a review concern.
+
+- `services/preferences/` is the device key-value store, the third home
+  directory of this kind, added on 2026-08-31 with `shared_preferences` itself.
+  The whole package family may appear nowhere else (rule 22), by prefix and for
+  the same reason as rule 21: `SharedPreferencesStorePlatform` lives in
+  `shared_preferences_platform_interface`, which is the obvious detour. The
+  contract the rest of the app sees is `KeyValueStore` in `core/preferences/`,
+  the same split as `core/diagnostics` and `services/diagnostics`. Five stores
+  ride on it: first launch, tour, audio mode, language and the running hunt.
 
 - `map/application/map_host_providers.dart` holds the two providers that give
   access to the map host, and the boundary between them is drawn by **type**,

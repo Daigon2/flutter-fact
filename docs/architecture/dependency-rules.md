@@ -65,8 +65,9 @@ independent business domain.
 19. `webview_flutter` may only be imported below `lib/map/presentation/avatar/`.
 20. `maplibre_gl` may only be imported below `lib/map/`.
 21. `geolocator` and its platform packages may only be imported below `lib/services/location/`.
+22. `shared_preferences` and its platform packages may only be imported below `lib/services/preferences/`.
 
-Rules 19 to 21 give a vendor SDK one home directory. They are not a ban, they
+Rules 19 to 22 give a vendor SDK one home directory. They are not a ban, they
 are an assignment: the map SDK belongs to the map host, the geolocation SDK
 belongs to the location service, and the WebView belongs to the avatar. Rule 4
 already keeps the map and geolocation SDKs out of every `domain` directory, but
@@ -80,6 +81,19 @@ the supporting technical capabilities and not among the business domains, in the
 same list as map rendering. The rule enforces that placement, it does not decide
 it. Rule 20 was enforced in `tool/check_architecture.dart` from 2026-08-28 and
 is written down here only now.
+
+Rule 22 was added on 2026-08-31, together with the package itself.
+`tool/check_architecture.dart` had until then carried `shared_preferences` as a
+**deliberate** gap, with two stated conditions: the package was not in
+`pubspec.yaml`, and no accepted decision named a home directory for it. Both
+conditions fell away in the same change, so the rule enforces a placement
+instead of making one. The device store is a supporting technical capability
+like the geolocation provider, `lib/features/README.md` assigns vendor adapters
+without a surface to `services/`, and the rest of the app sees the
+`KeyValueStore` contract in `lib/core/preferences/` and never the package.
+Like rules 19 to 21 it names the package family by prefix: the likeliest way
+around the adapter is `shared_preferences_platform_interface`, because
+`SharedPreferencesStorePlatform` lives there.
 
 All three check the import, not the content. A service that hands the user's
 position to somewhere it does not belong passes them, and where the position may

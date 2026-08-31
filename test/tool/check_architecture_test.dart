@@ -536,6 +536,30 @@ import 'package:geolocator_platform_interface/geolocator_platform_interface.dart
 
 class OrtungFamilie {}
 ''',
+  // Ä13: der Gerätespeicher gehört dem Präferenz-Adapter. Wie bei Regel 21
+  // verbietet Regel 4 ihn nur in einer Domäne; jedes andere Verzeichnis
+  // unterhalb von lib/ durfte ihn vor Regel 22 holen, und die Lücke stand im
+  // Skript ausdrücklich als bewusst offen gelassen.
+  'lib/features/settings/data/praeferenz_versuch.dart': r'''
+import 'package:shared_preferences/shared_preferences.dart';
+
+class PraeferenzVersuch {}
+''',
+  // Ä13: auch die App-Komposition bekommt ihn nicht, obwohl sie den Speicher
+  // lädt. Sie holt ihn über `loadKeyValueStore` und sieht das Paket nie.
+  'lib/app/praeferenz_daneben.dart': r'''
+import 'package:shared_preferences/shared_preferences.dart';
+
+class PraeferenzDaneben {}
+''',
+  // Ä13: das Verbot trifft die ganze Paketfamilie. `shared_preferences_platform_interface`
+  // ist der naheliegendste Umweg, dort liegt `SharedPreferencesStorePlatform`.
+  'lib/features/settings/data/praeferenz_familie.dart': r'''
+import 'package:shared_preferences_android/shared_preferences_android.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
+
+class PraeferenzFamilie {}
+''',
   // Ä10: webview_flutter ist auf lib/map/presentation/avatar/ beschränkt.
   'lib/features/discovery/presentation/avatar_versuch.dart': r'''
 import 'package:webview_flutter/webview_flutter.dart';
@@ -570,6 +594,13 @@ class GreiftAufFeature {}
 /// Baum 2: alles, was still bleiben muss. Enthält die Gegenproben und die
 /// bekannten Lücken. Dieser Baum muss Exit-Code 0 ohne jeden Fund ergeben.
 Map<String, String> _stilleProben() => <String, String>{
+  // Ä13 Gegenprobe: im Präferenz-Adapter ist der Gerätespeicher erlaubt. Sonst
+  // hätte Regel 22 kein Ziel, sondern wäre ein Verbot ohne Ort.
+  'lib/services/preferences/praeferenz_adapter.dart': r'''
+import 'package:shared_preferences/shared_preferences.dart';
+
+class PraeferenzAdapter {}
+''',
   // Gegenprobe zu Regel 8 und 9: Import innerhalb des eigenen Features,
   // absolut und relativ.
   'lib/features/tours/presentation/pages/eigenes_feature.dart': r'''
@@ -924,6 +955,9 @@ void main() {
         'lib/features/discovery/presentation/ortung_versuch.dart',
         'lib/features/discovery/presentation/ortung_familie.dart',
         'lib/map/presentation/ortung_daneben.dart',
+        'lib/features/settings/data/praeferenz_versuch.dart',
+        'lib/features/settings/data/praeferenz_familie.dart',
+        'lib/app/praeferenz_daneben.dart',
         'lib/core/greift_auf_feature.dart',
       }, reason: verstoss.bericht);
     });
@@ -1680,6 +1714,61 @@ void main() {
             'Sonst hat die Ortung keinen Ort mehr, an dem sie stattfinden '
             'darf.\n${still.bericht}',
       );
+    });
+
+    test('Ä13: der Gerätespeicher außerhalb des Präferenz-Adapters', () {
+      // Die Regel ist am 31.08.2026 entstanden, und sie ist genau das, was das
+      // Skript vorher ausdrücklich nicht sein wollte. Solange das Paket nicht
+      // in pubspec.yaml stand, wäre sie eine Entscheidung gewesen; seit es
+      // drinsteht und `lib/services/preferences/` sein Ort ist, ist sie eine
+      // Durchsetzung.
+      erwarteFunde(
+        verstoss,
+        'lib/features/settings/data/praeferenz_versuch.dart',
+        <(int, String)>[
+          (1, 'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter'),
+        ],
+      );
+      erwarteFunde(verstoss, 'lib/app/praeferenz_daneben.dart', <(int, String)>[
+        (1, 'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter'),
+      ]);
+    });
+
+    test('Ä13: das Verbot trifft die ganze shared_preferences-Familie', () {
+      // Wie bei Regel 21 breiter als der Paketname: in
+      // `shared_preferences_platform_interface` liegt
+      // `SharedPreferencesStorePlatform`, und das ist der Weg, auf dem jemand
+      // am Adapter vorbei eine eigene Plattform setzen würde.
+      erwarteFunde(
+        verstoss,
+        'lib/features/settings/data/praeferenz_familie.dart',
+        <(int, String)>[
+          (1, 'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter'),
+          (2, 'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter'),
+        ],
+      );
+    });
+
+    test('Ä13 Gegenprobe: im Präferenz-Adapter ist er erlaubt', () {
+      expect(
+        still.fuer('lib/services/preferences/praeferenz_adapter.dart'),
+        isEmpty,
+        reason:
+            'Sonst hat der Gerätespeicher keinen Ort mehr, an dem er '
+            'angesprochen werden darf. ${still.bericht}',
+      );
+    });
+
+    test('Ä13 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
+      // Dieselbe Abgrenzung wie bei Regel 20 und 21. Regel 4 verbietet
+      // Storage-SDKs in jeder Domäne und ist dort die genauere Aussage.
+      final zeile7 = verstoss
+          .fuer('lib/features/tours/domain/entities/technik_importe.dart')
+          .where((fund) => fund.zeile == 7)
+          .toList();
+
+      expect(zeile7, hasLength(1), reason: verstoss.bericht);
+      expect(zeile7.single.regel, contains('Regel 4: Domain darf keine'));
     });
 
     test('Ä12 Gegenprobe: in einer Domäne meldet nur Regel 4', () {

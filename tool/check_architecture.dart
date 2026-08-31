@@ -326,18 +326,56 @@ const _mapSdkBans = <Ban>[
 ///  * Sie gilt nur unterhalb von `lib/`, wie Regel 19 und 20. Ein Test darf
 ///    `geolocator` importieren, und
 ///    `test/services/location/geolocator_location_service_test.dart` tut es.
-///  * `shared_preferences` verhält sich heute identisch: außerhalb einer Domäne
-///    darf es jedes Verzeichnis importieren. Dafür entsteht hier bewusst keine
-///    Regel. Das Paket steht nicht in pubspec.yaml, und anders als bei
+///  * `shared_preferences` stand hier bis zum 31.08.2026 als bewusste Lücke:
+///    „Das Paket steht nicht in pubspec.yaml, und anders als bei
 ///    `webview_flutter` (Regel 19) gibt es keine getroffene Entscheidung, die
-///    ein Heimatverzeichnis benennt. Eine Regel wäre hier eine Entscheidung,
-///    keine Durchsetzung.
+///    ein Heimatverzeichnis benennt." **Beide Bedingungen sind seither
+///    weggefallen**, das Paket ist eine direkte Abhängigkeit und
+///    `lib/services/preferences/` ist sein Ort. Die Lücke ist damit Regel 22
+///    geworden, siehe [_prefsSdkBans].
 const _geoSdkBans = <Ban>[
   Ban(
     r'^package:geolocator',
     'Regel 21: das Geo-SDK gehört dem Ortungsdienst unter $_locationHome. Der '
         'Rest der App kennt nur den Domain-Vertrag des Dienstes, nicht das '
         'Vendor-Paket',
+  ),
+];
+
+/// Regel 22: den Gerätespeicher kennt nur der Präferenz-Adapter.
+///
+/// Dieselbe Bauart wie die Regeln 19 bis 21, und dieselbe Begründung:
+/// `lib/features/README.md` gibt `services/` als Ort für „Vendor-Adapter ohne
+/// Oberfläche", und ein Schlüssel-Wert-Speicher ist genau das. Der Rest der App
+/// kennt `KeyValueStore` aus `lib/core/preferences/`.
+///
+/// **Diese Regel ist eine Durchsetzung geworden, nachdem sie lange keine sein
+/// durfte.** Der Doku-Block von [_geoSdkBans] führte `shared_preferences`
+/// ausdrücklich als bewusste Lücke, mit zwei Bedingungen: das Paket stehe nicht
+/// in `pubspec.yaml`, und es gebe keine Entscheidung, die ein
+/// Heimatverzeichnis benennt. Am 31.08.2026 ist das Paket freigegeben und
+/// aufgenommen worden, und dieselbe Änderung benennt das Verzeichnis. Damit ist
+/// aus der Entscheidung eine Durchsetzung geworden.
+///
+/// Das Präfix und nicht der volle Name, wie bei Regel 21 und aus demselben
+/// Grund: `shared_preferences_android`, `_foundation`, `_web` und vor allem
+/// `shared_preferences_platform_interface` gehören zur Familie, und das
+/// Interface-Paket ist der naheliegendste Umweg, weil dort
+/// `SharedPreferencesStorePlatform` liegt. Genau daran hätte ein Test fast
+/// vorbeigegriffen: der Zweig „Schreiben abgelehnt" in
+/// `SharedPreferencesKeyValueStore` ist nur über dieses Paket erreichbar. Er
+/// bleibt deshalb ungeprüft, statt die Regel zu umgehen.
+///
+/// Die Regel gilt wie 19 bis 21 nur unterhalb von `lib/`. Ein Test darf das
+/// Paket importieren, und
+/// `test/services/preferences/shared_preferences_key_value_store_test.dart`
+/// tut es.
+const _prefsSdkBans = <Ban>[
+  Ban(
+    r'^package:shared_preferences',
+    'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter unter '
+        '$_preferencesHome. Der Rest der App kennt nur den '
+        'KeyValueStore-Vertrag aus core, nicht das Vendor-Paket',
   ),
 ];
 
@@ -415,6 +453,11 @@ final _layers = <LayerRule>[
     pathMatch: _ausserhalbLocationHome,
     bans: _geoSdkBans,
   ),
+  LayerRule(
+    name: 'praeferenz-sdk',
+    pathMatch: _ausserhalbPreferencesHome,
+    bans: _prefsSdkBans,
+  ),
   // Gate 7 gilt projektweit, nicht nur im Produktionscode. Ein GetIt-Container
   // in einem Test, einem Integrationstest oder einem Werkzeugskript ist
   // derselbe Regelbruch.
@@ -473,6 +516,13 @@ const _mapHome = 'lib/map/';
 /// nach `services/` und in kein Feature.
 const _locationHome = 'lib/services/location/';
 
+/// Der Präferenz-Adapter, der einzige Ort, an dem der Gerätespeicher
+/// vorkommen darf.
+///
+/// Wie [_locationHome] eine unterstützende Technik und keine Geschäftsdomäne.
+/// Der Vertrag dazu steht in `lib/core/preferences/key_value_store.dart`.
+const _preferencesHome = 'lib/services/preferences/';
+
 /// Alles unterhalb von `lib/`, außer [_mapHome] und außer jeder Domäne.
 ///
 /// Die erste Ausnahme ist der Zweck der Regel: der Host darf das SDK.
@@ -503,6 +553,16 @@ final _ausserhalbMapHome = RegExp(
 /// ihr einziger erlaubter Ort nicht auseinanderlaufen können.
 final _ausserhalbLocationHome = RegExp(
   '^lib/(?!${_locationHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
+);
+
+/// Alles unterhalb von `lib/`, außer [_preferencesHome] und außer jeder Domäne.
+///
+/// Wortgleich zu [_ausserhalbLocationHome] aufgebaut und aus denselben zwei
+/// Gründen: der Adapter darf sein SDK, und in einer Domäne ist die Meldung von
+/// Regel 4 die genauere. `_domainBans` verbietet `^package:shared_preferences`
+/// dort schon seit langem, und zwar bevor es das Paket in `pubspec.yaml` gab.
+final _ausserhalbPreferencesHome = RegExp(
+  '^lib/(?!${_preferencesHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
 );
 
 /// Alles unterhalb von `lib/`, außer [_avatarHome] und außer jeder Domäne.

@@ -23,8 +23,9 @@
 /// `FirstLaunchStore.hasLaunched` und `LanguagePreferenceStore.readLanguage`:
 /// die Entscheidung "Overlay bauen oder nicht" fällt beim ersten Frame. Ein
 /// `Future` hier würde die App-Shell in einen Ladezustand zwingen, obwohl der
-/// Wert längst feststeht. Wer später persistiert, lädt in `bootstrap()` vor und
-/// überschreibt `tourStoreProvider` mit einer gefüllten Implementierung.
+/// Wert längst feststeht. Seit dem 31.08.2026 ist die Persistenz gebaut:
+/// `bootstrap()` lädt vor und überschreibt `tourStoreProvider` mit
+/// `KeyValueTourStore`.
 abstract interface class TourStore {
   /// Ob das Tutorial schon einmal gezeigt und beendet wurde.
   bool hasSeenTour();
@@ -40,11 +41,12 @@ abstract interface class TourStore {
   Future<void> markTourSeen();
 }
 
-/// Flüchtiger Standard, solange nichts persistiert, und Vorgabe für Tests.
+/// Flüchtiger Speicher, Vorgabe für Tests.
 ///
-/// Die Merkung überlebt den Neustart nicht. Das ist gewollt: eine halbe
-/// Persistenz wäre schwerer zu erkennen als gar keine. Praktische Folge im
-/// aktuellen Stand: das Tutorial erscheint bei jedem Start erneut.
+/// Die Merkung überlebt den Neustart nicht. **Bis zum 31.08.2026 hieß das für
+/// die laufende App: das Tutorial erschien bei jedem Start erneut.** Seither
+/// überschreibt `bootstrap()` diesen Provider mit `KeyValueTourStore`, und der
+/// flüchtige bleibt die Vorgabe für Tests.
 class InMemoryTourStore implements TourStore {
   /// [hasSeenTour] setzt eine bereits gezeigte Tour, etwa in einem Test.
   InMemoryTourStore({bool hasSeenTour = false}) : _hasSeenTour = hasSeenTour;
