@@ -30,7 +30,7 @@ auf Bestätigung.
 | Ordner | Besitzt | Begründung |
 |---|---|---|
 | `puzzles` | Rätsel-Definition, sechs Rätseltypen, Auswertungs-Policy, Hinweisstufen | Die Engine wird von `tours` **und** `challenges` genutzt. Läge sie in einem der beiden, müsste das andere Feature dessen Presentation importieren, was Regel 8 der Dependency-Rules verbietet. Rätsel bewerten, nicht belohnen: die Belohnung entsteht als Ereignis für `progression`. |
-| `library` | Reiseführer-Regal, Cover, Kapitel, Reader | In der PWA heisst das „Wallet", enthält aber keine Währung. Coins gehören zu `progression`. Der Reader zeigt Fakten, besitzt sie nicht. |
+| `library` | Reiseführer-Regal, Cover, Kapitel, Reader | In der PWA heißt das „Wallet", enthält aber keine Währung. Coins gehören zu `progression`. Der Reader zeigt Fakten, besitzt sie nicht. |
 | `creator` | Fakt einreichen, Kategorie-Vorschlag, Foto-Upload, Wikipedia-Suche | `facts` besitzt veröffentlichten Inhalt, die Erzeugungs-Pipeline gilt laut Domain-Map als externes System. Nutzer-Einreichung ist ein eigener Arbeitsablauf mit eigenem Zustand. |
 
 ## Was bewusst kein Feature ist

@@ -78,7 +78,7 @@
 /// **Ab Zoom 14,6, bei jedem üblichen Gehzoom, wählt dieser Bau also ferne,
 /// ruhende Ballons aus, wo die (so hergeleitete) Quelle immer auf das
 /// Ersatzrechteck zeigt.** Ob der Pfeil auf einen echten fernen Ballon zeigen
-/// darf oder ausschliesslich auf das Ersatzrechteck, ist eine sichtbare
+/// darf oder ausschließlich auf das Ersatzrechteck, ist eine sichtbare
 /// Verhaltensfrage. **Sie ist hier bewusst nicht entschieden** und liegt bei
 /// Janek, nicht in diesem Kommentar; bis zur Antwort bleibt das Verhalten wie
 /// gebaut.
@@ -87,7 +87,7 @@
 /// für jeden Ballon, der [FactProximityPoint] gerade als nah kennt, und null
 /// für jeden nur geografisch ausgewählten. Das ist keine Häufigkeitsangabe,
 /// sondern eine Übersetzung: die Quelle hat kein Konzept „nativ“, sie hat nur
-/// „innerhalb von 150 Metern“ und „ausserhalb“, und genau diese Grenze ist
+/// „innerhalb von 150 Metern“ und „außerhalb“, und genau diese Grenze ist
 /// [FactProximityPoint.emphasis]. Woran diese Übersetzung heute vorbeizielt,
 /// steht oben.
 ///
@@ -100,12 +100,12 @@
 /// Diese Datei kennt den Gruppierungszustand einzelner Fakten nicht: es gibt
 /// keinen Vertrag, über den `map/domain/` beantworten könnte, welches Feature
 /// der native Cluster-Algorithmus gerade zusammengefasst hat, und ihn hier
-/// nachzubauen hiesse, MapLibres Gruppierung ein zweites Mal zu schreiben, mit
+/// nachzubauen hieße, MapLibres Gruppierung ein zweites Mal zu schreiben, mit
 /// echtem Risiko, dass beide Seiten auseinanderlaufen. **Diese Auswahl kann
 /// deshalb unterhalb von Zoom 15 einen Fakt wählen, der gerade in einer Gruppe
 /// steckt**, während die Quelle dort korrekt nichts fände. Oberhalb von Zoom 15
 /// gruppiert MapLibre gar nicht mehr (dieselbe Grenze, die `factAnimationRunsAt`
-/// schon nutzt), und dort ist diese Auswahl exakt. Wer das schliessen will,
+/// schon nutzt), und dort ist diese Auswahl exakt. Wer das schließen will,
 /// braucht zuerst eine Antwort auf die Frage, ob `map/domain/` den
 /// Gruppierungszustand einzelner Punkte überhaupt melden soll; das ist eine
 /// Erweiterung des Kartenvertrags und keine, die diese Datei allein
@@ -214,7 +214,7 @@ const double discoveryBalloonAnchorFallbackSize = 38;
 /// Das feste Rechteck, wenn kein Ballon als Ziel taugt.
 ///
 /// `screen-tour.jsx:217-220`, der `else`-Zweig: kein Treffer unter den Markern
-/// heisst „Frame-Mitte unten“, nicht „kein Ziel“. [frameSize] ist dieselbe
+/// heißt „Frame-Mitte unten“, nicht „kein Ziel“. [frameSize] ist dieselbe
 /// Fläche, gegen die auch [selectBalloonAnchorRect] misst.
 Rect discoveryBalloonAnchorFallbackRect(Size frameSize) => Rect.fromLTWH(
   frameSize.width * discoveryBalloonAnchorFallbackXFraction,
@@ -351,7 +351,7 @@ Rect? selectBalloonAnchorRect({
   for (int i = 0; i < candidates.length && i < screenPositions.length; i++) {
     final MapScreenPoint? at = screenPositions[i];
     if (at == null) {
-      // Keine Bildschirmlage, ausserhalb der Karte oder hinter der Kamera.
+      // Keine Bildschirmlage, außerhalb der Karte oder hinter der Kamera.
       continue;
     }
     final Size markerSize =

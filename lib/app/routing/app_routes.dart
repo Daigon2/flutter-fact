@@ -170,7 +170,7 @@ class MapRoute extends GoRouteData with $MapRoute {
 ///
 /// **Die Akte darf niemals ohne räumliche Nähe erreichbar sein.**
 /// `screen-map.jsx:2137-2142` hält den Fix wörtlich fest: „ohne GPS NIE die
-/// Fakt-Detail-Seite direkt oeffnen. Sonst koennte man durch Antippen aus
+/// Fakt-Detail-Seite direkt öffnen. Sonst könnte man durch Antippen aus
 /// 1000 km Entfernung einen Fakt lesen — was die Vor-Ort-Mechanik komplett
 /// aushebelt. Vorher gab es einen `!dist || dist <= 50` Escape-Hatch, der
 /// genau dieses Loch geoeffnet hat (Italien-User bekam Muenchen-Fakt voll

@@ -57,7 +57,7 @@ siehe „Rechner einrichten".
 1. **E-48 beantworten, es ist die einzige neue Frage aus dieser Nacht.** Wohin
    zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist? Der Anker ist
    gebaut, die Frage ist die Grösse, an der er misst. Belege im Abschnitt „Der
-   `balloon`-Anker". **Der billigste Weg, sie ganz zu schliessen:** einmal mit
+   `balloon`-Anker". **Der billigste Weg, sie ganz zu schließen:** einmal mit
    den Entwicklerwerkzeugen in der laufenden PWA die Breite eines Ballons bei
    zwei Zoomstufen ablesen. Die tragende Kette ist bis dahin hergeleitet und
    nicht gemessen.
