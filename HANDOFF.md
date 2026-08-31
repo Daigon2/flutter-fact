@@ -37,7 +37,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 1979 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2048 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -50,6 +50,40 @@ Drehung. Ungeprüft bleiben iOS (nie compiliert), echte Hardware, 360 und 320
 Pixel und Systemschrift 2.0; alle Aussagen dazu sind weiterhin strukturell.
 Die vier offenen Gerätemessungen sind am 30.08.2026 alle beantwortet, Belege in
 `REBUILD_STATUS.md`.
+
+**Drei Dinge aus Schritt 15 sind am 31.08.2026 ausdrücklich NICHT geprüft, und
+zwar aus einem Grund, der nichts mit dem Code zu tun hat.** Zu prüfen wäre:
+kommt beim Antippen einer Gruppe überhaupt ein Ereignis an, stimmt die
+gerechnete Zoomstufe bei 58 Grad Neigung, und trägt die aus der Web-Mercator-
+Rechnung abgeleitete Referenzkachelgröße 512, für die es im Repository keinen
+Beleg gibt. Kein Test in diesem Repository kann das beantworten.
+
+Der Emulator ist zweimal an derselben Stelle gebrochen, beide Male in der
+Grafikbrücke des Hosts und nie in der App: erst zeigte der Gast eine weiße
+Fläche und meldete `Requested texture size (1, 1) exceeds maximum supported size
+of (0, 0)` aus dem Impeller-Allokator, dann stürzte
+`libgfxstream_backend.dll` mit `EXCEPTION_ACCESS_VIOLATION_WRITE` ab. Beteiligt
+waren nur Emulator- und Intel-Treibermodule (`igvk64.dll`,
+`igxelpgicd64.dll`). **Die Ursache war der Schlaf des Rechners:** die
+Prozesslaufzeit im Absturzbericht betrug 158110 Sekunden, also knapp 44 Stunden,
+und die GPU-Verbindung war seit dem Aufwachen tot. Der Prozess lebte danach
+weiter, ohne über `adb` erreichbar zu sein, und sperrte die AVD, sodass ein
+Neustart mit „Running multiple emulators with the same AVD" abbrach.
+**Der Neustart mit Software-Rendering hat es nicht gelöst, und das ist der
+entscheidende Befund.** Nach `taskkill /F /IM qemu-system-x86_64.exe` startete
+der Emulator mit `-gpu swiftshader_indirect` sauber, bootete in 29 Sekunden, die
+App lief ohne weiße Fläche, der Startbildschirm zeigte echte Daten aus Supabase
+(950+ Fakten, 4 Städte). Beim ersten Antippen war das Gerät `offline`, und der
+Prozess starb mit **Segfault** (Exit 139). Im Protokoll steht davor
+`UpdateLayeredWindowIndirect failed ... (Ein an das System angeschlossenes
+Gerät funktioniert nicht.)`. Das ist die **Fensterschicht des Hosts** und nicht
+der Gast-Renderer: es sterben beide Pfade, der Intel-GPU-Pfad und der
+Software-Pfad. Die Grafikschicht des Rechners ist seit dem Schlaf kaputt, nicht
+die Wahl des Renderers.
+
+**Wer hier weitermacht, kommt an einem Neustart des Rechners nicht vorbei**, oder
+prüft auf echter Hardware, was ohnehin aussteht. Ein weiterer Emulator-Versuch
+ohne Neustart ist verschwendete Zeit, das ist jetzt zweimal gemessen.
 
 **Der Gerätelauf braucht Konfiguration, keine Arbeit:** URL und Schlüssel für
 Supabase kommen über `--dart-define-from-file=env.json`, die Datei steht in
@@ -115,8 +149,11 @@ siehe „Rechner einrichten".
    offen, solange die Lücke nur `test/` betrifft. **D-9** Variante (b), lokale
    Typen bleiben, denn die Umrechnung ist gemessen billig und die drei Typen
    sind keine Kopien. **D-14** hängt daran und bleibt deshalb wie es ist.
-   **D-15, D-16 und das neue D-17 sind am 31.08.2026 als Block an Dairen
-   gegangen**, zusammen mit zwei Meldungen, die keine Antwort brauchen: D-12s
+   **D-15, D-16 und D-17 sind am 31.08.2026 alle drei beantwortet:** D-15 und
+   D-16 an mich delegiert (ADR-006 und ADR-007), **D-17 mit Variante (a)**,
+   `projectToScreen` liefert mit, ob ein Punkt vor der Kamera liegt. Damit
+   wartet bei Dairen nur noch D-11, und das blockiert nichts. Der Block ging
+   am 31.08.2026 an ihn, zusammen mit zwei Meldungen, die keine Antwort brauchen: D-12s
    vorhergesagter Preis fällt nicht an, und die Paketlücken-Tabelle behauptete
    fälschlich, es gebe kein dauerhaftes Kamera-Padding. Wortlaut in
    `REBUILD_STATUS.md`.
@@ -140,6 +177,101 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, der Vertrag für die laufende Jagd steht, und eine Prüfung hat vier Dinge gefunden
+
+ADR-007 ist umgesetzt: `ActiveHunt` als Lesemodell und Nutzlast in
+`challenges/domain`, `ActiveHuntStore` mit In-Memory-Vorgabe, ein nur lesender
+`Provider<ActiveHunt?>` in `challenges/application`. Damit sind **Schritt 36 und
+37 nicht mehr blockiert**. Keine persistente Umsetzung, `shared_preferences`
+bleibt zustimmungspflichtig.
+
+**Überraschend war, was eine unabhängige Prüfung an einer Testdatei fand, die
+schon 14 eigene Mutationsproben überstanden hatte:** von 25 fremden Mutationen
+überlebten fünf. Der teuerste Fund war keine Zusicherung, sondern eine fehlende:
+der **Schreibweg prüfte nichts**. Eine ungültig gebaute Jagd lief eine Sitzung
+lang einwandfrei und war nach dem Neustart lautlos weg, weil erst
+`tryFromPayload` prüft. Behoben an der Wurzel, indem der öffentliche Konstruktor
+verschwand: `tryFrom` und `tryFromPayload` sind die einzigen Zugänge, und damit
+fielen NaN-Ungleichheit und ein Widerspruch zwischen zwei Kopfkommentaren im
+selben Zug weg. Dazu war eine Wache **bei jeder Eingabe unerreichbar**, weil eine
+andere Regel sie schon erzwang, und der Test dafür sah gemessen aus.
+
+**Zweitens, und das ist die übertragbare Lehre:** die Schreiblücke aus
+`discovery` ist **nicht** dieselbe wie beim Karten-Host, obwohl beide gleich
+aussehen. Dort ist der Fehlgriff sichtbar, hier stumm, weil der Provider sein
+Ergebnis merkt und ein Schreibvorgang keine Benachrichtigung auslöst. Aus dem
+Review-Versprechen ist deshalb ein Gate geworden: eine Textwache, die belegt
+rot wird, wenn eine Datei unter `lib/features/discovery/`
+`activeHuntStoreProvider` nennt. Ohne sie kostete das Wiederöffnen der Lücke
+**null** rote Tests, und das ist gemessen und nicht vermutet.
+
+**Ein Prozessfehler von mir gehört dazu:** ich hatte zwei Bauagenten gleichzeitig
+auf denselben Arbeitsbaum gesetzt. Dadurch meldete der eine `dart analyze` grün
+und der Prüfer gleichzeitig rot, und beide hatten recht, nur zu verschiedenen
+Zeitpunkten. Wer hier weiterarbeitet: **immer nur ein Schreiber je Arbeitsbaum**,
+Prüfer dürfen parallel laufen, wenn sie ihre Gates in einer Kopie fahren.
+
+**Was aus diesem Block offen bleibt, drei Dinge:**
+
+1. **Der D-17-Block hat keine unabhängige Prüfung.** Der Jagd-Vertrag hat eine,
+   D-17 nicht. Die Geometrie in `map_camera_horizon.dart` beruht auf zwei
+   abgelesenen Zahlen und einer Annahme (`f/H = 1,5` sei eine feste
+   SDK-Konstante), und die Ablesung war klug genug, um eine zweite Meinung wert
+   zu sein. Die eine Gerätemessung, die die Annahme fallen lässt, steht dort
+   samt vorhergesagten Zahlen für vier Neigungen.
+2. **`purchasedHintCount` heißt noch Anzahl und soll Münzen tragen.** Entschieden
+   im Nachtrag zu ADR-007, dort auch die Belege: die Quelle speichert
+   `hintCostSpent`, und bei Kosten `[0, 20, 30]` bedeuten die Summen 20 und 30
+   beide „ein Hinweis“. Die Umsetzung ändert einen Nutzlastschlüssel, wofür
+   `payloadVersion` da ist. ADR und Code widersprechen sich bis dahin in genau
+   diesem Feld, und der Nachtrag sagt das ausdrücklich.
+3. **D-18 ist neu und liegt bei Dairen:** die Schwierigkeitsstufe hat keinen Weg
+   über die Domänengrenze, `FactPuzzleDifficulty` gehört `facts` und Gate 6
+   sperrt sie aus. Solange das offen ist, kann eine wiederhergestellte Jagd ihre
+   eigene Stufe nicht kennen.
+
+### 31.08.2026, D-17 ist gebaut: die Projektion sagt jetzt, ob ein Punkt vor der Kamera liegt
+
+`MapScreenPoint` trägt ein drittes, pflichtiges Feld, der Karten-Host füllt es,
+die drei Verbraucher in `discovery` prüfen es statt die Lücke ein viertes Mal zu
+umschreiben. +25 Tests.
+
+**Überraschend war, dass das fehlende Sichtfeld gar nicht fehlte.** Die Frage
+sah nach einer Sackgasse aus: `maplibre_gl 0.26.2` gibt Sichtfeld und
+Kamerahöhe nicht heraus, also müsste eine Rechnung im Host eine Konstante raten,
+und Raten war ausgeschlossen. Die Zahl steckte aber schon in der Messnacht vom
+30.08.2026: die Leiter der Messung 3 läuft gegen einen Fluchtwert, dieser
+Fluchtwert **ist** der Horizont, und daraus folgt die Brennweite in einer Zeile
+Arithmetik. Sie kommt auf das 1,5009-fache der Flächenhöhe, also auf das
+Sichtfeld `2·arctan(1/3) = 36,87°`. Eine Messung, die für eine andere Frage
+gemacht war, hat die neue mitbeantwortet, und zwar seit einem Tag.
+
+**Der zweite Fund ist eine Vereinfachung, mit der ich nicht gerechnet hatte:**
+der Abstand der Kamera zu ihrem Ziel fällt aus der Rechnung heraus. Übrig bleibt
+ein Vergleich einer Bildzeile mit dem Horizont, ohne Kamerahöhe, ohne Zoom und
+ohne Umrechnung von Metern in Pixel. Die teuer aussehende Alternative, jeden
+Punkt mit `toLatLng` zurückzurechnen, hätte 25 zusätzliche Kanalaufrufe je
+Kamerameldung gekostet **und** eine eigene Gerätemessung gebraucht, bevor man
+überhaupt anfangen kann: rechnet `toLatLng` die Spiegelung rückwärts genauso wie
+`toScreenLocation` sie vorwärts, erkennt die Probe gar nichts.
+
+**Der dritte Fund ist unangenehm und gehört hierher:** dasselbe Modell rechnet
+alle vierzehn Ablesungen der Messung 3 auf 0,42 % nach, und dabei fällt auf, dass
+die Korrektur, die in derselben Nacht an die Tabelle geschrieben wurde, selbst
+falsch ist. Das Kameraziel lag nicht 2,2 km südlich, sondern 0,44 km nördlich
+des Startpunkts. Muster 9 zum siebten Mal: eine Begründung, die nach Messung
+aussieht und eine Rechnung war. Das qualitative Ergebnis der Messung bleibt.
+
+**Offen bleibt genau eine Annahme, und sie fällt mit einer einzigen Ablesung
+am Gerät:** dass das Verhältnis 1,5 bei **jeder** Neigung gilt, nicht nur bei
+den gemessenen 58 Grad. Wie zu messen ist und welche Zahl herauskommen muss,
+steht in `map_camera_horizon.dart` und in `REBUILD_STATUS.md` bei D-17.
+
+**Zur Testzahl:** die 2042 oben enthalten Testdateien unter
+`features/challenges/`, die nicht zu dieser Änderung gehören. Vor den 25 neuen
+Tests lief die Suite in diesem Arbeitsverzeichnis auf 2017, nicht auf den 1979,
+die hier vorher standen.
 
 ### 31.08.2026, Schritt 15 ist wirklich fertig, und der Preis von D-12 fiel nicht an
 

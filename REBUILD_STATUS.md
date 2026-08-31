@@ -1283,7 +1283,7 @@ führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
   Entfernung selbst.
 
 - [x] 33. Wizard · [x] 34. Solo-Setup · [x] 35. Hotspot-Picker
-- [!] 36. Phasen-Maschine (E-43 entschieden, wartet auf D-16) · [!] 37. Active-UI (dito)
+- [ ] 36. Phasen-Maschine (E-43 und D-16 entschieden, seit dem 31.08.2026 frei) · [ ] 37. Active-UI (dito)
   · [!] 38. Rätsel und Ökonomie
 - [ ] 39. Pause und Results · [!] 40. Gruppen-Flow (Realtime-Entscheidung)
 
@@ -1671,7 +1671,7 @@ Nutzermarker und Avatar frei statt um eine Lücke herum.
 | D-14 | Sauber machen, **wenn D-9 auch sauber gemacht wird**, und dann das Prüfskript anpassen |
 | D-15 | **An mich delegiert**, „bitte selbst entscheiden mit einer cleanen Architektur im Kopf" → ADR-006 |
 | D-16 | **An mich delegiert**, mit einer Vorgabe von Janek: die Jagd überlebt den Neustart → ADR-007 |
-| D-17 | **Rückfrage**, die Frage war nicht verständlich; neu erklärt am 31.08.2026 |
+| D-17 | **Variante (a)**, `projectToScreen` liefert es mit: „Aso, ja dann soll ProjektToScreen das mitliefern“ |
 
 | Nr | Frage in einem Satz | Blockiert | Nachtrag seit dem Absenden |
 |---|---|---|---|
@@ -1682,8 +1682,9 @@ Nutzermarker und Avatar frei statt um eine Lücke herum.
 | D-13 | Welches Sensorpaket für die Kompass-Drehung, und ist es frei | Schritt 14 | Der eingefrorene Port nennt `flutter_compass ^0.8.1` |
 | D-14 | Darf `presentation` direkt aus `lib/services/` lesen | nichts | Aus einer Lesestelle sind vier geworden |
 | D-15 | Ist `puzzles` als Feature bestätigt, damit `tours` und `challenges` später davon abhängen dürfen | nichts, blockiert aber Phase 5 | Am 30.08.2026 mit Schritt 27 entstanden |
-| D-16 | Wie liest `discovery` den Zustand der laufenden Jagd, wenn sie auf der Karte läuft | die Umsetzung von E-43, also Schritt 36 und 37 | Am 30.08.2026 aus E-43 entstanden |
-| D-17 | Soll `projectToScreen` melden, dass ein Punkt hinter der Kamera liegt | nichts, aber die Lücke steht jetzt in drei Verbrauchern | Am 31.08.2026 mit Schritt 15 zum dritten Mal aufgetreten |
+| D-16 | Wie liest `discovery` den Zustand der laufenden Jagd, wenn sie auf der Karte läuft | **nichts mehr**, seit ADR-007 | Am 30.08.2026 aus E-43 entstanden, am 31.08.2026 in ADR-007 entschieden; Schritt 36 und 37 sind damit frei |
+| D-17 | Soll `projectToScreen` melden, dass ein Punkt hinter der Kamera liegt | nichts mehr, **gebaut** | Am 31.08.2026 mit Schritt 15 zum dritten Mal aufgetreten, am selben Tag mit Variante (a) entschieden und umgesetzt |
+| D-18 | Wie kommt die Schwierigkeitsstufe einer Jagd über die Domänengrenze, damit `challenges` sie speichern kann | die **vollständige** Wiederherstellung, also einen Teil von Schritt 36 und 37 | Am 31.08.2026 beim Bau des Jagd-Vertrags entstanden |
 
 ### D-9, gemeinsamer Geo-Typ
 
@@ -2111,7 +2112,132 @@ Code beider Plattformen **nicht existiert** (`controller.dart:1782` gegen
 gemessen am 31.08.2026). Wer das Feld füllen will, rechnet es also selbst, aus
 Kamerastellung und Neigung, und das ist eine Rechnung im Host und keine Abfrage.
 
-### Zwei Punkte aus demselben Block, die keine Fragen sind
+**Antwort vom 31.08.2026, über Janek weitergegeben: Variante (a).** Im Wortlaut:
+„Aso, ja dann soll ProjektToScreen das mitliefern“. Gelesen als das Feld auf dem
+Ergebnis und nicht als `null`, denn „mitliefern“ heißt beiliegen und nicht
+fehlen. `MapScreenPoint` bekommt also ein Feld, und der Host füllt es.
+
+**Damit ist die teure Hälfte der Frage gewählt, und das ist bewusst so:** die
+Alternative `null` wäre billiger gewesen, hätte aber „keine Bildschirmlage“ und
+„Lage bekannt, liegt aber hinter der Kamera“ in denselben Wert gelegt. Der
+`discovery_balloon_anchor` braucht die Unterscheidung: er sucht den Ballon
+nächst der Rahmenmitte, und ein Punkt hinter der Kamera hat eine Lage, sie darf
+nur nicht mitspielen.
+
+**Was die Umsetzung mitbringt, und was sie nicht darf:** die Zahl kommt nicht
+vom Paket, sie wird gerechnet. Sie gehört damit in den Host und in keinen
+Verbraucher, und die drei bestehenden Umschreibungen der Lücke werden durch
+einen Verweis auf das Feld ersetzt, sonst bleibt genau das Muster stehen, dessen
+Beseitigung der Zweck war.
+
+#### Gebaut am 31.08.2026, und welcher Weg gewonnen hat
+
+`MapScreenPoint.isInFrontOfCamera` ist ein Pflichtfeld, der Host füllt es, die
+drei Verbraucher prüfen es. Die Rechnung liegt in
+`map/domain/map_camera_horizon.dart`.
+
+**Zwei Wege standen zur Wahl, und der Wettbewerb war nicht knapp.**
+
+**Verloren hat die Hin- und Rückrechnung** (projizieren, mit `toLatLng`
+zurückrechnen, mit dem Ausgangspunkt vergleichen). Sie kostet **einen
+Kanalaufruf je Punkt**, denn `toLatLng` hat kein Stapel-Gegenstück: die
+Plattform-Schnittstelle kennt `toScreenLocation`, `toScreenLocationBatch` und
+`toLatLng`, aber kein `toLatLngBatch`
+(`maplibre_gl_platform_interface-0.26.2/lib/src/maplibre_gl_platform_interface.dart:253-257`).
+Der `balloon`-Anker projiziert 25 Kandidaten je Kamerameldung; das wären 25
+zusätzliche Umläufe je Meldung, also genau das, was der Kopfkommentar von
+`map_projection_driver.dart` ausdrücklich verwirft. **Und sie hätte eine
+zweite, größere Unbekannte:** wenn `toLatLng` die Spiegelung genauso rückwärts
+rechnet, wie `toScreenLocation` sie vorwärts rechnet, kommt der Ausgangspunkt
+**exakt** wieder heraus, und die Probe erkennt gar nichts. Ob das so ist, sagt
+kein Dokument; es wäre eine Gerätemessung, und zwar eine, ohne die man nicht
+anfangen kann. Dazu käme eine Toleranz, die nahe am Horizont in Kilometern je
+Pixel zu bemessen wäre.
+
+**Gewonnen hat die Geometrie**, und der Einwand aus der Auftragsbeschreibung
+(„braucht das Sichtfeld, und das gibt das Paket nicht heraus") fällt, weil das
+Sichtfeld **schon gemessen ist**, nur hat es niemand als solches gelesen. Es
+steckt in der Leiter der Messung 3: die Werte laufen gegen einen Fluchtwert von
+rund −1050,9 Geräte-Pixeln, und aus `Horizont = H/2 − f·cot θ` folgt bei
+`H/2 = 1200` und `θ = 58°` sofort `f = 3602,2`, also `f/H = 1,5009`. Das ist
+das Sichtfeld `2·arctan(1/3) = 36,87°`, die feste Konstante von MapLibre. Keine
+geratene Zahl, eine abgelesene.
+
+**Die entscheidende Vereinfachung:** der Abstand der Kamera zum Ziel fällt aus
+der Rechnung heraus. Übrig bleibt `y > H/2 − f·cot θ`, und das braucht weder
+Kamerahöhe noch Zoom noch eine Umrechnung von Metern in Pixel. Die Herleitung
+steht vollständig im Kopfkommentar der neuen Datei.
+
+**Was daran geprüft ist, und zwar gegen die Messung und nicht gegen die
+Formel.** Die vierzehn Ablesungen der Leiter sind Zeile für Zeile Testdaten
+(`test/map/domain/map_camera_horizon_test.dart`). Der schärfste Fall sind die
+beiden Enden: 2000 km nach vorn (−1047,95) liegt rund zwei Pixel **vor** dem
+gerechneten Horizont, 2000 km nach hinten (−1053,83) rund vier Pixel
+**dahinter**. Die Formel trennt sie. Und die zwei verwirrenden Ablesungen
+(1774,76 und 3825,91, nach hinten gemessen und trotzdem vor der Kamera) liegen
+mit im Test, damit niemand „großes y heißt gespiegelt" einbaut.
+
+**Die Annahme, die übrig bleibt, und die eine Messung, die sie fällt.**
+`f/H = 1,5` ist bei **einer** Neigung (58°) und **einer** Fläche
+(1080 × 2400 Geräte-Pixel) belegt. Angenommen ist, dass das Sichtfeld des SDK
+eine feste Konstante ist. Zu messen: die Karte auf eine andere Neigung stellen,
+etwa 30 Grad, die Kamera stehen lassen, einen einzigen Punkt rund 2000 km in
+Blickrichtung projizieren und sein `y` ablesen. Vorhergesagt bei 2400
+Geräte-Pixeln Höhe: −5035,4 bei 30 Grad, −2400,0 bei 45, −1049,5 bei 58,
+−878,5 bei 60. Trifft es nicht, folgt das richtige Verhältnis aus derselben
+Ablesung. Ein sichtbarer Punkt ist dafür nicht nötig, die Projektion antwortet
+auch weit außerhalb des Bildes.
+
+**Was der Bau nebenbei gekostet hat:** der Host braucht jetzt den
+Skalierungsfaktor der Kartenfläche, weil `MapViewport` in Stilpixeln misst und
+die Projektion in Geräte-Pixeln antwortet. `MapSurface` meldet ihn zusammen mit
+der Größe, und ein Wechsel des Faktors ohne Größenänderung meldet ebenfalls.
+Der Vertrag in `map/domain/` rechnet weiter nicht um, die Umrechnung liegt an
+einer benannten Stelle im Host.
+
+**Was ausdrücklich nicht geprüft ist:** dass `_devicePixelRatio` beim
+`unbindSurface` mit gelöscht wird. Der Faktor kommt zusammen mit der Fläche
+herein und wird zusammen mit ihr gelesen; ein vergessenes Löschen ist über die
+Fassade nicht beobachtbar. Ein Test dafür wäre eine Zusicherung ohne Aussage.
+
+#### Ungefragter Fund C: das Modell rechnet die ganze Leiter der Messung 3 nach
+
+Nachgerechnet am 31.08.2026 aus der Tabelle oben, nicht neu am Gerät gemessen.
+Mit dem Fluchtwert und **zwei** der vierzehn Ablesungen (100 km und 20 km nach
+vorn) liegen die zwei Größen fest, die die Messnacht selbst als unsicher
+gekennzeichnet hatte: die Lage des Kameraziels auf der Leiter und der Abstand
+des Pols dahinter. Die **restlichen elf** Ablesungen trifft das Modell danach
+auf 0,42 % im schlechtesten Fall, über einen Wertebereich von −3241 bis +3826
+Pixeln.
+
+**Drei Dinge folgen daraus, und das dritte ist eine Korrektur an diesem
+Dokument.**
+
+1. Der Abstand des Pols hinter dem Kameraziel lässt sich unabhängig
+   vorhersagen: `D/sin θ`, mit `D = f` (MapLibre setzt den Abstand zum
+   Kameraziel gleich der Brennweite) und dem Web-Mercator-Maßstab bei Zoom
+   14,94, Breite 48,15° und Faktor 2,625. Das ergibt 2,688 km gegen 2,687 km
+   aus der Anpassung, **0,06 % Abweichung**.
+2. **Das ist ein Indiz für die 512 aus `map_camera_fit.dart`**, die dort bis
+   heute nur hergeleitet und nicht gemessen ist. Mit einer Referenz-Kachelgröße
+   von 256 wäre der Maßstab doppelt so grob und die Vorhersage um den Faktor
+   zwei daneben. **Ein Beweis ist es nicht:** bestätigt wird das Produkt aus
+   `D = f` und dem Maßstab, und eine Welt mit doppeltem `D` und halb so feinem
+   Maßstab passte genauso. Nebenbei: `camera.dart:40-42` des Pakets behauptet
+   selbst „A zoom of 0.0, the default, means the screen width of the world is
+   256", und dieselbe Sorte Satz hat bei `toScreenLocation` schon einmal nicht
+   gestimmt.
+3. **Die Korrektur vom 30.08.2026 zur Spalte „Entfernung" ist selbst falsch.**
+   Sie sagt, die Kamera sei vor der Messung 2,2 km nach Süden gesprungen und
+   jeder Leiterwert deshalb um diese Strecke verschoben. Aus den Zahlen folgt
+   das Gegenteil: das Kameraziel lag rund **0,44 km nördlich** des Startpunkts
+   der Probe. Läge es 2,2 km südlich, müsste der Punkt 2,3 km nach vorn
+   **oberhalb** der Bildmitte landen; abgelesen ist 1533,23, also deutlich
+   darunter. Der Umschlag liegt damit rund 2,7 km hinter dem Kameraziel und
+   nicht „zwischen 1,2 und 2,8 km", wobei die 1,2 km ohnehin **vor** der Kamera
+   lagen. Das qualitative Ergebnis der Messung 3 bleibt unangetastet, es hängt
+   nur an der Reihenfolge der Werte. Muster 9 in Reinform: eine Korrektur, die
+   nach Messung aussieht und eine Rechnung war.
 
 Im selben Block mitgeschickt, ausdrücklich als selbst entschieden gekennzeichnet
 und beide mit einer Zeile umkehrbar:
@@ -2123,6 +2249,43 @@ und beide mit einer Zeile umkehrbar:
 - **Die Cluster-Parameter gehören dem Feature**, nicht dem Karten-Host, weil sie
   technisch ohnehin an der Datenquelle hängen und zwei Überlagerungen
   unterschiedlich clustern dürfen.
+
+### D-18, die Schwierigkeitsstufe über die Domänengrenze
+
+**Am 31.08.2026 beim Bau des Jagd-Vertrags entstanden, noch nicht verschickt.
+Blockiert die vollständige Wiederherstellung einer Jagd, damit einen Teil von
+Schritt 36 und 37.**
+
+Der neue Jagd-Vertrag trägt die Schwierigkeitsstufe **nicht**, und das ist kein
+Versehen, sondern eine Sperre. Sie hat zwei echte Verbraucher in der Quelle:
+`screen-map.jsx:1049-1051` staffelt danach die Navigationshilfen, und
+`screen-challenge.jsx:2828` zeigt sie im Pause-Bildschirm. Der Typ dafür,
+`FactPuzzleDifficulty`, gehört aber `facts`, und Gate 6 in
+`tool/check_architecture.dart` sperrt ihn aus `challenges/domain` aus. Solange
+das offen ist, kann eine wiederhergestellte Jagd ihre Stufe nicht kennen.
+
+**Zur Wahl stehen drei Wege, und keiner ist billig:**
+
+1. **Die Aufzählung kopieren.** Es wäre die **dritte** Wiederholung dieser Art,
+   und der Präzedenzfall steht schon im Haus: `PuzzleDifficulty` in
+   `puzzles/domain` ist genau so entstanden, und ADR-006 führt die Doppelung
+   ausdrücklich als benannten Preis der Grenze. Billig zu bauen, teuer im
+   Bestand.
+2. **Als Zeichenkette in der Nutzlast führen.** Umgeht den Typ statt ihn zu
+   lösen: die Stufe wäre gespeichert, aber niemand im Vertrag könnte sie
+   auswerten, ohne sie wieder in eine Aufzählung zu übersetzen, und diese
+   Übersetzung läge dann in `presentation`.
+3. **Das Lesemodell nach `application` legen.** Dort dürfte es `facts/domain`
+   sehen. Widerspricht ADR-007 aber **wörtlich**, das den Vertrag in
+   `challenges/domain` verlangt.
+
+**Warum das dieselbe Frage wie D-9 ist, nur teurer:** D-9 ist mit „lokale Typen
+bleiben, die Umrechnung ist gemessen billig" beantwortet worden, und das trug
+dort, weil es um zwei Doubles ging. Hier geht es um eine Aufzählung mit
+Bedeutung, und eine Kopie kann auseinanderlaufen, ohne dass ein Test es merkt.
+Der eine Weg, der beide Fragen zusammen lösen würde, ist bei D-9 beschrieben
+und dort nicht empfohlen: ein geteilter Kern als Paket in der heute leeren
+Erlaubnisliste von Gate 6.
 
 ## Offene Entscheidungen
 
@@ -2590,6 +2753,8 @@ eine Fundstelle.
 | E-47 | **Drei Bedienelemente im Challenge-Reiter tun bis Schritt 35 nichts.** Seit Schritt 33 zeigt der Reiter den Assistenten. Wer ihn zu Ende bedient, drückt einen vollflächigen roten Knopf „Starten", sieht die Drück-Animation und danach passiert nichts, weil der Startpunkt-Picker fehlt. Dasselbe gilt für die Kachel „Gruppe" und für „Mit Code beitreten", deren Formulare Sitzungen über Supabase anlegen müssten, die es im Neubau nicht gibt. **Eine Sackgasse ist es nicht**, der Zurück-Knopf und die Tab-Leiste bleiben erreichbar, gemessen im Widget-Test. Aber es ist derselbe Zustand, den E-33 beim Kästchen „Angemeldet bleiben" beanstandet, und der Bau begründet an anderer Stelle ausdrücklich, warum die Zufallskarte **nicht** antippbar ist („ein Tipp, der nichts ändert, ist ein Bedienelement, das nichts tut"). Die Ungleichbehandlung ist bewusst, weil eine erfundene Navigation schlechter wäre als keine, aber sie gehört gewusst. Löst sich mit den Schritten 35 und 40 von selbst auf. | 2 | Schritt 35 |
 | E-48 | **Wohin zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist?** Die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, und ein ruhender Ballon ist selbst nur 26 breit; sie zeigt also nur dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ein festes Rechteck in der unteren Bildmitte. Der Neubau misst statt des Kopfes die Zeichenfläche samt Schattenrand und wählt deshalb ab Zoom 14,6 auch ferne Ballons. **Parität** hieße, den Kopf zu messen; **Abweichung** hieße, es so zu lassen, und der Pfeil fände fast immer einen echten Ballon, was möglicherweise besser aussieht. Zu entscheiden ist auch, ob die Zoomsperre des Ankers auf `factAnimationRunsAt` verschärft wird: das schnitte den Löwenanteil der Plattformkanal-Aufrufe weg und schlösse nebenbei die Gruppierungslücke unter Zoom 15, um den Preis, dass unter Zoom 16 das Ersatzrechteck steht. **Die tragende Kette ist hergeleitet und nicht am Browser gemessen**, siehe „Der `balloon`-Anker". | 2 | vor Auslieferung |
 | E-49 | **Zwei verschiedene Wahrheiten darüber, ob eine Trophäe verdient ist.** Der Profil-Bildschirm liest den Freischaltstand vom Server (`user_trophies`) und färbt danach. Das Reiseregal rechnet ihn **clientseitig neu**: `wltDeriveTrophies` (`screen-wallet.jsx:114-128`) zählt die gesammelten Fakten je Kategorie und setzt `earned` auf `counts[t.cat] >= t.threshold`. Beide können auseinanderlaufen, und beide zeigen dieselben 36 Definitionen. **Zusätzlich ist die Client-Rechnung unvollständig:** nur die Kategorie-Trophäen tragen ein `threshold`; die Stadt-, Rang- und Geheim-Trophäen haben keins, und `>= undefined` ist in JavaScript immer falsch. Im Reiseregal sind sie damit **dauerhaft** unverdient, egal was der Server sagt. Zu entscheiden ist, welche Quelle im Neubau gilt, bevor Schritt 45 gebaut wird; die Trophäenliste aus Schritt 49 nimmt heute den Stand als Parameter entgegen und legt sich nicht fest. Berührt E-16, weil `user_trophies` für jeden lesbar ist. | 3 | vor Schritt 45 |
+| E-50 | **Gekaufte Hinweise gehen beim Neustart verloren, die Schuld dafür nicht.** `unlockedHints` ist Komponentenzustand (`screen-map.jsx:1014`) und wird nie gespeichert; `stop.hintCostSpent` überlebt dagegen (`app.jsx:927-935`), und `:908-909` zieht genau diesen Betrag vom Stopp-Lohn ab (`netPoints = max(0, pointsAwarded - hintCost)`). Nach einem Neustart sieht der Nutzer die Hinweise wieder verschlossen, **zahlt erneut**, und der erste Kauf wird weiterhin abgezogen. Derselbe Commit, der die Wiederherstellung eingeführt hat, hat diese Hälfte vergessen. Das ist ein Defekt der Quelle und **keine Paritätsvorlage**: im Neubau gehört entweder beides gespeichert oder keins. | 3 | vor Schritt 37 |
+| E-51 | **Die gespeicherte Münzsumme kann nicht sagen, welche Hinweise gekauft waren.** `hintCostSpent` ist eine Summe, und `HINT_COSTS = [0, 20, 30]` (`screen-map.jsx:1031`) ist nicht eindeutig umkehrbar: die Summen 20 und 30 bedeuten beide „ein Hinweis“. Die *Anzahl* ist heute zufällig noch ableitbar, die *Identität* nicht, und ab einem vierten Kostenwert wäre auch die Anzahl mehrdeutig. Wer nach einem Neustart dieselben Hinweise offen zeigen will, braucht die Indizes und nicht die Summe. Hängt an E-50, ist aber der allgemeinere Fund. | 2 | vor Schritt 37 |
 
 ## Wie Tests hier blind werden
 

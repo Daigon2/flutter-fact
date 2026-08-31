@@ -118,6 +118,59 @@ to OD-002 and not here.
   `challenges/data`, and the in-memory default stays the test default.
 - Restoring validates; an unparsable or stale payload is discarded, not repaired.
 
+## Amendments
+
+### 2026-08-31: the read model carries neither the distance nor a hint count
+
+Two sentences in **Context** above name fields that the implementation
+deliberately does not have. Neither is a rule, so nothing here was violated, but
+a document that describes a shape the code does not have is worse than a gap.
+Both readings are corrected here rather than in the prose above, so that the
+change stays visible.
+
+**"how far away it is" is not a field, and must not become one.** Distance is
+not a property of a hunt. It is a function of the hunt and the current GPS
+fix, and it changes on every location update while the stored hunt does not.
+A persisted distance would be wrong one step after it was written. The consumer
+computes it from the station coordinates the read model does carry, with
+`MapPosition.distanceInMetersTo`, the same way `hunt_start_options.dart`
+already does.
+
+**"how many hints were bought" is the wrong quantity, and the source proves
+it.** The behavioural source persists coins, not a count: `app.jsx:931` adds up
+`hintCostSpent`, and `app.jsx:908-909` subtracts exactly that amount from the
+stop reward (`netPoints = max(0, pointsAwarded - hintCost)`). With
+`HINT_COSTS = [0, 20, 30]` (`screen-map.jsx:1031`) the mapping from a count to
+a cost is **not invertible**: the sums 20 and 30 both mean one hint. A count is
+therefore a lossy derivative of the number the reward calculation needs.
+
+The read model is therefore to carry the **spent cost in coins**. A count is
+recoverable from it only by accident today, and would stop being recoverable the
+moment a fourth cost value is added; see E-51 in `REBUILD_STATUS.md`.
+
+**Decided, not yet implemented, and the document says so on purpose.** The field
+in `active_hunt.dart` is still called `purchasedHintCount` and still holds a
+count. Changing it also changes a payload key, which is what `payloadVersion`
+exists for, and it is the one open follow-up from this amendment. Until it lands,
+ADR and code disagree on this single field, and that disagreement is named here
+rather than left for a reader to discover.
+
+**What this does not decide.** *Which* hints are unlocked is separate state, and
+the read model does not carry it yet. The source cannot serve as a template
+here, because it loses that state on every restart while keeping the debt for it
+(E-50). Restoring the unlocked hints belongs to the same step as restoring the
+route and the chosen puzzle, and `payloadVersion` exists for exactly that
+extension. The **contract** does not change when it happens.
+
+### Still open, and blocking full restoration
+
+The difficulty of a hunt has no way across the domain boundary:
+`FactPuzzleDifficulty` belongs to `facts`, and gate 6 locks it out of
+`challenges/domain`. Until that is decided, a restored hunt cannot know its own
+difficulty. Recorded as D-18 in `REBUILD_STATUS.md`, with the three candidate
+ways and why none of them is cheap. This ADR does not decide it: it is the same
+family as D-9 and touches the gate, not the hunt.
+
 ## Review triggers
 
 - A second feature needs write access to a running hunt.
