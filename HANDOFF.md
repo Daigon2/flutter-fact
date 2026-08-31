@@ -51,12 +51,38 @@ Pixel und Systemschrift 2.0; alle Aussagen dazu sind weiterhin strukturell.
 Die vier offenen Gerätemessungen sind am 30.08.2026 alle beantwortet, Belege in
 `REBUILD_STATUS.md`.
 
-**Drei Dinge aus Schritt 15 sind am 31.08.2026 ausdrücklich NICHT geprüft, und
-zwar aus einem Grund, der nichts mit dem Code zu tun hat.** Zu prüfen wäre:
-kommt beim Antippen einer Gruppe überhaupt ein Ereignis an, stimmt die
-gerechnete Zoomstufe bei 58 Grad Neigung, und trägt die aus der Web-Mercator-
-Rechnung abgeleitete Referenzkachelgröße 512, für die es im Repository keinen
-Beleg gibt. Kein Test in diesem Repository kann das beantworten.
+**Von den drei Dingen aus Schritt 15 sind am 31.08.2026 nach dem Neustart des
+Rechners zwei am Gerät geprüft, das dritte nicht.**
+
+- **Kommt beim Antippen einer Gruppe ein Ereignis an? Ja, gemessen.** Der Tipp
+  auf eine Gruppe mit der Zahl 15 hat die Kamera bewegt, und die Gruppe war
+  danach aufgelöst: an ihrer Stelle standen einzelne Nadeln. Das ist der
+  vollständige Weg vom SDK-Ereignis über `groupTaps`, `projectToScreen`,
+  `selectGroupMembers` und `rectFitZoom` bis zur Kamerafahrt, an einem Stück.
+- **Stimmt die gerechnete Zoomstufe? Betrieblich ja.** Die Gruppe ist
+  aufgegangen und die Kamera hat nicht überschossen. Genau das sollte die
+  untere Schranke `groupExpandMinZoom = 16` garantieren, abgeleitet aus
+  `clusterMaxZoom: 15`. Die Neigung war danach wieder da, die Absicht trägt
+  also eine vollständige Kamera, wie D-12 es verlangt.
+- **Trägt die Referenzkachelgröße 512? Weiter offen, und der Gruppentipp kann
+  es nicht beantworten.** Wäre sie um den Faktor zwei falsch, läge die
+  gerechnete Zoomstufe genau eine Stufe daneben, und zwischen der Schranke 16
+  und `maxZoom` 18 würde die Gruppe trotzdem aufgehen. Die naheliegende
+  Gegenprobe „sind hinterher alle Mitglieder im Bild" trägt auch nicht: die
+  Auswahl der Mitglieder ist bewusst eine Näherung und liefert absichtlich ein
+  zu kleines Rechteck. Es bleibt bei der Messung, die in
+  `map_camera_fit.dart` beschrieben ist.
+
+**Der Weg dorthin ist selbst ein Fund und spart dem Nächsten eine Stunde.**
+Gruppen entstehen erst ab Zoom 15 oder kleiner, die Karte startet aber bei 16,5,
+und **auf dem Emulator ist Herauszoomen nicht fernsteuerbar**: `input
+motionevent` kennt nur einen Finger und wird als Verschieben gedeutet, nicht als
+Doppeltipp-Zoom; `sendevent` auf `/dev/input/event2` scheitert im
+Play-Store-Image an den Rechten; und die Emulator-Konsole kennt weder
+`ABS_MT_*`-Codes noch ein Mausrad (`event codes EV_REL` hat nur `REL_X` und
+`REL_Y`). **Der Trick: die Standortfreigabe verweigern.** Ohne Position folgt die
+Karte niemandem, bleibt in der Stadtübersicht, und dort stehen die Gruppen samt
+Zahlen (87, 49, 32, 28, 17, 15, 12) direkt zum Antippen.
 
 Der Emulator ist zweimal an derselben Stelle gebrochen, beide Male in der
 Grafikbrücke des Hosts und nie in der App: erst zeigte der Gast eine weiße
