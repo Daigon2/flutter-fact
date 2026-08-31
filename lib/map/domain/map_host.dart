@@ -31,8 +31,10 @@ library;
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 
 /// Was ein Feature vom Karten-Host sehen darf.
 ///
@@ -70,6 +72,26 @@ abstract interface class MapHost {
   /// wird, also auf die erkannte Stadt, und erst dieser Wert gehört in den
   /// Aufbau der Oberfläche.
   Stream<MapCameraView> get cameraChanges;
+
+  /// Wie groß die Kartenfläche gerade ist, oder `null`, solange sie nicht
+  /// gemessen ist.
+  ///
+  /// `null` ist der Normalfall beim Start, genau wie bei [camera]: die Fläche
+  /// entsteht erst mit dem ersten Layout des Kartenwidgets.
+  ///
+  /// ## Warum das hier steht und nicht in `MediaQuery` des Features
+  ///
+  /// Die Fläche ist nichts, was ein Feature aus dem Kamerazustand ableiten
+  /// kann, und `MediaQuery.size` im Feature wäre die Größe des
+  /// **Bildschirms**, nicht die der Kartenfläche. Heute ist beides dieselbe
+  /// Zahl, weil die Karte den ganzen Bildschirm füllt; ein Feature, das sich
+  /// auf diese stille Gleichsetzung verließe, bräche lautlos, sobald die
+  /// Karte einmal nicht mehr den ganzen Bildschirm einnimmt, etwa hinter einem
+  /// Sheet. Genau solche stillen Gleichsetzungen sind in diesem Projekt schon
+  /// teuer geworden, siehe `REBUILD_STATUS.md`, „Wie Tests hier blind werden".
+  ///
+  /// In **Stilpixeln**, siehe [MapViewport].
+  MapViewport? get viewport;
 
   /// Gibt eine Absicht ab.
   ///
@@ -125,6 +147,30 @@ abstract interface class MapHost {
   /// eines Bildschirms, der nie eine Überlagerung gesetzt hat, soll nicht
   /// melden müssen, ob er es getan hat.
   void removeOverlay(String overlayId);
+
+  /// Meldet jeden Tipp auf eine **Gruppe** einer Überlagerung.
+  ///
+  /// ## Höchstens ein Ereignis je Tipp, und warum das gilt
+  ///
+  /// Das Karten-SDK prüft ein kleines Rechteck um die Antippstelle gegen alle
+  /// interaktiven Layer, von oben nach unten, und nimmt den **ersten** Treffer
+  /// (`maplibre_gl 0.26.2`, Android `MapLibreMapController.java:2123-2135`,
+  /// Auswahl `:816-822`; iOS `firstFeatureOnLayers(at:)`,
+  /// `MapLibreMapController.swift:1386-1432`, gemessen am 31.08.2026). Ein
+  /// Tipp erzeugt also nie zwei Ereignisse, auch dort nicht, wo sich mehrere
+  /// Layer einer Gruppe überlappen.
+  ///
+  /// ## Was hier ausdrücklich fehlt: der Tipp auf einen einzelnen Punkt
+  ///
+  /// Es gibt heute keinen Empfänger dafür (ADR-002), deshalb keinen Vertrag:
+  /// ein Punkt-Tipp verschwindet still. Der Auslöser, ab dem das nachgezogen
+  /// wird, ist der erste Bildschirm, der einen einzelnen Fakt von der Karte
+  /// aus öffnen will.
+  ///
+  /// [Stream] aus demselben Grund wie bei [cameraChanges]: die einzige
+  /// erlaubte reaktive Primitive in `map/domain/`
+  /// (`tool/check_architecture.dart`, Regel 1 und 2).
+  Stream<MapOverlayGroupTap> get groupTaps;
 
   /// Rechnet [positions] in Bildschirmlagen um, in derselben Reihenfolge.
   ///

@@ -24,8 +24,10 @@ import 'package:fact_app/map/domain/map_camera_gate.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/services/location/device_position.dart';
 import 'package:fact_app/services/location/location_providers.dart';
 import 'package:fact_app/services/location/location_service.dart';
@@ -1027,6 +1029,14 @@ class FakeMapHost implements MapHost {
 
   @override
   Stream<MapCameraView> get cameraChanges => _cameras.stream;
+
+  /// Kein Test hier braucht eine gemessene Fläche.
+  @override
+  MapViewport? get viewport => null;
+
+  /// Kein Test hier braucht einen Gruppen-Tipp.
+  @override
+  Stream<MapOverlayGroupTap> get groupTaps => const Stream.empty();
 
   @override
   void submitIntent(MapCameraIntent intent) => intents.add(intent);

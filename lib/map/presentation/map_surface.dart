@@ -42,12 +42,15 @@
 /// 58 endet.
 library;
 
+import 'dart:math';
+
 import 'package:fact_app/app/theme/fact_colors.dart';
 import 'package:fact_app/core/async/detached_work.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/map/presentation/map_camera_driver.dart';
 import 'package:fact_app/map/presentation/map_camera_host.dart';
 import 'package:fact_app/map/presentation/map_overlay_driver.dart';
@@ -128,6 +131,41 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
 
   String? _style;
 
+  /// Die zuletzt an den Host gemeldete Größe der Kartenfläche.
+  ///
+  /// **Im `State` gehalten und nicht nur an den Host gereicht.** Der Grund ist
+  /// [_onMapCreated]: `bindSurface` läuft dort und damit **nach** dem ersten
+  /// Aufbau, in dem der `LayoutBuilder` unten seine Größe schon gemeldet hat.
+  /// Ohne diesen Wert wüsste [_onMapCreated] nichts von einer Fläche, die
+  /// längst gemessen ist, und ein Wiederbinden ohne neuen Aufbau, etwa nach
+  /// einem Kartenwechsel im selben `State`, verlöre die Größe: `bindSurface`
+  /// selbst löscht sie nicht, aber ein vorheriges `unbindSurface` tut es, und
+  /// zwischen beiden läuft der `LayoutBuilder` nicht erneut.
+  MapViewport? _viewport;
+
+  /// Meldet die Größe der Kartenfläche, aber nur, wenn sie sich geändert hat.
+  ///
+  /// ## Warum der Vergleich hier steht und nicht im Host
+  ///
+  /// Der `builder` unten läuft bei **jedem** Aufbau dieses Widgets, nicht nur
+  /// bei einer echten Größenänderung, etwa weil `setState` beim Laden des
+  /// Stils das ganze Widget neu baut. [MapViewport] hat Wertgleichheit, und
+  /// genau die wird hier geprüft: ohne sie schriebe ein harmloser Neuaufbau
+  /// den Host bei unveränderter Größe erneut. Der Vergleich braucht [_viewport]
+  /// ohnehin als Gedächtnis für [_onMapCreated], siehe dort; eine zweite
+  /// Prüfung im Host wäre nur eine zweite Kopie desselben Vergleichs.
+  void _reportViewport(BoxConstraints constraints) {
+    final MapViewport viewport = MapViewport(
+      widthInScreenPixels: constraints.maxWidth,
+      heightInScreenPixels: constraints.maxHeight,
+    );
+    if (viewport == _viewport) {
+      return;
+    }
+    _viewport = viewport;
+    _host.handleViewportChange(viewport);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -168,14 +206,15 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
   /// nichts als die Verdrahtung.
   ///
   /// **Und deshalb ist genau diese Zeile die einzige des Karten-Hosts, für die
-  /// es keinen Test gibt und keinen geben kann.** Dass der Host seine sieben
+  /// es keinen Test gibt und keinen geben kann.** Dass der Host seine neun
   /// Fassadenmethoden richtig durchreicht, ist seit Schritt 16 zugesichert
   /// (`test/map/presentation/map_camera_host_test.dart`, „Die Durchreichungen
-  /// an den Überlagerungsteil" und „Die Projektion"); dass
-  /// `MapLibreOverlayDriver` und `MapLibreProjectionDriver` hier auch wirklich
-  /// mitgegeben werden, ist nur auf einem Gerät zu sehen. Ein Test dafür wäre
-  /// ein Test gegen einen Doppelgänger dieser Methode und würde nichts
-  /// belegen. Wer diese Zeile ändert, prüft sie am Gerät oder gar nicht.
+  /// an den Überlagerungsteil", „Die Projektion", „Die Fläche" und „Der
+  /// Gruppen-Tipp"); dass `MapLibreOverlayDriver` und `MapLibreProjectionDriver`
+  /// hier auch wirklich mitgegeben werden, ist nur auf einem Gerät zu sehen.
+  /// Ein Test dafür wäre ein Test gegen einen Doppelgänger dieser Methode und
+  /// würde nichts belegen. Wer diese Zeile ändert, prüft sie am Gerät oder gar
+  /// nicht.
   ///
   /// **Die Messung, die hier hing, ist am 30.08.2026 gefallen.**
   /// `controller.dart:1779` sagt zur Umrechnung „screen pixels (not display
@@ -192,6 +231,29 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
       overlays: MapLibreOverlayDriver(controller),
       projections: MapLibreProjectionDriver(controller),
       camera: widget.initialCamera,
+    );
+    // **Erneut gemeldet, und nicht nur beim ersten Mal.** Der `LayoutBuilder`
+    // unten misst die Fläche, bevor die Karte überhaupt gemountet ist, und
+    // meldet dem Host dann nur noch bei einer echten Änderung. Ein Wechsel der
+    // Karte im selben `State` (`unbindSurface` gefolgt von einem neuen
+    // `bindSurface`) läuft ohne neuen Aufbau des `LayoutBuilder`, und ohne
+    // diese Zeile bliebe [MapHost.viewport] für den neuen Host `null`, obwohl
+    // die Fläche längst feststeht.
+    final MapViewport? viewport = _viewport;
+    if (viewport != null) {
+      _host.handleViewportChange(viewport);
+    }
+    // Eine Liste am Controller, kein Widget-Parameter. Die Zuordnung des
+    // getroffenen Layers zu einer Überlagerung entscheidet [MapOverlayHost],
+    // hier steht bewusst nichts, das selbst entscheidet.
+    controller.onFeatureTapped.add(
+      (
+        Point<double> point,
+        LatLng coordinates,
+        String id,
+        String layerId,
+        Annotation? annotation,
+      ) => _host.handleFeatureTapped(layerId: layerId, at: coordinates),
     );
   }
 
@@ -216,27 +278,43 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
       return ColoredBox(color: context.factColors.mapBg);
     }
 
-    return MapLibreMap(
-      styleString: style,
-      initialCameraPosition: _positionOf(widget.initialCamera),
-      // **Pflicht und kein Schalter.** Ohne `trackCameraPosition` gibt es
-      // überhaupt keine Kamerarückmeldung: auf Android kehrt `onCameraMove()`
-      // sofort zurück und `onCameraIdle()` sendet keine Position, auf iOS
-      // liefert `getCamera()` `nil`. Der ganze Host hinge dann in der Luft.
-      trackCameraPosition: true,
-      // **Stabile Methodenreferenzen, keine frisch erzeugten Closures.**
-      // `maplibre_map.dart:406-410` liest diese beiden Rückrufe **genau
-      // einmal**, bei der Erzeugung des Controllers; `didUpdateWidget` gleicht
-      // nur Optionen ab. Eine Closure, die beim Bauen entsteht, wäre damit für
-      // immer die erste Fassung, ohne jede Fehlermeldung.
-      onMapCreated: _onMapCreated,
-      onCameraMove: _onCameraMove,
-      onCameraIdle: _onCameraIdle,
-      // Die App zeichnet ihren eigenen Kompass im Top-Chrome
-      // (`screen-map.jsx:3145-3190`). Der native läge darunter und wäre ein
-      // zweiter Knopf für dieselbe Sache.
-      compassEnabled: false,
-      minMaxZoomPreference: const MinMaxZoomPreference(null, factMapMaxZoom),
+    // **`LayoutBuilder` um die Karte, nicht um die ganze Fläche.** Sein
+    // `builder` läuft, sobald die verfügbare Größe feststeht, und damit vor
+    // dem Mounten der Karte: `_onMapCreated` kommt erst mit dem
+    // Plattformkanal, ein Layout aber schon beim ersten Aufbau dieses
+    // `State`. Gemessen wird in **Stilpixeln** (logischen Pixeln), das ist
+    // genau, was `constraints` hergibt, siehe `MapViewport`. Nicht
+    // Gerätepixel: die trägt `MapScreenPoint`, für eine andere Verwendung.
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        _reportViewport(constraints);
+        return MapLibreMap(
+          styleString: style,
+          initialCameraPosition: _positionOf(widget.initialCamera),
+          // **Pflicht und kein Schalter.** Ohne `trackCameraPosition` gibt es
+          // überhaupt keine Kamerarückmeldung: auf Android kehrt
+          // `onCameraMove()` sofort zurück und `onCameraIdle()` sendet keine
+          // Position, auf iOS liefert `getCamera()` `nil`. Der ganze Host
+          // hinge dann in der Luft.
+          trackCameraPosition: true,
+          // **Stabile Methodenreferenzen, keine frisch erzeugten Closures.**
+          // `maplibre_map.dart:406-410` liest diese beiden Rückrufe **genau
+          // einmal**, bei der Erzeugung des Controllers; `didUpdateWidget`
+          // gleicht nur Optionen ab. Eine Closure, die beim Bauen entsteht,
+          // wäre damit für immer die erste Fassung, ohne jede Fehlermeldung.
+          onMapCreated: _onMapCreated,
+          onCameraMove: _onCameraMove,
+          onCameraIdle: _onCameraIdle,
+          // Die App zeichnet ihren eigenen Kompass im Top-Chrome
+          // (`screen-map.jsx:3145-3190`). Der native läge darunter und wäre
+          // ein zweiter Knopf für dieselbe Sache.
+          compassEnabled: false,
+          minMaxZoomPreference: const MinMaxZoomPreference(
+            null,
+            factMapMaxZoom,
+          ),
+        );
+      },
     );
   }
 }

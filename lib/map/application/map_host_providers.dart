@@ -46,8 +46,10 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Nimmt Absichten entgegen und reicht sie an den eingeklinkten Host weiter.
@@ -94,8 +96,14 @@ final class MapHostRegistry implements MapHost {
   final StreamController<MapCameraView> _cameraChanges =
       StreamController<MapCameraView>.broadcast();
 
+  /// Der Strom der Gruppen-Tipps, aus demselben Grund wie [_cameraChanges]:
+  /// er gehört der Registry und überlebt einen Wechsel des Hosts.
+  final StreamController<MapOverlayGroupTap> _groupTaps =
+      StreamController<MapOverlayGroupTap>.broadcast();
+
   MapHost? _host;
   StreamSubscription<MapCameraView>? _subscription;
+  StreamSubscription<MapOverlayGroupTap>? _groupTapsSubscription;
 
   /// Die zuletzt registrierten Bilder, nach Stil-Kennung.
   ///
@@ -136,8 +144,10 @@ final class MapHostRegistry implements MapHost {
       return;
     }
     unawaited(_subscription?.cancel());
+    unawaited(_groupTapsSubscription?.cancel());
     _host = host;
     _subscription = host.cameraChanges.listen(_cameraChanges.add);
+    _groupTapsSubscription = host.groupTaps.listen(_groupTaps.add);
     // Bilder vor Überlagerungen: ein Symbol-Layer ohne sein Bild zeichnet
     // nichts, und zwar ohne Fehlermeldung.
     if (_images.isNotEmpty) {
@@ -165,7 +175,9 @@ final class MapHostRegistry implements MapHost {
       return false;
     }
     unawaited(_subscription?.cancel());
+    unawaited(_groupTapsSubscription?.cancel());
     _subscription = null;
+    _groupTapsSubscription = null;
     _host = null;
     return true;
   }
@@ -173,11 +185,14 @@ final class MapHostRegistry implements MapHost {
   /// Schließt den Strom. Ruft der Provider beim Entsorgen seines Scopes.
   void dispose() {
     unawaited(_subscription?.cancel());
+    unawaited(_groupTapsSubscription?.cancel());
     _subscription = null;
+    _groupTapsSubscription = null;
     _host = null;
     _images.clear();
     _overlays.clear();
     unawaited(_cameraChanges.close());
+    unawaited(_groupTaps.close());
   }
 
   @override
@@ -200,6 +215,29 @@ final class MapHostRegistry implements MapHost {
   /// niemand mehr.
   @override
   Stream<MapCameraView> get cameraChanges => _cameraChanges.stream;
+
+  /// Reicht die Größe der Kartenfläche durch. **Ohne Host meldet das genau
+  /// wie [camera] einen fehlenden Host**, aus demselben Grund: `null` wäre
+  /// sonst nicht von „Karte steht, aber noch ungemessen" zu unterscheiden.
+  @override
+  MapViewport? get viewport {
+    final MapHost? host = _host;
+    if (host == null) {
+      _reportMissing('viewport');
+      return null;
+    }
+    return host.viewport;
+  }
+
+  /// Meldet jeden Gruppen-Tipp, auch über einen Wechsel des Hosts hinweg.
+  ///
+  /// Dieselbe Bauart wie [cameraChanges] und aus demselben Grund: der Strom
+  /// gehört der Registry, ein Feature hält also nie ein Abonnement, das nach
+  /// einem Kartenwechsel still bleibt. **Ohne Host ist er still und meldet
+  /// das nicht**, wie [cameraChanges]: ein Ereignis dafür wäre der Normalfall
+  /// jedes Bildschirmaufbaus.
+  @override
+  Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
 
   @override
   void submitIntent(MapCameraIntent intent) {

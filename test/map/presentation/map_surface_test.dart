@@ -6,6 +6,7 @@ import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/map/presentation/map_camera_host.dart';
 import 'package:fact_app/map/presentation/map_surface.dart';
 import 'package:flutter/material.dart';
@@ -66,6 +67,22 @@ MapCameraOneShot skyFall() => const MapCameraOneShot(
   motion: MapCameraAnimated(Duration(milliseconds: 1200)),
   origin: MapCameraIntentOrigin.discovery,
 );
+
+/// Zählt mit, wie oft `MapSurface` die Größe der Kartenfläche meldet.
+///
+/// Ohne diesen Zähler wäre „meldet nur bei Änderung" nicht von außen zu
+/// unterscheiden: der Endwert von `viewport` ist in beiden Fällen derselbe,
+/// ob nun ein- oder zweimal geschrieben wurde. Der Zähler macht die
+/// **Häufigkeit** selbst zur Zusicherung.
+class CountingViewportHost extends MapCameraHost {
+  int viewportReports = 0;
+
+  @override
+  void handleViewportChange(MapViewport viewport) {
+    viewportReports++;
+    super.handleViewportChange(viewport);
+  }
+}
 
 void main() {
   late RecordingSink sink;
@@ -236,6 +253,61 @@ void main() {
     // Gleichheit des Pakets statt den gesetzten Wert.
     expect(map.minMaxZoomPreference.maxZoom, 20);
     expect(map.minMaxZoomPreference.minZoom, isNull);
+  });
+
+  testWidgets('misst die Kartenfläche und meldet sie dem Host', (tester) async {
+    // Der `LayoutBuilder` misst, **bevor** die Karte überhaupt gemountet ist:
+    // `MapLibreMap.onMapCreated` läuft im Widget-Test nie, also wäre ohne
+    // diesen Weg `MapHost.viewport` hier für immer `null`.
+    final CountingViewportHost host = CountingViewportHost();
+
+    await pumpSurface(
+      tester,
+      child: MapSurface(
+        initialCamera: startCamera,
+        debugCreateHost: () => host,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final Size size = tester.getSize(find.byType(MapSurface));
+    expect(host.viewport, isNotNull);
+    // **In Stilpixeln, nicht in Gerätepixeln.** `tester.getSize` liefert
+    // logische Pixel, genau das, was ein `LayoutBuilder` hergibt, und genau
+    // das, was `MapViewport` nach seinem Kopfkommentar tragen muss.
+    expect(host.viewport!.widthInScreenPixels, size.width);
+    expect(host.viewport!.heightInScreenPixels, size.height);
+  });
+
+  testWidgets('meldet die Fläche nur bei einer echten Größenänderung', (
+    tester,
+  ) async {
+    // **Die Mutationsprobe, die diesen Test rechtfertigt:** ohne den
+    // Vergleich in `_reportViewport` schriebe jeder harmlose Neuaufbau, etwa
+    // durch `setState` beim Laden des Stils, den Host erneut, ohne dass sich
+    // sichtbar etwas ändert. Ein Zähler am Host macht genau das beobachtbar.
+    final CountingViewportHost host = CountingViewportHost();
+
+    await pumpSurface(
+      tester,
+      child: MapSurface(
+        initialCamera: startCamera,
+        debugCreateHost: () => host,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(host.viewportReports, 1);
+
+    // Ein Neuaufbau ohne jede Größenänderung, wie ihn auch ein `setState`
+    // an anderer Stelle im Baum auslösen könnte.
+    tester.element(find.byType(MapSurface)).markNeedsBuild();
+    await tester.pump();
+
+    expect(
+      host.viewportReports,
+      1,
+      reason: 'die Größe hat sich nicht geändert',
+    );
   });
 
   testWidgets('entsorgt beim Ausbauen den Host samt Kamerastrom', (

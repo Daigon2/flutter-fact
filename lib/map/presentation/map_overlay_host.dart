@@ -36,9 +36,13 @@
 /// Überlagerungskennung.
 library;
 
+import 'dart:async';
+
 import 'package:fact_app/core/async/detached_work.dart';
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
+import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/presentation/map_overlay_driver.dart';
 import 'package:flutter/foundation.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -57,6 +61,20 @@ class MapOverlayHost {
   /// vertippte Kategorie eine leere Karte ohne jeden Hinweis.
   static const String unknownStyleEvent = 'map.overlay.unknown_style';
 
+  /// Gemeldet, wenn ein Tipp einen Layer trifft, den keine installierte
+  /// Überlagerung kennt.
+  ///
+  /// **Nur vom Host angelegte Layer können hier überhaupt feuern.** Der
+  /// gebackene Stil trägt 111 eigene Layer, aber keiner davon steht in
+  /// `interactiveFeatureLayerIds`, denn diese Liste befüllt allein
+  /// `addCircleLayer`/`addSymbolLayer` mit ihrem Standard `enableInteraction:
+  /// true` (`maplibre_gl 0.26.2`, `controller.dart:810`, `:620`, gemessen am
+  /// 31.08.2026), und die nutzt ausschließlich dieser Host. Eine unbekannte
+  /// Kennung ist deshalb ein Verdrahtungsfehler und kein Normalfall, anders
+  /// als [unknownStyleEvent], der aus einer echten Fakt-Kategorie entstehen
+  /// kann.
+  static const String unknownLayerTapEvent = 'map.overlay.unknown_layer_tap';
+
   final DiagnosticSink _diagnostics;
 
   /// Die registrierten Bilder, nach [MapOverlayImage.styleId].
@@ -71,7 +89,38 @@ class MapOverlayHost {
   /// Überlagerung, die vor der Karte gesetzt wurde, steht in [_overlays] und
   /// nicht hier. Ohne die Trennung müsste `setOverlay` raten, ob es die Quelle
   /// anlegen oder nur ihre Daten austauschen soll.
+  ///
+  /// **Und genau diese Menge entscheidet auch [handleFeatureTapped]:** nur
+  /// eine installierte Überlagerung hat wirklich Layer im SDK, die einen Tipp
+  /// auslösen könnten.
   final Set<String> _installed = <String>{};
+
+  /// Meldet jeden Tipp auf eine Gruppe. Siehe [groupTaps].
+  ///
+  /// `broadcast`, aber nicht, weil mehrere zusähen: diesen Strom abonniert
+  /// zur Laufzeit genau ein Hörer, `MapHostRegistry.attach`
+  /// (`map_host_providers.dart:150`). Eine frühere Fassung dieses Kommentars
+  /// hat das behauptet, ungeprüft, und war falsch (Muster 9 der 19 Muster in
+  /// `REBUILD_STATUS.md`).
+  ///
+  /// **Der wirkliche Grund:** `MapHostRegistry.attach` kehrt nur bei einem
+  /// bereits eingeklinkten, identischen Host früh zurück
+  /// (`map_host_providers.dart:143`), `MapHostRegistry.detach` löst dagegen
+  /// nur die Kennung (`:181`), ohne den abgemeldeten Host selbst
+  /// anzufassen. Die Folge `attach(a)`, `detach(a)`, `attach(a)` hört damit
+  /// **zweimal** auf denselben Strom, und ein Strom ohne `broadcast` wirft
+  /// beim zweiten `listen`, auch nach einem `cancel` des ersten.
+  ///
+  /// **Nachgesehen und nicht nur behauptet:** `MapSurface.initState` baut
+  /// heute bei jedem Aufbau einen frischen `MapCameraHost`
+  /// (`map_surface.dart:175-177`), diese eine Folge entsteht über den
+  /// einzigen Aufrufer also nicht. Der Vertrag von `attach`/`detach` selbst
+  /// verhindert sie aber nicht, und nichts hindert einen künftigen Aufrufer
+  /// daran, einen einmal abgeklinkten, weiterlebenden Host erneut
+  /// einzuklinken. Siehe die Probe „überlebt attach, detach, attach mit
+  /// demselben Host" in `map_host_providers_test.dart`.
+  final StreamController<MapOverlayGroupTap> _groupTaps =
+      StreamController<MapOverlayGroupTap>.broadcast();
 
   MapOverlayDriver? _driver;
 
@@ -163,11 +212,45 @@ class MapOverlayHost {
     });
   }
 
+  /// Meldet jeden Tipp auf eine Gruppe. Der Karten-Host reicht das nur durch.
+  Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
+
+  /// Das SDK meldet einen Tipp. Ruft die Kartenfläche aus
+  /// `controller.onFeatureTapped.add(...)`.
+  ///
+  /// Ordnet [layerId] über Mitgliedschaft einer installierten Überlagerung zu,
+  /// siehe [mapOverlayLayerTapOf]. Drei Fälle:
+  ///
+  /// 1. **Ein Gruppen-Layer:** [groupTaps] meldet einen Tipp mit der Kennung
+  ///    der Überlagerung.
+  /// 2. **Der Punkt-Layer:** nichts, still. Kein Empfänger, also kein Vertrag
+  ///    (ADR-002). Der Auslöser für eine Änderung steht bei [groupTaps].
+  /// 3. **Eine unbekannte Kennung:** [unknownLayerTapEvent], siehe dort.
+  void handleFeatureTapped({required String layerId, required LatLng at}) {
+    switch (mapOverlayLayerTapOf(
+      layerId: layerId,
+      coordinates: at,
+      installedOverlayIds: _installed,
+    )) {
+      case MapOverlayLayerTapGroup(:final MapOverlayGroupTap tap):
+        _groupTaps.add(tap);
+      case MapOverlayLayerTapPoint():
+        break;
+      case MapOverlayLayerTapUnknown():
+        _diagnostics.report(
+          DiagnosticEvent(unknownLayerTapEvent, <String, String>{
+            'layerId': layerId,
+          }),
+        );
+    }
+  }
+
   /// Vergisst alles. Ruft der Karten-Host beim Entsorgen.
   void dispose() {
     unbindSurface();
     _images.clear();
     _overlays.clear();
+    unawaited(_groupTaps.close());
   }
 
   // ---------------------------------------------------------------------------
@@ -318,6 +401,111 @@ List<String> overlayLayerIds(String overlayId) => <String>[
   overlayGroupCountLayerId(overlayId),
   overlayPointLayerId(overlayId),
 ];
+
+// -----------------------------------------------------------------------------
+// Antippen
+// -----------------------------------------------------------------------------
+
+/// Was ein getroffener Layer für [MapOverlayHost.handleFeatureTapped] bedeutet.
+///
+/// `sealed`, damit `switch` in [MapOverlayHost.handleFeatureTapped] ohne
+/// `default` auskommt: ein vierter Fall, den niemand bedient, fällt dem
+/// Übersetzer auf und nicht erst am Gerät.
+@visibleForTesting
+sealed class MapOverlayLayerTap {
+  const MapOverlayLayerTap();
+}
+
+/// Der Layer gehört zu einer Gruppe: einem der drei Kreise oder der Zahl.
+@visibleForTesting
+final class MapOverlayLayerTapGroup extends MapOverlayLayerTap {
+  /// Erzeugt den Fall mit dem fertigen Tipp.
+  const MapOverlayLayerTapGroup(this.tap);
+
+  /// Der Tipp, wie er über [MapOverlayHost.groupTaps] gemeldet wird.
+  final MapOverlayGroupTap tap;
+}
+
+/// Der Layer ist der Punkt-Layer einer installierten Überlagerung.
+///
+/// Kein Vertrag heute (ADR-002): es gibt keinen Empfänger für einen
+/// Punkt-Tipp. Siehe [MapOverlayHost.groupTaps] für den Auslöser, ab dem sich
+/// das ändert.
+@visibleForTesting
+final class MapOverlayLayerTapPoint extends MapOverlayLayerTap {
+  /// Erzeugt den Fall.
+  const MapOverlayLayerTapPoint();
+}
+
+/// Kein installierter Layer einer bekannten Überlagerung trägt diese Kennung.
+///
+/// Siehe [MapOverlayHost.unknownLayerTapEvent] für die Begründung, warum das
+/// ein Verdrahtungsfehler ist und kein Normalfall.
+@visibleForTesting
+final class MapOverlayLayerTapUnknown extends MapOverlayLayerTap {
+  /// Erzeugt den Fall.
+  const MapOverlayLayerTapUnknown();
+}
+
+/// Übersetzt den Rückruf des SDK in einen [MapOverlayLayerTap].
+///
+/// ## Warum das eine benannte, reine Funktion ist und keine private Zeile
+///
+/// Nach dem Vorbild von `mapCameraViewOf` (`map_surface.dart`): die Anmeldung
+/// `controller.onFeatureTapped.add(...)` läuft in `_onMapCreated` und damit im
+/// Widget-Test **nie**, weil ohne Plattformkanal kein Controller entsteht.
+/// Vertauschte `lat` und `lng` gingen sonst durch jede Suite und fielen erst
+/// am Gerät auf, als Ballon-Tipp, der eine Stelle in Somalia liefert. Als
+/// eigene, reine Funktion ist genau diese Übersetzung ohne Karte und ohne SDK
+/// prüfbar.
+///
+/// ## Nur `lng`/`lat` und `layerId`, nichts sonst aus dem Payload
+///
+/// Der Rückruf des SDK trägt außerdem `x`/`y` (als `Point<double>`) und `id`.
+/// Beide sind hier absichtlich nicht gefragt: `x`/`y` sind plattformasymmetrisch,
+/// Android liefert rohe Gerätepixel, iOS UIKit-Punkte
+/// (`maplibre_gl 0.26.2`, `MapLibreMapController.java:2128-2131` gegen
+/// `MapLibreMapController.swift:1425-1432`, gemessen am 31.08.2026), und
+/// dieser Pfad braucht sie nicht. `id` ist für ein von MapLibre erzeugtes
+/// Gruppen-Merkmal im Pub-Cache nicht als vorhanden nachweisbar (der Typ liegt
+/// in `maplibre-native`); ist sie `null`, macht `payload["id"].toString()`
+/// (`controller.dart:121`) daraus die Zeichenkette `"null"`, und **alle**
+/// Gruppen trügen dieselbe Kennung, lautlos. Verlässlich ist einzig
+/// [layerId], denn die Kennungen dafür vergibt dieser Host selbst.
+///
+/// ## Die Zuordnung ist Mitgliedschaft, keine Zerlegung der Zeichenkette
+///
+/// Für jede installierte Überlagerung wird geprüft, ob [layerId] zu ihren
+/// Gruppen-Layern oder ihrem Punkt-Layer gehört. Ein Zerlegen an `.` wäre eine
+/// zweite, stille Kopie des Kennungsschemas aus `overlaySourceId` und den
+/// Funktionen darüber.
+@visibleForTesting
+MapOverlayLayerTap mapOverlayLayerTapOf({
+  required String layerId,
+  required LatLng coordinates,
+  required Iterable<String> installedOverlayIds,
+}) {
+  for (final String overlayId in installedOverlayIds) {
+    final bool isGroupLayer =
+        overlayGroupCircleLayerIds(overlayId).contains(layerId) ||
+        layerId == overlayGroupCountLayerId(overlayId);
+    if (isGroupLayer) {
+      return MapOverlayLayerTapGroup(
+        MapOverlayGroupTap(
+          overlayId: overlayId,
+          position: MapPosition(
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+          ),
+        ),
+      );
+    }
+    if (layerId == overlayPointLayerId(overlayId)) {
+      return const MapOverlayLayerTapPoint();
+    }
+  }
+  return const MapOverlayLayerTapUnknown();
+}
 
 // -----------------------------------------------------------------------------
 // GeoJSON und Quelle

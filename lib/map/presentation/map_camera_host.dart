@@ -28,8 +28,10 @@ import 'package:fact_app/map/domain/map_camera_gate.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/map/presentation/map_auto_pitch.dart';
 import 'package:fact_app/map/presentation/map_camera_driver.dart';
 import 'package:fact_app/map/presentation/map_overlay_driver.dart';
@@ -188,11 +190,28 @@ class MapCameraHost implements MapHost {
   /// wartet also eher zu lange als zu kurz.
   final Duration Function() _now;
 
+  /// Meldet jede Kamerabewegung. Siehe [cameraChanges].
+  ///
+  /// `broadcast`, aus demselben Grund wie `MapOverlayHost._groupTaps`
+  /// (`map_overlay_host.dart:98-117`, dort ausführlich mit den Fundstellen):
+  /// diesen Strom abonniert zur Laufzeit genau ein Hörer,
+  /// `MapHostRegistry.attach` (`map_host_providers.dart:149`), nicht
+  /// mehrere. `attach` kehrt nur bei einem bereits eingeklinkten,
+  /// identischen Host früh zurück, `detach` löst nur die Kennung, ohne den
+  /// Host selbst anzufassen. Die Folge `attach(a)`, `detach(a)`,
+  /// `attach(a)` hört damit zweimal auf denselben Strom, und ohne
+  /// `broadcast` wirft das zweite `listen`, auch nach einem `cancel` des
+  /// ersten. Siehe die Probe „überlebt attach, detach, attach mit demselben
+  /// Host" in `map_host_providers_test.dart`.
   final StreamController<MapCameraView> _cameraChanges =
       StreamController<MapCameraView>.broadcast();
 
   MapCameraDriver? _driver;
   MapCameraView? _camera;
+
+  /// Die zuletzt gemeldete Größe der Kartenfläche, oder `null`, siehe
+  /// [viewport].
+  MapViewport? _viewport;
 
   /// Die Naht, über die Koordinaten zu Bildschirmlagen werden.
   MapProjectionDriver? _projections;
@@ -296,9 +315,17 @@ class MapCameraHost implements MapHost {
   }
 
   /// Die Karte ist weg. Der Host lebt weiter und verwirft Absichten wieder.
+  ///
+  /// **Löscht auch [_viewport], anders als [bindSurface].** Eine Fläche ohne
+  /// Karte ist keine Aussage über irgendetwas: die nächste Karte kann in einem
+  /// ganz anderen Teil des Baums entstehen. `MapSurface` meldet die zuletzt
+  /// gemessene Größe deshalb beim nächsten Binden erneut, aus ihrem eigenen
+  /// `State` heraus und nicht aus einem `LayoutBuilder`-Aufbau, der zwischen
+  /// Entsorgen und Neuaufbau gar nicht erneut läuft.
   void unbindSurface() {
     _driver = null;
     _camera = null;
+    _viewport = null;
     _zoomAtLastRest = null;
     _clearAnimation();
     _steering = null;
@@ -387,6 +414,31 @@ class MapCameraHost implements MapHost {
     }
   }
 
+  /// `MapSurface` meldet die gemessene Größe der Kartenfläche.
+  ///
+  /// Ruft `MapSurface` aus dem `builder` seines `LayoutBuilder`, **nicht** nur
+  /// aus `_onMapCreated`: das Layout der Fläche steht schon, bevor die Karte
+  /// gemountet ist, und ändert sich unabhängig von jeder Kamerabewegung, etwa
+  /// bei einer Drehung des Geräts.
+  ///
+  /// **Hält den Wert nur, ohne selbst zu vergleichen.** Ob sich die Größe
+  /// wirklich geändert hat, entscheidet `MapSurface`, bevor sie ruft: sie hält
+  /// die zuletzt gemeldete Größe in ihrem eigenen `State`, weil sie sie auch
+  /// beim erneuten Binden ohne neuen Aufbau braucht (siehe dort). Eine zweite
+  /// Prüfung hier wäre nur eine zweite Kopie desselben Vergleichs.
+  void handleViewportChange(MapViewport viewport) {
+    _viewport = viewport;
+  }
+
+  /// Das SDK meldet einen Tipp. Ruft die Kartenfläche aus
+  /// `controller.onFeatureTapped.add(...)`.
+  ///
+  /// Reicht durch, siehe Klassenkommentar: die Zuordnung des getroffenen
+  /// Layers zu einer Überlagerung gehört [MapOverlayHost], der besitzt die
+  /// Kennungen.
+  void handleFeatureTapped({required String layerId, required LatLng at}) =>
+      _overlays.handleFeatureTapped(layerId: layerId, at: at);
+
   // ---------------------------------------------------------------------------
   // MapHost
   // ---------------------------------------------------------------------------
@@ -396,6 +448,12 @@ class MapCameraHost implements MapHost {
 
   @override
   Stream<MapCameraView> get cameraChanges => _cameraChanges.stream;
+
+  @override
+  MapViewport? get viewport => _viewport;
+
+  @override
+  Stream<MapOverlayGroupTap> get groupTaps => _overlays.groupTaps;
 
   /// Nimmt eine Absicht an, fragt das Gate und führt aus oder meldet.
   ///

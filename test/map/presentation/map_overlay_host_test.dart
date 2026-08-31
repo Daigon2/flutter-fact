@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/presentation/map_overlay_driver.dart';
 import 'package:fact_app/map/presentation/map_overlay_host.dart';
@@ -307,6 +309,130 @@ void main() {
     });
   });
 
+  group('mapOverlayLayerTapOf', () {
+    // **Reine Funktion, ohne Karte und ohne SDK prüfbar.** Genau das ist ihr
+    // Zweck: `_onMapCreated` läuft im Widget-Test nie, also muss die
+    // Übersetzung aus dem Rückruf des SDK hier stehen und nicht dort.
+    const LatLng tapAt = LatLng(48.1351, 11.582);
+
+    test('ein Kreis-Layer meldet einen Gruppen-Tipp mit lng/lat, nicht x/y', () {
+      // **Der teuerste denkbare Vertauschungsfehler dieses Schritts:** GeoJSON
+      // zählt Länge vor Breite, die Domäne umgekehrt. Vertauschte `lat` und
+      // `lng` gingen sonst durch jede Suite und fielen erst am Gerät auf, als
+      // Ballon-Tipp mit einer Stelle in Somalia.
+      final MapOverlayLayerTap result = mapOverlayLayerTapOf(
+        layerId: 'discovery.facts.groups-mid',
+        coordinates: tapAt,
+        installedOverlayIds: <String>['discovery.facts'],
+      );
+
+      final MapOverlayLayerTapGroup group = result as MapOverlayLayerTapGroup;
+      expect(group.tap.overlayId, 'discovery.facts');
+      expect(group.tap.position.latitude, 48.1351);
+      // **Nicht auf den Zahlenwert genau**: `LatLng` normalisiert den
+      // Längengrad im Konstruktor, aus 11.582 wird 11.581999999999994, wie in
+      // `map_surface_test.dart` gemessen.
+      expect(group.tap.position.longitude, closeTo(11.582, 1e-9));
+    });
+
+    test('die Beschriftung einer Gruppe zählt genauso als Gruppen-Tipp', () {
+      final MapOverlayLayerTap result = mapOverlayLayerTapOf(
+        layerId: 'discovery.facts.group-count',
+        coordinates: tapAt,
+        installedOverlayIds: <String>['discovery.facts'],
+      );
+
+      expect(result, isA<MapOverlayLayerTapGroup>());
+    });
+
+    test('der Punkt-Layer einer installierten Überlagerung bleibt still', () {
+      final MapOverlayLayerTap result = mapOverlayLayerTapOf(
+        layerId: 'discovery.facts.points',
+        coordinates: tapAt,
+        installedOverlayIds: <String>['discovery.facts'],
+      );
+
+      expect(result, isA<MapOverlayLayerTapPoint>());
+    });
+
+    test('eine Kennung, die keine installierte Überlagerung kennt, ist '
+        'unbekannt', () {
+      final MapOverlayLayerTap result = mapOverlayLayerTapOf(
+        layerId: 'discovery.facts.points',
+        coordinates: tapAt,
+        // Die Überlagerung ist gesetzt, aber nicht installiert: ohne Karte
+        // hat sie keine echten Layer, ein Tipp darauf kann also gar nicht
+        // entstehen, und eine ankommende Kennung ist dann unbekannt.
+        installedOverlayIds: <String>[],
+      );
+
+      expect(result, isA<MapOverlayLayerTapUnknown>());
+    });
+
+    test('eine Kennung, die zu keiner installierten Überlagerung gehört, ist '
+        'unbekannt', () {
+      final MapOverlayLayerTap result = mapOverlayLayerTapOf(
+        layerId: 'irgendein.anderer.layer',
+        coordinates: tapAt,
+        installedOverlayIds: <String>['discovery.facts'],
+      );
+
+      expect(result, isA<MapOverlayLayerTapUnknown>());
+    });
+
+    group('mit zwei installierten Überlagerungen', () {
+      // **Block 2 hat nie zwei Überlagerungen gleichzeitig installiert.**
+      // Eine Mutation, die bei einem Treffer immer die *erste* installierte
+      // Kennung zurückgibt statt der wirklich getroffenen, blieb dadurch in
+      // allen 642 Tests unter `test/map/` und `test/features/discovery/`
+      // unentdeckt. Vier Features teilen sich diese Karte; sobald ein
+      // zweites gruppiertes Overlay liegt, würde ein Tipp auf dessen Gruppe
+      // lautlos der ersten Überlagerung zugeschrieben.
+      const List<String> installed = <String>[
+        'discovery.facts',
+        'events.today',
+      ];
+
+      test('jeder der vier Gruppen-Layer der zweiten Überlagerung meldet ihre '
+          'eigene Kennung, nicht die der ersten', () {
+        // Die Kennungen kommen aus den echten Funktionen und stehen nicht
+        // als abgeschriebene Zeichenkette da: sonst prüfte der Test die
+        // Konstante gegen sich selbst (Regel 18).
+        final List<String> secondGroupLayerIds = <String>[
+          ...overlayGroupCircleLayerIds('events.today'),
+          overlayGroupCountLayerId('events.today'),
+        ];
+
+        for (final String layerId in secondGroupLayerIds) {
+          final MapOverlayLayerTap result = mapOverlayLayerTapOf(
+            layerId: layerId,
+            coordinates: tapAt,
+            installedOverlayIds: installed,
+          );
+
+          final MapOverlayLayerTapGroup group =
+              result as MapOverlayLayerTapGroup;
+          expect(
+            group.tap.overlayId,
+            'events.today',
+            reason: 'layerId: $layerId',
+          );
+        }
+      });
+
+      test('der Punkt-Layer der zweiten Überlagerung bleibt still, auch mit '
+          'zwei installierten Überlagerungen', () {
+        final MapOverlayLayerTap result = mapOverlayLayerTapOf(
+          layerId: overlayPointLayerId('events.today'),
+          coordinates: tapAt,
+          installedOverlayIds: installed,
+        );
+
+        expect(result, isA<MapOverlayLayerTapPoint>());
+      });
+    });
+  });
+
   group('MapOverlayHost', () {
     late RecordingOverlayDriver driver;
     late RecordingSink diagnostics;
@@ -555,6 +681,151 @@ void main() {
 
       expect(host.debugRegisteredStyleIds, isEmpty);
       expect(host.debugInstalledOverlayIds, isEmpty);
+    });
+
+    test('dispose schließt auch den Gruppen-Tipp-Strom', () async {
+      bool closed = false;
+      host.groupTaps.listen(null, onDone: () => closed = true);
+
+      host.dispose();
+      await pumpEventQueue();
+
+      expect(closed, isTrue);
+    });
+
+    test('eine gesetzte, aber nie installierte Überlagerung zählt nicht als '
+        'bekannt', () {
+      // **Ohne Karte hat eine gesetzte Überlagerung keine echten Layer im
+      // SDK**, ein Tipp auf ihre errechnete Layer-Kennung kann also gar
+      // nicht entstehen. Zählte `handleFeatureTapped` trotzdem jede
+      // *gesetzte* statt jede *installierte* Überlagerung mit, würde diese
+      // Kennung fälschlich als Gruppen-Tipp durchgehen.
+      host.setOverlay(
+        const MapOverlay(
+          id: 'nicht.installiert',
+          points: <MapOverlayPoint>[],
+          grouping: MapOverlayGrouping(maxZoom: 15, radiusInScreenPixels: 70),
+        ),
+      );
+
+      host.handleFeatureTapped(
+        layerId: 'nicht.installiert.groups',
+        at: const LatLng(48.1351, 11.582),
+      );
+
+      expect(diagnostics.events, hasLength(1));
+      expect(
+        diagnostics.events.single.name,
+        MapOverlayHost.unknownLayerTapEvent,
+      );
+    });
+
+    group('handleFeatureTapped', () {
+      const LatLng tapAt = LatLng(48.1351, 11.582);
+
+      setUp(() async {
+        host
+          // Registriert, damit `setOverlay` keine unbekannte Stil-Kennung
+          // meldet und diese Gruppe damit ununterscheidbar von der
+          // gesuchten Meldung dieses Tests macht.
+          ..registerImages(<MapOverlayImage>[imageFor('fact.hist.uncollected')])
+          ..setOverlay(grouped)
+          ..bindSurface(driver);
+        await host.debugSettled;
+        diagnostics.events.clear();
+      });
+
+      test('ein Gruppen-Layer meldet einen Tipp über groupTaps', () async {
+        final Future<MapOverlayGroupTap> seen = host.groupTaps.first;
+
+        host.handleFeatureTapped(layerId: 'discovery.facts.groups', at: tapAt);
+
+        final MapOverlayGroupTap tap = await seen;
+        expect(tap.overlayId, 'discovery.facts');
+        expect(tap.position.latitude, 48.1351);
+        // **Nicht auf den Zahlenwert genau**, aus demselben Grund wie in
+        // `map_surface_test.dart`: `LatLng` normalisiert den Längengrad im
+        // Konstruktor, aus 11.582 wird 11.581999999999994.
+        expect(tap.position.longitude, closeTo(11.582, 1e-9));
+      });
+
+      test('der Punkt-Layer meldet nichts und bleibt still', () async {
+        final List<MapOverlayGroupTap> seen = <MapOverlayGroupTap>[];
+        final StreamSubscription<MapOverlayGroupTap> subscription = host
+            .groupTaps
+            .listen(seen.add);
+        addTearDown(subscription.cancel);
+
+        host.handleFeatureTapped(layerId: 'discovery.facts.points', at: tapAt);
+        await pumpEventQueue();
+
+        expect(seen, isEmpty);
+        expect(diagnostics.events, isEmpty);
+      });
+
+      test('eine unbekannte Kennung wird gemeldet', () async {
+        host.handleFeatureTapped(layerId: 'gibt.es.nicht.points', at: tapAt);
+
+        expect(diagnostics.events, hasLength(1));
+        final DiagnosticEvent event = diagnostics.events.single;
+        expect(event.name, MapOverlayHost.unknownLayerTapEvent);
+        expect(event.attributes['layerId'], 'gibt.es.nicht.points');
+      });
+
+      test('ein Tipp auf (0, 0) wird ganz normal gemeldet: keine Position '
+          'ist hier ein Sonderfall', () async {
+        // Real-weltlich läge der Punkt im Atlantik, aber (0, 0) ist der
+        // Nullwert, den viele Typen als Standard tragen, und deshalb der
+        // naheliegendste Randfall für einen übersehenen frühen
+        // Rückgabe-Zweig. Dieser Pfad filtert grundsätzlich keine Position.
+        final Future<MapOverlayGroupTap> seen = host.groupTaps.first;
+
+        host.handleFeatureTapped(
+          layerId: 'discovery.facts.groups',
+          at: const LatLng(0, 0),
+        );
+
+        final MapOverlayGroupTap tap = await seen;
+        expect(tap.overlayId, 'discovery.facts');
+        expect(tap.position.latitude, 0);
+        expect(tap.position.longitude, 0);
+      });
+    });
+
+    group('zwei installierte Überlagerungen', () {
+      // **Der echte Weg, nicht nur die reine Funktion.** Eine Überlagerung
+      // wird nur auf einem **gebundenen** Host wirklich installiert; dieser
+      // Test bindet deshalb zuerst und setzt die Überlagerungen danach, damit
+      // `_install` sofort greift. Der Bauende von Block 2 hat sich genau an
+      // dieser Reihenfolge schon einmal geschnitten, und ein Test, der sie
+      // vertauscht, wäre aus dem falschen Grund grün: eine gesetzte, aber nie
+      // installierte Überlagerung zählt für `handleFeatureTapped` nicht.
+      const MapOverlay second = MapOverlay(
+        id: 'events.today',
+        points: <MapOverlayPoint>[point],
+        grouping: MapOverlayGrouping(maxZoom: 15, radiusInScreenPixels: 70),
+        minZoom: 11,
+      );
+
+      test('ein Tipp auf die zweite Überlagerung trifft die zweite, nicht '
+          'die erste', () async {
+        host
+          ..registerImages(<MapOverlayImage>[imageFor('fact.hist.uncollected')])
+          ..bindSurface(driver)
+          ..setOverlay(grouped)
+          ..setOverlay(second);
+        await host.debugSettled;
+
+        final Future<MapOverlayGroupTap> seen = host.groupTaps.first;
+
+        host.handleFeatureTapped(
+          layerId: 'events.today.groups-mid',
+          at: const LatLng(48.1351, 11.582),
+        );
+
+        final MapOverlayGroupTap tap = await seen;
+        expect(tap.overlayId, 'events.today');
+      });
     });
   });
 }

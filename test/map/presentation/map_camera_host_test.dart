@@ -8,8 +8,10 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_gate.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/map/presentation/map_auto_pitch.dart';
 import 'package:fact_app/map/presentation/map_camera_driver.dart';
 import 'package:fact_app/map/presentation/map_camera_host.dart';
@@ -1086,6 +1088,89 @@ void main() {
         <MapScreenPoint?>[null],
       );
       expect(projections.requests, isEmpty);
+    });
+  });
+
+  group('Die Fläche', () {
+    test('ohne Messung ist sie null', () {
+      expect(host.viewport, isNull);
+    });
+
+    test('handleViewportChange hält die gemeldete Größe', () {
+      const MapViewport size = MapViewport(
+        widthInScreenPixels: 400,
+        heightInScreenPixels: 800,
+      );
+
+      host.handleViewportChange(size);
+
+      expect(host.viewport, size);
+    });
+
+    test('bindSurface löscht die Fläche nicht', () {
+      // Eine `MapSurface` misst, bevor die Karte gemountet ist; `bindSurface`
+      // darf diese Messung nicht wegwerfen, sonst wäre `viewport` bis zur
+      // nächsten Größenänderung wieder `null`.
+      const MapViewport size = MapViewport(
+        widthInScreenPixels: 400,
+        heightInScreenPixels: 800,
+      );
+      host.handleViewportChange(size);
+
+      bind();
+
+      expect(host.viewport, size);
+    });
+
+    test('unbindSurface löscht die Fläche', () {
+      // `MapSurface` meldet sie beim nächsten Binden aus ihrem eigenen
+      // `State` erneut, siehe dessen Kommentar; hier wird nur zugesichert,
+      // dass der Host ohne diese erneute Meldung `null` zeigt.
+      const MapViewport size = MapViewport(
+        widthInScreenPixels: 400,
+        heightInScreenPixels: 800,
+      );
+      bind();
+      host.handleViewportChange(size);
+
+      host.unbindSurface();
+
+      expect(host.viewport, isNull);
+    });
+  });
+
+  group('Der Gruppen-Tipp', () {
+    late RecordingOverlayDriver overlays;
+
+    setUp(() => overlays = RecordingOverlayDriver());
+
+    void bindBoth() =>
+        host.bindSurface(driver: driver, camera: viewAt(), overlays: overlays);
+
+    test('handleFeatureTapped reicht wirklich an den Überlagerungsteil '
+        'durch', () async {
+      // **Genau die Durchreichung, deren fehlende Prüfung Schritt 15/16 einmal
+      // jeden Fakt auf der Karte gekostet hat.** Ein Test gegen einen
+      // Doppelgänger von `MapOverlayHost` würde das nicht zeigen: er müsste
+      // die Durchreichung selbst schon richtig nachbauen.
+      bindBoth();
+      host.setOverlay(overlay);
+      await host.debugOverlays.debugSettled;
+      final Future<MapOverlayGroupTap> seen = host.groupTaps.first;
+
+      host.handleFeatureTapped(
+        layerId: 'discovery.facts.groups',
+        at: const LatLng(48.1351, 11.582),
+      );
+
+      final MapOverlayGroupTap tap = await seen;
+      expect(tap.overlayId, 'discovery.facts');
+    });
+
+    test('groupTaps reicht den Strom des Überlagerungsteils durch', () async {
+      bindBoth();
+
+      expect(host.groupTaps, host.debugOverlays.groupTaps);
     });
   });
 

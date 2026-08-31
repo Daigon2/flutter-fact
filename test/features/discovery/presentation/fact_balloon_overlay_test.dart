@@ -12,8 +12,10 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -896,6 +898,14 @@ class FakeMapHost implements MapHost {
   /// nach `dispose`, und eine Ausnahme aus einem Mikrotask ist ein wackliger
   /// Messwert. `hasListener` ist ein Rechteck.
   bool get hasCameraListener => _cameras.hasListener;
+
+  /// Kein Test hier braucht eine gemessene Fläche.
+  @override
+  MapViewport? get viewport => null;
+
+  /// Kein Test hier braucht einen Gruppen-Tipp.
+  @override
+  Stream<MapOverlayGroupTap> get groupTaps => const Stream.empty();
 
   @override
   void submitIntent(MapCameraIntent intent) {}
