@@ -66,6 +66,7 @@ lib/
     ├── progression/
     ├── challenges/
     ├── tours/
+    ├── puzzles/
     ├── profile/
     └── settings/
 ```

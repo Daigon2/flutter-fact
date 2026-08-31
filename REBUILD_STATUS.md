@@ -1669,6 +1669,9 @@ Nutzermarker und Avatar frei statt um eine Lücke herum.
 | D-12 | Variante (b), die Kamera fährt auf ein Rechteck |
 | D-13 | **Ein neues Paket ist freigegeben**, welches, ist zu recherchieren |
 | D-14 | Sauber machen, **wenn D-9 auch sauber gemacht wird**, und dann das Prüfskript anpassen |
+| D-15 | **An mich delegiert**, „bitte selbst entscheiden mit einer cleanen Architektur im Kopf" → ADR-006 |
+| D-16 | **An mich delegiert**, mit einer Vorgabe von Janek: die Jagd überlebt den Neustart → ADR-007 |
+| D-17 | **Rückfrage**, die Frage war nicht verständlich; neu erklärt am 31.08.2026 |
 
 | Nr | Frage in einem Satz | Blockiert | Nachtrag seit dem Absenden |
 |---|---|---|---|
@@ -1975,6 +1978,26 @@ ging nach `lib/app/onboarding/`, ausdrücklich damit `domain-map.md` und
 Mit zu entscheiden: ob dieselben drei Dokumente auch `library` und `creator`
 nachtragen sollen, die unter demselben Vorbehalt stehen.
 
+**Antwort vom 31.08.2026: an mich delegiert, „bitte selbst entscheiden mit einer
+cleanen Architektur im Kopf". Entschieden in ADR-006.**
+
+`puzzles` ist die elfte Domäne. `tours` und `challenges` dürfen davon abhängen,
+aber nur von `puzzles/domain` und `puzzles/application`; `puzzles` referenziert
+die beiden nie, damit der Graph kreisfrei bleibt. Die drei akzeptierten
+Dokumente nennen `puzzles` seit heute.
+
+**`library` und `creator` bleiben Vorschläge**, und das ist die eigentliche
+Entscheidung an dieser Stelle: beide haben keinen Inhalt und keinen Verbraucher,
+und bei `library` ist zusätzlich ungeklärt, was ihm gehört. Der Bildschirm, den
+es beansprucht, ist derselbe, für den `collection_page.dart:5-9` schon einen
+Platzhalter trägt und dem `shell_tab.dart:34` den `wallet`-Tab zuweist. Ob das
+PWA-„Wallet" ein Bildschirm ist oder zwei, ist eine **Produktfrage** und liegt
+bei Janek. Sie blockiert Phase 7, weil sie entscheidet, wohin die Dateien gehen.
+
+Die gemessene Doppelung in `puzzles/domain` (zweite Schwierigkeitsstufe, zweites
+Operanden-Wertobjekt) bleibt, weil Gate 6 den Import weiter verbietet. Sie steht
+in ADR-006 als benannter Preis der Grenze und nicht als Versehen.
+
 ### D-16, wie `discovery` an den Jagdzustand kommt
 
 **Am 30.08.2026 aus E-43 entstanden, noch nicht verschickt. Blockiert die
@@ -2011,6 +2034,37 @@ die dritte die sauberste und teuerste.
 Quelle sagt ja und legt sie im lokalen Speicher ab; im Neubau gibt es dafür
 Präzedenzfälle (`FirstLaunchStore`, `TourStore`, `AudioModeStore`), aber keinen
 Vertrag.
+
+**Antwort vom 31.08.2026: an mich delegiert, mit einer Vorgabe von Janek, „Jagd
+sollte aber den Neustart der App überleben". Entschieden in ADR-007.**
+
+`challenges` besitzt die Jagd samt Sitzungszustand. `discovery` liest sie über
+einen öffentlichen, nur lesenden Vertrag: Lesemodell und Store-Vertrag in
+`challenges/domain`, Provider in `challenges/application`, beobachtet von
+`discovery/presentation`. Kein Adapter in der App-Komposition, denn der wäre eine
+dritte Stelle, die die Form der Jagd kennt, für einen Zustand mit einem
+Eigentümer.
+
+**Die Vorgabe zur Dauerhaftigkeit hat die Frage vergrößert, und das ist der
+wichtigste Teil dieser Antwort.** Es gibt in diesem Projekt **überhaupt keine**
+dauerhafte Speicherung: alle vier vorhandenen Stores sind reine
+`InMemory`-Fassungen, und `pubspec.yaml` führt kein Speicherpaket. Die Vorgabe
+erzeugt also kein Jagd-Problem, sondern erzwingt die **erste**
+Persistenz-Entscheidung, und auf dieselbe warten schon vier Stores und die
+zwischengespeicherte letzte GPS-Position (`map_camera_intents.dart`).
+
+Empfohlen ist `shared_preferences`, und der Grund ist billiger als erwartet: es
+steht **schon als transitive Abhängigkeit in `pubspec.lock`**, gezogen von
+`supabase_flutter`. Es zur direkten Abhängigkeit zu machen bringt damit **keine
+einzige neue Zeile** in den Bau. Trotzdem ist ein Paket laut `CLAUDE.md`
+zustimmungspflichtig, deshalb steht in ADR-007 die Empfehlung und nicht der
+Einbau. **Das ist das eine, was hier noch bei Janek liegt.**
+
+Zwei Folgen, die in ADR-007 als Regel stehen und leicht zu übersehen sind: eine
+wiederhergestellte Jagd kann eine Station nennen, deren Fakt es nicht mehr gibt,
+das Wiederherstellen muss also gegen aktuelle Daten prüfen statt der gespeicherten
+Nutzlast zu glauben. Und die Gruppenjagd aus Phase 6 ist damit **nicht** gelöst:
+geteilter Zustand über Geräte hinweg ist Serverzustand und kein lokaler Store.
 
 ### D-17, soll die Projektion einen Punkt hinter der Kamera melden
 

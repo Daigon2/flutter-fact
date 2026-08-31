@@ -127,6 +127,7 @@ Flutter application
     ├── progression
     ├── challenges
     ├── tours
+    ├── puzzles
     ├── profile
     └── settings
 ```

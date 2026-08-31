@@ -24,8 +24,21 @@ Komplexität es verlangt.
 ## Über die Domain-Map hinaus
 
 Diese drei existieren, weil die Parity-Spec Verhalten fordert, für das die
-Domain-Map keinen Eigentümer nennt. Der Zuschnitt ist ein Vorschlag und wartet
-auf Bestätigung.
+Domain-Map keinen Eigentümer nennt.
+
+**`puzzles` ist seit dem 31.08.2026 bestätigt**, siehe ADR-006, und steht
+seitdem auch in `domain-map.md`, `architecture-overview.md` und
+`project-structure.md`. `tours` und `challenges` dürfen davon abhängen, aber nur
+von `puzzles/domain` und `puzzles/application`; umgekehrt nie.
+
+**`library` und `creator` bleiben Vorschläge**, und zwar bewusst: sie haben heute
+keinen Inhalt und keinen Verbraucher, und für `library` ist zusätzlich ungeklärt,
+was ihm überhaupt gehört. Der Bildschirm, den es beansprucht, ist derselbe, für
+den `collection/presentation/pages/collection_page.dart` schon einen Platzhalter
+trägt und dem `shell_tab.dart` den `wallet`-Tab zuweist. Ob das PWA-„Wallet" ein
+Bildschirm ist (gesammelte Fakten, nach Städten als Reiseführer dargestellt) oder
+zwei, ist eine Produktfrage und keine Architekturfrage. Sie gehört beantwortet,
+bevor jemand in `library` baut, siehe ADR-006.
 
 | Ordner | Besitzt | Begründung |
 |---|---|---|

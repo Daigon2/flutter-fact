@@ -124,6 +124,26 @@ Owns:
 
 Tours reference Fact IDs rather than embedding owned fact models.
 
+Challenges also owns the **session state of a running hunt**: current station,
+distance, hints bought. `Discovery` reads that state through a public read-only
+contract of Challenges and never writes it. See ADR-007.
+
+### Puzzles
+
+Owns:
+
+- puzzle definitions for the six puzzle types;
+- evaluation policy;
+- hint levels;
+- puzzle difficulty and operand value objects.
+
+Added on 2026-08-31 by ADR-006. Puzzles is a shared domain with two consumers,
+Tours and Challenges, which depend on its domain and application contracts only.
+Puzzles never references Tours or Challenges, so the graph stays acyclic.
+
+Puzzles evaluates, it does not reward: a puzzle reward is a specification owned
+by the consuming feature, and applying it belongs to Progression.
+
 ### Profile
 
 Owns:
@@ -175,6 +195,9 @@ City ───────┬───────────┤
 Facts ─────────> Collection
 Facts ─────────> Tours
 Facts ─────────> Challenges
+Puzzles <─────── Tours
+Puzzles <─────── Challenges
+Challenges ────> Discovery read model (active hunt, ADR-007)
 Progression ───> Profile read model
 Collection ────> Profile read model
 ```
@@ -207,6 +230,12 @@ Forbidden mechanisms:
 - `RewardEvent` belongs to Progression.
 - `ChallengeReward` belongs to Challenges as a reward specification, while applying it belongs to Progression.
 - `TourStop` belongs to Tours and references a `FactId`.
+- `Puzzle` and its evaluation policy belong to Puzzles; a `PuzzleReward` is a
+  specification owned by the consuming feature, and applying it belongs to
+  Progression.
+- `ActiveHunt` belongs to Challenges; the read model Discovery watches on the map
+  belongs to Challenges as well, not to the consuming presentation layer, because
+  Discovery must not restate what a hunt is.
 - `CityId` belongs to City and may be used as a shared domain value type through an explicit public domain contract.
 
 ## 7. Initial domain decisions made by architecture
