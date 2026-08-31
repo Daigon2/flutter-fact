@@ -1457,10 +1457,20 @@ Tests. Was sich seither geändert hat, steht als **Nachtrag** unter der jeweilig
 Frage. Der Fragetext selbst wird nicht nachgeführt, denn Dairen hat genau ihn
 bekommen.
 
-**Verschickt sind D-9 bis D-14, also sechs.** D-15 und D-16 sind am 30.08.2026
-dazugekommen und liegen **noch bei niemandem**: D-15 beim Bau von Schritt 27,
-D-16 als technische Folge von Janeks Entscheidung zu E-43. Wer den nächsten
-Block schickt, nimmt beide mit.
+**Am 31.08.2026 hat Dairen die sechs verschickten beantwortet.** Die Antworten
+stehen unter der jeweiligen Frage, jeweils als eigener Abschnitt „Antwort".
+**D-15 und D-16 liegen weiter bei niemandem**: D-15 ist beim Bau von Schritt 27
+entstanden, D-16 als technische Folge von Janeks Entscheidung zu E-43. Wer den
+nächsten Block schickt, nimmt beide mit.
+
+| Nr | Antwort in einem Satz |
+|---|---|
+| D-9 | Variante (b), lokale Typen bleiben, **falls** die Umrechnung nicht teuer ist; vorher prüfen, ob es doch einen sauberen architektonischen Weg gibt |
+| D-10 | Bestätigt, `lib/map/application/` bleibt |
+| D-11 | Bleibt vorerst offen, solange die Lücke nur `test/` betrifft |
+| D-12 | Variante (b), die Kamera fährt auf ein Rechteck |
+| D-13 | **Ein neues Paket ist freigegeben**, welches, ist zu recherchieren |
+| D-14 | Sauber machen, **wenn D-9 auch sauber gemacht wird**, und dann das Prüfskript anpassen |
 
 | Nr | Frage in einem Satz | Blockiert | Nachtrag seit dem Absenden |
 |---|---|---|---|
@@ -1547,6 +1557,44 @@ Nebenbei ist damit die vierte Cross-Feature-Kante des Repositories entstanden,
 `facts → discovery` und `puzzles → facts`. Regel 10 sieht das Prüfskript
 ausdrücklich nicht, das steht im Skript selbst; es bleibt Review-Sache.
 
+**Antwort vom 31.08.2026: Variante (b), und die Messung stützt sie stärker als
+erwartet.**
+
+Dairen hat zurückgefragt, ob die Umrechnung teuer sei und oft vorkomme. Sie ist
+es nicht: **fünf Aufrufstellen** im ganzen Repository, viermal `mapPositionOf`
+und einmal die Feldübernahme beim Bau der Überlagerung. Jede Umrechnung ist ein
+Wertobjekt aus zwei Doubles; selbst der Durchlauf über 600 Fakten verschwindet
+neben dem JSON-Parsen und dem Plattformkanal, die ihn umgeben.
+
+**Beim Nachmessen ist die Prämisse der Frage gekippt: die drei Typen sind keine
+Kopien.**
+
+| Typ | Felder | eigenes Verhalten |
+|---|---|---|
+| `FactCoordinates` | lat, lon | `tryFrom`, prüft ungeprüfte Rohwerte |
+| `MapPosition` | lat, lon | `distanceInMetersTo`, Haversine |
+| `DevicePosition` | lat, lon, **Genauigkeit** | — |
+
+`DevicePosition` trägt ein **drittes Feld**, ohne das der 35-Meter-Filter der
+Quelle nicht baubar wäre. Die beiden übrigen teilen die Felder, haben aber
+**überschneidungsfreies** Verhalten, jedes an seine Rolle gebunden. Ein
+gemeinsamer Typ müsste alle drei Rollen auf sich vereinen, und genau das ist die
+bekannte Schwäche eines geteilten Kerns.
+
+**Der saubere architektonische Weg existiert trotzdem, und er ist nicht der,
+den D-9 vorschlug.** Gate 6 lässt in einer Domäne nicht nur `dart:` und die
+eigene Domäne zu, sondern auch **geprüfte reine Dart-Pakete**
+(`_domainAllowedPackages` in `tool/check_architecture.dart`, heute leer). Ein
+geteilter Kern als lokales Paket käme also durch, **ohne** die Ausnahme für
+`core/geo` und ohne Loch in Regel 11. Das ist der Mechanismus, den das Skript
+für genau diesen Fall vorsieht.
+
+Nicht empfohlen, aus drei Gründen: es gibt keine echte Doppelung aufzulösen; ein
+geteilter Kern ist ein Kopplungspunkt, den jede Feature-Domäne danach trägt; und
+`project-structure.md` sowie `api-and-domain-design.md` schreiben `core/geo`
+vor, nicht ein Paket, es wäre also zusätzlich ein Edit an zwei akzeptierten
+Dokumenten.
+
 ### D-10, `lib/map/application/`
 
 **Bestätigung, blockiert nichts.**
@@ -1569,6 +1617,11 @@ belegt. Die Frage lautet damit nicht mehr „darf es diese eine Ausnahme geben",
 sondern „ist `application/` die reguläre Kompositionsschicht". Das ist eine
 andere Frage mit einer anderen Folge: Antwort A wäre ein Eintrag in
 `project-structure.md`, Antwort B ein Rückbau an zwei Stellen.
+
+**Antwort vom 31.08.2026: bestätigt.** `lib/map/application/` bleibt als
+Kompositionsschicht. Damit ist auch die Nachfrage aus dem Nachtrag beantwortet:
+`application/` ist die reguläre Kompositionsschicht und nicht eine geduldete
+Ausnahme, und `lib/features/facts/application/` steht auf derselben Grundlage.
 
 ### D-11, die Karten-Host-Regel gilt in `test/` nicht
 
@@ -1595,6 +1648,11 @@ null Tests, und `setOverlay` leer zu machen löschte jeden Fakt von der Karte, b
 ausgerechnet die Tests, die diese Lücke geschlossen haben. Wer D-11 mit „eigene
 Regel" beantwortet, muss also sagen, woran die Ausnahme hängt: am Dateinamen, an
 einer Anmerkung oder an einer Erlaubnisliste.
+
+**Antwort vom 31.08.2026: bleibt vorerst offen.** Solange die Lücke nur `test/`
+betrifft, kann sie so bleiben. Keine eigene Prüfregel. Der Befund aus dem
+Nachtrag bleibt damit stehen: eine pauschale Pfadregel träfe zwei Testdateien,
+die den teuersten Fund der Woche abdecken.
 
 ### D-12, Aufklappen einer Gruppe
 
@@ -1630,6 +1688,11 @@ neu:
   `min(expansionZoom + 0.4, 18)` über 700 ms, zentriert auf die Koordinaten des
   Cluster-Merkmals.
 
+**Antwort vom 31.08.2026: Variante (b).** Die Kamera fährt auf ein Rechteck,
+berechnet aus den Punkten, die das Feature ohnehin hält. Damit ist das Antippen
+der Gruppen aus Schritt 15 baubar, und der Kameravertrag bekommt die
+Rechteck-Absicht, vor deren Nachrüsten die Frage gewarnt hatte.
+
 ### D-13, Sensorpaket für die Kompass-Drehung
 
 **Blockiert Schritt 14.**
@@ -1650,6 +1713,9 @@ aber es ist der Präzedenzfall, den `CLAUDE.md` für genau solche Fragen im
 Lese-Repo nachschlagen lässt. Das `pubspec.yaml` hier führt heute weder das eine
 noch das andere. Ein neues Paket ist laut `CLAUDE.md` zustimmungspflichtig, die
 Frage bleibt also so oder so eine Frage.
+
+**Antwort vom 31.08.2026: ein neues Paket ist freigegeben.** Welches, ist zu
+recherchieren und zu begründen. Damit ist Schritt 14 nicht mehr gesperrt.
 
 ### D-14, `presentation` liest aus `lib/services/`
 
@@ -1672,6 +1738,20 @@ lesen heute `features/discovery/presentation/fact_proximity.dart`,
 `features/facts/presentation/pages/fact_page.dart` aus `lib/services/location/`.
 Ein Umbau kostet damit mehr als beim Absenden, und die Frage wird mit jedem
 Schritt, der die Nutzerposition braucht, teurer statt billiger.
+
+**Antwort vom 31.08.2026: sauber machen, wenn D-9 auch sauber gemacht wird, und
+dann das Prüfskript anpassen.**
+
+Die Kopplung ist richtig gesehen und nicht willkürlich. Der vollständig
+geschichtete Weg für D-14 kostet nach der Bestandsaufnahme drei zusätzliche
+Dateien **und einen vierten Koordinatentyp**, weil `discovery/domain` weder
+`services` noch `map/domain` importieren darf. Wer D-9 mit lokalen Typen
+beantwortet, kann D-14 also nicht ohne einen vierten Typ sauber machen. Genau
+deshalb hängen beide zusammen.
+
+**Umgekehrt gilt: ein geteilter Kern als erlaubtes Paket löst beide auf
+einmal.** Er nimmt D-14 die Kosten, weil kein vierter Typ mehr entsteht. Das ist
+das eine Argument, das für ihn spricht, und es stand in D-9 nicht drin.
 
 ### D-15, ist `puzzles` als Feature bestätigt
 

@@ -62,19 +62,20 @@ siehe „Rechner einrichten".
    zwei Zoomstufen ablesen. Die tragende Kette ist bis dahin hergeleitet und
    nicht gemessen.
 
-2. **Die saubere, unblockierte Arbeit ist damit vorerst aufgebraucht**, und das
-   ist keine Klage, sondern der Stand. Was übrig ist, fällt in drei Gruppen:
-   es braucht eine Antwort (E-06, E-08, E-10, E-11, E-14, E-15, E-16, E-19,
-   E-48, E-49, D-12, D-13, D-15, D-16), es braucht ein neues Paket
-   (`share_plus` für Schritt 23, `qr_flutter` für 40, ein Sensorpaket für 14),
-   oder es ist eine Phase-7-Ansicht über Features, die es noch nicht gibt.
+2. **Dairens Antworten haben drei Dinge freigemacht, und sie sind der nächste
+   Bauplan.** In dieser Reihenfolge, begründet in `REBUILD_STATUS.md`:
+   **das Antippen der Gruppen** aus Schritt 15 (D-12, der Kameravertrag bekommt
+   eine Rechteck-Absicht), **Schritt 14** die Kompass-Drehung (D-13, ein neues
+   Paket ist frei, welches ist zu recherchieren und zu begründen), und danach
+   ist Phase 2 bis auf Schritt 18 und 20 zu.
 
-3. **Phase 7 ist trotzdem ehrlich baubar**, wenn man den leeren Zustand als
-   richtigen Zustand akzeptiert, so wie es die Trophäenliste vormacht. Aber
-   **Schritt 45 zieht mehr hinter sich her als er aussieht:** er braucht den
-   Sammelstand, einen „zuletzt gelesen"-Speicher, den eigenen Rang aus Schritt
-   48 und eine Trophäenableitung, die E-49 aufwirft. Wer ihn anfängt, schneidet
-   ihn besser vorher zu.
+3. **D-9 und D-14 sind entschieden und kosten keine Arbeit.** Lokale Typen
+   bleiben. Die Umrechnung ist gemessen billig, fünf Aufrufstellen mit je zwei
+   Doubles, und die drei Typen sind keine Kopien: `DevicePosition` trägt ein
+   drittes Feld, die anderen beiden haben überschneidungsfreies Verhalten. D-14
+   hängt daran und bleibt deshalb, wie es ist. **Der eine Weg, der beide sauber
+   auflösen würde**, ist im Dokument beschrieben und nicht empfohlen: ein
+   geteilter Kern als Paket in der leeren Erlaubnisliste von Gate 6.
 
 4. **Die Schritte 36 und 37 warten auf D-16, nicht mehr auf Janek.** E-43 ist am
    30.08.2026 entschieden: die Solo-Jagd läuft auf der **Karte**, wie die
@@ -84,18 +85,17 @@ siehe „Rechner einrichten".
    D-16.
 
 
-5. **Acht Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
-   Wortlaut, Stand und Nachträge stehen in `REBUILD_STATUS.md` unter „Fragen an
-   Dairen". Zwei blockieren heute: **D-12** das Antippen der Gruppen aus
-   Schritt 15, **D-13** den ganzen Schritt 14. **D-15 ist am 30.08.2026 neu
-   dazugekommen und liegt noch bei niemandem:** ob `puzzles` als Feature
-   bestätigt ist, damit `tours` und `challenges` später davon abhängen dürfen.
-   Sie blockiert Phase 5, **D-16** die Schritte 36 und 37. Die übrigen vier
-   sperren nichts, kosten aber mit
-   jedem Schritt mehr. Wer eine Antwort bekommt, trägt sie dort ein und nicht
-   hier. Nicht Teil des Blocks und weiter offen: ob der Karten-Host
-   im **unsichtbaren Tab** weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht,
-   das ist gemessen; die PWA kennt keine Tabs, es gibt also keine Quelle.
+5. **Dairen hat am 31.08.2026 die sechs verschickten Fragen beantwortet.**
+   Wortlaut und Antworten stehen in `REBUILD_STATUS.md` unter „Fragen an
+   Dairen", je Frage ein eigener Abschnitt „Antwort". Kurz: **D-12** Variante
+   (b), die Kamera fährt auf ein Rechteck, damit ist das Antippen der Gruppen
+   baubar. **D-13** ein neues Paket ist freigegeben, welches ist zu
+   recherchieren, damit ist Schritt 14 frei. **D-10** bestätigt. **D-11** bleibt
+   offen, solange die Lücke nur `test/` betrifft. **D-9** Variante (b), lokale
+   Typen bleiben, denn die Umrechnung ist gemessen billig und die drei Typen
+   sind keine Kopien. **D-14** hängt daran und bleibt deshalb wie es ist.
+   **D-15 und D-16 liegen weiter bei niemandem** und gehören in den nächsten
+   Block.
 6. **Ein Kartenanker fehlt noch.** Diese Zeile stand bis zum
    30.08.2026 falsch hier: `discovery_anchors.dart:24-30` sagt, dass `coins`,
    `modeFactFinder`, `modeTour` und `compass` sich seit dem Top-Chrome aus
