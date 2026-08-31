@@ -185,18 +185,29 @@ ist die Reihenfolge danach.
    Bau, weil dort die geografische Verankerung auf der bewegten Karte schon
    gelöst ist. `webview_flutter` kehrt damit in die Paketliste zurück.
 
-9. **Größer als es klingt: das Backend des Monorepos gehört perspektivisch mit
-   zum Neubau, und die Richtung ist Neubau.** „das neu zu machen mit den
-   guardlines klingt aber eigentlich auf jeden fall vernünftig“, 31.08.2026.
-   Das widerspricht der heutigen Arbeitsgrundlage, denn `CLAUDE.md` führt das
-   Monorepo als schreibgeschützte Verhaltensquelle; die Zeile muss mit der
-   Umsetzung fallen, nicht vorher. **Die Aufnahme ist gemacht**, sie steht in
-   `docs/operations/backend-inventory.md`, und sie hat sieben neue Befunde
-   ergeben (E-52 bis E-58). Offen bleiben drei Dinge: Umzug in einem Schritt
-   oder zweites System daneben, ob Ökonomie und Trophäen wieder in die Datenbank
-   gehören, und wer künftig redigiert (E-58). **Vorarbeit ohne Entscheidung:**
-   ein Schema-Dump der laufenden Datenbank. Solange er fehlt, steht jeder Satz
-   über das Backend unter „laut Dateien“.
+9. **Das Backend kommt nach dem Frontend, und ein Neubau ist es vermutlich
+   nicht.** Entschieden am 31.08.2026, abends: „Aber das Frontend sollten wir
+   erstmal abschließen, dann kommt später das backend.“ Damit ist die Reihenfolge
+   geklärt und der Punkt aus dem Weg. Die Vormittagsrichtung „neu bauen mit
+   Leitplanken“ ist im selben Zug wieder aufgemacht worden („vielleicht braucht
+   es auch keinen echten neubau, sondern nur eine fehleranalyse“), und nach der
+   Aufnahme ist das die bessere Frage: **sechs der sieben neuen Befunde sind
+   Reparaturen von wenigen Zeilen SQL.** Nicht reparierbar ist nur E-58, denn
+   einen Admin-Server gibt es nicht, den müsste man bauen, und das wäre ein
+   kleines neues Teil und kein Backend-Neubau. Dazu käme ein Migrationssystem,
+   das unter den Bestand gelegt wird. Begründung und Kostenschätzung je Befund in
+   `docs/operations/backend-inventory.md`.
+
+   **Zwei Dinge, die die Reihenfolge nicht abwartet.** Erstens wirken E-06 und
+   E-24 samt E-52, E-53 und E-55 **heute** gegen echte Konten; sie kosten rund
+   eine Stunde SQL, brauchen keine Flutter-Arbeit und hängen nur an
+   Datenbankzugriff. Zweitens hält „Backend später“ nur bis etwa Schritt 48: das
+   Leaderboard erbt E-16, E-55 und E-56, und **Schritt 50 braucht einen
+   Storage-Bucket, den es heute überhaupt nicht gibt** (E-17). Fünf der 28
+   restlichen Schritte fassen das Backend an, die anderen 23 nicht.
+
+   **Vorarbeit ohne Entscheidung:** ein Schema-Dump der laufenden Datenbank.
+   Solange er fehlt, steht jeder Satz über das Backend unter „laut Dateien“.
 
 ---
 

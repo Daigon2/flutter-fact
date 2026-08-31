@@ -2396,8 +2396,26 @@ des Auftrags über die 50 Schritte hinaus** und keine Umsortierung.
 
 Zu klären, bevor daran jemand anfängt, und ausdrücklich nicht von mir entschieden:
 
-- **Neubau oder Weiterbetrieb?** Dasselbe Backend bedient die laufende PWA. Ein
-  Neubau heißt entweder Migration mit Stillstand oder zwei Systeme parallel.
+- **Neubau oder Reparatur? Am 31.08.2026 abends wieder offen, und die Neigung
+  hat gedreht.** Vormittags „das neu zu machen mit den guardlines klingt aber
+  eigentlich auf jeden fall vernünftig“, abends „vielleicht braucht es auch
+  keinen echten neubau, sondern nur eine fehleranalyse“. Nach der Aufnahme ist
+  Letzteres besser begründet: E-06, E-23, E-24, E-52, E-53 und E-55 sind
+  Policy- und Funktionsänderungen von wenigen Zeilen, für die ersten drei liegt
+  die Migrations-SQL fertig in `backend-security-fixes.md`. E-54 und E-56
+  brauchen je eine Regelentscheidung, E-57 eine Produktantwort. **Neu zu bauen
+  wäre genau ein Teil, und es existiert heute gar nicht:** ein Admin-Zugang mit
+  Rollenprüfung statt des `service_role`-Schlüssels im Browser (E-58). Dazu ein
+  Migrationssystem, das unter den Bestand gelegt wird. Das ist zusammen deutlich
+  weniger als ein zweites Supabase-Projekt mit Datenmigration, und es hält die
+  laufende PWA am Netz.
+- **Reihenfolge entschieden:** erst das Frontend fertig, dann das Backend.
+  „Aber das Frontend sollten wir erstmal abschließen, dann kommt später das
+  backend.“ Zwei Einschränkungen, die dazugehören: die Löcher, die **heute**
+  gegen echte Konten wirken, warten nicht auf die Reihenfolge, und „später“
+  trägt nur bis etwa Schritt 48. Fünf der 28 restlichen Schritte fassen das
+  Backend an (38, 40, 47, 48, 50), Schritt 50 braucht einen Storage-Bucket, den
+  es überhaupt nicht gibt.
 - **Was genau gehört dazu? Beantwortet am 31.08.2026.** Die vollständige
   lesende Aufnahme steht in `docs/operations/backend-inventory.md`: 11 Tabellen,
   30 Funktionen, 3 Trigger, 15 Policies, 1 Edge Function, kein Bucket, kein
