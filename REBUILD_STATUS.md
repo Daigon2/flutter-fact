@@ -1552,6 +1552,7 @@ Nutzermarker und Avatar frei statt um eine Lücke herum.
 | D-14 | Darf `presentation` direkt aus `lib/services/` lesen | nichts | Aus einer Lesestelle sind vier geworden |
 | D-15 | Ist `puzzles` als Feature bestätigt, damit `tours` und `challenges` später davon abhängen dürfen | nichts, blockiert aber Phase 5 | Am 30.08.2026 mit Schritt 27 entstanden |
 | D-16 | Wie liest `discovery` den Zustand der laufenden Jagd, wenn sie auf der Karte läuft | die Umsetzung von E-43, also Schritt 36 und 37 | Am 30.08.2026 aus E-43 entstanden |
+| D-17 | Soll `projectToScreen` melden, dass ein Punkt hinter der Kamera liegt | nichts, aber die Lücke steht jetzt in drei Verbrauchern | Am 31.08.2026 mit Schritt 15 zum dritten Mal aufgetreten |
 
 ### D-9, gemeinsamer Geo-Typ
 
@@ -1882,6 +1883,51 @@ die dritte die sauberste und teuerste.
 Quelle sagt ja und legt sie im lokalen Speicher ab; im Neubau gibt es dafür
 Präzedenzfälle (`FirstLaunchStore`, `TourStore`, `AudioModeStore`), aber keinen
 Vertrag.
+
+### D-17, soll die Projektion einen Punkt hinter der Kamera melden
+
+**Am 31.08.2026 beim Bau von Schritt 15 entstanden, blockiert nichts.**
+
+`MapHost.projectToScreen` liefert für einen Punkt **hinter** der Kamera keine
+Ausnahme und kein `null`, sondern eine still **gespiegelte** Zahl, die von der
+Lage eines weit voraus liegenden Punktes nicht zu unterscheiden ist. Das ist am
+30.08.2026 am Gerät gemessen, siehe „Die vier Gerätemessungen"; es war einer der
+zwei teuersten Funde und stand auf keiner Liste. Bei 58 Grad Neigung liegt alles
+jenseits des Horizonts hinter der Kamera, der Fall ist also normal und nicht
+exotisch.
+
+Der Vertrag kann die beiden Lagen heute nicht unterscheiden, und das steht auch
+so in `map/domain/map_host.dart`. **Jeder Verbraucher erbt die Lücke und
+beschreibt sie erneut**, mit jedes Mal anderer Folge:
+
+- `features/discovery/presentation/fact_balloon_overlay.dart`: ein gespiegelter
+  Punkt zeichnet einen Ballon an falscher Stelle, ein optischer Aussetzer.
+- `features/discovery/presentation/discovery_balloon_anchor.dart:115-125`: dort
+  ist die Folge **teurer**, ein gespiegelter Punkt kann den Wettbewerb um die
+  Rahmenmitte gewinnen und zum Tutorial-Ziel werden, weil die Spiegelung
+  gespiegelte Punkte in Richtung Bildmitte zieht.
+- Seit Schritt 15 der dritte: die Auswahl der Punkte einer angetippten Gruppe
+  kann einen gespiegelten Punkt in den Gruppierungsradius fallen lassen und
+  damit das Rechteck verfälschen.
+
+Damit ist es das Muster, an dem dieses Repository sonst zu suchen anfängt: drei
+Stellen, dieselbe Lücke, dreimal einzeln umschrieben. Ein vierter Verbraucher
+kommt in Schritt 18 mit dem Avatar.
+
+**Zur Wahl stehen mindestens:** `MapScreenPoint` bekommt ein Feld „liegt vor der
+Kamera", und der Host füllt es; oder `projectToScreen` gibt für einen solchen
+Punkt `null` zurück, so wie es für „keine Bildschirmlage" schon vorgesehen ist;
+oder es bleibt, wie es ist, und die Lücke wird an genau einer Stelle
+dokumentiert, auf die die Verbraucher verweisen.
+
+**Was die Antwort teuer oder billig macht:** das Paket hilft nicht. `maplibre_gl
+0.26.2` gibt Sichtfeld und Kamerahöhe nicht heraus, `getVisibleRegion` liefert
+bei Neigung nur die achsparallele Box des trapezförmigen Sichtfelds, und die
+eigene Doku von `toScreenLocation` behauptet eine Sichtbarkeitsprüfung, die im
+Code beider Plattformen **nicht existiert** (`controller.dart:1782` gegen
+`MapLibreMapController.java:913-925` und `MapLibreMapController.swift:562-571`,
+gemessen am 31.08.2026). Wer das Feld füllen will, rechnet es also selbst, aus
+Kamerastellung und Neigung, und das ist eine Rechnung im Host und keine Abfrage.
 
 ### Zwei Punkte aus demselben Block, die keine Fragen sind
 
