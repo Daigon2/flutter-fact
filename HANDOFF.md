@@ -30,7 +30,7 @@ Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schrit
 steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
 Kästchen war das Veraltete, nicht der Stand.
 
-**Kennzahlen:** 1813 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 1859 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -54,24 +54,28 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **Der `balloon`-Anker und der CI-Workflow**, beide ohne jede Antwort baubar.
-   Der Anker macht zwei Tutorial-Schritte voll baubar, siehe Punkt 5. Der
-   CI-Workflow ist der grösste Punkt ausserhalb der 50 Schritte:
-   `.github/workflows/` existiert nicht, **kein einziges Gate läuft
-   automatisch**. Eine Einschränkung gehört dazu und steht in
-   `quality-gates.md`: zwei der drei Drift-Werkzeuge lesen die PWA im Lese-Repo
-   und können in CI nicht laufen. Vier der sieben Prüfungen wären automatisch.
+1. **Der `balloon`-Anker**, ohne jede Antwort baubar, siehe Punkt 5. Er ist
+   grösser als er aussieht: die Quelle sucht den **MapLibre-Marker** nächst der
+   Rahmenmitte, und im Neubau sind nur die nahen Ballons Flutter-Widgets mit
+   einem Kontext, die fernen sind native Symbole. Eine treue Umsetzung muss
+   deren Lage über die Projektion selbst rechnen. Das Ersatzrechteck der Quelle
+   (`x = Breite × 0,45`, `y = Höhe × 0,55`, 38 × 38) lässt sich als unsichtbares
+   `AnchorTarget` an derselben Stelle nachbauen, dann braucht die Registry
+   keinen neuen Mechanismus.
 
-2. **Die Schritte 36 und 37 warten auf D-16, nicht mehr auf Janek.** E-43 ist am
+2. **Danach 45, 46 und 48 aus Phase 7.** Achtung beim Zuschnitt: 45 zeigt
+   „X von N gesammelt" je Stadt, und `collection` ist heute eine Platzhalterseite,
+   `progression` ein leerer Ordner. Die Ansicht ist trotzdem ehrlich baubar, sie
+   zeigt dann den richtigen Zustand eines neuen Nutzers. 48 hängt zusätzlich an
+   E-16.
+
+3. **Die Schritte 36 und 37 warten auf D-16, nicht mehr auf Janek.** E-43 ist am
    30.08.2026 entschieden: die Solo-Jagd läuft auf der **Karte**, wie die
    Quelle. Damit ist der Plan an dieser Stelle überholt und der Zuschnitt neu zu
    machen. Was fehlt, ist die technische Antwort, **wie `discovery` an den
    Jagdzustand kommt**, denn das wäre die fünfte Cross-Feature-Kante. Siehe
    D-16.
 
-3. **Danach 45, 46 und 49 aus Phase 7**, dazu der `balloon`-Anker und die
-   Punkte ausserhalb der 50 Schritte. Der grösste davon ist der CI-Workflow:
-   `.github/workflows/` existiert nicht, kein Gate läuft automatisch.
 
 4. **Acht Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
    Wortlaut, Stand und Nachträge stehen in `REBUILD_STATUS.md` unter „Fragen an
@@ -107,6 +111,20 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, CI, und die Trophäen als Probe aufs Muster
+
+Die vier Gates laufen jetzt maschinell, `.github/workflows/gates.yml`, und der
+erste Lauf ist Schritt für Schritt grün, nicht nur als Ganzes. Danach die
+Trophäenliste, 1813 → 1859 Tests, und sie war zugleich die Probe, ob die
+Registrierung des neuen Datenwerkzeugs beim **zweiten** Fall trägt. Sie trug,
+ungebogen, obwohl die Quelle strukturell anders ist: eine Liste statt einer
+Abbildung, Einträge mit unterschiedlichen Feldern, dazu `§`, `⌂`, `☾` und
+deutsche Anführungszeichen. **Überraschend war, dass zwei von fünf
+Pflicht-Mutationen echte Lücken aufdeckten statt die Mutation zu bestätigen:**
+die Graustufe zu entfernen überlebte, weil eine gesperrte Karte ohnehin nur
+neutrale Töne trägt, und eine Stufenfarbe zu ändern überlebte, weil kein Test je
+den Farbwert prüfte, nur die Zuordnung des Wortes.
 
 ### 31.08.2026, Schritt 35, und zwei Mutationsläufe mit gegensätzlichem Ergebnis
 

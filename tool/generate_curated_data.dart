@@ -115,6 +115,12 @@ const _curatedSources = <_CuratedSource>[
         'lib/features/challenges/application/generated/hunt_hotspots.g.dart',
     render: _renderHuntHotspots,
   ),
+  _CuratedSource(
+    sourceFile: 'wallet-colors.jsx',
+    outputPath:
+        'lib/features/progression/application/generated/wallet_trophies.g.dart',
+    render: _renderWalletTrophies,
+  ),
 ];
 
 void main(List<String> args) {
@@ -310,6 +316,114 @@ typedef HuntHotspotRecord = ({
 const Map<String, List<HuntHotspotRecord>> huntHotspotRecordsByCityName =
     <String, List<HuntHotspotRecord>>{
 $rows};
+''';
+}
+
+// ── wallet-colors.jsx ────────────────────────────────────────────────────────
+
+/// Baut `wallet_trophies.g.dart` aus `window.WalletTrophies`, Schritt 49.
+///
+/// Anders als `window.HUNT_HOTSPOTS` ist die Quelle hier eine **Liste**, keine
+/// Abbildung, und ihre Einträge tragen **unterschiedliche Felder**:
+/// `threshold` steht nur bei den acht Kategorie-Trophäen, alle anderen
+/// (Stadt, Meilenstein, Zeit, Creator, Rang, Koop, Geheim) haben das Feld gar
+/// nicht. Übernommen werden `key`, `cat`, `threshold` (nullbar), `glyph`,
+/// `label_de`, `label_en`, `desc_de` und `desc_en`, jedes wörtlich.
+///
+/// **Nicht übernommen: `color`.** Jeder der 36 Einträge trägt es, und trotzdem
+/// hat es hier keine Spalte. Grund, gemessen und nicht vermutet:
+/// `screen-profil.jsx:208-215` baut das angezeigte Trophäenobjekt aus `key`,
+/// `label_de`/`label_en`, `desc_de`/`desc_en`, `glyph` und der aus `cat`,
+/// `key` und `threshold` **abgeleiteten** Stufe (`:184-203`); `def.color` wird
+/// dort an keiner Stelle gelesen. Die drei Stufenfarben (`:218`, `tierC`)
+/// entscheiden jede Einfärbung, nicht die per-Trophäe-Farbe der Quelle. Eine
+/// Spalte ohne einen einzigen Leser wäre ungetestet und spekulativ; wer sie
+/// später braucht (etwa für eine Freischalt-Animation), liest sie erneut aus
+/// der Quelle und fügt sie hier hinzu.
+String _renderWalletTrophies(String source, _Report report) {
+  final value = _JsLiteral.read(source, 'window.WalletTrophies');
+  if (value is! List<Object?>) {
+    _fail('wallet-colors.jsx: `window.WalletTrophies` ist keine Liste.');
+  }
+
+  final rows = StringBuffer();
+  final categories = <String, int>{};
+  var withThreshold = 0;
+
+  for (final raw in value) {
+    if (raw is! Map<String, Object?>) {
+      _fail('wallet-colors.jsx: WalletTrophies enthält einen Nicht-Eintrag.');
+    }
+    final key = raw['key'];
+    final cat = raw['cat'];
+    final glyph = raw['glyph'];
+    final labelDe = raw['label_de'];
+    final labelEn = raw['label_en'];
+    final descDe = raw['desc_de'];
+    final descEn = raw['desc_en'];
+    if (key is! String ||
+        cat is! String ||
+        glyph is! String ||
+        labelDe is! String ||
+        labelEn is! String ||
+        descDe is! String ||
+        descEn is! String) {
+      _fail('wallet-colors.jsx: unvollständiger Eintrag: $raw');
+    }
+    final thresholdRaw = raw['threshold'];
+    if (thresholdRaw != null && thresholdRaw is! num) {
+      _fail('wallet-colors.jsx: "threshold" ist keine Zahl bei "$key".');
+    }
+    final threshold = (thresholdRaw as num?)?.toInt();
+
+    categories[cat] = (categories[cat] ?? 0) + 1;
+    if (threshold != null) {
+      withThreshold++;
+    }
+
+    rows.writeln(
+      '  (key: ${_dartString(key)}, '
+      'category: ${_dartString(cat)}, '
+      'threshold: ${threshold ?? 'null'}, '
+      'glyph: ${_dartString(glyph)}, '
+      'labelDe: ${_dartString(labelDe)}, '
+      'labelEn: ${_dartString(labelEn)}, '
+      'descDe: ${_dartString(descDe)}, '
+      'descEn: ${_dartString(descEn)}),',
+    );
+  }
+
+  report
+    ..note('wallet-colors.jsx: ${value.length} Trophäen übernommen.')
+    ..note(
+      'wallet-colors.jsx: Kategorien '
+      '${categories.entries.map((e) => '${e.key}=${e.value}').join(', ')}.',
+    )
+    ..note('wallet-colors.jsx: $withThreshold mit Schwelle.');
+
+  return '''
+${_fileHeaderComment('wallet-colors.jsx')}
+/// Eine Trophäendefinition, wörtlich wie in der Quelle.
+///
+/// `threshold` ist `null`, wo `wallet-colors.jsx` das Feld gar nicht schreibt
+/// (Stadt-, Meilenstein-, Zeit-, Creator-, Rang-, Koop- und Geheimtrophäen).
+/// Die Stufenherleitung dafür steht **nicht** hier, sondern in
+/// `progression/domain/value_objects/trophy_tier.dart`: diese Datei liest nur
+/// ab, sie entscheidet nichts.
+typedef WalletTrophyRecord = ({
+  String key,
+  String category,
+  int? threshold,
+  String glyph,
+  String labelDe,
+  String labelEn,
+  String descDe,
+  String descEn,
+});
+
+/// Alle Trophäen, Reihenfolge wie in der Quelle.
+const List<WalletTrophyRecord> walletTrophyRecords = <WalletTrophyRecord>[
+$rows];
 ''';
 }
 

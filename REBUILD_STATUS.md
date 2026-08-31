@@ -1117,8 +1117,48 @@ führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
 
 ## Phase 7, Reiseführer und Profil
 
+### Die Trophäenliste, der baubare Teil von Schritt 49
+
+1813 → 1859 Tests. **Schritt 49 ist damit nicht fertig**, sondern aufgeteilt:
+der Plan bündelt dort drei unabhängige Dinge, und zwei davon sind gesperrt. Der
+Stimmen-Picker hängt an E-15, das Sitzungsende im Entdecken-Modus an E-19.
+Gebaut ist die Liste, ohne Einstieg, wie die Fakt-Akte und das Rätsel-Sheet.
+
+- **Es sind 36 Trophäen, nicht die 34 aus dem Plan.** Gezählt in
+  `wallet-colors.jsx`.
+- **Die Texte stehen zweisprachig in den Daten** (`label_de`, `label_en`,
+  `desc_de`, `desc_en`), wie bei den Themenrouten. Kein i18n-Schlüssel, kein
+  erfundener Text.
+- **Der Freischaltstand ist ein Parameter mit leerer Vorgabe.** Er käme aus
+  `user_trophies`, und `progression` hat keine Datenschicht. Heute zeigt die
+  Ansicht 36 gesperrte Trophäen, und das ist der **richtige** Zustand für einen
+  neuen Nutzer, kein Platzhalter.
+- **Die Registrierung des Datenwerkzeugs hat beim zweiten Fall getragen, ohne
+  gebogen zu werden.** Ein Eintrag plus eine Render-Funktion, kein zweites
+  Werkzeug, kein zweiter Gate-Aufruf. Der JS-Leser trug die strukturell andere
+  Quelle unverändert: eine **Liste** statt einer Abbildung, Einträge mit
+  **unterschiedlichen Feldern**, dazu `§`, `⌂`, `☾`, `⚓` und deutsche
+  Anführungszeichen.
+- **Eine Nebenwirkung der Registrierung ist gemeldet und nicht verschwiegen:**
+  das Werkzeug verlangt **jede** registrierte Quelle, bevor es überhaupt
+  rendert. Jeder Test, der bisher nur eine Quelle schrieb, wäre ab der
+  Registrierung mit Exit-Code 2 abgebrochen, auch wenn er mit der neuen nichts
+  zu tun hat. Bei der fünften Quelle wächst dieser Kopplungspunkt weiter.
+- **Zwei von fünf Pflicht-Mutationen haben echte Lücken aufgedeckt**, statt nur
+  die Mutation zu bestätigen. Die Graustufe zu entfernen überlebte, weil eine
+  gesperrte Karte ohnehin nur neutrale Töne trägt und der Bildpunktabstand zur
+  offenen Karte groß genug bleibt. Und eine Stufenfarbe zu ändern überlebte,
+  weil kein Test je den Farbwert prüfte, nur die Zuordnung des Wortes. Beides
+  ist jetzt gegen die **Quelle** festgenagelt, nicht gegen die eigene Konstante.
+- **Zwei Funde am Rand.** Das Feld `color` jeder Trophäe wird von der Quelle
+  **nie gelesen**, gefärbt wird ausschliesslich über die drei Stufenfarben; es
+  fehlt deshalb bewusst im erzeugten Datensatz. Und „Silber" gibt es in
+  derselben Datei zweimal mit verschiedenen Werten: `#B0BEC5` für die
+  Trophäenstufe, `#A8A8A8` für das Rang-Abzeichen.
+
 - [ ] 45. Library · [ ] 46. Cover und Illustrationen · [!] 47. Chapters und
-  Reader („Frag Claude") · [ ] 48. Leaderboard · [ ] 49. Trophäen
+  Reader („Frag Claude") · [ ] 48. Leaderboard · [~] 49. Trophäen (Liste steht,
+  Stimmen-Picker hängt an E-15, Sitzungsende an E-19)
 
 ## Phase 8, Abschluss
 
