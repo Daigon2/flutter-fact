@@ -62,13 +62,21 @@ siehe „Rechner einrichten".
    zwei Zoomstufen ablesen. Die tragende Kette ist bis dahin hergeleitet und
    nicht gemessen.
 
-2. **Danach 45, 46 und 48 aus Phase 7.** Achtung beim Zuschnitt: 45 zeigt
-   „X von N gesammelt" je Stadt, und `collection` ist heute eine Platzhalterseite,
-   `progression` ein leerer Ordner. Die Ansicht ist trotzdem ehrlich baubar, sie
-   zeigt dann den richtigen Zustand eines neuen Nutzers. 48 hängt zusätzlich an
-   E-16.
+2. **Die saubere, unblockierte Arbeit ist damit vorerst aufgebraucht**, und das
+   ist keine Klage, sondern der Stand. Was übrig ist, fällt in drei Gruppen:
+   es braucht eine Antwort (E-06, E-08, E-10, E-11, E-14, E-15, E-16, E-19,
+   E-48, E-49, D-12, D-13, D-15, D-16), es braucht ein neues Paket
+   (`share_plus` für Schritt 23, `qr_flutter` für 40, ein Sensorpaket für 14),
+   oder es ist eine Phase-7-Ansicht über Features, die es noch nicht gibt.
 
-3. **Die Schritte 36 und 37 warten auf D-16, nicht mehr auf Janek.** E-43 ist am
+3. **Phase 7 ist trotzdem ehrlich baubar**, wenn man den leeren Zustand als
+   richtigen Zustand akzeptiert, so wie es die Trophäenliste vormacht. Aber
+   **Schritt 45 zieht mehr hinter sich her als er aussieht:** er braucht den
+   Sammelstand, einen „zuletzt gelesen"-Speicher, den eigenen Rang aus Schritt
+   48 und eine Trophäenableitung, die E-49 aufwirft. Wer ihn anfängt, schneidet
+   ihn besser vorher zu.
+
+4. **Die Schritte 36 und 37 warten auf D-16, nicht mehr auf Janek.** E-43 ist am
    30.08.2026 entschieden: die Solo-Jagd läuft auf der **Karte**, wie die
    Quelle. Damit ist der Plan an dieser Stelle überholt und der Zuschnitt neu zu
    machen. Was fehlt, ist die technische Antwort, **wie `discovery` an den
@@ -76,7 +84,7 @@ siehe „Rechner einrichten".
    D-16.
 
 
-4. **Acht Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
+5. **Acht Fragen für Dairen, sechs davon verschickt und unbeantwortet.**
    Wortlaut, Stand und Nachträge stehen in `REBUILD_STATUS.md` unter „Fragen an
    Dairen". Zwei blockieren heute: **D-12** das Antippen der Gruppen aus
    Schritt 15, **D-13** den ganzen Schritt 14. **D-15 ist am 30.08.2026 neu
@@ -88,7 +96,7 @@ siehe „Rechner einrichten".
    hier. Nicht Teil des Blocks und weiter offen: ob der Karten-Host
    im **unsichtbaren Tab** weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht,
    das ist gemessen; die PWA kennt keine Tabs, es gibt also keine Quelle.
-5. **Ein Kartenanker fehlt noch.** Diese Zeile stand bis zum
+6. **Ein Kartenanker fehlt noch.** Diese Zeile stand bis zum
    30.08.2026 falsch hier: `discovery_anchors.dart:24-30` sagt, dass `coins`,
    `modeFactFinder`, `modeTour` und `compass` sich seit dem Top-Chrome aus
    Schritt 19 selbst anmelden. **`balloon` ist seit dem 31.08.2026 gebaut**,
@@ -97,7 +105,7 @@ siehe „Rechner einrichten".
    im Code noch gar nicht, und der hängt an E-10. Wer einen baut, streicht die
    Kennung aus `knownMissing`, sonst schlägt
    `discovery_anchors_test.dart` an.
-6. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
+7. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
    technische Sperre ist seit E-39 weg. Vorschlag DE/EN liegt in
    `REBUILD_STATUS.md` bei E-28, hergeleitet und nicht freigegeben.
 

@@ -944,8 +944,30 @@ plus 19 Mutationen, alle gefallen.
   diese Bedingung.
 
 - [x] 21. Fact-Detail-Sheet · [ ] 22. Collect-Reveal-Overlay
-- [ ] 23. Akte-Interaktion · [ ] 24. Damals/Heute · [!] 25. Audio-Service (TTS-Weg)
+- [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [!] 25. Audio-Service (TTS-Weg)
 - [ ] 26. Map-Audio-Kopplung
+
+### Schritt 23 ist zur Hälfte schon fertig, und zwar seit Schritt 21
+
+Am 31.08.2026 beim Suchen nach unblockierter Arbeit aufgefallen. Der Plan
+verlangt für Schritt 23 „Klickbare Zitate `[n]` (URL öffnen / zu Quellen
+scrollen)" und nennt als Abnahmekriterium „Zitat-Tap springt/öffnet". **Beides
+steht schon**, gebaut mit der Fakt-Akte: `fact_page.dart` hängt an der
+Hochziffer ein `onTap: _jumpToSources` und springt mit
+`Scrollable.ensureVisible(alignment: 0.5)` zur Quellenliste, wie
+`screen-fact.jsx:29-33`.
+
+**Und der zweite Weg der Quelle ist für diese App unerreichbar**, was
+`cited_text.dart` bereits nachgemessen hat: die Hochziffer wird dort zu einem
+Verweis, wenn der Quelleneintrag eine `url` trägt, aber `quellenListe` steht
+**nicht** im Supabase-Schema; in der PWA kommt das Feld ausschliesslich aus den
+eingebauten JS-Datendateien. Es gibt hier also genau ein Verhalten, und das ist
+gebaut. **Damit braucht dieser Teil auch kein `url_launcher`.**
+
+Was von Schritt 23 übrig bleibt, ist gesperrt: Kommentare mit Münzgutschrift
+(E-06, und es gibt keine Serveranbindung dafür), echtes Teilen (`share_plus`,
+ein neues Paket ist zustimmungspflichtig), der Lesezeichen-Hinweis (braucht
+einen Lesezeichen-Zustand) und das Vorlesen (E-15).
 
 ## Phase 4, Rätsel-Engine
 
@@ -2189,6 +2211,7 @@ eine Fundstelle.
 | E-44 | **Der Faktor 1,5 am letzten Stopp wird angezeigt, aber nicht gutgeschrieben.** `screen-challenge.jsx:2479` übergibt dem Nächster-Fakt-Abzeichen `isLast ? Math.round(diff.points * 1.5) : diff.points`. Die tatsächlich vergebenen Punkte rechnet `handleChallengeComplete` (`:2295-2299`), und dort kommt der Faktor nicht vor. Das Abzeichen verspricht am letzten Stopp das Anderthalbfache, gutgeschrieben wird der einfache Satz. Widerspruch in der Quelle, nicht in E-19. Sichtbares Verhalten. | 3 | Schritt 37 |
 | E-47 | **Drei Bedienelemente im Challenge-Reiter tun bis Schritt 35 nichts.** Seit Schritt 33 zeigt der Reiter den Assistenten. Wer ihn zu Ende bedient, drückt einen vollflächigen roten Knopf „Starten", sieht die Drück-Animation und danach passiert nichts, weil der Startpunkt-Picker fehlt. Dasselbe gilt für die Kachel „Gruppe" und für „Mit Code beitreten", deren Formulare Sitzungen über Supabase anlegen müssten, die es im Neubau nicht gibt. **Eine Sackgasse ist es nicht**, der Zurück-Knopf und die Tab-Leiste bleiben erreichbar, gemessen im Widget-Test. Aber es ist derselbe Zustand, den E-33 beim Kästchen „Angemeldet bleiben" beanstandet, und der Bau begründet an anderer Stelle ausdrücklich, warum die Zufallskarte **nicht** antippbar ist („ein Tipp, der nichts ändert, ist ein Bedienelement, das nichts tut"). Die Ungleichbehandlung ist bewusst, weil eine erfundene Navigation schlechter wäre als keine, aber sie gehört gewusst. Löst sich mit den Schritten 35 und 40 von selbst auf. | 2 | Schritt 35 |
 | E-48 | **Wohin zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist?** Die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, und ein ruhender Ballon ist selbst nur 26 breit; sie zeigt also nur dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ein festes Rechteck in der unteren Bildmitte. Der Neubau misst statt des Kopfes die Zeichenfläche samt Schattenrand und wählt deshalb ab Zoom 14,6 auch ferne Ballons. **Parität** hiesse, den Kopf zu messen; **Abweichung** hiesse, es so zu lassen, und der Pfeil fände fast immer einen echten Ballon, was möglicherweise besser aussieht. Zu entscheiden ist auch, ob die Zoomsperre des Ankers auf `factAnimationRunsAt` verschärft wird: das schnitte den Löwenanteil der Plattformkanal-Aufrufe weg und schlösse nebenbei die Gruppierungslücke unter Zoom 15, um den Preis, dass unter Zoom 16 das Ersatzrechteck steht. **Die tragende Kette ist hergeleitet und nicht am Browser gemessen**, siehe „Der `balloon`-Anker". | 2 | vor Auslieferung |
+| E-49 | **Zwei verschiedene Wahrheiten darüber, ob eine Trophäe verdient ist.** Der Profil-Bildschirm liest den Freischaltstand vom Server (`user_trophies`) und färbt danach. Das Reiseregal rechnet ihn **clientseitig neu**: `wltDeriveTrophies` (`screen-wallet.jsx:114-128`) zählt die gesammelten Fakten je Kategorie und setzt `earned` auf `counts[t.cat] >= t.threshold`. Beide können auseinanderlaufen, und beide zeigen dieselben 36 Definitionen. **Zusätzlich ist die Client-Rechnung unvollständig:** nur die Kategorie-Trophäen tragen ein `threshold`; die Stadt-, Rang- und Geheim-Trophäen haben keins, und `>= undefined` ist in JavaScript immer falsch. Im Reiseregal sind sie damit **dauerhaft** unverdient, egal was der Server sagt. Zu entscheiden ist, welche Quelle im Neubau gilt, bevor Schritt 45 gebaut wird; die Trophäenliste aus Schritt 49 nimmt heute den Stand als Parameter entgegen und legt sich nicht fest. Berührt E-16, weil `user_trophies` für jeden lesbar ist. | 3 | vor Schritt 45 |
 
 ## Wie Tests hier blind werden
 
