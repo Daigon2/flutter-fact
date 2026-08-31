@@ -186,12 +186,17 @@ ist die Reihenfolge danach.
    gelöst ist. `webview_flutter` kehrt damit in die Paketliste zurück.
 
 9. **Größer als es klingt: das Backend des Monorepos gehört perspektivisch mit
-   zum Neubau.** Das widerspricht der heutigen Arbeitsgrundlage, denn `CLAUDE.md`
-   führt es als schreibgeschützte Verhaltensquelle. **Erst klären, dann
-   anfangen:** Neubau oder Weiterbetrieb (dasselbe Backend bedient die laufende
-   PWA), was genau dazugehört (eine vollständige Aufnahme existiert **nicht**,
-   ich kann sie lesend machen), und ob E-06 und E-24 der Anfang sind, weil sie
-   jetzt wirken. Belege und die drei Fragen in `REBUILD_STATUS.md`.
+   zum Neubau, und die Richtung ist Neubau.** „das neu zu machen mit den
+   guardlines klingt aber eigentlich auf jeden fall vernünftig“, 31.08.2026.
+   Das widerspricht der heutigen Arbeitsgrundlage, denn `CLAUDE.md` führt das
+   Monorepo als schreibgeschützte Verhaltensquelle; die Zeile muss mit der
+   Umsetzung fallen, nicht vorher. **Die Aufnahme ist gemacht**, sie steht in
+   `docs/operations/backend-inventory.md`, und sie hat sieben neue Befunde
+   ergeben (E-52 bis E-58). Offen bleiben drei Dinge: Umzug in einem Schritt
+   oder zweites System daneben, ob Ökonomie und Trophäen wieder in die Datenbank
+   gehören, und wer künftig redigiert (E-58). **Vorarbeit ohne Entscheidung:**
+   ein Schema-Dump der laufenden Datenbank. Solange er fehlt, steht jeder Satz
+   über das Backend unter „laut Dateien“.
 
 ---
 
@@ -200,6 +205,21 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Die Aufnahme des Backends, und was daran fehlt
+
+11 Tabellen, 30 Funktionen, 3 Trigger, 15 Policies, eine Edge Function, dazu
+der Admin und 11 Pipeline-Skripte. Sieben neue Befunde als E-52 bis E-58, kein
+Code geändert, `docs/operations/backend-inventory.md`. **Überraschend war, dass
+der schwerste Fund eine Abwesenheit ist:** es gibt kein Migrationssystem, kein
+`config.toml`, keine Ledger-Tabelle, jede der acht Dateien trägt „Run manually
+in Supabase SQL Editor" im Kopf. Die Dateien sagen, was jemand vorhatte, nicht
+was in der Datenbank steht, und zwei Funktionen sind deshalb zweimal definiert,
+mit unterschiedlichem Verhalten je nach Kopierreihenfolge. **Der zweite
+Überraschungsfund ging in die andere Richtung:** der Client-Vertrag der PWA
+liegt vollständig in **einer** Datei, `api.jsx`, und der Neubau ruft von den 17
+RPCs bisher **keinen einzigen**. Die Kopplung ist heute fast null und wächst mit
+jedem Schritt ab 36.
 
 ### 31.08.2026, der ganze Entscheidungsstapel ist beantwortet
 
