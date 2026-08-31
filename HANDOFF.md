@@ -176,9 +176,22 @@ ist die Reihenfolge danach.
 
 7. **Ein Kartenanker fehlt noch: `userMarker`.** Er wartet auf Schritt 18. Wer
    ihn baut, streicht die Kennung aus `knownMissing`, sonst schlägt
-   `discovery_anchors_test.dart` an. Der Avatar dahinter ist seit dem 31.08.2026
-   entschieden: **2D in Flutter, kein `webview_flutter`**, und die Frage kommt
-   neu, sobald ein Charakterentwurf existiert.
+   `discovery_anchors_test.dart` an.
+
+8. **Der Avatar wird gleich 3D, und damit ist eine neue technische Frage offen:
+   welche 3D-Laufzeit.** Die 2D-Entscheidung von wenigen Minuten vorher ist am
+   31.08.2026 aufgehoben („bau doch gleich 3D … das ist es wert“). Drei Wege in
+   `REBUILD_STATUS.md`, meine Neigung ist WebView mit Three.js für den ersten
+   Bau, weil dort die geografische Verankerung auf der bewegten Karte schon
+   gelöst ist. `webview_flutter` kehrt damit in die Paketliste zurück.
+
+9. **Größer als es klingt: das Backend des Monorepos gehört perspektivisch mit
+   zum Neubau.** Das widerspricht der heutigen Arbeitsgrundlage, denn `CLAUDE.md`
+   führt es als schreibgeschützte Verhaltensquelle. **Erst klären, dann
+   anfangen:** Neubau oder Weiterbetrieb (dasselbe Backend bedient die laufende
+   PWA), was genau dazugehört (eine vollständige Aufnahme existiert **nicht**,
+   ich kann sie lesend machen), und ob E-06 und E-24 der Anfang sind, weil sie
+   jetzt wirken. Belege und die drei Fragen in `REBUILD_STATUS.md`.
 
 ---
 

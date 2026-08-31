@@ -2351,6 +2351,61 @@ und die Frage kommt neu, sobald ein Charakterentwurf existiert. Nebenwirkung:
 270 KB Assets und die JS-Brücke fallen weg, und Regel 19 hat vorläufig keinen
 Gegenstand mehr.
 
+**Nachtrag am selben Tag, drei Korrekturen von Janek.**
+
+**Der Avatar wird gleich 3D.** „ja dann bau doch gleich 3D der carakter wird
+sicher etwas brauchen. das ist es wert.“ Damit ist die Entscheidung von wenigen
+Minuten vorher („jetzt 2D, kein WebView“) **aufgehoben**, und mein Widerspruch
+ist der Grund dafür: wenn das Ziel eine schöne 3D-Person ist, dann ist 2D ein
+Umweg, der zweimal bezahlt wird.
+
+Damit ist eine **neue technische Frage offen: welche 3D-Laufzeit.** Drei Wege:
+
+1. **WebView mit Three.js**, wie die Quelle. Der einzige Weg, bei dem der
+   schwierige Teil schon gelöst ist, nämlich die geografische Verankerung auf
+   einer sich bewegenden Karte. 270 KB Assets und eine JS-Brücke.
+2. **Flutter 3D** (`flutter_scene` auf `flutter_gpu`). Kein WebView, aber
+   experimentell, und die Verankerung wäre neu zu bauen.
+3. **Spiel-Engine einbetten.** Größte Freiheit, größter Preis, und sie bringt
+   ihren eigenen Renderer neben Flutter mit.
+
+Meine Neigung ist (1) für den ersten Bau, weil die Verankerung der teure Teil
+ist, mit Regel 19 als Grenze: `webview_flutter` darf nur unter
+`map/presentation/avatar/` auftauchen. Damit kehrt `webview_flutter` in die
+Paketliste zurück; Janeks Freigabe von heute umfasste es, es war nur durch die
+inzwischen aufgehobene 2D-Entscheidung entfallen.
+
+**E-17, Creator-Foto: gespeichert wird auf Supabase, aber es ist der Ausnahmeweg.**
+„nein, das foto wird nicht gespeichert, fotos nehmen wir immer professionelle
+(außer es gibt keins im Internet … ja dann auf supabase)“. Der Normalfall ist
+also **kuratiertes, professionelles Bildmaterial**, und der Nutzer-Upload ist die
+Ausnahme für Fakten, zu denen es kein Bild gibt. Das ändert die Gewichtung von
+Schritt 50: der Upload ist kein Hauptweg, sondern eine Lücken-Füllung. Bucket
+privat und Freigabe vor Sichtbarkeit bleiben mein Vorschlag und sind nicht
+bestätigt.
+
+**Neu und größer als es klingt: das Backend des Monorepos gehört perspektivisch
+mit zum Neubau.** „was liegt denn sonst im backend des monorepos? das brauchen
+wir perspektivisch ja schon auch. Das ist ja auch etwas was du neu bauen musst!“
+
+Das widerspricht der heutigen Arbeitsgrundlage: `CLAUDE.md` führt das Monorepo
+als **schreibgeschützte** Verhaltensquelle, und Schema, RLS und RPCs gelten dort
+als geteilt mit der laufenden PWA, jede Änderung als Stufe-3-Entscheidung im
+anderen Repository. Wenn das Backend mitgebaut wird, ist das **eine Erweiterung
+des Auftrags über die 50 Schritte hinaus** und keine Umsortierung.
+
+Zu klären, bevor daran jemand anfängt, und ausdrücklich nicht von mir entschieden:
+
+- **Neubau oder Weiterbetrieb?** Dasselbe Backend bedient die laufende PWA. Ein
+  Neubau heißt entweder Migration mit Stillstand oder zwei Systeme parallel.
+- **Was genau gehört dazu?** Ich habe bisher nur die Teile gelesen, die für das
+  Verhalten nötig waren. Eine vollständige Aufnahme (Tabellen, Policies,
+  Funktionen, Edge Functions, Buckets, Cron) habe ich **nicht** gemacht und kann
+  sie lesend machen, sobald es gewünscht ist.
+- **Was daran ist die Priorität?** E-06 und E-24 sind offene Löcher, die
+  **jetzt** wirken. Ob der Neubau bei ihnen anfängt oder woanders, ist eine
+  Reihenfolgefrage mit Sicherheitsgewicht.
+
 **Pakete freigegeben.** „ja pakete können frei gemacht werden“. Ich lese das als
 Freigabe für die **benannte Liste** und nicht als Blankoscheck:
 `shared_preferences`, `flutter_rotation_sensor`, `flutter_tts`, `audioplayers`,
