@@ -77,10 +77,21 @@ MapCameraOneShot skyFall() => const MapCameraOneShot(
 class CountingViewportHost extends MapCameraHost {
   int viewportReports = 0;
 
+  /// Der zuletzt gemeldete Skalierungsfaktor, oder `null`.
+  ///
+  /// Gemerkt und nicht nur gezählt: der Host braucht ihn für den Horizont
+  /// (`map_camera_horizon.dart`), und ohne diese Zusicherung könnte
+  /// `MapSurface` eine 1 durchreichen, ohne dass etwas rot würde.
+  double? lastDevicePixelRatio;
+
   @override
-  void handleViewportChange(MapViewport viewport) {
+  void handleViewportChange(
+    MapViewport viewport, {
+    required double devicePixelRatio,
+  }) {
     viewportReports++;
-    super.handleViewportChange(viewport);
+    lastDevicePixelRatio = devicePixelRatio;
+    super.handleViewportChange(viewport, devicePixelRatio: devicePixelRatio);
   }
 }
 
@@ -277,6 +288,78 @@ void main() {
     // das, was `MapViewport` nach seinem Kopfkommentar tragen muss.
     expect(host.viewport!.widthInScreenPixels, size.width);
     expect(host.viewport!.heightInScreenPixels, size.height);
+  });
+
+  testWidgets('meldet den Skalierungsfaktor der Fläche mit', (tester) async {
+    // **Der Host braucht ihn, und ohne diese Probe käme eine 1 durch.** Die
+    // Projektion antwortet in Geräte-Pixeln, `MapViewport` misst in
+    // Stilpixeln, und der Horizont der geneigten Karte braucht beide in einer
+    // Formel (D-17, `map_camera_horizon.dart`).
+    //
+    // **Gesetzt über `tester.view` und nicht über eine eigene
+    // `MediaQuery`**: die eigene läge unter der echten und wäre wirkungslos
+    // (`REBUILD_STATUS.md`, „Wie Tests hier blind werden“, Muster 11).
+    //
+    // **Zwei Faktoren statt einem**, damit eine fest eingetragene Zahl nicht
+    // durchkommt. 2,625 ist der des Messgeräts.
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final CountingViewportHost host = CountingViewportHost();
+
+    tester.view.devicePixelRatio = 2.625;
+    await pumpSurface(
+      tester,
+      child: MapSurface(
+        initialCamera: startCamera,
+        debugCreateHost: () => host,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(host.lastDevicePixelRatio, 2.625);
+
+    tester.view.devicePixelRatio = 1.5;
+    await tester.pumpAndSettle();
+
+    expect(host.lastDevicePixelRatio, 1.5);
+  });
+
+  testWidgets('meldet auch dann, wenn sich nur der Skalierungsfaktor ändert', (
+    tester,
+  ) async {
+    // **Der Fall, den der Vergleich in `_reportViewport` sonst verschluckt.**
+    // Physische Größe und Faktor ändern sich hier so, dass die **logische**
+    // Größe gleich bleibt: 2400 × 1800 bei 3,0 und 1200 × 900 bei 1,5 sind
+    // beide 800 × 600 Stilpixel. Der [MapViewport] ist also identisch, und
+    // ein Vergleich, der nur ihn prüft, meldet nicht erneut. Der Host bliebe
+    // dann auf dem alten Faktor stehen, und der Horizont läge um dessen
+    // Verhältnis daneben. Auf dem Gerät ist das der Wechsel auf einen zweiten
+    // Bildschirm.
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final CountingViewportHost host = CountingViewportHost();
+
+    tester.view
+      ..devicePixelRatio = 3
+      ..physicalSize = const Size(2400, 1800);
+    await pumpSurface(
+      tester,
+      child: MapSurface(
+        initialCamera: startCamera,
+        debugCreateHost: () => host,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final MapViewport? before = host.viewport;
+    expect(host.viewportReports, 1);
+
+    tester.view
+      ..devicePixelRatio = 1.5
+      ..physicalSize = const Size(1200, 900);
+    await tester.pumpAndSettle();
+
+    expect(host.viewport, before, reason: 'dieselbe Fläche in Stilpixeln');
+    expect(host.viewportReports, 2);
+    expect(host.lastDevicePixelRatio, 1.5);
   });
 
   testWidgets('meldet die Fläche nur bei einer echten Größenänderung', (

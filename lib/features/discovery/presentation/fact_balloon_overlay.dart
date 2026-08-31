@@ -132,8 +132,13 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
 
   /// Wo die lebenden Ballons auf dem Bildschirm liegen.
   ///
-  /// Ein fehlender Eintrag heißt „gerade nicht sichtbar" und ist kein Fehler:
-  /// bei 58 Grad Neigung liegt alles jenseits des Horizonts hinter der Kamera.
+  /// Ein fehlender Eintrag heißt „gerade nicht zeichenbar" und ist kein
+  /// Fehler. Zwei Gründe führen dazu, und der Vertrag hält sie auseinander:
+  /// die Projektion liefert für diesen Punkt gar keine Lage (`null`), oder sie
+  /// liefert eine, die hinter der Kamera liegt
+  /// (`MapScreenPoint.isInFrontOfCamera` ist `false`). Der zweite Fall ist bei
+  /// 58 Grad Neigung der Normalfall für alles jenseits des Horizonts, und
+  /// seine Zahlen sehen gültig aus: er ist eine Spiegelung, siehe dort.
   Map<String, MapScreenPoint> _screen = const <String, MapScreenPoint>{};
 
   /// Wer gerade lebend gezeichnet wird.
@@ -260,7 +265,11 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
                 <String, MapScreenPoint>{};
             for (int i = 0; i < points.length && i < located.length; i++) {
               final MapScreenPoint? at = located[i];
-              if (at != null) {
+              // **Ein gespiegelter Punkt bekommt keinen Eintrag**, und damit
+              // keinen Ballon: seine Lage sieht gültig aus und liegt
+              // geometrisch nirgends, siehe [_screen]. Bis zum 31.08.2026
+              // stand hier nur die `null`-Prüfung und der Rest als Prosa.
+              if (at != null && at.isInFrontOfCamera) {
                 screen[points[i].id] = at;
               }
             }

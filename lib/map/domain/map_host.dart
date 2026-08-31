@@ -203,5 +203,25 @@ abstract interface class MapHost {
   /// `null` zurück. Der Aufrufer zeichnet dann nichts, und das ist die
   /// richtige Seite: eine Überlagerung, die bei einem Kanalfehler an der
   /// falschen Stelle stehen bleibt, ist schlechter als keine.
+  ///
+  /// ## Ein Punkt hinter der Kamera hat eine Lage, und sie ist gespiegelt
+  ///
+  /// Das ist die zweite Aussage dieser Methode, seit D-17 am 31.08.2026
+  /// entschieden ist: jeder gelieferte [MapScreenPoint] trägt in
+  /// [MapScreenPoint.isInFrontOfCamera] mit, ob seine Lage überhaupt etwas
+  /// bedeutet. `null` heißt weiterhin **keine** Lage, `isInFrontOfCamera:
+  /// false` heißt „Lage bekannt, aber gespiegelt". Die Trennung ist gewollt und
+  /// hat einen Verbraucher, der sie braucht, siehe `map_screen_point.dart`.
+  ///
+  /// **Die Zahl kommt nicht vom Paket, der Host rechnet sie.** `maplibre_gl
+  /// 0.26.2` meldet den Fall nicht: seine eigene Doku behauptet eine
+  /// Sichtbarkeitsprüfung, die im Code beider Plattformen fehlt, und Sichtfeld
+  /// und Kamerahöhe gibt es nicht heraus. Die Herleitung samt Gerätemessung und
+  /// der einen offenen Annahme steht in `map_camera_horizon.dart`.
+  ///
+  /// **Ein Verbraucher prüft das Feld und rechnet nichts nach.** Wer die
+  /// Neigung selbst holte, um dasselbe herzuleiten, baute die Kamerahoheit
+  /// nach, und drei Verbraucher täten es dreimal verschieden. Genau dieser
+  /// Zustand war der Anlass für D-17.
   Future<List<MapScreenPoint?>> projectToScreen(List<MapPosition> positions);
 }

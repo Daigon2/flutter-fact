@@ -35,6 +35,17 @@
 /// wie es der Kopfkommentar von `map_screen_point.dart` für den
 /// Gruppierungsradius bereits festhält.
 ///
+/// **Seit dem 31.08.2026 gibt es eine Rechnung, die beide Einheiten in einer
+/// Formel braucht, und sie steht bewusst nicht hier.** Der Horizont der
+/// geneigten Karte (`map_camera_horizon.dart`, D-17) folgt aus der Höhe der
+/// Kartenfläche und der Neigung, und er muss im Geräteraster herauskommen,
+/// weil die Projektion dort antwortet. Umgerechnet wird deshalb im
+/// Karten-Host, an einer benannten Stelle, aus diesem Typ mal dem
+/// Skalierungsfaktor der Fläche, den `MapSurface` mitmeldet
+/// (`map_camera_host.dart`, `handleViewportChange`). Dieser Typ bleibt
+/// Stilpixel, der Vertrag rechnet weiter nicht um, und die Aussage oben gilt
+/// unverändert für alles, was in `map/domain/` liegt.
+///
 /// `final class`, weil der Typ Wertgleichheit hat, aus demselben Grund wie
 /// `MapPosition`: eine offene Klasse mit `==` würde bei einer Unterklasse mit
 /// einem dritten Feld zu asymmetrischer Gleichheit führen.

@@ -25,6 +25,7 @@ import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_gate.dart';
+import 'package:fact_app/map/domain/map_camera_horizon.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
@@ -213,6 +214,15 @@ class MapCameraHost implements MapHost {
   /// [viewport].
   MapViewport? _viewport;
 
+  /// Der Skalierungsfaktor der Kartenfläche, oder `null`, solange sie nicht
+  /// gemessen ist.
+  ///
+  /// Kommt mit [_viewport] zusammen herein und geht mit ihm zusammen wieder
+  /// weg, siehe [handleViewportChange]. Gebraucht wird er an genau einer
+  /// Stelle, dem Horizont in [_horizonYInDevicePixels]; er ist deshalb kein
+  /// Teil der Fassade [MapHost], sondern Innenleben des Hosts.
+  double? _devicePixelRatio;
+
   /// Die Naht, über die Koordinaten zu Bildschirmlagen werden.
   MapProjectionDriver? _projections;
 
@@ -326,6 +336,7 @@ class MapCameraHost implements MapHost {
     _driver = null;
     _camera = null;
     _viewport = null;
+    _devicePixelRatio = null;
     _zoomAtLastRest = null;
     _clearAnimation();
     _steering = null;
@@ -426,8 +437,34 @@ class MapCameraHost implements MapHost {
   /// die zuletzt gemeldete Größe in ihrem eigenen `State`, weil sie sie auch
   /// beim erneuten Binden ohne neuen Aufbau braucht (siehe dort). Eine zweite
   /// Prüfung hier wäre nur eine zweite Kopie desselben Vergleichs.
-  void handleViewportChange(MapViewport viewport) {
+  ///
+  /// ## Warum der Skalierungsfaktor mitkommt, und warum er hier Pflicht ist
+  ///
+  /// [MapViewport] misst in **Stilpixeln**, die Projektion antwortet in
+  /// **Geräte-Pixeln** (`map_screen_point.dart`, am 30.08.2026 gemessen). Der
+  /// Horizont der geneigten Karte braucht beide Größen in **einer** Formel,
+  /// nämlich die Flächenhöhe im Geräteraster (`map_camera_horizon.dart`,
+  /// D-17). Diese Umrechnung ist damit die eine Stelle, an der die beiden
+  /// Bildschirmeinheiten aufeinandertreffen, und sie liegt hier und nicht in
+  /// `map/domain/`, weil der Vertrag die Einheiten getrennt hält, siehe den
+  /// Kopfkommentar von [MapViewport].
+  ///
+  /// **Ein Pflichtparameter und kein Standardwert von 1.** Ein Standard wäre
+  /// auf jedem Telefon falsch (2,625 auf dem Messgerät), und der Fehler wäre
+  /// lautlos: der Horizont läge um denselben Faktor daneben, also weit
+  /// oberhalb des Bildes, und jeder gespiegelte Punkt käme wieder als „liegt
+  /// vor der Kamera" durch. Genau der Zustand, den D-17 beendet hat, wäre
+  /// zurück, ohne dass irgendetwas rot würde.
+  ///
+  /// [devicePixelRatio] gehört zur Fläche und nicht zur Kamera: er ändert sich
+  /// mit dem Gerät und dem Fenster, nicht mit dem Blick. Deshalb kommt er auf
+  /// demselben Weg herein wie die Größe und nicht über `bindSurface`.
+  void handleViewportChange(
+    MapViewport viewport, {
+    required double devicePixelRatio,
+  }) {
     _viewport = viewport;
+    _devicePixelRatio = devicePixelRatio;
   }
 
   /// Das SDK meldet einen Tipp. Ruft die Kartenfläche aus
@@ -552,6 +589,13 @@ class MapCameraHost implements MapHost {
       return nothing;
     }
 
+    // **Vor dem Kanalaufruf gelesen und nicht danach.** Die Neigung, die zur
+    // Projektion gehört, ist die zum Zeitpunkt des Aufrufs; die Antwort trifft
+    // eine Runde später ein, und eine dann gelesene Kamera wäre unter
+    // Umständen jünger als das, was das SDK gerechnet hat. Zur Latenz siehe
+    // [_horizonYInDevicePixels].
+    final double horizonY = _horizonYInDevicePixels();
+
     final List<Point<num>> screen;
     try {
       screen = await projections.toScreenLocationBatch(
@@ -586,10 +630,57 @@ class MapCameraHost implements MapHost {
           MapScreenPoint(
             xInScreenPixels: point.x.toDouble(),
             yInScreenPixels: point.y.toDouble(),
+            isInFrontOfCamera: liesInFrontOfCamera(
+              yInDevicePixels: point.y.toDouble(),
+              horizonYInDevicePixels: horizonY,
+            ),
           )
         else
           null,
     ];
+  }
+
+  /// Wo der Horizont der geneigten Karte gerade liegt, in Geräte-Pixeln.
+  ///
+  /// Die Herleitung, die Gerätemessung und die eine offene Annahme stehen in
+  /// `map_camera_horizon.dart`. Hier steht nur, woher die zwei Eingaben kommen
+  /// und was fehlende Eingaben bedeuten.
+  ///
+  /// **Ohne gemessene Fläche gibt es keinen Horizont**, und dann gilt jeder
+  /// Punkt als vor der Kamera liegend, siehe [cameraHorizonYInDevicePixels]
+  /// für die Begründung dieser Richtung. Erreichbar ist das nur im
+  /// Startvorgang: `MapSurface` meldet die Fläche aus dem `builder` ihres
+  /// `LayoutBuilder`, also vor dem Mounten der Karte, und noch einmal beim
+  /// Binden.
+  ///
+  /// **Die Neigung ist die zuletzt gemeldete, und die ist gemessen bis zu
+  /// 140 ms alt.** Am 30.08.2026 belegt (`REBUILD_STATUS.md`, „Die vier
+  /// Gerätemessungen", Messung 4): `cameraPosition` ist ein in Dart
+  /// zwischengespeicherter Wert aus `onCameraMove` und wird nur alle 70 bis
+  /// 140 ms nachgeführt, während `toScreenLocation` jedes Mal wirklich fragt.
+  /// Wer beides verrechnet, mischt zwei Zeitpunkte, und genau das passiert
+  /// hier.
+  ///
+  /// **Warum das trotzdem der richtige Bau ist.** Der Fehler tritt nur
+  /// auf, solange sich die **Neigung** ändert, nicht bei Schwenk und Zoom: der
+  /// Mittelpunkt kommt in dieser Rechnung nicht vor. Neigungswechsel gibt es
+  /// zwei, die Auto-Neigung über 300 ms und die Zwei-Finger-Geste. Und die
+  /// Richtung des Fehlers ist die harmlose: eine zu kleine gemeldete Neigung
+  /// schiebt den Horizont nach oben aus dem Bild, also gelten mehr Punkte als
+  /// „vor der Kamera", und das ist genau der Zustand vor D-17. Eine frischere
+  /// Neigung gibt das Paket nicht heraus, ohne einen zweiten Kanalaufruf je
+  /// Projektion zu kosten.
+  double _horizonYInDevicePixels() {
+    final MapViewport? viewport = _viewport;
+    final double? ratio = _devicePixelRatio;
+    final MapCameraView? view = _camera;
+    if (viewport == null || ratio == null || view == null) {
+      return double.negativeInfinity;
+    }
+    return cameraHorizonYInDevicePixels(
+      viewportHeightInDevicePixels: viewport.heightInScreenPixels * ratio,
+      pitchInDegrees: view.pitch,
+    );
   }
 
   // ---------------------------------------------------------------------------

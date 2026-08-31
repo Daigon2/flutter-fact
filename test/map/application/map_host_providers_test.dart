@@ -287,7 +287,11 @@ void main() {
       // Durchreichung, die ihre Antwort verschluckt, sähe von außen aus wie
       // eine Karte ohne sichtbare Punkte.
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 12, yInScreenPixels: 34),
+        const MapScreenPoint(
+          xInScreenPixels: 12,
+          yInScreenPixels: 34,
+          isInFrontOfCamera: true,
+        ),
       ];
 
       final List<MapScreenPoint?> located = await registry.projectToScreen(

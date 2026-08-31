@@ -982,8 +982,16 @@ void main() {
       );
 
       expect(located, <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 12.5, yInScreenPixels: 340),
-        const MapScreenPoint(xInScreenPixels: 7, yInScreenPixels: 8),
+        const MapScreenPoint(
+          xInScreenPixels: 12.5,
+          yInScreenPixels: 340,
+          isInFrontOfCamera: true,
+        ),
+        const MapScreenPoint(
+          xInScreenPixels: 7,
+          yInScreenPixels: 8,
+          isInFrontOfCamera: true,
+        ),
       ]);
     });
 
@@ -996,7 +1004,11 @@ void main() {
       expect(
         await host.projectToScreen(<MapPosition>[munich]),
         <MapScreenPoint?>[
-          const MapScreenPoint(xInScreenPixels: 10, yInScreenPixels: 900),
+          const MapScreenPoint(
+            xInScreenPixels: 10,
+            yInScreenPixels: 900,
+            isInFrontOfCamera: true,
+          ),
         ],
       );
     });
@@ -1065,6 +1077,115 @@ void main() {
       expect(projections.requests, isEmpty);
     });
 
+    // -------------------------------------------------------------------------
+    // D-17: liegt der Punkt vor der Kamera
+    // -------------------------------------------------------------------------
+    //
+    // **Die gestellten Zahlen sind die des Messgeräts**, damit die Probe
+    // gegen eine Messung und nicht gegen die Formel läuft: Kartenfläche
+    // 411,43 × 914,29 Stilpixel bei Skalierungsfaktor 2,625, also 1080 × 2400
+    // Geräte-Pixel, Neigung 58 Grad (`REBUILD_STATUS.md`, „Die vier
+    // Gerätemessungen“, Messung 3, und „Ungefragter Fund A“). Die zwei
+    // Ablesungen darunter sind die beiden Enden der gemessenen Leiter, 2000 km
+    // nach vorn und 2000 km nach hinten. Sie liegen nur rund sechs Pixel
+    // auseinander und auf verschiedenen Seiten des Horizonts; enger trennt
+    // diese Messung nicht.
+    const MapViewport measuredSurface = MapViewport(
+      widthInScreenPixels: 411.43,
+      heightInScreenPixels: 914.29,
+    );
+    const double measuredRatio = 2.625;
+    const double readingInFront = -1047.95;
+    const double readingBehind = -1053.83;
+
+    test('ohne gemessene Fläche gilt jeder Punkt als vor der Kamera', () async {
+      // Der Startvorgang: die Fläche ist noch nicht gemeldet, also gibt es
+      // keinen Horizont. Von den beiden möglichen Antworten ist das die
+      // harmlose, siehe `cameraHorizonYInDevicePixels`; die andere ließe
+      // jeden Ballon einer noch nicht gemessenen Fläche verschwinden.
+      bindWithProjections();
+      projections.answer = <Point<num>>[const Point<num>(540, -99999)];
+
+      final List<MapScreenPoint?> located = await host.projectToScreen(
+        <MapPosition>[munich],
+      );
+
+      expect(located.single!.isInFrontOfCamera, isTrue);
+    });
+
+    test('mit gemessener Fläche trennt der Horizont die beiden Enden der '
+        'gemessenen Leiter', () async {
+      bindWithProjections();
+      host.handleViewportChange(
+        measuredSurface,
+        devicePixelRatio: measuredRatio,
+      );
+      projections.answer = <Point<num>>[
+        const Point<num>(540, readingInFront),
+        const Point<num>(540, readingBehind),
+      ];
+
+      final List<MapScreenPoint?> located = await host.projectToScreen(
+        <MapPosition>[munich, munich],
+      );
+
+      expect(located.first!.isInFrontOfCamera, isTrue);
+      expect(located[1]!.isInFrontOfCamera, isFalse);
+      // **Und die Zahlen bleiben trotzdem beide da.** `null` heißt keine
+      // Lage, dieses Feld heißt „Lage bekannt, aber gespiegelt“; wer die
+      // zweite zu einem `null` machte, nahm dem `balloon`-Anker die
+      // Unterscheidung, die er braucht.
+      expect(located[1]!.yInScreenPixels, readingBehind);
+    });
+
+    test('der Skalierungsfaktor entscheidet mit, und zwar wirklich', () async {
+      // **Zwei Faktoren statt einem**, aus demselben Grund wie beim
+      // Platzierungstest der Ballons: mit nur einem wäre die Multiplikation
+      // durch eine beliebige Konstante zu ersetzen. Dieselbe Fläche, dieselbe
+      // Ablesung, zwei Faktoren, zwei Antworten. Bei 2,625 liegt der Horizont
+      // bei −1049,5 und die Ablesung darunter; bei 1 liegt er bei −400,0 und
+      // die Ablesung darüber.
+      Future<bool> inFrontAtRatio(double ratio) async {
+        host.handleViewportChange(measuredSurface, devicePixelRatio: ratio);
+        projections.answer = <Point<num>>[const Point<num>(540, -500)];
+        final List<MapScreenPoint?> located = await host.projectToScreen(
+          <MapPosition>[munich],
+        );
+        return located.single!.isInFrontOfCamera;
+      }
+
+      bindWithProjections();
+
+      expect(await inFrontAtRatio(measuredRatio), isTrue);
+      expect(await inFrontAtRatio(1), isFalse);
+    });
+
+    test(
+      'die Neigung entscheidet mit: senkrecht von oben liegt alles vorn',
+      () async {
+        // `cot(0)` ist unendlich, der Horizont liegt dann nirgends, und das ist
+        // die richtige Antwort: eine senkrecht nach unten blickende Kamera hat
+        // nichts hinter sich. Ohne die Neigung in der Rechnung wäre dieselbe
+        // Ablesung wie oben „gespiegelt“.
+        host.bindSurface(
+          driver: driver,
+          camera: viewAt(pitch: 0),
+          projections: projections,
+        );
+        host.handleViewportChange(
+          measuredSurface,
+          devicePixelRatio: measuredRatio,
+        );
+        projections.answer = <Point<num>>[const Point<num>(540, readingBehind)];
+
+        final List<MapScreenPoint?> located = await host.projectToScreen(
+          <MapPosition>[munich],
+        );
+
+        expect(located.single!.isInFrontOfCamera, isTrue);
+      },
+    );
+
     test('unbindSurface löst auch die Projektionsnaht', () async {
       // Bliebe sie stehen, rechnete der Host gegen eine Kamera, die es nicht
       // mehr gibt, und die Ballons stünden an den Stellen der alten Karte.
@@ -1102,7 +1223,7 @@ void main() {
         heightInScreenPixels: 800,
       );
 
-      host.handleViewportChange(size);
+      host.handleViewportChange(size, devicePixelRatio: 1);
 
       expect(host.viewport, size);
     });
@@ -1115,7 +1236,7 @@ void main() {
         widthInScreenPixels: 400,
         heightInScreenPixels: 800,
       );
-      host.handleViewportChange(size);
+      host.handleViewportChange(size, devicePixelRatio: 1);
 
       bind();
 
@@ -1131,7 +1252,7 @@ void main() {
         heightInScreenPixels: 800,
       );
       bind();
-      host.handleViewportChange(size);
+      host.handleViewportChange(size, devicePixelRatio: 1);
 
       host.unbindSurface();
 

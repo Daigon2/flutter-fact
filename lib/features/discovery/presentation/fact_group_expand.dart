@@ -36,16 +36,17 @@
 ///
 /// ## Ein Punkt hinter der Kamera
 ///
-/// `MapHost.projectToScreen` liefert für einen Punkt hinter der Kamera keine
-/// Ausnahme und kein `null`, sondern eine still gespiegelte Zahl, die wie
-/// eine plausible Bildschirmlage aussieht (`REBUILD_STATUS.md`, „Die vier
-/// Gerätemessungen"; dieselbe Lücke ist in `discovery_balloon_anchor.dart`
-/// um Zeile 115 beschrieben, unter „Ein Fakt hinter der Kamera"). Ein solcher
-/// Punkt kann hier in den Radius fallen und das Rechteck verfälschen: es
-/// wird dann **zu groß**, die Fahrt zu vorsichtig, und [groupExpandMinZoom]
-/// fängt genau diesen Fall auf. Diese Datei löst die Lücke nicht, sie erbt
-/// sie, wie `discovery_balloon_anchor.dart` es für seine eigene Auswahl auch
-/// tut.
+/// Fällt heraus, weil `MapScreenPoint.isInFrontOfCamera` es sagt (D-17). Diese
+/// Datei prüft das Feld und rechnet nichts nach; die Zahl entsteht im
+/// Karten-Host, siehe `map_camera_horizon.dart`.
+///
+/// **Warum das hier überhaupt geprüft werden muss**, obwohl die Kandidaten
+/// gerade noch als Gruppe auf dem Bildschirm standen: die Bildschirmlagen
+/// entstehen **nach** dem Tipp, in einem eigenen Umlauf über den
+/// Plattformkanal, und dazwischen kann sich die Kamera bewegt haben. Ein
+/// gespiegelter Punkt fällt sonst in den Radius und verfälscht das Rechteck:
+/// es wird **zu groß**, die Fahrt zu vorsichtig, und [groupExpandMinZoom]
+/// fängt das nur auf, es macht die Auswahl nicht richtig.
 library;
 
 import 'package:fact_app/map/domain/map_overlay.dart';
@@ -66,6 +67,11 @@ import 'package:fact_app/map/domain/map_screen_point.dart';
 /// Beides ist wissenswert und keins davon ein Fehler des Nutzers, deshalb ein
 /// Ereignis und keine stumme Rückkehr.
 ///
+/// **Seit D-17 gibt es einen dritten Grund**, und er ist der harmloseste: die
+/// getippte Stelle selbst liegt inzwischen hinter der Kamera, weil sich die
+/// Kamera zwischen dem Tipp und der Antwort der Projektion bewegt hat. Wer
+/// diese Ereignisse später auszählt, rechnet mit dieser Sorte.
+///
 /// Gemeldet wird das vom Aufrufer (`pages/map_page.dart`), nicht hier: diese
 /// Datei bleibt eine reine Funktion ohne `DiagnosticSink`.
 const String groupTapFoundNoMembersEvent = 'discovery.group_tap.no_members';
@@ -74,13 +80,17 @@ const String groupTapFoundNoMembersEvent = 'discovery.group_tap.no_members';
 /// [tapScreenPosition] liegt.
 ///
 /// [candidates] und [candidateScreenPositions] gehören zusammen, Index für
-/// Index, genau wie bei `MapHost.projectToScreen`s eigenem Vertrag. Ein
-/// fehlender Bildschirmpunkt (`null`, siehe dort: außerhalb der Karte oder
-/// hinter der Kamera) fällt heraus, er hat gerade keine Lage.
+/// Index, genau wie bei `MapHost.projectToScreen`s eigenem Vertrag. Zwei
+/// Sorten Kandidat fallen heraus, und der Vertrag hält sie auseinander: einer
+/// ohne Bildschirmlage (`null`) hat gerade keine, einer mit
+/// `isInFrontOfCamera: false` hat eine, die nichts bedeutet.
 ///
-/// Ist [tapScreenPosition] `null`, entsteht **keine** Auswahl (leere Liste):
-/// ohne eine Bildschirmlage der getippten Stelle selbst gibt es nichts,
-/// wogegen verglichen werden könnte.
+/// Ist [tapScreenPosition] `null` **oder liegt sie selbst hinter der
+/// Kamera**, entsteht **keine** Auswahl (leere Liste): ohne eine brauchbare
+/// Bildschirmlage der getippten Stelle gibt es nichts, wogegen verglichen
+/// werden könnte, und eine gespiegelte Tippstelle zöge einen beliebigen Kreis
+/// irgendwo durch die Karte. Erreichbar ist das, weil die Projektion erst nach
+/// dem Tipp herausgeht, siehe den Kopfkommentar dieser Datei.
 ///
 /// [radiusInStylePixels] ist `factOverlayGrouping.radiusInScreenPixels`, in
 /// **Stilpixeln**; [pixelRatio] rechnet ihn in dasselbe Geräteraster um, in
@@ -98,7 +108,7 @@ List<MapOverlayPoint> selectGroupMembers({
     'Kandidaten und Bildschirmlagen müssen dieselbe Reihenfolge tragen.',
   );
   final MapScreenPoint? tap = tapScreenPosition;
-  if (tap == null) {
+  if (tap == null || !tap.isInFrontOfCamera) {
     return const <MapOverlayPoint>[];
   }
 
@@ -113,7 +123,7 @@ List<MapOverlayPoint> selectGroupMembers({
     i++
   ) {
     final MapScreenPoint? at = candidateScreenPositions[i];
-    if (at == null) {
+    if (at == null || !at.isInFrontOfCamera) {
       continue;
     }
     final double dxInScreenPixels = at.xInScreenPixels - tap.xInScreenPixels;

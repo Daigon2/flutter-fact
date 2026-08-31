@@ -143,6 +143,15 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
   /// zwischen beiden läuft der `LayoutBuilder` nicht erneut.
   MapViewport? _viewport;
 
+  /// Der zuletzt an den Host gemeldete Skalierungsfaktor.
+  ///
+  /// Aus demselben Grund gemerkt wie [_viewport], und mit derselben Rolle im
+  /// Vergleich: er kann sich **ohne** eine Größenänderung ändern, etwa wenn das
+  /// Fenster auf einen zweiten Bildschirm wandert. Ohne ihn im Vergleich
+  /// bliebe der Host in genau diesem Fall auf dem alten Faktor stehen, und der
+  /// Horizont läge um dessen Verhältnis daneben.
+  double? _devicePixelRatio;
+
   /// Meldet die Größe der Kartenfläche, aber nur, wenn sie sich geändert hat.
   ///
   /// ## Warum der Vergleich hier steht und nicht im Host
@@ -154,16 +163,17 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
   /// den Host bei unveränderter Größe erneut. Der Vergleich braucht [_viewport]
   /// ohnehin als Gedächtnis für [_onMapCreated], siehe dort; eine zweite
   /// Prüfung im Host wäre nur eine zweite Kopie desselben Vergleichs.
-  void _reportViewport(BoxConstraints constraints) {
+  void _reportViewport(BoxConstraints constraints, double devicePixelRatio) {
     final MapViewport viewport = MapViewport(
       widthInScreenPixels: constraints.maxWidth,
       heightInScreenPixels: constraints.maxHeight,
     );
-    if (viewport == _viewport) {
+    if (viewport == _viewport && devicePixelRatio == _devicePixelRatio) {
       return;
     }
     _viewport = viewport;
-    _host.handleViewportChange(viewport);
+    _devicePixelRatio = devicePixelRatio;
+    _host.handleViewportChange(viewport, devicePixelRatio: devicePixelRatio);
   }
 
   @override
@@ -240,8 +250,9 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
     // diese Zeile bliebe [MapHost.viewport] für den neuen Host `null`, obwohl
     // die Fläche längst feststeht.
     final MapViewport? viewport = _viewport;
-    if (viewport != null) {
-      _host.handleViewportChange(viewport);
+    final double? devicePixelRatio = _devicePixelRatio;
+    if (viewport != null && devicePixelRatio != null) {
+      _host.handleViewportChange(viewport, devicePixelRatio: devicePixelRatio);
     }
     // Eine Liste am Controller, kein Widget-Parameter. Die Zuordnung des
     // getroffenen Layers zu einer Überlagerung entscheidet [MapOverlayHost],
@@ -285,9 +296,18 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
     // `State`. Gemessen wird in **Stilpixeln** (logischen Pixeln), das ist
     // genau, was `constraints` hergibt, siehe `MapViewport`. Nicht
     // Gerätepixel: die trägt `MapScreenPoint`, für eine andere Verwendung.
+    //
+    // **Der Skalierungsfaktor kommt aus diesem `build` und nicht aus dem
+    // `builder` unten**, obwohl beide einen Kontext haben. Ein
+    // `MediaQuery`-Zugriff meldet eine Abhängigkeit an, und die gehört in die
+    // Aufbauphase und nicht in die Layoutphase, in der der `builder` läuft.
+    // Ändert sich der Faktor, baut dieses Widget neu, der `builder` läuft mit,
+    // und `_reportViewport` sieht die neue Zahl. Wozu der Host sie braucht,
+    // steht bei `MapCameraHost.handleViewportChange`.
+    final double devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        _reportViewport(constraints);
+        _reportViewport(constraints, devicePixelRatio);
         return MapLibreMap(
           styleString: style,
           initialCameraPosition: _positionOf(widget.initialCamera),

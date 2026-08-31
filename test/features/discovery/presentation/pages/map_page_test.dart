@@ -1067,9 +1067,21 @@ void main() {
         // in dieser Reihenfolge: `near`, `far`, Tippstelle. `far` liegt weit
         // draußen (1000 Gerätepixel vom Tipp), `near` genau auf ihm.
         host.projectionAnswer = const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 1200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ];
         host.viewport = const MapViewport(
           widthInScreenPixels: 400,
@@ -1137,9 +1149,21 @@ void main() {
       // deutlich innerhalb von 70 Stilpixeln mal 3 (Bildverhältnis der
       // Testumgebung) = 210 Gerätepixeln.
       host.projectionAnswer = const <MapScreenPoint?>[
-        MapScreenPoint(xInScreenPixels: 150, yInScreenPixels: 400),
-        MapScreenPoint(xInScreenPixels: 230, yInScreenPixels: 400),
-        MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        MapScreenPoint(
+          xInScreenPixels: 150,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 230,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       host.viewport = const MapViewport(
         widthInScreenPixels: 400,
@@ -1231,9 +1255,21 @@ void main() {
         // Die Antwort auf den ersten (ältesten) Tipp: „near" liegt auf der
         // Tippstelle, „far" weit weg, die Auswahl wäre also „near".
         host.answerProjectionAt(0, const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 1200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ]);
         await tester.pump();
         await tester.pump();
@@ -1262,9 +1298,21 @@ void main() {
         // Die Antwort auf den gemerkten (dritten) Tipp: umgekehrt, jetzt
         // liegt „far" auf der Tippstelle.
         host.answerProjectionAt(1, const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 1200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ]);
         await tester.pump();
         await tester.pump();
@@ -1369,8 +1417,16 @@ void main() {
         // Die Tippstelle selbst hat keine Bildschirmlage (letztes Element
         // `null`), obwohl beide Kandidaten eine haben.
         host.projectionAnswer = const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 210, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 210,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
           null,
         ];
 
@@ -1402,9 +1458,21 @@ void main() {
         );
         // Beide Kandidaten weit weg von der Tippstelle.
         host.projectionAnswer = const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 2000, yInScreenPixels: 2000),
-          MapScreenPoint(xInScreenPixels: 3000, yInScreenPixels: 3000),
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 2000,
+            yInScreenPixels: 2000,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 3000,
+            yInScreenPixels: 3000,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ];
 
         host.emitGroupTap(tapOnFacts);
@@ -1440,8 +1508,16 @@ void main() {
           heightInScreenPixels: 800,
         );
         host.projectionAnswer = const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ];
 
         host.emitGroupTap(tapOnFacts);
@@ -1491,9 +1567,21 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
 
       host.answerProjection(const <MapScreenPoint?>[
-        MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
-        MapScreenPoint(xInScreenPixels: 1200, yInScreenPixels: 400),
-        MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 1200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ]);
       await tester.pump();
       await tester.pump();
@@ -1525,9 +1613,21 @@ void main() {
           heightInScreenPixels: 800,
         );
         host.projectionAnswer = const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 1200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ];
 
         await tester.pumpWidget(const SizedBox.shrink());

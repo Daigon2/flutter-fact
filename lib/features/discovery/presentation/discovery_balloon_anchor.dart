@@ -113,17 +113,20 @@
 ///
 /// ## Ein Fakt hinter der Kamera
 ///
-/// `MapHost.projectToScreen` liefert für einen Punkt hinter der Kamera keine
-/// Ausnahme und kein `null`, sondern eine gespiegelte Zahl, die wie eine
-/// plausible Bildschirmlage aussieht (siehe `REBUILD_STATUS.md`, „Die vier
-/// Gerätemessungen“). Dieselbe Lücke hat `fact_balloon_overlay.dart` schon,
-/// ungelöst: `map/domain/` unterscheidet „vor der Kamera“ und „gespiegelt“
-/// nicht. Diese Auswahl erbt die Lücke, statt sie zu verdoppeln, aber die
-/// **Folge ist hier teurer**: in der Überlagerung zeichnet ein gespiegelter
-/// Punkt einen Ballon an falscher Stelle, ein optischer Aussetzer. Hier kann
-/// derselbe Punkt den Wettbewerb um die Rahmenmitte **gewinnen** und zum
-/// Tutorial-Ziel werden, denn eine Spiegelung an der Kameraachse zieht
-/// gespiegelte Punkte tendenziell in Richtung Bildmitte statt an den Rand.
+/// Ein solcher Punkt fällt aus dem Wettbewerb heraus, weil
+/// `MapScreenPoint.isInFrontOfCamera` es sagt; [selectBalloonAnchorRect] prüft
+/// das Feld und rechnet nichts nach.
+///
+/// **Bis zum 31.08.2026 stand hier eine halbe Seite darüber, dass der Vertrag
+/// diese Aussage nicht macht.** Er macht sie jetzt (D-17,
+/// `map_screen_point.dart` und `map_camera_horizon.dart`), und das war für
+/// diese Datei die teuerste der drei Folgen: in `fact_balloon_overlay.dart`
+/// zeichnete ein gespiegelter Punkt einen Ballon an falscher Stelle, ein
+/// optischer Aussetzer, hier konnte derselbe Punkt den Wettbewerb um die
+/// Rahmenmitte **gewinnen** und zum Tutorial-Ziel werden. Eine Spiegelung an
+/// der Kameraachse zieht gespiegelte Punkte nämlich in Richtung Bildmitte
+/// statt an den Rand, sie sind also nicht bloß falsch, sie sind bevorzugt
+/// falsch.
 library;
 
 import 'dart:async';
@@ -183,8 +186,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// sichtbaren Fakt.** Und genau die bricht bei geneigter Kamera: der
 /// sichtbare Bereich ist bei 58 Grad ein unsymmetrisches Trapez und kein
 /// Kreis um die Kameramitte. Ein Fakt direkt hinter der Kamera ist
-/// geografisch nah und trotzdem nicht sichtbar (er liefert ohnehin eine
-/// gespiegelte Zahl statt `null`, siehe unten); ein Fakt weit voraus Richtung
+/// geografisch nah und trotzdem nicht sichtbar (dass er es nicht ist, sagt
+/// seit D-17 `MapScreenPoint.isInFrontOfCamera`, seine Zahlen sagen es nicht);
+/// ein Fakt weit voraus Richtung
 /// Horizont ist geografisch fern und sehr wohl sichtbar. Die geografische
 /// Vorauswahl ist eine reine Entfernungsprüfung und keine Sichtbarkeitsprüfung,
 /// sie kennt die Neigung nicht. Das macht 25 nicht zu einer schlechten Zahl,
@@ -312,6 +316,13 @@ List<BalloonAnchorCandidate> balloonAnchorCandidatesOf({
 ///
 /// `screen-tour.jsx:193-222`, in dieser Reihenfolge geprüft:
 ///
+/// 0. Ein Punkt ohne Bildschirmlage fällt weg, und seit D-17 auch einer, der
+///    laut `MapScreenPoint.isInFrontOfCamera` hinter der Kamera liegt. **In
+///    der Quelle steht diese Stufe nicht**, und warum sie dort fehlt, ist
+///    hier ausdrücklich **nicht** geprüft: ob MapLibre GL JS einen DOM-Marker
+///    hinter der Kamera von selbst versteckt, wäre am laufenden Browser in
+///    einer Minute zu sehen und ist es nicht. Die Stufe steht hier, weil der
+///    eigene Vertrag die Aussage macht, nicht weil die Quelle sie verlangt.
 /// 1. Ein zu kleiner Marker fällt weg, siehe [discoveryBalloonAnchorMinMarkerSize].
 ///    Die Größe folgt aus [BalloonAnchorCandidate.emphasis] und [zoom], genau
 ///    wie beim gezeichneten Ballon in `fact_balloon_overlay.dart`.
@@ -350,8 +361,12 @@ Rect? selectBalloonAnchorRect({
   double bestDistanceSquared = double.infinity;
   for (int i = 0; i < candidates.length && i < screenPositions.length; i++) {
     final MapScreenPoint? at = screenPositions[i];
-    if (at == null) {
-      // Keine Bildschirmlage, außerhalb der Karte oder hinter der Kamera.
+    if (at == null || !at.isInFrontOfCamera) {
+      // Keine Bildschirmlage, oder eine, die hinter der Kamera liegt und
+      // deshalb gespiegelt ist. **Die zweite Hälfte dieser Zeile ist die
+      // wichtigere**: ein `null` verliert den Wettbewerb von selbst, ein
+      // gespiegelter Punkt gewinnt ihn tendenziell, siehe den Kopfkommentar
+      // dieser Datei unter „Ein Fakt hinter der Kamera“.
       continue;
     }
     final Size markerSize =

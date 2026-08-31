@@ -21,7 +21,11 @@ void main() {
       final List<MapOverlayPoint> selected = selectGroupMembers(
         candidates: <MapOverlayPoint>[pointAt('1')],
         candidateScreenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         tapScreenPosition: null,
         radiusInStylePixels: 70,
@@ -37,11 +41,16 @@ void main() {
       final List<MapOverlayPoint> selected = selectGroupMembers(
         candidates: <MapOverlayPoint>[pointAt('1')],
         candidateScreenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         tapScreenPosition: const MapScreenPoint(
           xInScreenPixels: 200,
           yInScreenPixels: 400,
+          isInFrontOfCamera: true,
         ),
         radiusInStylePixels: 70,
         pixelRatio: 1,
@@ -56,11 +65,16 @@ void main() {
       final List<MapOverlayPoint> selected = selectGroupMembers(
         candidates: <MapOverlayPoint>[pointAt('fern')],
         candidateScreenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 1200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         tapScreenPosition: const MapScreenPoint(
           xInScreenPixels: 200,
           yInScreenPixels: 400,
+          isInFrontOfCamera: true,
         ),
         radiusInStylePixels: 70,
         pixelRatio: 1,
@@ -78,11 +92,16 @@ void main() {
       final List<MapOverlayPoint> selected = selectGroupMembers(
         candidates: <MapOverlayPoint>[pointAt('1')],
         candidateScreenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 270, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 270,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         tapScreenPosition: const MapScreenPoint(
           xInScreenPixels: 200,
           yInScreenPixels: 400,
+          isInFrontOfCamera: true,
         ),
         radiusInStylePixels: 70,
         pixelRatio: 1,
@@ -105,11 +124,16 @@ void main() {
         candidates: <MapOverlayPoint>[pointAt('1'), pointAt('2')],
         candidateScreenPositions: const <MapScreenPoint?>[
           null,
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         tapScreenPosition: const MapScreenPoint(
           xInScreenPixels: 200,
           yInScreenPixels: 400,
+          isInFrontOfCamera: true,
         ),
         radiusInStylePixels: 500,
         pixelRatio: 1,
@@ -122,12 +146,21 @@ void main() {
       final List<MapOverlayPoint> selected = selectGroupMembers(
         candidates: <MapOverlayPoint>[pointAt('nah'), pointAt('fern')],
         candidateScreenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 230, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 1200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 230,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         tapScreenPosition: const MapScreenPoint(
           xInScreenPixels: 200,
           yInScreenPixels: 400,
+          isInFrontOfCamera: true,
         ),
         radiusInStylePixels: 70,
         pixelRatio: 1,
@@ -148,11 +181,16 @@ void main() {
       final List<MapOverlayPoint> selected = selectGroupMembers(
         candidates: <MapOverlayPoint>[pointAt('1')],
         candidateScreenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 225, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 225,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         tapScreenPosition: const MapScreenPoint(
           xInScreenPixels: 200,
           yInScreenPixels: 400,
+          isInFrontOfCamera: true,
         ),
         radiusInStylePixels: 10,
         pixelRatio: 3,
@@ -171,11 +209,16 @@ void main() {
       final List<MapOverlayPoint> selected = selectGroupMembers(
         candidates: <MapOverlayPoint>[pointAt('1')],
         candidateScreenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 225, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 225,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         tapScreenPosition: const MapScreenPoint(
           xInScreenPixels: 200,
           yInScreenPixels: 400,
+          isInFrontOfCamera: true,
         ),
         radiusInStylePixels: 10,
         pixelRatio: 1,
@@ -190,18 +233,101 @@ void main() {
     final List<MapOverlayPoint> selected = selectGroupMembers(
       candidates: <MapOverlayPoint>[pointAt('a'), pointAt('b'), pointAt('c')],
       candidateScreenPositions: const <MapScreenPoint?>[
-        MapScreenPoint(xInScreenPixels: 210, yInScreenPixels: 400),
-        MapScreenPoint(xInScreenPixels: 1200, yInScreenPixels: 400),
-        MapScreenPoint(xInScreenPixels: 195, yInScreenPixels: 400),
+        MapScreenPoint(
+          xInScreenPixels: 210,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 1200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 195,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ],
       tapScreenPosition: const MapScreenPoint(
         xInScreenPixels: 200,
         yInScreenPixels: 400,
+        isInFrontOfCamera: true,
       ),
       radiusInStylePixels: 70,
       pixelRatio: 1,
     );
 
     expect(selected.map((p) => p.id), <String>['a', 'c']);
+  });
+
+  group('ein Punkt hinter der Kamera', () {
+    // D-17: `MapScreenPoint.isInFrontOfCamera` sagt es, die Zahlen sagen es
+    // nicht. Ein gespiegelter Punkt trägt eine endliche Lage, die wie jede
+    // andere aussieht.
+    //
+    // **Die Eingaben sind so gewählt, dass ein ignoriertes Feld ein anderes
+    // Ergebnis liefert**, und das ist hier Pflicht: genau diese Auswahl hat
+    // schon einmal eine blinde Probe getragen, weil der Ersatzwert zufällig
+    // dasselbe Ergebnis ergab (`REBUILD_STATUS.md`, „Wie Tests hier blind
+    // werden“, Muster 21). Der gespiegelte Punkt liegt deshalb **genau auf**
+    // der Tippstelle, also so tief im Radius, wie es geht.
+    test('fällt aus dem Radius heraus, obwohl er genau auf der Tippstelle '
+        'liegt', () {
+      final List<MapOverlayPoint> selected = selectGroupMembers(
+        candidates: <MapOverlayPoint>[pointAt('gespiegelt'), pointAt('echt')],
+        candidateScreenPositions: const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: false,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 210,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+        ],
+        tapScreenPosition: const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        radiusInStylePixels: 70,
+        pixelRatio: 1,
+      );
+
+      // **Der zweite Kandidat ist der eigentliche Punkt dieser Probe.** Ohne
+      // ihn wäre „leere Auswahl“ nicht von „die Funktion hat gar nichts
+      // gefunden“ zu unterscheiden, und eine Mutation, die grundsätzlich
+      // leer zurückgibt, bliebe grün.
+      expect(selected.map((MapOverlayPoint p) => p.id), <String>['echt']);
+    });
+
+    test('eine gespiegelte Tippstelle ergibt gar keine Auswahl', () {
+      // Erreichbar, weil die Projektion erst **nach** dem Tipp herausgeht:
+      // dazwischen kann die Kamera sich gedreht haben. Ohne diese Prüfung
+      // zöge eine gespiegelte Tippstelle einen Kreis irgendwo durch die Karte
+      // und fände die Punkte, die dort zufällig liegen.
+      final List<MapOverlayPoint> selected = selectGroupMembers(
+        candidates: <MapOverlayPoint>[pointAt('1')],
+        candidateScreenPositions: const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+        ],
+        tapScreenPosition: const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: false,
+        ),
+        radiusInStylePixels: 70,
+        pixelRatio: 1,
+      );
+
+      expect(selected, isEmpty);
+    });
   });
 }

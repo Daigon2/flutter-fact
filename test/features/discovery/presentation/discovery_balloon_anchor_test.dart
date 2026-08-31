@@ -172,7 +172,11 @@ void main() {
       final Rect? rect = selectBalloonAnchorRect(
         candidates: <BalloonAnchorCandidate>[candidateAt(munich)],
         screenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: 11,
         frameSize: frame,
@@ -196,7 +200,11 @@ void main() {
       Rect? rectAt(double zoom) => selectBalloonAnchorRect(
         candidates: <BalloonAnchorCandidate>[candidateAt(munich)],
         screenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: zoom,
         frameSize: frame,
@@ -220,7 +228,11 @@ void main() {
       final Rect? rect = selectBalloonAnchorRect(
         candidates: <BalloonAnchorCandidate>[candidateAt(munich, emphasis: 1)],
         screenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: 11,
         frameSize: frame,
@@ -247,7 +259,11 @@ void main() {
         // x weit links, rect.right bleibt trotzdem negativ; y in der Mitte,
         // also innerhalb beider senkrechter Grenzen.
         screenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: -100, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: -100,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: zoomWithRoom,
         frameSize: frame,
@@ -264,7 +280,11 @@ void main() {
         // x weit rechts von 400, y in der Mitte: nur die rechte Kante
         // schlägt an, `rect.right < 0` bleibt falsch.
         screenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 1000, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 1000,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: zoomWithRoom,
         frameSize: frame,
@@ -279,7 +299,11 @@ void main() {
         candidates: <BalloonAnchorCandidate>[candidateAt(munich)],
         // y weit oberhalb, x in der Mitte: nur die obere Kante schlägt an.
         screenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: -100),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: -100,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: zoomWithRoom,
         frameSize: frame,
@@ -295,7 +319,11 @@ void main() {
         // y weit unterhalb von 800, x in der Mitte: nur die untere Kante
         // schlägt an.
         screenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 1000),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 1000,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: zoomWithRoom,
         frameSize: frame,
@@ -313,7 +341,11 @@ void main() {
         ],
         screenPositions: const <MapScreenPoint?>[
           null,
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: zoomWithRoom,
         frameSize: frame,
@@ -346,8 +378,16 @@ void main() {
           candidateAt(const MapPosition(latitude: 48.14, longitude: 11.6)),
         ],
         screenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 390, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 390,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: zoomWithRoom,
         frameSize: frame,
@@ -355,6 +395,66 @@ void main() {
       );
 
       expect(rect!.center.dx, closeTo(200, 0.001));
+    });
+
+    test('ein Punkt hinter der Kamera gewinnt den Wettbewerb nicht, obwohl er '
+        'näher an der Rahmenmitte liegt', () {
+      // **Die teuerste der drei Folgen von D-17, und die einzige, die eine
+      // Auswahl umdreht statt nur ein Bild zu verderben.** Eine Spiegelung an
+      // der Kameraachse zieht gespiegelte Punkte in Richtung Bildmitte, also
+      // genau dorthin, wo dieser Wettbewerb entschieden wird.
+      //
+      // **Die Eingaben sind so gewählt, dass ein ignoriertes Feld ein anderes
+      // Ergebnis liefert** (Muster 21): der gespiegelte Punkt liegt **genau**
+      // in der Rahmenmitte und würde jeden anderen schlagen. Eine Probe, in
+      // der er ohnehin verliert, wäre blind.
+      final Rect? rect = selectBalloonAnchorRect(
+        candidates: <BalloonAnchorCandidate>[
+          candidateAt(munich),
+          candidateAt(const MapPosition(latitude: 48.14, longitude: 11.6)),
+        ],
+        screenPositions: const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: false,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 390,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+        ],
+        zoom: zoomWithRoom,
+        frameSize: frame,
+        pixelRatio: 1,
+      );
+
+      // **Der zweite Kandidat gehört zur Probe.** Mit nur einem wäre `null`
+      // auch das Ergebnis einer Mutation, die immer `null` liefert; so muss
+      // der Gewinner der **andere** sein, und das trennt „ausgeschlossen“ von
+      // „nichts gefunden“.
+      expect(rect!.center.dx, closeTo(390, 0.001));
+    });
+
+    test('taugt nur ein gespiegelter Punkt, gibt es kein Ziel', () {
+      // Der Rest ist Sache des Aufrufers: er legt dann das Ersatzrechteck der
+      // Quelle an, siehe `discoveryBalloonAnchorFallbackRect`.
+      final Rect? rect = selectBalloonAnchorRect(
+        candidates: <BalloonAnchorCandidate>[candidateAt(munich)],
+        screenPositions: const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: false,
+          ),
+        ],
+        zoom: zoomWithRoom,
+        frameSize: frame,
+        pixelRatio: 1,
+      );
+
+      expect(rect, isNull);
     });
 
     test('bei Gleichstand gewinnt der zuerst geprüfte, wie `d < bestD` in der '
@@ -367,8 +467,16 @@ void main() {
           candidateAt(const MapPosition(latitude: 48.14, longitude: 11.6)),
         ],
         screenPositions: const <MapScreenPoint?>[
-          MapScreenPoint(xInScreenPixels: 150, yInScreenPixels: 400),
-          MapScreenPoint(xInScreenPixels: 250, yInScreenPixels: 400),
+          MapScreenPoint(
+            xInScreenPixels: 150,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 250,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ],
         zoom: zoomWithRoom,
         frameSize: frame,
@@ -385,7 +493,11 @@ void main() {
           final Rect? rect = selectBalloonAnchorRect(
             candidates: <BalloonAnchorCandidate>[candidateAt(munich)],
             screenPositions: const <MapScreenPoint?>[
-              MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+              MapScreenPoint(
+                xInScreenPixels: 200,
+                yInScreenPixels: 400,
+                isInFrontOfCamera: true,
+              ),
             ],
             zoom: zoomWithRoom,
             frameSize: frame,
@@ -502,7 +614,11 @@ void main() {
         points: <MapOverlayPoint>[pointAt('1')],
       );
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       await pumpAnchor(tester, container: containerWith(overlay: overlay));
       await tester.pump();
@@ -575,7 +691,11 @@ void main() {
       );
       await tester.pump();
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       // Zoom 11: Betonung 0 fällt durch die Schwelle (siehe
       // `selectBalloonAnchorRect`, „die Betonung … wirkt“), der Anker steht
@@ -662,7 +782,11 @@ void main() {
       expect(host.peakInFlight, 1);
 
       host.answerProjection(<MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ]);
       await tester.pump();
       await tester.pump();
