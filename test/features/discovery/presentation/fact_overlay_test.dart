@@ -132,6 +132,21 @@ void main() {
     expect(overlay.minZoom, 11);
   });
 
+  test('die Untergrenze fürs Aufklappen einer Gruppe ist 16, nicht die '
+      'Gruppierungsgrenze selbst', () {
+    // **Gegen die feste Zahl 16, nicht gegen `factOverlayGrouping.maxZoom`
+    // selbst geprüft** (Muster 18 aus „Wie Tests hier blind werden"): eine
+    // Zusicherung `groupExpandMinZoom == factOverlayGrouping.maxZoom + 1`
+    // wäre immer wahr, egal welche Zahl `maxZoom` trägt, und ein Mutant, der
+    // die Ableitung kaputt macht, änderte beide Seiten der Gleichung
+    // gleichzeitig.
+    //
+    // `factOverlayGrouping.maxZoom` heißt „bis einschließlich 15 wird
+    // gruppiert" (siehe `MapOverlayGrouping.maxZoom`), ein Fahrziel von 16
+    // liegt also sicher darüber.
+    expect(groupExpandMinZoom, 16);
+  });
+
   test('es gibt keine Deckelung bei 25 Punkten', () {
     // Die Quelle zeigt ab Zoom 16 nur die 25 nächsten (`screen-map.jsx:2048`),
     // ihr Kommentar nennt als Grund den Lag-Schutz im Browser: dort ist jeder

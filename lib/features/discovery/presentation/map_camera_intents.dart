@@ -1,9 +1,10 @@
 /// Die Kameraabsichten des Kartenbildschirms, als reine Funktionen.
 ///
-/// Vier Anlässe, sechs Zahlen, keine Zeile Oberfläche: Sky-Fall, GPS-Folgen,
-/// Neuzentrieren und der harte Reset. Jede Funktion nimmt entgegen, was sie
-/// wissen muss, und gibt eine Absicht zurück. Ob sie ausgeführt wird,
-/// entscheidet der Karten-Host mit `decideMapCameraIntent`.
+/// Fünf Anlässe, keine Zeile Oberfläche: Sky-Fall, GPS-Folgen, Neuzentrieren,
+/// der harte Reset und, seit Schritt 15 Block 3, der Tipp auf eine Gruppe.
+/// Jede Funktion nimmt entgegen, was sie wissen muss, und gibt eine Absicht
+/// zurück. Ob sie ausgeführt wird, entscheidet der Karten-Host mit
+/// `decideMapCameraIntent`.
 ///
 /// ## Warum das in `presentation/` liegt und nicht in `domain/`
 ///
@@ -41,10 +42,14 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
+import 'package:fact_app/map/domain/map_camera_fit.dart';
 import 'package:fact_app/map/domain/map_camera_gate.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_position_rect.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 
 /// Zoomstufe, auf die der Sky-Fall zufliegt. `screen-map.jsx:1734`.
 ///
@@ -295,3 +300,66 @@ MapCameraCommand compassLongPressIntent({MapPosition? target}) =>
       releasesBearingLock: true,
       clearsFollowAnchor: true,
     );
+
+/// Wie lange die Fahrt auf eine angetippte Gruppe dauert.
+///
+/// `02_Frontend/app/screen-map.jsx:2450` (Lese-Repo, Pfad in `CLAUDE.md`,
+/// eingesehen am 31.08.2026): `map.easeTo({ ..., duration: 700 })`.
+const Duration groupExpandDuration = Duration(milliseconds: 700);
+
+/// Obergrenze der Zoomstufe, auf die eine angetippte Gruppe maximal fährt.
+///
+/// `02_Frontend/app/screen-map.jsx:2449`: `zoom: Math.min(zoom + 0.4, 18)`.
+/// Die 18 ist die Obergrenze der Quelle selbst und unabhängig vom Rechteck
+/// dieses Baus; [rectFitZoom] bekommt sie als eigenen Parameter `maxZoom` mit
+/// und wendet sie auf die **geometrische** Zoomstufe an, nicht auf
+/// `expansionZoom + 0,4` wie die Quelle, siehe der Entwurf zu Schritt 15,
+/// Block 3, „Die Entscheidung, und wo sie von D-12s Vorhersage abweicht".
+const double groupExpandMaxZoom = 18;
+
+/// Tipp auf eine angetippte Gruppe, `screen-map.jsx:2439-2459`.
+///
+/// ## Ein Rechteck statt `getClusterExpansionZoom`
+///
+/// Die Quelle fragt das SDK selbst, auf welche Zoomstufe eine Gruppe
+/// aufgeht (`getClusterExpansionZoom`), und fährt dorthin plus 0,4, gedeckelt
+/// auf 18. `maplibre_gl 0.26.2` hat dafür kein Gegenstück: kein
+/// `getClusterExpansionZoom`, kein `getClusterLeaves`. Stattdessen rechnet
+/// dieser Bau vorab ein Rechteck aus den eigenen, geografisch genäherten
+/// Gruppenmitgliedern (`fact_group_expand.dart`, `selectGroupMembers`) und
+/// lässt [rectFitZoom] die Zoomstufe bestimmen, auf der dieses Rechteck
+/// gerade noch ins Bild passt. [rect] und [viewport] kommen deshalb fertig
+/// vom Aufrufer (`pages/map_page.dart`); diese Funktion selbst kennt weder
+/// den Host noch eine Projektion.
+///
+/// [groupExpandMinZoom] (`fact_overlay.dart`) hebt das Ergebnis notfalls an:
+/// die geometrische Zoomstufe kann niedriger ausfallen als jede Zoomstufe,
+/// auf der MapLibre die Gruppe überhaupt noch zusammenfasst, etwa wenn die
+/// Näherung wegen Kettenbildung zu wenige Punkte gewählt hat (siehe dort,
+/// „Die Fehlerrichtung ist die sichere").
+///
+/// **`MapCameraOneShot` und kein `MapCameraCommand`.** Ein Tipp auf eine
+/// Gruppe ist keine der beiden Kompass-Gesten, er darf das Einrasten der
+/// Blickrichtung nicht lösen; dieselbe Begründung wie bei [recenterIntent].
+///
+/// **Neigung und Blickrichtung bleiben `null`, also unverändert, und das ist
+/// hier ausdrücklich erwähnt, weil es der ganze Punkt dieses Baus ist.**
+/// `CameraUpdate.newLatLngBounds` hätte beide auf 0 gezogen (siehe der
+/// Entwurf zu Schritt 15, Block 3, „Die Entscheidung..."), diese Absicht
+/// rührt sie gar nicht erst an: [MapCameraChange] lässt jedes ausgelassene
+/// Feld, wie es ist, und hier werden nur [MapCameraChange.center] und
+/// [MapCameraChange.zoom] gesetzt.
+MapCameraOneShot groupExpandIntent({
+  required MapPositionRect rect,
+  required MapViewport viewport,
+}) => MapCameraOneShot(
+  change: MapCameraChange(
+    center: rect.center,
+    zoom: math.max(
+      rectFitZoom(rect: rect, viewport: viewport, maxZoom: groupExpandMaxZoom),
+      groupExpandMinZoom,
+    ),
+  ),
+  motion: const MapCameraAnimated(groupExpandDuration),
+  origin: MapCameraIntentOrigin.discovery,
+);

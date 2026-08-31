@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:fact_app/core/async/detached_work.dart';
+import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
+import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/discovery/presentation/discovery_balloon_anchor.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_images.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_overlay.dart';
+import 'package:fact_app/features/discovery/presentation/fact_group_expand.dart';
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/fact_proximity.dart';
 import 'package:fact_app/features/discovery/presentation/map_camera_intents.dart';
@@ -15,7 +18,11 @@ import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_position_rect.dart';
+import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/services/location/device_position.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -60,10 +67,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// [_deliverOverlay]. Dass dabei nichts verloren geht, ist derselbe Gedanke wie
 /// beim Sky-Fall eine Zeile weiter unten.
 ///
-/// **Was beim Antippen eines Ballons passiert, steht bewusst nicht hier.** Der
-/// Punkt-Tipp hat bis Schritt 21 keinen Empfänger, und das Aufklappen einer
-/// Gruppe hängt an einer offenen technischen Entscheidung. Ein Strom auf
-/// Vorrat wäre Zustand, den niemand prüft.
+/// **Was beim Antippen eines einzelnen Ballons passiert, steht bewusst nicht
+/// hier.** Der Punkt-Tipp hat bis Schritt 21 keinen Empfänger, ein Strom auf
+/// Vorrat wäre Zustand, den niemand prüft. **Der Tipp auf eine Gruppe dagegen
+/// hat seit Schritt 15 Block 3 einen Empfänger**, [_onGroupTap]: er fährt die
+/// Kamera auf ein Rechteck, das die eigenen, genäherten Gruppenmitglieder
+/// umschließt.
 ///
 /// ## Seit Schritt 17 liegen die nahen Fakten nicht mehr nativ
 ///
@@ -241,6 +250,36 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   StreamSubscription<MapCameraView>? _cameraSubscription;
 
+  /// Zuhörer auf Gruppen-Tipps, siehe [_onGroupTap].
+  ///
+  /// Ein eigenes Abonnement und kein zweiter Zweig in [_onCameraChange]:
+  /// `MapHost.groupTaps` ist ein eigener Strom, vier Features teilen sich
+  /// ihn, und dieser Bildschirm filtert selbst auf [factOverlayId].
+  StreamSubscription<MapOverlayGroupTap>? _groupTapSubscription;
+
+  /// Ob gerade eine Projektion für einen Gruppen-Tipp unterwegs ist.
+  ///
+  /// Die dritte Stelle mit demselben Zusammenfassungs-Muster wie
+  /// `discovery_balloon_anchor.dart` (`_selectionInFlight`) und
+  /// `fact_balloon_overlay.dart` (`_projectionInFlight`), hier aber mit einem
+  /// Unterschied in der Auswertung, siehe [_onGroupTap]: dort darf eine
+  /// veraltete Antwort noch gelten, weil sie nur einen Bildschirmzustand neu
+  /// zeichnet, den die nächste Antwort ohnehin gleich wieder überschreibt.
+  /// Hier gibt eine Antwort eine **einmalige** Kameraabsicht ab
+  /// (`MapCameraOneShot`, „es gibt keine Warteschlange"), und die nimmt
+  /// niemand zurück: kommt die Antwort auf einen älteren Tipp erst nach der
+  /// eines neueren zurück, überschriebe ihre Absicht die frische, und die
+  /// Kamera führe auf die falsche Gruppe zurück. Nicht die zweite Anfrage ist
+  /// dabei das Problem, sondern die veraltete Antwort auf die erste.
+  bool _groupTapInFlight = false;
+
+  /// Der jüngste Gruppen-Tipp, der während einer laufenden Anfrage eintraf.
+  ///
+  /// Es gibt keine Warteschlange: trifft während der laufenden Anfrage noch
+  /// ein zweiter und danach ein dritter Tipp ein, verwirft der dritte den
+  /// zweiten hier, nicht umgekehrt. Bei Einmal-Absichten gewinnt die letzte.
+  MapOverlayGroupTap? _pendingGroupTap;
+
   /// Für welches Bildverhältnis die Ballonbilder schon gezeichnet wurden.
   ///
   /// `null` heißt „noch keine". Gemerkt, weil [didChangeDependencies] bei jeder
@@ -310,6 +349,13 @@ class _MapPageState extends ConsumerState<MapPage> {
         .read(mapHostProvider)
         .cameraChanges
         .listen(_onCameraChange);
+
+    // Aus demselben Grund vor der Kartenfläche wie das Abonnement oben: ein
+    // Tipp, der vor diesem Aufruf einträfe, wäre für immer verpasst.
+    _groupTapSubscription = ref
+        .read(mapHostProvider)
+        .groupTaps
+        .listen(_onGroupTap);
 
     // **`listenManual` und nicht `ref.listen` im `build`, und der Grund ist
     // `fireImmediately`.** `ref.listen` kennt den Schalter in
@@ -441,6 +487,8 @@ class _MapPageState extends ConsumerState<MapPage> {
   void dispose() {
     unawaited(_cameraSubscription?.cancel());
     _cameraSubscription = null;
+    unawaited(_groupTapSubscription?.cancel());
+    _groupTapSubscription = null;
     super.dispose();
   }
 
@@ -464,6 +512,144 @@ class _MapPageState extends ConsumerState<MapPage> {
     if (view.bearing != _bearingDegrees) {
       setState(() => _bearingDegrees = view.bearing);
     }
+  }
+
+  /// Ein Tipp auf eine Gruppe, `screen-map.jsx:2439-2459`.
+  ///
+  /// ## Vier Features teilen sich `groupTaps`
+  ///
+  /// Verarbeitet wird nur ein Tipp auf die **eigene** Überlagerung, siehe
+  /// [factOverlayId]. Ein Tipp auf eine fremde Gruppe geht diesen Bildschirm
+  /// nichts an.
+  ///
+  /// ## Die Kandidaten sind die wirklich nativ liegenden Punkte
+  ///
+  /// Nicht `_latestOverlay` selbst, sondern
+  /// `factOverlayWithout(_latestOverlay!, _animatedIds).points`, dieselbe
+  /// Übersetzung, die [_deliverOverlay] auch an den Host schickt. Die
+  /// ausgeblendeten, lebenden Ballons sind Flutter-Widgets über der Karte und
+  /// stecken in **keiner** nativen Gruppe; die volle Liste zöge Punkte ins
+  /// Rechteck, die MapLibre gar nicht zusammengefasst hat.
+  ///
+  /// ## Die Näherung, mitprojiziert im selben Aufruf
+  ///
+  /// Die Kandidatenpositionen und die getippte Stelle gehen in **einem**
+  /// `projectToScreen`-Aufruf hinaus, damit beide Seiten im selben
+  /// Bildschirmraster landen; siehe `fact_group_expand.dart`,
+  /// `selectGroupMembers`, für die Auswahlregel selbst und ihre
+  /// Fehlerrichtung.
+  ///
+  /// ## Nie zwei Anfragen gleichzeitig, und die veraltete Antwort zählt nicht
+  ///
+  /// Läuft schon eine Anfrage, wird ein neuer Tipp nur in [_pendingGroupTap]
+  /// gemerkt und erst nach der laufenden verarbeitet, siehe
+  /// [_groupTapInFlight] für die Begründung. Trifft dabei ein dritter Tipp
+  /// ein, verwirft er den zweiten, denn bei Einmal-Absichten gewinnt die
+  /// letzte, nicht die erste.
+  ///
+  /// Kommt die Antwort auf einen Tipp zurück, während schon ein neuerer
+  /// gemerkt ist, entsteht aus dieser Antwort **keine** Absicht mehr: sie
+  /// gehört zu einem Tipp, den der Nutzer bereits hinter sich gelassen hat,
+  /// und eine `MapCameraOneShot`-Absicht kann niemand zurücknehmen. Ohne
+  /// diese Prüfung führe die Kamera kurz auf die richtige Gruppe und dann,
+  /// sobald die veraltete Antwort eintrifft, wieder auf die falsche zurück.
+  ///
+  /// ## Nach der Unterbrechung
+  ///
+  /// `projectToScreen` liefert ein `Future`; nach dem `await` wird geprüft, ob
+  /// dieser `State` noch lebt (`mounted`) und ob der Host noch eine Fläche
+  /// kennt (`host.viewport`, erneut gelesen und nicht der Stand von vor dem
+  /// Aufruf). Ohne beide Prüfungen könnte eine `setState`-freie, aber
+  /// trotzdem falsche Absicht bei einem längst entsorgten Bildschirm
+  /// abgegeben werden.
+  ///
+  /// Findet die Näherung keinen einzigen Punkt, entsteht keine Absicht,
+  /// siehe [groupTapFoundNoMembersEvent] für die Begründung, warum das
+  /// trotzdem gemeldet wird.
+  void _onGroupTap(MapOverlayGroupTap tap) {
+    if (tap.overlayId != factOverlayId) {
+      return;
+    }
+    if (_groupTapInFlight) {
+      _pendingGroupTap = tap;
+      return;
+    }
+    final MapOverlay? overlay = _latestOverlay;
+    if (overlay == null) {
+      return;
+    }
+    final MapHost host = ref.read(mapHostProvider);
+    if (host.viewport == null) {
+      // Vor dem ersten Layout der Kartenfläche entsteht keine Absicht: ohne
+      // Fläche kann `rectFitZoom` nicht rechnen, siehe dort.
+      return;
+    }
+    final List<MapOverlayPoint> candidates = factOverlayWithout(
+      overlay,
+      _animatedIds,
+    ).points;
+    if (candidates.isEmpty) {
+      return;
+    }
+
+    _groupTapInFlight = true;
+    reportDetached(
+      host
+          .projectToScreen(<MapPosition>[
+            for (final MapOverlayPoint point in candidates) point.position,
+            tap.position,
+          ])
+          .then((List<MapScreenPoint?> located) {
+            final MapViewport? viewport = host.viewport;
+            if (!mounted || viewport == null) {
+              return;
+            }
+            if (_pendingGroupTap != null) {
+              // Während diese Anfrage unterwegs war, ist schon ein neuerer
+              // Tipp eingetroffen. Diese Antwort gehört zum veralteten Tipp,
+              // siehe [_groupTapInFlight]; sie löst keine Absicht mehr aus,
+              // das übernimmt gleich die Anfrage zum gemerkten Tipp.
+              return;
+            }
+            final MapScreenPoint? tapAt = located.last;
+            if (tapAt == null) {
+              return;
+            }
+            final List<MapOverlayPoint> selected = selectGroupMembers(
+              candidates: candidates,
+              candidateScreenPositions: located.sublist(0, candidates.length),
+              tapScreenPosition: tapAt,
+              radiusInStylePixels: factOverlayGrouping.radiusInScreenPixels,
+              pixelRatio: MediaQuery.devicePixelRatioOf(context),
+            );
+            if (selected.isEmpty) {
+              ref
+                  .read(diagnosticSinkProvider)
+                  .report(DiagnosticEvent(groupTapFoundNoMembersEvent));
+              return;
+            }
+            final MapPositionRect rect = MapPositionRect.enclosingOrNull(
+              <MapPosition>[
+                for (final MapOverlayPoint point in selected) point.position,
+              ],
+            )!;
+            host.submitIntent(
+              groupExpandIntent(rect: rect, viewport: viewport),
+            );
+          })
+          .whenComplete(() {
+            _groupTapInFlight = false;
+            if (!mounted) {
+              return;
+            }
+            final MapOverlayGroupTap? pending = _pendingGroupTap;
+            if (pending != null) {
+              _pendingGroupTap = null;
+              _onGroupTap(pending);
+            }
+          }),
+      origin: 'discovery.group_tap',
+    );
   }
 
   /// Gleicht ab, welche Fakten aus der nativen Liste fallen.

@@ -39,6 +39,25 @@ const MapOverlayGrouping factOverlayGrouping = MapOverlayGrouping(
   radiusInScreenPixels: 70,
 );
 
+/// Untergrenze der Zoomstufe, auf die eine angetippte Gruppe mindestens
+/// fährt (`map_camera_intents.dart`, `groupExpandIntent`).
+///
+/// **Abgeleitet, nicht aus der Quelle.** [factOverlayGrouping.maxZoom] ist 15
+/// und heißt „bis einschließlich 15 wird gruppiert, ab 16 liegen die Punkte
+/// einzeln" (siehe der Kommentar dort). Ein Fahrziel von mindestens 16 lässt
+/// die angetippte Gruppe deshalb **sicher** aufgehen, ohne dass irgendwer
+/// MapLibres Gruppierung nachrechnet.
+///
+/// Gerechnet wird `maxZoom.floorToDouble() + 1` und nicht die hingeschriebene
+/// 16: derselbe Kommentar sagt, dass Android den Wert ohnehin abschneidet,
+/// unten kommen also nur ganze Zoomstufen an. Ändert sich künftig
+/// [factOverlayGrouping], zieht diese Zahl automatisch mit, statt als
+/// zweites, unabhängiges Literal danebenzustehen.
+///
+/// Kein `const`: `floorToDouble()` ist zur Kompilierzeit nicht auswertbar.
+final double groupExpandMinZoom =
+    factOverlayGrouping.maxZoom.floorToDouble() + 1;
+
 /// Ab welcher Zoomstufe die Fakten sichtbar sind.
 ///
 /// Die vier Gruppen-Layer der Quelle tragen alle `minzoom: 11`
