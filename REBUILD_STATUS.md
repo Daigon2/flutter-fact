@@ -1052,10 +1052,10 @@ das nächste Mal an Phase 2 arbeitet, prüft, ob noch etwas fehlt, und setzt gen
 eine der beiden Stellen richtig.
 
 - [x] 12. MapLibre mit gebackenem Style · [x] 13. Kamera-Verhalten
-- [!] 14. Kompass-Rotation (Paket recherchiert, Freigabe von Janek offen) ·
+- [ ] 14. Kompass-Rotation (Paket am 31.08.2026 freigegeben) ·
   [x] 15. Cluster-Layer **und Antippen** (das Antippen am 31.08.2026 nachgezogen)
   · [x] 16. Einzel-Marker
-- [x] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
+- [x] 17. Münz-Proximity-Animation · [ ] 18. 3D-Avatar (am 31.08.2026 entschieden: 2D in Flutter, kein WebView)
 - [x] 19. Top-Chrome (vorgezogen, D-5 am 29.08.2026 abgeschlossen) · [ ] 20. Sammel-Erlebnis
 
 ## Phase 3, Fakt-Akte und Audio
@@ -1099,7 +1099,7 @@ plus 19 Mutationen, alle gefallen.
   diese Bedingung.
 
 - [x] 21. Fact-Detail-Sheet · [ ] 22. Collect-Reveal-Overlay
-- [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [!] 25. Audio-Service (TTS-Weg)
+- [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [ ] 25. Audio-Service (am 31.08.2026 entschieden: Gerät zuerst)
 - [ ] 26. Map-Audio-Kopplung
 
 ### Schritt 23 ist zur Hälfte schon fertig, und zwar seit Schritt 21
@@ -1178,7 +1178,7 @@ Sheets, **ohne jeden Einstieg**, wie die Fakt-Akte in Schritt 21.
 
 - [x] 27. Puzzle-Sheet mit vollem Mapping · [!] 28. Alle Rätseltypen
   (sprachneutrale Auswertung) · [ ] 29. In-Puzzle-Hint · [ ] 30. Reveal-Screen
-- [!] 31. Hinweis-Ökonomie (Reward-Ledger) · [!] 32. Punkte gegen Coins
+- [ ] 31. Hinweis-Ökonomie · [ ] 32. Punkte gegen Coins (beide am 31.08.2026 frei, Restrisiko E-06 und E-24 im Backend, siehe Antwortblock)
 
 ## Phase 5, Challenge
 
@@ -1992,8 +1992,15 @@ Entscheidung an dieser Stelle: beide haben keinen Inhalt und keinen Verbraucher,
 und bei `library` ist zusätzlich ungeklärt, was ihm gehört. Der Bildschirm, den
 es beansprucht, ist derselbe, für den `collection_page.dart:5-9` schon einen
 Platzhalter trägt und dem `shell_tab.dart:34` den `wallet`-Tab zuweist. Ob das
-PWA-„Wallet" ein Bildschirm ist oder zwei, ist eine **Produktfrage** und liegt
-bei Janek. Sie blockiert Phase 7, weil sie entscheidet, wohin die Dateien gehen.
+PWA-„Wallet" ein Bildschirm ist oder zwei, war eine **Produktfrage**.
+
+**Am 31.08.2026 von Janek entschieden: ein Bildschirm.** „Alles kommt in den
+Wallet, also das Bücherregal mit den Fakten.“ Damit besitzt `collection` diesen
+Bildschirm, und **`library` entfällt als Ordnervorschlag**. Die Coins gehen ins
+**Profil** und nicht ins Regal: sie gehören fachlich `progression`, und Janeks
+Begründung trägt auch ohne Architektur („die Coins sind ja einfach nur eine Zahl
+und machen nichts“). Der Münzzähler oben auf der Karte bleibt, der ist ein
+laufender Stand während des Spiels und keine zweite Heimat.
 
 Die gemessene Doppelung in `puzzles/domain` (zweite Schwierigkeitsstufe, zweites
 Operanden-Wertobjekt) bleibt, weil Gate 6 den Import weiter verbietet. Sie steht
@@ -2286,6 +2293,102 @@ Bedeutung, und eine Kopie kann auseinanderlaufen, ohne dass ein Test es merkt.
 Der eine Weg, der beide Fragen zusammen lösen würde, ist bei D-9 beschrieben
 und dort nicht empfohlen: ein geteilter Kern als Paket in der heute leeren
 Erlaubnisliste von Gate 6.
+
+## Antworten von Janek, 31.08.2026
+
+Der ganze Stapel Produkt-, UX- und Kostenfragen ist an einem Stück beantwortet.
+Was hier steht, ist die Antwort **plus** die Folge für den Bau; wo ich
+widersprochen habe, steht es dabei.
+
+**Wallet, ein Bildschirm.** Siehe oben bei ADR-006. `library` entfällt, Coins
+ins Profil. **Phase 7 ist damit frei.**
+
+**Belohnungs-ökonomie: die Frage war falsch gestellt, und der Widerspruch war
+berechtigt.** Janek: „mach es halt so dass es logisch aufgeht und nicht irgendwo
+ein logik fehler ist oder dass man irgendwo zu wenig bekommt … das ist doch keine
+wichtige entscheidung von mir?“ Richtig: die Zahlen sind Herleitung aus der
+Quelle und keine Entscheidung. **Was bleibt, ist auch keine Entscheidung für
+ihn**, sondern eine Aufgabe im anderen Repository: E-06 (`increment_coins` ist
+`security definer` und prüft den Betrag nicht) und E-24 (Policy auf `profiles`
+ohne `WITH CHECK`) sitzen im Backend des Monorepos, und `CLAUDE.md` verbietet,
+es von hier zu ändern.
+
+Folge für den Neubau, als Regel formuliert: **der Client bestimmt nie einen
+gutgeschriebenen Betrag.** Jede Gutschrift geht über einen Serveraufruf, der den
+Betrag selbst herleitet. Damit sind Schritt 31 und 32 baubar, und das Restrisiko
+bleibt benannt statt vergessen: solange E-06 und E-24 offen sind, ist das
+Backend manipulierbar, unabhängig davon, wie sauber der Client rechnet.
+
+**Sprachausgabe: Gerät zuerst, Cloud als Einklick-Umschaltung.** Janek: „mach
+erstmal einfach Gerät und später kann man dann über chatgpt das nice abspielen
+lassen … bau auch alles schon so, dass ein nurnoch ein klick wäre das andere zu
+aktivieren. soll aber nirgends rumliegen, ist ja schließlich ein api key.“
+
+Drei Anforderungen, die daraus folgen und die keine Erfindung von mir sind:
+
+1. Der Vertrag ist **anbieterneutral**. `flutter_tts` ist eine Umsetzung davon
+   und nicht die Schnittstelle.
+2. **Kein Schlüssel im Client, nie.** Die Cloud-Variante läuft über Proxy und
+   Edge Function, wie E-13 es für den KI-Zugang ohnehin verlangt.
+3. **Vorladen, dann abspielen.** Janek nennt die Latenz ausdrücklich als
+   erträglich, *weil* geladen werden kann, bevor man sich nähert. Das ist eine
+   Verhaltensanforderung an die Kopplung aus Schritt 26 und keine Optimierung.
+
+Die Stimmqualität auf dem Gerät nennt er selbst „grausam“. Das ist der bewusst
+in Kauf genommene Preis des Starts.
+
+**Avatar: 2D in Flutter, kein WebView. Mit einem Widerspruch von mir, der
+stehenbleibt.** Janek: „ist mir egal, ich hänge nicht so am design … wenn es
+sinnvoller und langfristiger ist das in flutter nachzubauen, dann go for it“,
+und als Ziel „wie bei pokemon go“.
+
+Die Bedingung „wenn es langfristig sinnvoller ist“ trägt für den heutigen
+Avatar, aber **nicht für das genannte Ziel**: Flutter hat keine eingebaute
+3D-Szene, und die Wege dorthin sind experimentell. Für eine schöne 3D-Person
+lautet die Frage später nicht „Flutter oder WebView“, sondern „welche
+3D-Laufzeit“. Entschieden ist deshalb nur: **jetzt 2D, kein `webview_flutter`**,
+und die Frage kommt neu, sobald ein Charakterentwurf existiert. Nebenwirkung:
+270 KB Assets und die JS-Brücke fallen weg, und Regel 19 hat vorläufig keinen
+Gegenstand mehr.
+
+**Pakete freigegeben.** „ja pakete können frei gemacht werden“. Ich lese das als
+Freigabe für die **benannte Liste** und nicht als Blankoscheck:
+`shared_preferences`, `flutter_rotation_sensor`, `flutter_tts`, `audioplayers`,
+`image_picker`, `share_plus`. **`webview_flutter` fällt weg** (Avatar).
+
+Zwei Folgen, die dazugehören: `flutter_rotation_sensor` verlangt Dart ≥ 3.12.1,
+die `pubspec.yaml` deklariert `^3.9.0` und muss mit angehoben werden. Und
+`shared_preferences` macht `readActiveHunt` zur Startbedingung: `bootstrap()`
+braucht ein `await` vor dem ersten Bild.
+
+**Dienste.** Janek: „was brauchst du? wenn etwas nicht geht, gehts halt nicht.
+KI Zugang kann ich dir ganz am ende geben.“ Daraus folgt kein Konto, also:
+
+- **OpenRouteService (E-14, Schritt 42):** der Routen-Anbieter kommt hinter
+  einen Vertrag, mit Luftlinie als Rückfall. Kein Konto nötig, um zu bauen.
+- **KI-Zugang (E-13, Schritt 47):** bleibt blockiert, aber nur der Aufruf. Alles
+  darum herum ist baubar. Schlüssel kommen am Ende.
+- **Creator-Foto (E-17, Schritt 50):** erklärt und mit Vorschlag versehen, Bucket
+  privat und `is_approved` bleibt falsch bis zur menschlichen Freigabe. Wartet
+  auf ein Wort, betrifft aber erst Phase 8.
+
+**An mich delegiert, vier Stück.** Kamera-Zweckwortlaut (E-20, „soll halt beides
+abdecken“, also Damals/Heute **und** Foto-Rätsel in einem Satz), der
+Tutorial-Pfeil ohne Ballon (E-48), der Lautstärke-Wortlaut (E-28), und die
+Konsistenz der Ökonomie.
+
+**E-50 und E-51: der Defekt wird behoben, nicht nachgebaut.** Janek: „ja na klar
+sollen die gespeichert bleiben!! wenn etwas abstürzt hat man trotzdem seine
+Rätsel.“
+
+**Das ändert eine Entscheidung von heute Vormittag, und zwar zum Besseren.** Der
+Nachtrag zu ADR-007 hatte für das Hinweis-Feld die **Münzsumme** gewählt, weil
+die Quelle sie speichert. Wenn aber die *freigeschalteten* Hinweise überleben
+sollen, dann sind die **Indizes** die richtige Nutzlast: aus ihnen folgt die
+Summe (`HINT_COSTS[i]` addieren), umgekehrt nicht. Die Indizes tragen also
+strikt mehr Information bei gleicher Größe. Das Feld heißt damit weder
+`purchasedHintCount` noch eine Summe, sondern führt die Indizes.
+
 
 ## Offene Entscheidungen
 

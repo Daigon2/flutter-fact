@@ -148,12 +148,29 @@ The read model is therefore to carry the **spent cost in coins**. A count is
 recoverable from it only by accident today, and would stop being recoverable the
 moment a fourth cost value is added; see E-51 in `REBUILD_STATUS.md`.
 
-**Decided, not yet implemented, and the document says so on purpose.** The field
-in `active_hunt.dart` is still called `purchasedHintCount` and still holds a
-count. Changing it also changes a payload key, which is what `payloadVersion`
-exists for, and it is the one open follow-up from this amendment. Until it lands,
-ADR and code disagree on this single field, and that disagreement is named here
-rather than left for a reader to discover.
+### 2026-08-31, later the same day: superseded by the owner's answer
+
+The paragraph above chose the **spent cost**. The owner then decided that the
+*unlocked hints themselves* must survive a restart ("ja na klar sollen die
+gespeichert bleiben, wenn etwas abstuerzt hat man trotzdem seine Raetsel"),
+which fixes the source defect recorded as E-50 rather than reproducing it.
+
+That makes the cost the wrong payload too, for the same kind of reason the count
+was wrong: **the indices of the unlocked hints carry strictly more information at
+the same size.** The cost follows from them by summing `HINT_COSTS[i]`; the
+indices do not follow from the cost. The read model therefore carries the
+**indices of the unlocked hints**, and both the count and the spent cost become
+derived values with no storage of their own.
+
+This is the third shape this one field has had in a day. The sequence is kept
+visible on purpose: a count (implemented), a cost (decided, never implemented),
+the indices (decided). Only the last one is to be built.
+
+**Not yet implemented.** The field in `active_hunt.dart` is still
+`purchasedHintCount` and still holds a count. The change touches a payload key,
+which is what `payloadVersion` exists for. Until it lands, ADR and code disagree
+on this single field, and that disagreement is named here rather than left for a
+reader to discover.
 
 **What this does not decide.** *Which* hints are unlocked is separate state, and
 the read model does not carry it yet. The source cannot serve as a template

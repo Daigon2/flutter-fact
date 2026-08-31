@@ -121,80 +121,64 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **E-48 beantworten, es ist die einzige neue Frage aus dieser Nacht.** Wohin
-   zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist? Der Anker ist
-   gebaut, die Frage ist die Größe, an der er misst. Belege im Abschnitt „Der
-   `balloon`-Anker". **Der billigste Weg, sie ganz zu schließen:** einmal mit
-   den Entwicklerwerkzeugen in der laufenden PWA die Breite eines Ballons bei
-   zwei Zoomstufen ablesen. Die tragende Kette ist bis dahin hergeleitet und
-   nicht gemessen.
+**Am 31.08.2026 hat Janek den ganzen Stapel Produkt-, UX- und Kostenfragen an
+einem Stück beantwortet.** Wortlaut, Folgen und meine zwei Widersprüche stehen
+in `REBUILD_STATUS.md` unter „Antworten von Janek, 31.08.2026“. Was unten steht,
+ist die Reihenfolge danach.
 
-2. **Schritt 14 wartet auf ein Wort von Janek, nicht auf Dairen.** Das Antippen
-   der Gruppen aus Schritt 15 ist am 31.08.2026 gebaut, D-12 ist umgesetzt (und
-   zwar **ohne** die vorhergesagte Änderung am Kameravertrag, die Begründung
-   steht in `REBUILD_STATUS.md`). Für die Kompass-Drehung ist die Paketfrage aus
-   D-13 recherchiert: empfohlen wird `flutter_rotation_sensor` und **nicht**
-   `flutter_compass` aus dem eingefrorenen Port, weil das seit November 2024
-   keinen Commit hat und auf iOS einen zweiten `CLLocationManager` neben
-   `geolocator` öffnet. Der Vorbehalt gehört dazu: sechs GitHub-Sterne, ein
-   Einzelbetreuer, „unverified uploader", keine Genauigkeitsangabe und kein
-   Sensor-Fallback. Nebenwirkung: das Paket verlangt Dart ≥ 3.12.1, die
-   `pubspec.yaml` deklariert heute `^3.9.0` und müsste mit angehoben werden.
-   **Ein neues Paket ist zustimmungspflichtig, also wandert ohne Janeks Ja
-   nichts in `pubspec.yaml`.** Danach ist Phase 2 bis auf 18 und 20 zu.
+1. **Die Antworten in Code umsetzen. Das ist jetzt der Hauptweg, nicht mehr das
+   Warten.** In dieser Reihenfolge, weil jede Zeile die nächste billiger macht:
 
-   **Wenn das stillsteht, ist die unblockierte Arbeit Phase 7:** die Schritte
-   45 (Library), 46 (Cover und Illustrationen) und 48 (Leaderboard) stehen als
-   offen und nicht als blockiert. Schritt 20 steht formal offen, hat aber keine
-   Datenquelle für den Sammelzustand, `features/collection` existiert nicht; wer
-   dort anfängt, prüft **zuerst**, ob echtes Sammeln eine Backend-Entscheidung
-   auslöst. Dreizehn der siebenundzwanzig verbleibenden Schritte sind blockiert.
+   a. **`shared_preferences` aufnehmen** und die vier bestehenden `InMemory`
+      Speicher plus den Jagd-Speicher dauerhaft machen. Steht schon transitiv im
+      Bau, kostet keine neue Zeile Abhängigkeit. **Achtung:** `readActiveHunt`
+      ist synchron, `bootstrap()` braucht dafür ein `await` vor dem ersten Bild.
+   b. **Das Hinweis-Feld auf Indizes umstellen.** Siehe den zweiten Nachtrag in
+      ADR-007. Heute heißt es `purchasedHintCount` und trägt eine Anzahl; es soll
+      die Indizes der freigeschalteten Hinweise tragen. Ändert einen
+      Nutzlastschlüssel, dafür ist `payloadVersion` da.
+   c. **Schritt 14, Kompass.** `flutter_rotation_sensor` ist freigegeben. Dabei
+      `pubspec.yaml` von `^3.9.0` auf `^3.12.1` anheben, das Paket verlangt es.
+   d. **Schritt 36 und 37**, die Phasen-Maschine und die Active-UI, auf dem
+      Vertrag aus ADR-007.
 
-3. **D-9 und D-14 sind entschieden und kosten keine Arbeit.** Lokale Typen
-   bleiben. Die Umrechnung ist gemessen billig, fünf Aufrufstellen mit je zwei
-   Doubles, und die drei Typen sind keine Kopien: `DevicePosition` trägt ein
-   drittes Feld, die anderen beiden haben überschneidungsfreies Verhalten. D-14
-   hängt daran und bleibt deshalb, wie es ist. **Der eine Weg, der beide sauber
-   auflösen würde**, ist im Dokument beschrieben und nicht empfohlen: ein
-   geteilter Kern als Paket in der leeren Erlaubnisliste von Gate 6.
+2. **Der D-17-Block hat keine unabhängige Prüfung.** Der Jagd-Vertrag hat eine
+   bekommen, und sie hat vier Dinge gefunden, die kein Test fing. Die Geometrie
+   in `map_camera_horizon.dart` beruht auf zwei abgelesenen Zahlen und einer
+   Annahme (`f/H = 1,5` sei eine feste SDK-Konstante) und ist eine zweite
+   Meinung wert.
 
-4. **Die Schritte 36 und 37 warten auf D-16, nicht mehr auf Janek.** E-43 ist am
-   30.08.2026 entschieden: die Solo-Jagd läuft auf der **Karte**, wie die
-   Quelle. Damit ist der Plan an dieser Stelle überholt und der Zuschnitt neu zu
-   machen. Was fehlt, ist die technische Antwort, **wie `discovery` an den
-   Jagdzustand kommt**, denn das wäre die fünfte Cross-Feature-Kante. Siehe
-   D-16.
+3. **Eine Gerätemessung ist jetzt möglich und offen.** Der Emulator läuft nach
+   dem Neustart wieder. Die eine Ablesung, die `f/H = 1,5` bestätigt oder
+   ersetzt, steht in `map_camera_horizon.dart` samt vorhergesagten Zahlen für
+   vier Neigungen. Ebenso offen: die Referenzkachelgröße 512, Messung
+   beschrieben in `map_camera_fit.dart`. Beide brauchen eine kurze, wieder
+   entfernte Sonde, weil der Diagnosekanal absichtlich nicht druckt.
 
+4. **Bei Dairen liegen zwei Fragen, D-11 und D-18.** D-18 blockiert die
+   vollständige Wiederherstellung einer Jagd (die Schwierigkeitsstufe kommt
+   nicht über die Domänengrenze), D-11 blockiert nichts. Der technische
+   Fragenblock ist am 31.08.2026 formuliert und enthält zwei Fragen, die vorher
+   falsch bei Janek einsortiert waren: **Trusted Time** (E-19) und **die
+   Trophäen-Quelle** (E-49) sind Fragen nach der Vertrauensgrenze und nach einer
+   einzigen Wahrheit, keine Produktfragen.
 
-5. **Dairen hat am 31.08.2026 die sechs verschickten Fragen beantwortet.**
-   Wortlaut und Antworten stehen in `REBUILD_STATUS.md` unter „Fragen an
-   Dairen", je Frage ein eigener Abschnitt „Antwort". Kurz: **D-12** Variante
-   (b), die Kamera fährt auf ein Rechteck, damit ist das Antippen der Gruppen
-   baubar. **D-13** ein neues Paket ist freigegeben, welches ist zu
-   recherchieren, damit ist Schritt 14 frei. **D-10** bestätigt. **D-11** bleibt
-   offen, solange die Lücke nur `test/` betrifft. **D-9** Variante (b), lokale
-   Typen bleiben, denn die Umrechnung ist gemessen billig und die drei Typen
-   sind keine Kopien. **D-14** hängt daran und bleibt deshalb wie es ist.
-   **D-15, D-16 und D-17 sind am 31.08.2026 alle drei beantwortet:** D-15 und
-   D-16 an mich delegiert (ADR-006 und ADR-007), **D-17 mit Variante (a)**,
-   `projectToScreen` liefert mit, ob ein Punkt vor der Kamera liegt. Damit
-   wartet bei Dairen nur noch D-11, und das blockiert nichts. Der Block ging
-   am 31.08.2026 an ihn, zusammen mit zwei Meldungen, die keine Antwort brauchen: D-12s
-   vorhergesagter Preis fällt nicht an, und die Paketlücken-Tabelle behauptete
-   fälschlich, es gebe kein dauerhaftes Kamera-Padding. Wortlaut in
-   `REBUILD_STATUS.md`.
-6. **Ein Kartenanker fehlt noch.** Diese Zeile stand bis zum
-   30.08.2026 falsch hier: `discovery_anchors.dart:24-30` sagt, dass `coins`,
-   `modeFactFinder`, `modeTour` und `compass` sich seit dem Top-Chrome aus
-   Schritt 19 selbst anmelden. **`balloon` ist seit dem 31.08.2026 gebaut**,
-   siehe „Der `balloon`-Anker". Übrig ist nur noch **`userMarker`**, und der
-   wartet auf Schritt 18, denn den Marker selbst gibt es
-   im Code noch gar nicht, und der hängt an E-10. Wer einen baut, streicht die
-   Kennung aus `knownMissing`, sonst schlägt
-   `discovery_anchors_test.dart` an.
-7. **E-28, Lautstärke-Hinweis im Audio-Dialog.** Nur noch Wortlaut, die
-   technische Sperre ist seit E-39 weg. Vorschlag DE/EN liegt in
-   `REBUILD_STATUS.md` bei E-28, hergeleitet und nicht freigegeben.
+5. **Vier Dinge sind an mich delegiert und können jederzeit gemacht werden:**
+   der Kamera-Zweckwortlaut (E-20, muss Damals/Heute **und** Foto-Rätsel in
+   einem Satz abdecken), der Tutorial-Pfeil ohne Ballon in der Nähe (E-48), der
+   Lautstärke-Wortlaut (E-28), und die Konsistenz der Ökonomie.
+
+6. **Zwei Aufgaben für das andere Repository, die von hier nicht gehen.** E-06
+   (`increment_coins` prüft den Betrag nicht) und E-24 (Policy auf `profiles`
+   ohne `WITH CHECK`). Sie betreffen **jetzt** die laufende PWA. Die Regel für
+   den Neubau lautet deshalb: der Client bestimmt nie einen gutgeschriebenen
+   Betrag.
+
+7. **Ein Kartenanker fehlt noch: `userMarker`.** Er wartet auf Schritt 18. Wer
+   ihn baut, streicht die Kennung aus `knownMissing`, sonst schlägt
+   `discovery_anchors_test.dart` an. Der Avatar dahinter ist seit dem 31.08.2026
+   entschieden: **2D in Flutter, kein `webview_flutter`**, und die Frage kommt
+   neu, sobald ein Charakterentwurf existiert.
 
 ---
 
@@ -203,6 +187,38 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, der ganze Entscheidungsstapel ist beantwortet
+
+Janek hat Produkt, UX, Kosten und Paketfreigaben an einem Stück beantwortet.
+Wortlaut und Folgen in `REBUILD_STATUS.md`. Sechs Pakete frei, Phase 7 frei, die
+Schritte 14, 18, 25, 31 und 32 nicht mehr blockiert, `library` gestrichen.
+
+**Überraschend war, wo ich als Fragesteller falsch lag, und zwar zweimal in
+entgegengesetzte Richtungen.** Zur Ökonomie fragte ich nach einer Entscheidung,
+wo keine war: die Zahlen sind Herleitung aus der Quelle, und was übrig bleibt,
+sind zwei Backend-Löcher, die von hier ohnehin nicht anfassbar sind. Sein
+„das ist doch keine wichtige entscheidung von mir?“ war berechtigt. Umgekehrt
+hatte ich **Trusted Time** und **die Trophäen-Quelle** bei ihm einsortiert, weil
+ich auf die Kostenseite geschaut hatte; das sind aber Fragen nach der
+Vertrauensgrenze und nach einer einzigen Wahrheit und gehören zu Dairen. Die
+Lehre fürs nächste Mal: nicht danach sortieren, wer es bezahlt, sondern danach,
+was die Frage eigentlich fragt.
+
+**Ein Widerspruch von mir bleibt stehen und ist wichtiger als die Antwort.** Der
+Avatar soll „wie bei pokemon go“ aussehen, und die Freigabe für einen
+Flutter-Nachbau war an „wenn es langfristig sinnvoller ist“ gebunden. Für den
+heutigen Avatar trägt das, für eine schöne 3D-Person nicht: Flutter hat keine
+eingebaute 3D-Szene. Entschieden ist deshalb nur „jetzt 2D, kein WebView“, und
+die Frage lautet beim nächsten Mal nicht „Flutter oder WebView“, sondern
+„welche 3D-Laufzeit“.
+
+**Und eine Antwort hat eine Entscheidung von wenigen Stunden vorher verbessert.**
+Der Nachtrag zu ADR-007 hatte für das Hinweis-Feld die Münzsumme gewählt. Weil
+die freigeschalteten Hinweise jetzt einen Neustart überleben sollen, sind die
+**Indizes** die richtige Nutzlast: aus ihnen folgt die Summe, umgekehrt nicht.
+Das Feld hat damit an einem Tag drei Formen gehabt, und die Reihenfolge steht
+absichtlich sichtbar im ADR.
 
 ### 31.08.2026, der Vertrag für die laufende Jagd steht, und eine Prüfung hat vier Dinge gefunden
 

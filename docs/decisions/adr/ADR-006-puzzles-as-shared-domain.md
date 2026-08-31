@@ -60,6 +60,21 @@ That overlap is a product question about what the screen **is**, not an
 architecture question about where it goes, and it must be settled before
 `library` is built.
 
+**Settled on 2026-08-31 by the owner: one screen. `library` is dropped as a
+folder proposal.** In his words, everything goes into the Wallet, that is the
+bookshelf holding the collected facts. `Collection` therefore owns that screen,
+and the placeholder in `collection_page.dart` is the right place for it rather
+than a stand-in for a feature that never arrives.
+
+The coins go to **Profile**, not to the shelf. That follows the domain map
+anyway (coins belong to `Progression`), and the owner's own reason stands
+without it: the coins are a number that does nothing yet. The coin counter in
+the map's top chrome stays; it is a live figure during play, not a second home
+for the concept.
+
+`creator` remains a proposal, unchanged. It has a real workflow behind it
+(submitting a fact, uploading a photo) and no consumer yet.
+
 ## Alternatives considered
 
 - Puzzle engine inside `tours`, `challenges` importing it: forbidden by rule 8.

@@ -31,7 +31,12 @@ seitdem auch in `domain-map.md`, `architecture-overview.md` und
 `project-structure.md`. `tours` und `challenges` dürfen davon abhängen, aber nur
 von `puzzles/domain` und `puzzles/application`; umgekehrt nie.
 
-**`library` und `creator` bleiben Vorschläge**, und zwar bewusst: sie haben heute
+**`library` ist am 31.08.2026 gestrichen.** Die Produktfrage ist entschieden:
+alles kommt in den Wallet, also das Bücherregal mit den gesammelten Fakten, und
+`collection` besitzt diesen Bildschirm. Die Coins gehen ins **Profil**, sie
+gehören `progression`. Siehe ADR-006.
+
+**`creator` bleibt Vorschlag**, und zwar bewusst: sie haben heute
 keinen Inhalt und keinen Verbraucher, und für `library` ist zusätzlich ungeklärt,
 was ihm überhaupt gehört. Der Bildschirm, den es beansprucht, ist derselbe, für
 den `collection/presentation/pages/collection_page.dart` schon einen Platzhalter
