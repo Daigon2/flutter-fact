@@ -256,9 +256,9 @@ Sammelstelle: was hier fehlt, ist auch nicht anderswo dokumentiert.
 | **`animateCamera` liefert auf iOS immer sofort `null`**, auf Android echte Werte über einen Listener | `controller.dart:416`, eigene Doku; gilt genauso für `moveCamera` | Taugt nicht zum Abwarten. `if (await animateCamera(...) != true)` wäre auf Android richtig und auf iOS fatal: der Host löschte seinen Animationszustand nie mehr und unterdrückte danach jede Dauerabsicht. Regel: `true` und `false` löschen, `null` heißt „keine Auskunft" und lässt stehen. Ein Animationszustand mit Start und **ohne** geplantes Ende gilt sonst als „läuft ewig" und friert jede Dauerabsicht dauerhaft ein. |
 | **Keine Bewegungsursache im Rückruf** | `OnCameraMoveCallback = void Function(CameraPosition)`, ohne Ursache, ohne `isGesture`; `onCameraMoveStarted` gibt es als Widget-Rückruf nicht | „Der Nutzer hat angefasst" ist nur als **unerklärte Kamerabewegung** erkennbar. |
 | **Kein `setPaintProperty`, kein `setLayoutProperty`** | vorhanden ist nur `setLayerProperties`, das laut eigener Doku unbelegte Eigenschaften auf den Standard zurücksetzt | Der Stil wird **gebacken** statt zur Laufzeit umgefärbt, erzwungen und nicht gewählt. Die PWA ändert je Layer genau eine Eigenschaft und lässt den Rest stehen; nachbauen hieße, für jeden der **111 Layer** den vollständigen Eigenschaftssatz zurückzulesen und über den Plattformkanal zurückzuschieben. |
-| **Kein dauerhaftes Kamera-Padding** | `setPadding` fehlt; `padding` kommt nur an `CameraUpdate.newLatLngBounds` (`maplibre_gl_platform_interface-0.26.2/lib/src/camera.dart:106-119`) und an `setCameraBounds` (`controller.dart:1811-1826`) vor | `screen-map.jsx:1694` setzt `map.setPadding({ top: 320 })` und schiebt den wirksamen Kartenmittelpunkt um 320 Pixel nach unten, damit die Figur im unteren Drittel steht. `setCameraBounds` grenzt den **erlaubten Ausschnitt** ein; wer sie dafür hält, sperrt das Schieben ein, statt die Kamera zu versetzen. **Entscheidet in den Schritten 15 bis 18**, wo Nutzermarker und Avatar landen und wie ein Neuzentrieren aussieht. |
+| **Kein `setPadding`, aber `updateContentInsets` leistet dasselbe** | `updateContentInsets(EdgeInsets, [bool animated])`, `controller.dart:958-962`; Android macht daraus `CameraUpdateFactory.paddingTo` **mit** `density`-Skalierung (`MapLibreMapController.java:867-875`), iOS `mapView.setContentInset` (`MapLibreMapController.swift:311-323`) | `screen-map.jsx:1694` setzt `map.setPadding({ top: 320 })` und schiebt den wirksamen Kartenmittelpunkt um 320 Pixel nach unten, damit die Figur im unteren Drittel steht. Das ist nachbaubar, und die eigene Doku der Methode beschreibt genau diese Wirkung: „if the only the top edge is inset, the map center is effectively shifted downward" (`controller.dart:950-954`). `setCameraBounds` ist dagegen **nicht** das Gesuchte, sie grenzt den erlaubten Ausschnitt ein und sperrt damit das Schieben ein, statt die Kamera zu versetzen. Wo Nutzermarker und Avatar landen, bleibt Entscheidung der Schritte 15 bis 18, aber **nicht mehr wegen einer Paketlücke**. |
 | **`maxPitch` und `minPitch` haben kein Gegenstück** | `screen-map.jsx:1677-1678` | Das SDK klemmt die Neigung zoomabhängig und still. Folgenlos, solange die Auto-Neigung bei 58 endet. `dragRotate: false` (`:1681`) ist auf dem Gerät gegenstandslos, es betrifft nur die Maus. |
-| **Kein `getClusterExpansionZoom`** | null Treffer im ganzen Paket, ebenso `getClusterChildren` und `getClusterLeaves` | Die PWA rechnet damit die Zoomstufe, ab der genau dieser Cluster zerfällt (`screen-map.jsx:2447-2451`). Das ist die einzige Stelle, an der die Überlagerung in den **fertigen** Kameravertrag hineingreift, siehe D-b. |
+| **Kein `getClusterExpansionZoom`** | null Treffer im ganzen Paket, ebenso `getClusterChildren` und `getClusterLeaves` | Die PWA rechnet damit die Zoomstufe, ab der genau dieser Cluster zerfällt (`screen-map.jsx:2447-2451`). Das ist die einzige Stelle, an der die Überlagerung in den **fertigen** Kameravertrag hineingreift, siehe D-12. |
 | **`addGeoJsonSource` kann nicht clustern** | reicht auf Android nur `withSynchronousUpdate` durch, `MapLibreMapController.java:448` | Die Methode, deren Name genau das verspricht, hat keinen Cluster-Schalter; eine so angelegte Quelle clustert **nie**, ohne Fehlermeldung. Tragend ist `addSource` mit `GeojsonSourceProperties`, das `cluster`, `clusterRadius` und `clusterMaxZoom` führt, umgesetzt in `SourcePropertyConverter` auf beiden Plattformen. Dieselbe Sorte Falle wie `PLAIN_MAP_LOOK`: der naheliegende Name liefert das Falsche, und wer den Fehler beim Layer sucht, sucht Stunden. |
 | **Der Antipp-Rückruf liefert keine `properties`**, nur die Top-Level-`id` | Android schickt `layerId` und `feature.id()`, iOS `id`, `layerId` und die Positionen; Dart macht daraus blind `payload["id"].toString()` | Die Fakt-Kennung muss die **Top-Level-`id`** des GeoJSON-Merkmals sein. Die PWA legt sie nach `properties.id` (`screen-map.jsx:1896`); wer das GeoJSON eins zu eins übernimmt, bekommt beim Antippen die Zeichenkette `"null"`, ohne Ausnahme und ohne Warnung. `promoteId` rettet das nicht, es wirkt laut eigener Doku nur im Web und wird vom Android-Konverter gar nicht gelesen. **Kein Test in diesem Repository kann das finden**, weil ohne Plattformkanal kein Controller entsteht; es fällt am Gerät auf, und dort als „beim Tippen passiert nichts". |
 
@@ -268,6 +268,33 @@ schloss aus `:451`, das gehe mit diesem Paketstand nicht; `:451` ist eine
 Leerzeile, der Eintrag steht auf `:450` und ein zweiter auf `:477`, in genau der
 Methode, die bei jeder Aktualisierung läuft. Richtig ist nur „vor dem ersten
 `setGeoJsonSource` nicht".
+
+**Zweite Korrektur an dieser Tabelle, 31.08.2026: das Kamera-Padding gibt es
+doch.** Die Zeile hieß „Kein dauerhaftes Kamera-Padding, `setPadding` fehlt" und
+zog daraus, dass die 320 Pixel der Quelle nicht nachbaubar seien und die
+Schritte 15 bis 18 deshalb entscheiden müssten, wo Nutzermarker und Avatar
+landen. Beides stimmte nicht: `updateContentInsets` steht im Dart-Controller
+(`controller.dart:958-962`) und wird auf **beiden** Plattformen umgesetzt,
+Android über `CameraUpdateFactory.paddingTo` (`MapLibreMapController.java:867-875`),
+iOS über `mapView.setContentInset` (`MapLibreMapController.swift:311-323`).
+
+**Warum die Suche daran vorbeiging, und das ist das Lehrreiche:** gesucht wurde
+nach dem Namen der **Quelle**, `setPadding`. Das Paket nennt dieselbe Sache
+`updateContentInsets`, nach der iOS-Vokabel `contentInset`. „Null Treffer im
+ganzen Paket" ist damit eine Aussage über den gesuchten Namen und keine über
+die Fähigkeit. Dieselbe Falle wie bei `addGeoJsonSource`, nur umgekehrt: dort
+verspricht der naheliegende Name etwas, das er nicht kann, hier kann etwas mehr,
+als sein Name vermuten lässt.
+
+**Was daran noch nicht gemessen ist**, und das gehört dazu: alles oben ist am
+Quelltext des Plugins gelesen, nicht am Gerät. Ungeprüft bleibt, ob ein
+gesetztes Inset die Projektion (`toScreenLocation`) mitverschiebt, und die
+Einheit ist auf Android **nicht** dieselbe wie bei der Projektion:
+`updateContentInsets` skaliert mit `density` (`Convert.java:58-61`, `:205`,
+`:208-209`), `toScreenLocation` und `queryRenderedFeatures` tun das nicht
+(`MapLibreMapController.java:913-925`, `:1041-1054`). Wer das Padding einbaut,
+misst zuerst diese beiden Dinge, sonst wandert die Einheitenverwechslung von
+Schritt 17 in die Kameramitte.
 
 **Am 30.08.2026 gemessen: ja, `moveCamera` verwirft eine laufende
 `animateCamera`** auf maplibre-native unter Android. Zwei unabhängige Signale,
@@ -914,7 +941,7 @@ plus 19 Mutationen, alle gefallen.
   Ballon-Tipp führt **nicht** in die Akte: innerhalb von 150 Metern löst er das
   Sammeln aus, außerhalb zeigt er nur eine Mini-Kachel. Der Grund steht als
   ausdrücklicher Fix in der Quelle (`screen-map.jsx:2137-2142`): „ohne GPS NIE
-  die Fakt-Detail-Seite direkt oeffnen. Sonst koennte man durch Antippen aus
+  die Fakt-Detail-Seite direkt öffnen. Sonst könnte man durch Antippen aus
   1000 km Entfernung einen Fakt ‚lesen'". Es gab dort ein Schlupfloch, und ein
   Nutzer in Italien bekam einen München-Fakt vollständig angezeigt.
 - **Die Akte ist deshalb ohne Einstieg gebaut**, und ein Test bewacht das: er
@@ -960,7 +987,7 @@ Hochziffer ein `onTap: _jumpToSources` und springt mit
 **Und der zweite Weg der Quelle ist für diese App unerreichbar**, was
 `cited_text.dart` bereits nachgemessen hat: die Hochziffer wird dort zu einem
 Verweis, wenn der Quelleneintrag eine `url` trägt, aber `quellenListe` steht
-**nicht** im Supabase-Schema; in der PWA kommt das Feld ausschliesslich aus den
+**nicht** im Supabase-Schema; in der PWA kommt das Feld ausschließlich aus den
 eingebauten JS-Datendateien. Es gibt hier also genau ein Verhalten, und das ist
 gebaut. **Damit braucht dieser Teil auch kein `url_launcher`.**
 
@@ -1087,7 +1114,7 @@ Ausgang von Schritt 2. 1625 → 1725 Tests.
 
 ### Schritt 35, was daran gemessen ist
 
-1729 → 1813 Tests. Der Picker schliesst den Ausgang des Assistenten an: „Starten"
+1729 → 1813 Tests. Der Picker schließt den Ausgang des Assistenten an: „Starten"
 führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
 
 - **Er braucht keine Karte, und das ist gemessen.** `HotspotPickView` ist eine
@@ -1173,7 +1200,7 @@ Gebaut ist die Liste, ohne Einstieg, wie die Fakt-Akte und das Rätsel-Sheet.
   weil kein Test je den Farbwert prüfte, nur die Zuordnung des Wortes. Beides
   ist jetzt gegen die **Quelle** festgenagelt, nicht gegen die eigene Konstante.
 - **Zwei Funde am Rand.** Das Feld `color` jeder Trophäe wird von der Quelle
-  **nie gelesen**, gefärbt wird ausschliesslich über die drei Stufenfarben; es
+  **nie gelesen**, gefärbt wird ausschließlich über die drei Stufenfarben; es
   fehlt deshalb bewusst im erzeugten Datensatz. Und „Silber" gibt es in
   derselben Datei zweimal mit verschiedenen Werten: `#B0BEC5` für die
   Trophäenstufe, `#A8A8A8` für das Rang-Abzeichen.
@@ -1223,7 +1250,7 @@ Ersatzrechteck zeigte. Gemessen: 29,17 Pixel bei Zoom 14,5, 30,00 bei 14,6,
 
 **Zwei Mutationsläufe, wieder mit gegensätzlichem Ergebnis.** Der Bauende fuhr
 fünf, alle fielen, eine erst nach Korrektur seines eigenen Tests, den er selbst
-als blind erkannt hatte: ein Punkt ausserhalb des Rahmens kann rechnerisch nie
+als blind erkannt hatte: ein Punkt außerhalb des Rahmens kann rechnerisch nie
 näher an der Rahmenmitte liegen als einer in der Mitte, der Ausschluss war also
 nicht prüfbar, wie er geschrieben war. Die Review fuhr zwölf, **sechs
 überlebten**, vier davon in genau diesem Filter: die ganze senkrechte Prüfung,
@@ -1442,13 +1469,14 @@ nachsehen. Der Ausweg wird sein, dass `maplibre_gl` eine Fassung mit
 Built-in-Kotlin bekommt; dann ist zu prüfen, ob der `app_links`-Konflikt
 dabei mit verschwindet.
 
-## Fragen an Dairen, gestellt und unbeantwortet
+## Fragen an Dairen
 
-Am 29.08.2026 als Block verschickt, seither ohne Antwort. **Der Wortlaut steht
+Am 29.08.2026 als Block verschickt. **Der Wortlaut steht
 hier, weil er sonst nirgends stand.** Im Repository gab es die D-Nummerierung
 bis dahin in genau drei Vorkommen: `D-5` (entschieden), ein beiläufiges `D-9` in
 `lib/services/location/device_position.dart:24` und ein `D-b` in der
-maplibre-Tabelle, das nirgends aufgelöst wird. Die sechs Fragen selbst lebten
+maplibre-Tabelle, das nirgends aufgelöst wurde; dieses letzte ist am 31.08.2026
+auf `D-12` berichtigt worden, denn genau diese Frage war gemeint. Die sechs Fragen selbst lebten
 allein im Chatverlauf, und `CLAUDE.md` sagt, dass Chatverlauf keine Quelle ist.
 Eine eintreffende Antwort wäre ihrer Frage nicht mehr sicher zuzuordnen gewesen.
 
@@ -1462,6 +1490,48 @@ stehen unter der jeweiligen Frage, jeweils als eigener Abschnitt „Antwort".
 **D-15 und D-16 liegen weiter bei niemandem**: D-15 ist beim Bau von Schritt 27
 entstanden, D-16 als technische Folge von Janeks Entscheidung zu E-43. Wer den
 nächsten Block schickt, nimmt beide mit.
+
+### Was in denselben Block gehört, aber keine Frage ist
+
+Zwei Punkte aus dem Bau von Schritt 15 am 31.08.2026. Beide betreffen
+Vorhersagen aus dem letzten Block, beide sind selbst entschieden, und beide
+gehören mitgeteilt statt gefragt, weil `CLAUDE.md` verlangt, einen Widerspruch
+zu melden statt ihn still aufzulösen.
+
+**1. Der von D-12 vorhergesagte Preis fällt nicht an.** D-12 sagte, Variante (b)
+koste „ein neues Feld im gerade fertiggestellten Kameravertrag und einen zweiten
+Bewegungspfad im Host". Gebaut wird keines von beidem. Drei Gründe, alle am
+Paket gelesen:
+
+- `CameraUpdate.newLatLngBounds` übergibt der nativen Seite **keinen** Neigungs-
+  und keinen Blickrichtungswert (Android `Convert.java:56-61`, iOS
+  `Convert.swift:135-145`). Die Dart-Doku behauptet, beide fielen dabei auf 0
+  (`maplibre_gl_platform_interface-0.26.2/lib/src/camera.dart:104`); ob das
+  stimmt, entscheidet `maplibre-native` und ist im Pub-Cache **nicht**
+  nachprüfbar. Eine Kamerafahrt, die die 58 Grad Neigung möglicherweise still
+  flachlegt, ist kein Fundament.
+- `MapCameraDriver` schickt bewusst **immer** eine vollständige Kamera, weil das
+  SDK zwei Teiländerungen nicht in einem Aufruf verbinden kann. Ein
+  Rechteck-Pfad wäre eine zweite Buchführung für Animationsende, Lenkfenster und
+  Folge-Anker.
+- `getVisibleRegion` taugt nicht als Gegenprobe: bei Neigung liefert es nur die
+  achsparallele Box des trapezförmigen Sichtfelds (Android
+  `MapLibreMapController.java:897-912`, iOS `:556-561`).
+
+Stattdessen ist das Rechteck eine **Rechnung vor der Absicht**: `map/domain/`
+bekommt Geometrie ohne Kamerabezug (`MapPositionRect`, `MapViewport`,
+`rectFitZoom`), und das Feature gibt am Ende eine gewöhnliche `MapCameraOneShot`
+mit Mittelpunkt und Zoom ab. Neigung und Blickrichtung bleiben stehen, weil
+`MapCameraChange` sie mit `null` unverändert lässt. Erweitert wird allein die
+Fassade `MapHost`, um die Größe der Kartenfläche und den Gruppen-Tipp, also um
+zwei Dinge, die ein Feature ohne die Karte nicht wissen kann.
+
+**2. Eine Prämisse der Paketlücken-Tabelle war falsch.** Es gibt dauerhaftes
+Kamera-Padding. `updateContentInsets` steht im Dart-Controller und wird auf
+beiden Plattformen umgesetzt; die Einzelheiten und die Lehre daraus stehen oben
+unter „Was `maplibre_gl 0.26.2` nicht kann". Die 320 Pixel der Quelle sind damit
+nachbaubar, und die Schritte 15 bis 18 entscheiden über die Lage von
+Nutzermarker und Avatar frei statt um eine Lücke herum.
 
 | Nr | Antwort in einem Satz |
 |---|---|
@@ -2208,7 +2278,7 @@ Zeile ab, die in der Quelle tote Fläche ist.
 nicht wieder entstehen kann:** `generateHuntRoute` nimmt jetzt die gewählte
 Dauer und leitet die Stationszahl daraus ab, statt beides einzeln zu bekommen.
 Eine Eingabe, keine Hintertür für Tests. Der Preis waren 37 Testaufrufe, von
-denen 28 mit Stationszahlen ausserhalb von 5, 7 und 9 arbeiteten; 25 davon
+denen 28 mit Stationszahlen außerhalb von 5, 7 und 9 arbeiteten; 25 davon
 kosteten nur eine längere Erwartungsliste, weil die Schleife bei kleinem
 Bestand ohnehin von selbst abbricht. Die drei Tests, die eine Regel an ihrer
 **Position im Lauf** prüfen, sind neu gelegt und ihre Läufe vorher mit einem
@@ -2232,7 +2302,7 @@ importieren". Angelegt, ausgeführt, gelöscht.
 Der Knopf liegt jetzt als `PrimaryButton` in `lib/core/widgets/primary_button.dart`.
 **Umbenannt werden musste er auch**, und zwar von der Maschine erzwungen: Regel
 11 zerlegt Pfade in Wortbestandteile, `fact_button.dart` fiel über den Begriff
-„fact", obwohl der Knopf nach der App heisst und nicht nach der Entität.
+„fact", obwohl der Knopf nach der App heißt und nicht nach der Entität.
 Ebenfalls mit einer Probe gemessen. Die Wache wurde dafür **nicht** aufgeweicht.
 
 **Die Fälligkeitsangabe des alten Eintrags war falsch gesetzt** und das ist der
@@ -2290,7 +2360,7 @@ eine Fundstelle.
 | E-42 | **Der 150-Meter-Radius der Foto-Rätsel wirkt in der PWA nie.** `screen-map.jsx:3915` übergibt die Nutzerposition als `userPos`, `puzzle-sheet.jsx:50` erwartet sie als `userPosition`. Folge in `PszPhoto`: `:373` liefert immer `null`, `:374` setzt `inRange = true`, und die Näherungsprüfung `:378` läuft nie. `foto-beweis` und `perspektiven` sind damit von überall mit einem beliebigen Foto lösbar, obwohl `gpsRadius` (`:372`) in den Daten durchgehend auf 150 steht. Dieselbe Klasse wie E-08: ein Defekt der Quelle, der wie Parität aussieht, und wie E-07 einer, der eine Ortsprüfung aushebelt. **Ändert sichtbares Verhalten, geht deshalb an Janek.** | 3, verwandt mit E-07 | Phase 4, Schritt 28 |
 | E-44 | **Der Faktor 1,5 am letzten Stopp wird angezeigt, aber nicht gutgeschrieben.** `screen-challenge.jsx:2479` übergibt dem Nächster-Fakt-Abzeichen `isLast ? Math.round(diff.points * 1.5) : diff.points`. Die tatsächlich vergebenen Punkte rechnet `handleChallengeComplete` (`:2295-2299`), und dort kommt der Faktor nicht vor. Das Abzeichen verspricht am letzten Stopp das Anderthalbfache, gutgeschrieben wird der einfache Satz. Widerspruch in der Quelle, nicht in E-19. Sichtbares Verhalten. | 3 | Schritt 37 |
 | E-47 | **Drei Bedienelemente im Challenge-Reiter tun bis Schritt 35 nichts.** Seit Schritt 33 zeigt der Reiter den Assistenten. Wer ihn zu Ende bedient, drückt einen vollflächigen roten Knopf „Starten", sieht die Drück-Animation und danach passiert nichts, weil der Startpunkt-Picker fehlt. Dasselbe gilt für die Kachel „Gruppe" und für „Mit Code beitreten", deren Formulare Sitzungen über Supabase anlegen müssten, die es im Neubau nicht gibt. **Eine Sackgasse ist es nicht**, der Zurück-Knopf und die Tab-Leiste bleiben erreichbar, gemessen im Widget-Test. Aber es ist derselbe Zustand, den E-33 beim Kästchen „Angemeldet bleiben" beanstandet, und der Bau begründet an anderer Stelle ausdrücklich, warum die Zufallskarte **nicht** antippbar ist („ein Tipp, der nichts ändert, ist ein Bedienelement, das nichts tut"). Die Ungleichbehandlung ist bewusst, weil eine erfundene Navigation schlechter wäre als keine, aber sie gehört gewusst. Löst sich mit den Schritten 35 und 40 von selbst auf. | 2 | Schritt 35 |
-| E-48 | **Wohin zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist?** Die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, und ein ruhender Ballon ist selbst nur 26 breit; sie zeigt also nur dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ein festes Rechteck in der unteren Bildmitte. Der Neubau misst statt des Kopfes die Zeichenfläche samt Schattenrand und wählt deshalb ab Zoom 14,6 auch ferne Ballons. **Parität** hiesse, den Kopf zu messen; **Abweichung** hiesse, es so zu lassen, und der Pfeil fände fast immer einen echten Ballon, was möglicherweise besser aussieht. Zu entscheiden ist auch, ob die Zoomsperre des Ankers auf `factAnimationRunsAt` verschärft wird: das schnitte den Löwenanteil der Plattformkanal-Aufrufe weg und schlösse nebenbei die Gruppierungslücke unter Zoom 15, um den Preis, dass unter Zoom 16 das Ersatzrechteck steht. **Die tragende Kette ist hergeleitet und nicht am Browser gemessen**, siehe „Der `balloon`-Anker". | 2 | vor Auslieferung |
+| E-48 | **Wohin zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist?** Die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, und ein ruhender Ballon ist selbst nur 26 breit; sie zeigt also nur dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ein festes Rechteck in der unteren Bildmitte. Der Neubau misst statt des Kopfes die Zeichenfläche samt Schattenrand und wählt deshalb ab Zoom 14,6 auch ferne Ballons. **Parität** hieße, den Kopf zu messen; **Abweichung** hieße, es so zu lassen, und der Pfeil fände fast immer einen echten Ballon, was möglicherweise besser aussieht. Zu entscheiden ist auch, ob die Zoomsperre des Ankers auf `factAnimationRunsAt` verschärft wird: das schnitte den Löwenanteil der Plattformkanal-Aufrufe weg und schlösse nebenbei die Gruppierungslücke unter Zoom 15, um den Preis, dass unter Zoom 16 das Ersatzrechteck steht. **Die tragende Kette ist hergeleitet und nicht am Browser gemessen**, siehe „Der `balloon`-Anker". | 2 | vor Auslieferung |
 | E-49 | **Zwei verschiedene Wahrheiten darüber, ob eine Trophäe verdient ist.** Der Profil-Bildschirm liest den Freischaltstand vom Server (`user_trophies`) und färbt danach. Das Reiseregal rechnet ihn **clientseitig neu**: `wltDeriveTrophies` (`screen-wallet.jsx:114-128`) zählt die gesammelten Fakten je Kategorie und setzt `earned` auf `counts[t.cat] >= t.threshold`. Beide können auseinanderlaufen, und beide zeigen dieselben 36 Definitionen. **Zusätzlich ist die Client-Rechnung unvollständig:** nur die Kategorie-Trophäen tragen ein `threshold`; die Stadt-, Rang- und Geheim-Trophäen haben keins, und `>= undefined` ist in JavaScript immer falsch. Im Reiseregal sind sie damit **dauerhaft** unverdient, egal was der Server sagt. Zu entscheiden ist, welche Quelle im Neubau gilt, bevor Schritt 45 gebaut wird; die Trophäenliste aus Schritt 49 nimmt heute den Stand als Parameter entgegen und legt sich nicht fest. Berührt E-16, weil `user_trophies` für jeden lesbar ist. | 3 | vor Schritt 45 |
 
 ## Wie Tests hier blind werden
