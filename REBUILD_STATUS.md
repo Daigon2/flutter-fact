@@ -1164,6 +1164,56 @@ Gebaut ist die Liste, ohne Einstieg, wie die Fakt-Akte und das Rätsel-Sheet.
 
 - [!] 50. Creator (Foto-Storage) und Paritäts-Sweep
 
+## Der `balloon`-Anker, 31.08.2026
+
+Nicht Teil der 50 Schritte, aber er macht einen Tutorial-Schritt voll baubar
+statt degradiert. 1859 → 1885 Tests. `DiscoveryAnchors.knownMissing` führt jetzt
+nur noch `userMarker`.
+
+**Der Fund, der aus keinem Auftrag kam.** Die Quelle sucht den Kartenmarker
+nächst der Rahmenmitte und verwirft alles unter 30 mal 30, mit der Begründung,
+das sei der Nutzermarker (rund 28 mal 28). Beim Nachrechnen der Animation zeigt
+sich: **ein ruhender Ballon ist selbst nur 26 Pixel breit** und fällt damit
+durch dieselbe Schwelle. `screen-map.jsx:2252` setzt `sizePx = 26` unbedingt,
+und der Zoomfaktor hilft ihm nicht, denn er sitzt an `.coin-float-wrap`, einem
+**Nachfahren** des Markerelements; eine Transformation an einem Nachfahren
+ändert `getBoundingClientRect()` des Vorfahren nicht. Die gemessene Markerbreite
+ist also konstant. Die Regel, die den Nutzermarker aussortieren sollte,
+sortiert damit **jeden ruhenden Ballon gleich mit aus**; die Quelle zeigt nur
+dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ihr
+Ersatzrechteck.
+
+Das deckt sich mit dem, was Schritt 17 schon gemessen hat: der ruhende Ballon
+ist 26 Pixel breit statt 28, und `coinRafTick` überschreibt den Zustand aus
+`coinMakeEl` unbedingt.
+
+**Wichtig: die Kette ist aus der CSS-Semantik hergeleitet und nicht am
+laufenden Browser nachgemessen.** Ein Blick mit den Entwicklerwerkzeugen auf
+die Breite eines Ballons bei zwei Zoomstufen entscheidet sie in dreissig
+Sekunden. Bis dahin ist sie eine Ableitung.
+
+**Offene Verhaltensfrage bei Janek, siehe E-48.** Der Neubau misst nicht den
+Kopf, sondern die Zeichenfläche samt zwölf Pixel durchsichtigem Schattenrand je
+Seite, und wählt deshalb ab Zoom 14,6 auch ferne, ruhende Ballons. Bei jedem
+normalen Gehzoom zeigt der Pfeil also auf einen echten Ballon, wo die Quelle ihr
+Ersatzrechteck zeigte. Gemessen: 29,17 Pixel bei Zoom 14,5, 30,00 bei 14,6,
+41,67 bei 16,0.
+
+**Zwei Mutationsläufe, wieder mit gegensätzlichem Ergebnis.** Der Bauende fuhr
+fünf, alle fielen, eine erst nach Korrektur seines eigenen Tests, den er selbst
+als blind erkannt hatte: ein Punkt ausserhalb des Rahmens kann rechnerisch nie
+näher an der Rahmenmitte liegen als einer in der Mitte, der Ausschluss war also
+nicht prüfbar, wie er geschrieben war. Die Review fuhr zwölf, **sechs
+überlebten**, vier davon in genau diesem Filter: die ganze senkrechte Prüfung,
+der rechte Rand, die Grössenschwelle und die Betonung des Kandidaten. Nach der
+Nachbesserung fallen alle sechs.
+
+**Drei veraltete Zusagen im Bestand mitgezogen.** Die Umrechnung von Geräte- auf
+logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
+`map_screen_point.dart` und die Liste „Was bewusst fehlt" sagten alle drei noch
+„nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
+
+
 ## Arbeit außerhalb der 50 Schritte
 
 Nicht im REBUILD_PLAN, aber notwendig:
@@ -2138,6 +2188,7 @@ eine Fundstelle.
 | E-42 | **Der 150-Meter-Radius der Foto-Rätsel wirkt in der PWA nie.** `screen-map.jsx:3915` übergibt die Nutzerposition als `userPos`, `puzzle-sheet.jsx:50` erwartet sie als `userPosition`. Folge in `PszPhoto`: `:373` liefert immer `null`, `:374` setzt `inRange = true`, und die Näherungsprüfung `:378` läuft nie. `foto-beweis` und `perspektiven` sind damit von überall mit einem beliebigen Foto lösbar, obwohl `gpsRadius` (`:372`) in den Daten durchgehend auf 150 steht. Dieselbe Klasse wie E-08: ein Defekt der Quelle, der wie Parität aussieht, und wie E-07 einer, der eine Ortsprüfung aushebelt. **Ändert sichtbares Verhalten, geht deshalb an Janek.** | 3, verwandt mit E-07 | Phase 4, Schritt 28 |
 | E-44 | **Der Faktor 1,5 am letzten Stopp wird angezeigt, aber nicht gutgeschrieben.** `screen-challenge.jsx:2479` übergibt dem Nächster-Fakt-Abzeichen `isLast ? Math.round(diff.points * 1.5) : diff.points`. Die tatsächlich vergebenen Punkte rechnet `handleChallengeComplete` (`:2295-2299`), und dort kommt der Faktor nicht vor. Das Abzeichen verspricht am letzten Stopp das Anderthalbfache, gutgeschrieben wird der einfache Satz. Widerspruch in der Quelle, nicht in E-19. Sichtbares Verhalten. | 3 | Schritt 37 |
 | E-47 | **Drei Bedienelemente im Challenge-Reiter tun bis Schritt 35 nichts.** Seit Schritt 33 zeigt der Reiter den Assistenten. Wer ihn zu Ende bedient, drückt einen vollflächigen roten Knopf „Starten", sieht die Drück-Animation und danach passiert nichts, weil der Startpunkt-Picker fehlt. Dasselbe gilt für die Kachel „Gruppe" und für „Mit Code beitreten", deren Formulare Sitzungen über Supabase anlegen müssten, die es im Neubau nicht gibt. **Eine Sackgasse ist es nicht**, der Zurück-Knopf und die Tab-Leiste bleiben erreichbar, gemessen im Widget-Test. Aber es ist derselbe Zustand, den E-33 beim Kästchen „Angemeldet bleiben" beanstandet, und der Bau begründet an anderer Stelle ausdrücklich, warum die Zufallskarte **nicht** antippbar ist („ein Tipp, der nichts ändert, ist ein Bedienelement, das nichts tut"). Die Ungleichbehandlung ist bewusst, weil eine erfundene Navigation schlechter wäre als keine, aber sie gehört gewusst. Löst sich mit den Schritten 35 und 40 von selbst auf. | 2 | Schritt 35 |
+| E-48 | **Wohin zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist?** Die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, und ein ruhender Ballon ist selbst nur 26 breit; sie zeigt also nur dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ein festes Rechteck in der unteren Bildmitte. Der Neubau misst statt des Kopfes die Zeichenfläche samt Schattenrand und wählt deshalb ab Zoom 14,6 auch ferne Ballons. **Parität** hiesse, den Kopf zu messen; **Abweichung** hiesse, es so zu lassen, und der Pfeil fände fast immer einen echten Ballon, was möglicherweise besser aussieht. Zu entscheiden ist auch, ob die Zoomsperre des Ankers auf `factAnimationRunsAt` verschärft wird: das schnitte den Löwenanteil der Plattformkanal-Aufrufe weg und schlösse nebenbei die Gruppierungslücke unter Zoom 15, um den Preis, dass unter Zoom 16 das Ersatzrechteck steht. **Die tragende Kette ist hergeleitet und nicht am Browser gemessen**, siehe „Der `balloon`-Anker". | 2 | vor Auslieferung |
 
 ## Wie Tests hier blind werden
 

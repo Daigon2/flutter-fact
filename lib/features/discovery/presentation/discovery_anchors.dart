@@ -21,16 +21,18 @@ import 'package:fact_app/core/anchors/anchor_id.dart';
 /// Oberfläche gerade ihre Zahl hinlegt, und das ist ein Vertrag, den niemand
 /// haben will.
 ///
-/// ## Vier der sechs Anker sind gebaut
+/// ## Fünf der sechs Anker sind gebaut
 ///
 /// Seit dem Top-Chrome des Kartenbildschirms melden [coins], [modeFactFinder],
 /// [modeTour] und [compass] sich über `AnchorTarget` an
-/// (`presentation/widgets/map_top_chrome.dart`). Übrig bleiben [balloon] und
-/// [userMarker]; beide hängen an der Kartenschicht selbst, siehe
-/// [knownMissing].
+/// (`presentation/widgets/map_top_chrome.dart`). Seit `discovery_balloon_anchor.dart`
+/// meldet sich auch [balloon] so an, nur eben nicht über ein sichtbares
+/// Hüllwidget, sondern über ein unsichtbares `AnchorTarget` an der Stelle, die
+/// dieselbe Auswahlregel wie die Quelle berechnet. Übrig bleibt [userMarker];
+/// er hängt an Schritt 18 und E-10, siehe [knownMissing].
 ///
-/// Wer in Phase 2 einen der beiden baut, umschließt das Widget mit
-/// `AnchorTarget` **und** streicht die Kennung aus [knownMissing]. Der Test
+/// Wer ihn baut, umschließt das Widget mit `AnchorTarget` **und** streicht die
+/// Kennung aus [knownMissing]. Der Test
 /// `test/features/discovery/presentation/discovery_anchors_test.dart` nagelt
 /// die Liste fest und schlägt dabei an.
 abstract final class DiscoveryAnchors {
@@ -39,9 +41,11 @@ abstract final class DiscoveryAnchors {
   /// Sonderfall in der Quelle: Ballons tragen kein `data-tour-anchor`, die PWA
   /// sucht stattdessen den MapLibre-Marker, der der Rahmenmitte am nächsten
   /// liegt, und nimmt bei Fehlanzeige ein festes Ersatzrechteck
-  /// (`screen-tour.jsx:193-224`). Für die App heißt das: [balloon] wird von
-  /// keinem Hüllwidget angemeldet, sondern von der Kartenschicht selbst
-  /// berechnet, sobald es sie gibt.
+  /// (`screen-tour.jsx:193-222`, selbst nachgezählt, siehe
+  /// `discovery_balloon_anchor.dart`). Für die App heißt das: [balloon] wird
+  /// von keinem sichtbaren Hüllwidget angemeldet, sondern von
+  /// `DiscoveryBalloonAnchor`, das dieselbe Auswahlregel nachbildet und ein
+  /// unsichtbares `AnchorTarget` an die berechnete Stelle setzt.
   static const AnchorId balloon = AnchorId('balloon');
 
   /// Der eigene Avatar-Marker.
@@ -95,11 +99,15 @@ abstract final class DiscoveryAnchors {
   /// Ergebnis beide gleich aussehen, nämlich als `null` aus
   /// `AnchorRegistry.rectOf`.
   ///
-  /// Heute sind das noch [balloon] und [userMarker]. Beide sind Sonderfälle,
-  /// die kein Hüllwidget anmelden kann: der Ballon ist der Marker, der der
-  /// Rahmenmitte am nächsten liegt (`screen-tour.jsx:193-224`), der
-  /// Avatar-Marker wird über eine innere CSS-Klasse gesucht (`:226-242`).
-  /// Beide entstehen mit der Kartenschicht.
+  /// Heute ist das noch [userMarker]. Er wartet auf Schritt 18 und E-10: den
+  /// Marker selbst gibt es im Code noch gar nicht, und die Quelle sucht ihn
+  /// über eine innere CSS-Klasse, `.arrow-shell` (`screen-tour.jsx:226-242`).
+  ///
+  /// [balloon] stand hier bis `discovery_balloon_anchor.dart`: die Quelle
+  /// sucht dafür den Marker nächst der Rahmenmitte
+  /// (`screen-tour.jsx:193-222`), und das kann kein sichtbares Hüllwidget
+  /// anmelden. `DiscoveryBalloonAnchor` löst das mit einem unsichtbaren
+  /// `AnchorTarget` an der berechneten Stelle, siehe dort.
   ///
   /// [coins], [modeFactFinder], [modeTour] und [compass] stehen seit dem
   /// Top-Chrome nicht mehr hier. Löst einer von ihnen nicht auf, schlägt der
@@ -113,6 +121,6 @@ abstract final class DiscoveryAnchors {
   /// Absichtlich **nicht** aus [values] abgeleitet: [values] bleibt
   /// vollständig, diese Menge schrumpft mit jedem gebauten Widget.
   static final Set<AnchorId> knownMissing = Set<AnchorId>.unmodifiable(
-    <AnchorId>[balloon, userMarker],
+    <AnchorId>[userMarker],
   );
 }

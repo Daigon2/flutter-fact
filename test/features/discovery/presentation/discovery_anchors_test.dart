@@ -45,25 +45,27 @@ void main() {
   });
 
   group('Bekannt fehlende Anker', () {
-    test('sind nur noch Ballon und Avatar-Marker', () {
-      // Wer in Phase 2 einen dieser Anker baut, streicht ihn hier **und** in
+    test('ist nur noch der Avatar-Marker', () {
+      // Wer diesen Anker baut, streicht ihn hier **und** in
       // `DiscoveryAnchors.knownMissing`. Schlägt dieser Test an, ohne dass
-      // jemand einen Anker gebaut hat, ist die Liste gewachsen und der `assert`
+      // jemand ihn gebaut hat, ist die Liste gewachsen und der `assert`
       // in `AnchorRegistry.rectOf` deckt mehr zu als er soll.
       expect(DiscoveryAnchors.knownMissing, <AnchorId>{
-        const AnchorId('balloon'),
         const AnchorId('user-marker'),
       });
     });
 
     test('enthalten keinen gebauten Anker', () {
-      // Vier Tab-Anker und vier Anker des Top-Chrome sind gebaut. Stünde einer
-      // davon in der Liste, würde ein Tippfehler an ihm still durchgehen.
+      // Vier Tab-Anker, vier Anker des Top-Chrome und seit
+      // `discovery_balloon_anchor.dart` auch der Ballon sind gebaut. Stünde
+      // einer davon in der Liste, würde ein Tippfehler an ihm still
+      // durchgehen.
       for (final name in <String>[
         'tab-modus',
         'tab-wallet',
         'tab-challenge',
         'tab-profil',
+        'balloon',
         'coins',
         'mode-fact-finder',
         'mode-tour',

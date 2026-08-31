@@ -276,10 +276,12 @@ void main() {
       // zweites `pumpWidget` mit demselben Widgettyp behält den Zustand des
       // Overlays, der Schrittzähler liefe also weiter statt von vorn. Genau
       // daran ist die erste Fassung dieses Tests gescheitert.
-      // Nur noch Ballon (2) und Avatar-Marker (3). Die Schritte 4, 6 und 8
-      // zeigen auf Coin-Pille, Tour-Knopf und Kompass, und die meldet das
-      // Top-Chrome des Kartenbildschirms seit Schritt 19 an.
-      const degrading = <int>[2, 3];
+      // Nur noch der Avatar-Marker (3): Schritt 18 hängt an E-10. Schritt 2
+      // (Ballon) meldet sich seit `discovery_balloon_anchor.dart` selbst an,
+      // hier ohne Karte über das Ersatzrechteck, siehe dort. Die Schritte 4,
+      // 6 und 8 zeigen auf Coin-Pille, Tour-Knopf und Kompass, und die meldet
+      // das Top-Chrome des Kartenbildschirms seit Schritt 19 an.
+      const degrading = <int>[3];
       const withAnchor = <int>[2, 3, 4, 5, 6, 7, 8];
       await pumpApp(tester);
 
@@ -344,10 +346,11 @@ void main() {
       for (final anchor in DiscoveryAnchors.knownMissing) {
         expect(registryOf(tester).rectOf(anchor), isNull, reason: anchor.value);
       }
-      // Die vier gebauten lösen umgekehrt wirklich auf. Ohne diese Zeile
+      // Die fünf gebauten lösen umgekehrt wirklich auf. Ohne diese Zeile
       // bliebe offen, ob `degrading` oben nur deshalb kurz ist, weil der
       // Pfeil aus einem anderen Grund gezeichnet wird.
       for (final anchor in <AnchorId>[
+        DiscoveryAnchors.balloon,
         DiscoveryAnchors.coins,
         DiscoveryAnchors.modeFactFinder,
         DiscoveryAnchors.modeTour,

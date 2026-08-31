@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fact_app/core/async/detached_work.dart';
+import 'package:fact_app/features/discovery/presentation/discovery_balloon_anchor.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_images.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
@@ -620,6 +621,11 @@ class _MapPageState extends ConsumerState<MapPage> {
         // dazwischen verschöbe jeden Ballon. Und unter dem Top-Chrome, damit
         // ein wachsender Ballon nicht über die Stadt-Pille läuft.
         const FactBalloonOverlay(),
+        // Meldet den Tutorial-Anker `DiscoveryAnchors.balloon` an, ohne selbst
+        // etwas zu zeichnen; siehe `discovery_balloon_anchor.dart`. Nach
+        // `FactBalloonOverlay`, damit beide dieselbe Kartenfläche als
+        // Bezugspunkt für ihre Bildschirmlagen haben.
+        const DiscoveryBalloonAnchor(),
         MapTopChrome(
           cityName: MapPage.placeholderCityName,
           coins: MapPage.placeholderCoins,

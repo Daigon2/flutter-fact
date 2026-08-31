@@ -50,9 +50,14 @@
 /// ## Was bewusst fehlt
 ///
 /// Das Antippen (Schritt 21), das goldene Aussehen (es gibt weder Auslöser
-/// noch Bild), das automatische Einsammeln bei 18 Metern und der Tutorial-Anker
-/// `balloon` (der zeigt auf den Marker nächst der **Rahmenmitte**, nicht nächst
-/// dem Nutzer, und muss auch ohne Ortung existieren).
+/// noch Bild) und das automatische Einsammeln bei 18 Metern.
+///
+/// **Der Tutorial-Anker `balloon` stand bis zum 31.08.2026 auch hier**, mit dem
+/// Vermerk, er zeige auf den Marker nächst der **Rahmenmitte** und nicht nächst
+/// dem Nutzer und müsse auch ohne Ortung existieren. Genau deshalb ist er
+/// **nicht** hier gelandet, sondern in `discovery_balloon_anchor.dart`: diese
+/// Datei kennt nur, was innerhalb von 150 Metern liegt, der Anker braucht aber
+/// auch die fernen Punkte und einen Rückfall ohne jeden Ballon.
 ///
 /// **Der atmende Bodenschatten ist zur Hälfte gebaut, und die Trennlinie ist
 /// belegt.** `coinShadowNear` gehört zum Hüpfen: `screen-map.jsx:2300-2303`
@@ -394,7 +399,12 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
   /// (not display pixels)", und dieser Satz kann beides heißen.
   ///
   /// **Am 30.08.2026 am Gerät gemessen: es ist das Geräteraster**, deshalb
-  /// steht die Division jetzt hier und nirgendwo sonst. Belegt ist sie nicht
+  /// steht die Division hier. **Seit `discovery_balloon_anchor.dart` gibt es
+  /// eine zweite, benannte und begründete Stelle**: der `balloon`-Anker der
+  /// Tutorial-Führung nimmt denselben rohen Kartenpunkt entgegen und kann ihn
+  /// nicht über diesen Zeichner beziehen, ohne Regel 18 zu verletzen. Zwei
+  /// Stellen sind eine bewusste Entscheidung und keine stille Verdopplung,
+  /// siehe die Begründung dort. Belegt ist die Umrechnung selbst nicht
   /// über einen Bildvergleich, sondern über die projizierte **Kameramitte**:
   /// sie kommt auf (540,75 | 1200,94) heraus, bei einer Kartenfläche von
   /// 1080 × 2400 Gerätepixeln und einem Skalierungsfaktor von 2,625. Die Mitte

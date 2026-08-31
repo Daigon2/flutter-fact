@@ -30,7 +30,7 @@ Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schrit
 steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
 Kästchen war das Veraltete, nicht der Stand.
 
-**Kennzahlen:** 1859 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 1885 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -54,14 +54,13 @@ siehe „Rechner einrichten".
 
 ## Als Nächstes
 
-1. **Der `balloon`-Anker**, ohne jede Antwort baubar, siehe Punkt 5. Er ist
-   grösser als er aussieht: die Quelle sucht den **MapLibre-Marker** nächst der
-   Rahmenmitte, und im Neubau sind nur die nahen Ballons Flutter-Widgets mit
-   einem Kontext, die fernen sind native Symbole. Eine treue Umsetzung muss
-   deren Lage über die Projektion selbst rechnen. Das Ersatzrechteck der Quelle
-   (`x = Breite × 0,45`, `y = Höhe × 0,55`, 38 × 38) lässt sich als unsichtbares
-   `AnchorTarget` an derselben Stelle nachbauen, dann braucht die Registry
-   keinen neuen Mechanismus.
+1. **E-48 beantworten, es ist die einzige neue Frage aus dieser Nacht.** Wohin
+   zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist? Der Anker ist
+   gebaut, die Frage ist die Grösse, an der er misst. Belege im Abschnitt „Der
+   `balloon`-Anker". **Der billigste Weg, sie ganz zu schliessen:** einmal mit
+   den Entwicklerwerkzeugen in der laufenden PWA die Breite eines Ballons bei
+   zwei Zoomstufen ablesen. Die tragende Kette ist bis dahin hergeleitet und
+   nicht gemessen.
 
 2. **Danach 45, 46 und 48 aus Phase 7.** Achtung beim Zuschnitt: 45 zeigt
    „X von N gesammelt" je Stadt, und `collection` ist heute eine Platzhalterseite,
@@ -89,14 +88,12 @@ siehe „Rechner einrichten".
    hier. Nicht Teil des Blocks und weiter offen: ob der Karten-Host
    im **unsichtbaren Tab** weiterfolgen soll. Der Tabwechsel entsorgt ihn nicht,
    das ist gemessen; die PWA kennt keine Tabs, es gibt also keine Quelle.
-5. **Zwei Kartenanker fehlen noch, nicht fünf.** Diese Zeile stand bis zum
+5. **Ein Kartenanker fehlt noch.** Diese Zeile stand bis zum
    30.08.2026 falsch hier: `discovery_anchors.dart:24-30` sagt, dass `coins`,
    `modeFactFinder`, `modeTour` und `compass` sich seit dem Top-Chrome aus
-   Schritt 19 selbst anmelden. Übrig sind **`balloon`** und **`userMarker`**.
-   `balloon` ist heute baubar und hängt an nichts: die Quelle sucht dafür den
-   Marker nächst der **Rahmenmitte** (nicht nächst dem Nutzer) und nimmt bei
-   Fehlanzeige ein festes Ersatzrechteck, `screen-tour.jsx:193-224`.
-   `userMarker` dagegen wartet auf Schritt 18, denn den Marker selbst gibt es
+   Schritt 19 selbst anmelden. **`balloon` ist seit dem 31.08.2026 gebaut**,
+   siehe „Der `balloon`-Anker". Übrig ist nur noch **`userMarker`**, und der
+   wartet auf Schritt 18, denn den Marker selbst gibt es
    im Code noch gar nicht, und der hängt an E-10. Wer einen baut, streicht die
    Kennung aus `knownMissing`, sonst schlägt
    `discovery_anchors_test.dart` an.
@@ -111,6 +108,20 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Der `balloon`-Anker, und eine Schwelle, die das Gegenteil tut
+
+Ein Tutorial-Schritt degradiert nicht mehr, 1859 → 1885 Tests, und
+`knownMissing` führt nur noch den Nutzermarker. **Überraschend war die Regel
+selbst:** die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, um den
+Nutzermarker auszusortieren, und ein ruhender Ballon ist selbst nur 26 breit.
+Die Regel sortiert also fast alles aus, was sie behalten wollte, und die
+PWA zeigt in der Regel auf ein festes Ersatzrechteck statt auf einen Ballon.
+Der Neubau misst versehentlich etwas anderes und trifft deshalb ab Zoom 14,6
+echte Ballons; das steht jetzt als E-48 bei Janek statt als Parität im Code.
+**Und wieder liefen zwei Mutationsläufe gegensätzlich:** fünf eigene fielen
+alle, zwölf fremde liessen sechs überleben, vier davon in dem Filter, den der
+Autor selbst als blind erkannt und korrigiert hatte.
 
 ### 31.08.2026, CI, und die Trophäen als Probe aufs Muster
 

@@ -64,16 +64,19 @@ void main() {
     ) async {
       await pumpApp(tester);
 
-      // Die vier Kartenanker stehen mit in der Liste, weil der Zweig `/map`
-      // der Startzweig ist und sein Top-Chrome sich beim Aufbau anmeldet.
-      // Absichtlich die vollständige Menge und keine Teilmengenprüfung: eine
-      // unerwartete Anmeldung ist genauso ein Fund wie eine fehlende.
+      // Die fünf Kartenanker stehen mit in der Liste, weil der Zweig `/map`
+      // der Startzweig ist: vier melden sich über das Top-Chrome an, der
+      // fünfte, `balloon`, über `DiscoveryBalloonAnchor` ohne sichtbares
+      // Hüllwidget. Absichtlich die vollständige Menge und keine
+      // Teilmengenprüfung: eine unerwartete Anmeldung ist genauso ein Fund
+      // wie eine fehlende.
       expect(registryOf(tester).debugRegisteredIds, <AnchorId>{
         const AnchorId('shell-bottom-bar'),
         const AnchorId('tab-modus'),
         const AnchorId('tab-wallet'),
         const AnchorId('tab-challenge'),
         const AnchorId('tab-profil'),
+        const AnchorId('balloon'),
         const AnchorId('coins'),
         const AnchorId('mode-fact-finder'),
         const AnchorId('mode-tour'),
@@ -181,6 +184,7 @@ void main() {
       await pumpApp(tester);
 
       for (final anchor in <AnchorId>[
+        DiscoveryAnchors.balloon,
         DiscoveryAnchors.coins,
         DiscoveryAnchors.modeFactFinder,
         DiscoveryAnchors.modeTour,

@@ -30,10 +30,12 @@
 /// der Skalierungsfaktor, einen Versatz gibt es nicht. Zahlen und Gegenprobe
 /// in `REBUILD_STATUS.md` unter „Ungefragter Fund A".
 ///
-/// **Die Umrechnung steht an genau einer Stelle**, so wie es der Aufbau
-/// vorsah: `fact_balloon_overlay.dart`, dort wo eine Bildschirmlage zu einem
-/// `Positioned` wird. Dieser Typ trägt die rohe Einheit des SDK, damit die
-/// Umrechnung sichtbar bleibt statt sich über den Vertrag zu verteilen.
+/// **Die Umrechnung steht an benannten Stellen und nicht verteilt im
+/// Vertrag**, so wie es der Aufbau vorsah: zuerst `fact_balloon_overlay.dart`,
+/// dort wo eine Bildschirmlage zu einem `Positioned` wird, seit
+/// `discovery_balloon_anchor.dart` eine zweite, aus demselben Grund. Dieser
+/// Typ trägt die rohe Einheit des SDK, damit jede Umrechnung sichtbar bleibt
+/// statt sich über den Vertrag zu verteilen.
 ///
 /// **Der Feldname sagt die Einheit nicht.** `xInScreenPixels` bliebe auch dann
 /// stehen, wenn jemand den Wert für logische Pixel hielte; ehrlicher wäre
