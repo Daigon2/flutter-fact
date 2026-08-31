@@ -543,6 +543,133 @@ Empfänger.
   aus. `FactFailure` ist eine `Exception`, wird also wiederholt. Das trifft jeden
   künftigen Bildschirm mit einem `FutureProvider`.
 
+### Schritt 15, das Antippen der Gruppen, 31.08.2026
+
+1885 → 1979 Tests, in drei Blöcken mit je einer unabhängigen Review. **Damit ist
+Schritt 15 wirklich fertig**, nachdem er seit dem 29.08.2026 als `[x]` galt und
+das Antippen ausdrücklich nicht enthielt. Das ist der zweite Fall, in dem
+Kästchen und Wirklichkeit auseinanderlagen, diesmal in der anderen Richtung als
+bei Schritt 19: dort war das Kästchen zu vorsichtig, hier war es zu großzügig.
+An der Zahl 22 ändert das nichts, sie war schon vorher so gezählt.
+
+**Der Entwurf weicht von D-12s Vorhersage ab, und der Grund ist eine Messung.**
+D-12 sagte, Variante (b) koste ein neues Feld im Kameravertrag und einen zweiten
+Bewegungspfad im Host. Gebaut ist keines von beidem, siehe „Was in denselben
+Block gehört, aber keine Frage ist" unter „Fragen an Dairen". Kurz: das Rechteck
+ist eine **Rechnung vor der Absicht**, am Ende steht eine gewöhnliche
+`MapCameraOneShot` mit Mittelpunkt und Zoom, und Neigung und Blickrichtung
+bleiben deshalb von selbst stehen.
+
+**Die Zahlen und ihre Herkunft.** Zwei stehen in der Quelle, eine ist
+abgeleitet, und der Unterschied steht in den Kommentaren:
+
+| Zahl | Herkunft |
+|---|---|
+| 700 ms Fahrtdauer | `screen-map.jsx:2450`, `duration: 700` |
+| Obergrenze Zoom 18 | `screen-map.jsx:2449`, `Math.min(zoom + 0.4, 18)` |
+| Untergrenze Zoom 16 | **abgeleitet** aus `clusterMaxZoom: 15` (`:1911`), gerechnet als `maxZoom.floorToDouble() + 1` |
+
+Die Untergrenze ist der billigste Teil des Entwurfs: ab Zoom 16 gruppiert
+MapLibre überhaupt nicht mehr, ein Fahrziel von mindestens 16 lässt die
+angetippte Gruppe also **sicher** aufgehen, ohne dass irgendwer MapLibres
+Gruppierung nachrechnet. Gerechnet und nicht als 16 hingeschrieben, weil Android
+`clusterMaxZoom` ohnehin abschneidet und deshalb nur ganze Zoomstufen unten
+ankommen.
+
+**Größenordnung, damit die Zahlen nicht überraschen.** Bei Zoom 15 und 48 Grad
+Breite ist ein Stilpixel rund 1,6 m, 70 px also rund 112 m; ein Rechteck von
+etwa 224 m Kante passt bei 800 px Höhe auf Zoomstufe 17,5, die Obergrenze greift
+dort **nicht**. Bei Zoom 11 sind 70 px dagegen rund 25 km, ein gekettetes
+Stadt-Cluster kann 50 km spannen, und die Rechnung landet unter 16. Dann greift
+die Untergrenze, und **nicht alle Mitglieder sind danach im Bild**. Das ist die
+dokumentierte Abweichung: die Quelle garantiert dort ebenfalls nur das Aufgehen,
+sie fährt auf `expansionZoom + 0,4` ohne jedes Rechteck.
+
+**Die Auswahl der Punkte ist eine Näherung, und die Fehlerrichtung ist der
+Grund für sie.** `getClusterLeaves` und `getClusterChildren` fehlen im Paket,
+das SDK sagt nicht, welche Punkte in einer Gruppe stecken. Gewählt sind die
+eigenen Punkte innerhalb des Gruppierungsradius um die getippte Stelle, die im
+**selben** Projektionsaufruf mitprojiziert wird, damit beide Seiten im selben
+Raster liegen und die Einheitenfrage in diesem Vergleich gar nicht entsteht.
+Supercluster kettet, die Näherung wählt also im Zweifel zu wenige Punkte, das
+Rechteck wird zu klein, die Kamera fährt **zu weit** hinein. Zu weit hinein
+heißt: die Gruppe geht auf. Zu wenig weit hinein hieße: noch einmal tippen, und
+genau dafür hat D-12 die Variante (a) verworfen.
+
+**Vom Antipp-Payload ist nur die Hälfte brauchbar**, gemessen am Pub-Cache:
+
+- `x` und `y` sind plattformasymmetrisch, Android liefert rohe Gerätepixel
+  (`MapLibreMapController.java:2128-2131`), iOS UIKit-Punkte (`.swift:1425-1432`).
+  Benutzt werden deshalb nur `lng` und `lat`.
+- `id` ist für ein von MapLibre erzeugtes Gruppen-Merkmal im Pub-Cache **nicht
+  als vorhanden nachweisbar**, der Typ liegt in `maplibre-native`. Ist sie
+  `null`, macht `payload["id"].toString()` (`controller.dart:121`) daraus die
+  Zeichenkette `"null"`, und alle Gruppen trügen dieselbe Kennung, lautlos.
+  Verlässlich ist einzig `layerId`, denn die Kennungen vergibt der Host selbst.
+- Ein Tipp erzeugt **höchstens ein** Ereignis: Android prüft ein Rechteck von
+  20x20 Gerätepixeln gegen die interaktiven Layer, von oben nach unten, und
+  nimmt den ersten Treffer (`:2123-2135`, Auswahl `:816-822`), iOS ebenso
+  (`.swift:1386-1432`). Und die Layer sind **schon** interaktiv,
+  `enableInteraction` ist Standard (`controller.dart:810`, `:620`).
+
+**Die Reviews haben in allen drei Blöcken etwas gefunden, insgesamt zehn
+Punkte**, und das Verhältnis der Mutationsläufe hält sich: die eigenen des
+Bauenden fielen 11 von 11, 13 von 13 und 12 von 13, die fremden der Review
+überlebten 3 von 12, 3 von 13 und 4 von 15.
+
+Der teuerste Fund kam **ohne Mutation** zustande, durch Vergleich mit zwei
+Nachbarstellen: `_onGroupTap` hatte keine Sequenzsicherung. Zwei Tipps kurz
+hintereinander starten zwei Projektionsanfragen, und kommt die Antwort auf den
+älteren zuletzt zurück, überschreibt die **veraltete** Absicht die frische; die
+Karte zieht kurz auf die richtige Gruppe und fährt dann wieder weg.
+`discovery_balloon_anchor.dart:470-538` und `FactBalloonOverlay._requestProjection`
+lösen genau das schon, **beide älter als dieser Code**. Das ist Muster 10 in
+seiner unangenehmsten Form: nicht zwei Stellen, von denen eine ungeprüft ist,
+sondern eine dritte Stelle, die eine bereits bezahlte Lehre nicht mitgenommen
+hat. Die dritte Umsetzung weicht bewusst in einem Punkt ab: eine veraltete
+Antwort löst hier **gar keine** Absicht mehr aus, weil eine `MapCameraOneShot`
+nicht zurücknehmbar ist, während die beiden Vorbilder laufende Bildschirmzustände
+beschreiben.
+
+Die weiteren Funde, jeder mit einer Gegenprobe belegt:
+
+- **Eine zugesagte Eigenschaft ohne Zusicherung.** Der Konstruktorkommentar von
+  `MapPositionRect` sagte zu, `rectFitZoom` behandle vertauschte Ecken robust.
+  `.abs()` war ersatzlos löschbar, weil die vorhandene Probe nur die **Länge**
+  vertauscht und die Breitenspanne bei null lässt.
+- **Eine Klemmgrenze, die nur als „irgendwo" zugesichert war.** Die Konstante
+  85,051129 auf 84,051129 zu verschieben lief durch. Jetzt auf das Intervall
+  zwischen 85,0 und 85,051129 eingegrenzt, ohne die Zahl abzuschreiben.
+- **Kein Test installierte zwei Überlagerungen gleichzeitig.** Die Zuordnung
+  Layer zu Überlagerung konnte immer die erste installierte Kennung
+  zurückgeben, und alle 642 Tests blieben grün. Vier Features teilen sich diese
+  Karte.
+- **Eine abgeschriebene Begründung.** `broadcast` war mit „mehrere dürfen
+  gleichzeitig zusehen" begründet, tatsächlich abonniert genau ein Hörer. Der
+  echte Grund ist, dass `attach`, `detach`, `attach` zweimal auf denselben Strom
+  hört und ein Einzelabonnement-Strom dann wirft. **Die Reichweite dieser
+  Begründung ist dabei kleiner, als der erste Entwurf behauptete:** die einzige
+  heute belegte Aufrufer-Kette erzeugt die Folge nicht, weil
+  `MapSurface.initState` bei jedem Mount einen frischen Host baut. Das steht so
+  im Kommentar.
+- **Eine falsche Fundstelle**, `controller.dart:663` gehört zu `addLineLayer`.
+- **`dispose` war unbeprobt**, die zwei Zeilen zum Abmelden waren ersatzlos
+  löschbar.
+- **Zwei konstante `hashCode`** liefen durch.
+- Dazu die zwei neuen Blindheitsmuster 20 und 21, beide hier entstanden.
+
+**Was am Gerät zu prüfen bleibt:**
+
+1. Stimmt die Zoomstufe aus `rectFitZoom` bei 58 Grad Neigung? Die Formel
+   rechnet flach. Bei Neigung deckt die Karte oben mehr Boden ab, das Rechteck
+   erscheint also kleiner als gerechnet, die Fahrt ist tendenziell zu
+   vorsichtig. Die Untergrenze fängt den Fall auf, in dem das wirklich stört.
+2. Trägt ein Gruppen-Merkmal eine `id`? Betrifft diesen Pfad nicht mehr, aber es
+   entscheidet, ob der Punkt-Tipp später über `id` gehen kann.
+3. Die Referenzkachelgröße 512 in `rectFitZoom` ist hergeleitet und hat im
+   Repository **keinen** Beleg. Nachzumessen mit einem bekannten Rechteck über
+   `rectFitZoom`, Kamera setzen, `toScreenLocation` gegenprüfen.
+
 ### Schritt 17, was daran gemessen ist
 
 Größe, Glühen und Drehung für **jeden** nicht gesammelten Ballon innerhalb der
@@ -925,7 +1052,8 @@ das nächste Mal an Phase 2 arbeitet, prüft, ob noch etwas fehlt, und setzt gen
 eine der beiden Stellen richtig.
 
 - [x] 12. MapLibre mit gebackenem Style · [x] 13. Kamera-Verhalten
-- [!] 14. Kompass-Rotation (Sensorpaket fehlt) · [x] 15. Cluster-Layer
+- [!] 14. Kompass-Rotation (Paket recherchiert, Freigabe von Janek offen) ·
+  [x] 15. Cluster-Layer **und Antippen** (das Antippen am 31.08.2026 nachgezogen)
   · [x] 16. Einzel-Marker
 - [x] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
 - [x] 19. Top-Chrome (vorgezogen, D-5 am 29.08.2026 abgeschlossen) · [ ] 20. Sammel-Erlebnis
@@ -1061,7 +1189,7 @@ Assistent hält seine Schritte selbst, Schritt 1 ist die Solo- und Gruppenwahl,
 Schritt 2 sind Schwierigkeit, Dauer und Genres, und der Generator hängt am
 Ausgang von Schritt 2. 1625 → 1725 Tests.
 
-- **Der grösste Fund kam vor dem Bau und betrifft den Plan, nicht den Code.**
+- **Der größte Fund kam vor dem Bau und betrifft den Plan, nicht den Code.**
   Die Solo-Jagd läuft in der Quelle auf der **Karte**, nicht im Challenge-Reiter.
   Damit beschreiben die Plan-Schritte 36 und 37 den Demo-Pfad. Steht als E-43,
   und deshalb endet dieser Block nach 34 statt nach 37.
@@ -1254,7 +1382,7 @@ als blind erkannt hatte: ein Punkt außerhalb des Rahmens kann rechnerisch nie
 näher an der Rahmenmitte liegen als einer in der Mitte, der Ausschluss war also
 nicht prüfbar, wie er geschrieben war. Die Review fuhr zwölf, **sechs
 überlebten**, vier davon in genau diesem Filter: die ganze senkrechte Prüfung,
-der rechte Rand, die Grössenschwelle und die Betonung des Kandidaten. Nach der
+der rechte Rand, die Größenschwelle und die Betonung des Kandidaten. Nach der
 Nachbesserung fallen alle sechs.
 
 **Drei veraltete Zusagen im Bestand mitgezogen.** Die Umrechnung von Geräte- auf
@@ -2269,11 +2397,11 @@ nicht.** Nachgeschlagen: `screen-auth.jsx:348` zeichnet unbedingt
 `<Flag size={30}/>`, eine Breitenschwelle für die Flagge gibt es in der ganzen
 PWA nicht; der einzige Umbruchpunkt ist `@media (max-width: 500px)` in
 `styles.css:269` und schaltet den Telefonrahmen auf Vollbild. Die 30 war die
-Grösse, nicht eine Regel. **Die Verkleinerung ist damit eine bewusste
+Größe, nicht eine Regel. **Die Verkleinerung ist damit eine bewusste
 Abweichung von der Quelle und kein Nachbau**, und sie wurde Janek mit der
 falschen Begründung vorgelegt.
 
-Schwelle und Grösse sind hergeleitet und gemessen, mit echten Schriften: der
+Schwelle und Größe sind hergeleitet und gemessen, mit echten Schriften: der
 Fehlbetrag von 14,657 Pixeln verteilt sich auf zwei Karten, jede muss 7,33
 schmaler werden, die Flagge darf also höchstens 22,67 breit sein. **22 wäre das
 Maximum und geht mit 0,039 Pixeln Rest auf**, also ein Zufallstreffer; gewählt
@@ -2508,7 +2636,7 @@ halben Tag.
     Registrierung" die ganze Suite. Was einen guten Prüfauftrag ausmacht, steht
     in `HANDOFF.md` unter „Arbeitsweise mit Claude".
 16. **Ein Test, der `lib/` nach einer Zeichenkette durchsucht, findet zuerst
-    sich selbst, und wer das behebt, reisst ein Loch auf.** Beide Hälften sind
+    sich selbst, und wer das behebt, reißt ein Loch auf.** Beide Hälften sind
     in Schritt 27 passiert. Die Einstiegs-Wache des Rätsel-Sheets schlug im
     ersten Lauf an, weil in **ihrem eigenen Kopfkommentar** das Wort steht, nach
     dem sie sucht. Die naheliegende Behebung, vor dem Vergleich alles ab dem
@@ -2541,6 +2669,25 @@ halben Tag.
     Helfer neben `pumpEventQueue()` und `loadAppFonts()`, und der Ausweg ist
     hier ein anderer: nicht `setUpAll`, sondern `tester.runAsync`. Der
     Unterschied zu Muster 13 ist die **Zone**, nicht die Zeit.
+20. **Zwei Ereignisse reichen nicht, um „die letzte gewinnt" von „die erste
+    gewinnt" zu unterscheiden.** Wo ein Aufbau genau **einen** Vorgang merkt,
+    während ein anderer läuft, sind beide Regeln bei zwei Ereignissen identisch:
+    das erste läuft, das zweite wird gemerkt, es gibt nichts zu verdrängen. Erst
+    das **dritte** trennt sie. Beleg: die Sequenzsicherung des Gruppen-Tipps in
+    Schritt 15. Die Mutation `_pendingGroupTap ??= tap`, also „der ältere
+    bleibt", überlebte den Zwei-Tipp-Test und fällt erst gegen drei Tipps.
+    Verwandt mit Muster 18, aber die Ursache liegt nicht in der Zusicherung,
+    sondern in der **Anzahl der Eingaben**.
+21. **Zwei Verhalten, die bei den gewählten Eingaben zufällig dasselbe
+    Ergebnis liefern, sind nicht unterscheidbar.** Beleg: die Auswahl der Punkte
+    einer angetippten Gruppe lässt einen Punkt ohne Bildschirmlage herausfallen.
+    Behandelt man ihn stattdessen als (0, 0), bleibt die Suite grün, weil die
+    Testkoordinaten so lagen, dass (0, 0) **ebenfalls** außerhalb des Radius
+    fiel. Beide Wege endeten bei „ausgeschlossen". Der Produktivcode war
+    richtig, nur die Probe war blind. Gegenmittel: die Eingaben so wählen, dass
+    der Ersatzwert ein **anderes** Ergebnis erzwingt, und den Grund für die
+    Wahl in den Test schreiben, sonst macht der Nächste sie beim Aufräumen
+    wieder harmlos.
 
 ## Datenvertrag: die bekannten Fallen
 

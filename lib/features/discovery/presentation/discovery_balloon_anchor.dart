@@ -162,7 +162,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// beim Gehzoom auf die 25 zur Kartenmitte nächsten Features zu
 /// (`screen-map.jsx:2050-2056`). Der Grund dort ist ein anderer (Lag-Schutz
 /// bei 600 DOM-Knoten) als hier (Bildschirmabstand statt Kanalkosten), die
-/// Grössenordnung beantwortet aber dieselbe Frage: wie viele der nächsten
+/// Größenordnung beantwortet aber dieselbe Frage: wie viele der nächsten
 /// Punkte reichen, um die Umgebung eines Zentrums verlässlich zu vertreten.
 ///
 /// **Was diese Zahl in der Praxis trägt, hängt an der offenen Verhaltensfrage
@@ -278,7 +278,7 @@ List<MapOverlayPoint> nearestOverlayPointsTo(
 /// von [overlay] mit Betonung 0, ohne Dopplung.
 ///
 /// Ein Fakt, der in [nearby] steht, kommt nicht ein zweites Mal mit Betonung 0
-/// herein: [nearby] kennt die echte, grössere Rolle, die dieser Ballon gerade
+/// herein: [nearby] kennt die echte, größere Rolle, die dieser Ballon gerade
 /// spielt.
 List<BalloonAnchorCandidate> balloonAnchorCandidatesOf({
   required MapOverlay overlay,
@@ -313,7 +313,7 @@ List<BalloonAnchorCandidate> balloonAnchorCandidatesOf({
 /// `screen-tour.jsx:193-222`, in dieser Reihenfolge geprüft:
 ///
 /// 1. Ein zu kleiner Marker fällt weg, siehe [discoveryBalloonAnchorMinMarkerSize].
-///    Die Grösse folgt aus [BalloonAnchorCandidate.emphasis] und [zoom], genau
+///    Die Größe folgt aus [BalloonAnchorCandidate.emphasis] und [zoom], genau
 ///    wie beim gezeichneten Ballon in `fact_balloon_overlay.dart`.
 /// 2. Ein Marker, der den Rahmen gar nicht berührt, fällt weg.
 /// 3. Von den übrigen gewinnt der euklidisch nächste Mittelpunkt zur
@@ -396,7 +396,7 @@ Rect? selectBalloonAnchorRect({
 /// das Rechteck erst beim Abfragen aus einem echten Renderobjekt aus (siehe
 /// Kopfkommentar von `anchor_registry.dart`); ein schon berechnetes `Rect`
 /// lässt sich dort nicht direkt anmelden. Der Ausweg ist ein `AnchorTarget`,
-/// das an der berechneten Stelle, in der berechneten Grösse, nichts zeichnet:
+/// das an der berechneten Stelle, in der berechneten Größe, nichts zeichnet:
 /// sein Renderobjekt ist das Rechteck, das `AnchorRegistry.rectOf`
 /// zurückgibt, ohne dass `core/anchors/` einen zweiten Anmeldeweg braucht.
 /// Dasselbe `Positioned` trägt auch das Ersatzrechteck der Quelle, siehe
@@ -406,16 +406,16 @@ Rect? selectBalloonAnchorRect({
 ///
 /// Am 30.08.2026 am Gerät belegt (`REBUILD_STATUS.md`, „Ungefragter Fund A“):
 /// die projizierte Kameramitte trifft die Mitte der Kartenfläche, und die
-/// Kartenfläche deckt sich mit der Bildschirmgrösse. `MediaQuery.sizeOf`
+/// Kartenfläche deckt sich mit der Bildschirmgröße. `MediaQuery.sizeOf`
 /// genügt deshalb als Rahmenmass, ohne einen eigenen Messlauf über
-/// `LayoutBuilder`; dieselbe Grösse wird für die Rahmenmitte, den
+/// `LayoutBuilder`; dieselbe Größe wird für die Rahmenmitte, den
 /// Rahmenfilter und das Ersatzrechteck benutzt, damit alle drei
 /// übereinstimmen.
 ///
 /// ## Warum hier trotzdem dauerhaft ein Kamera-Zuhörer hängt
 ///
 /// Anders als beim Tutorial-Overlay selbst (das nur bei Schrittwechsel und
-/// Grössenänderung misst, siehe `tour_overlay.dart`) muss diese Klasse selbst
+/// Größenänderung misst, siehe `tour_overlay.dart`) muss diese Klasse selbst
 /// wissen, wo die Karte gerade steht, denn niemand sonst fragt sie danach. Der
 /// Kamerastrom projiziert trotzdem nicht 600 Fakten je Bild: eine geografische
 /// Vorauswahl (siehe [balloonAnchorCandidatesOf]) hält die Kandidatenzahl

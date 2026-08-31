@@ -30,7 +30,14 @@ Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schrit
 steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
 Kästchen war das Veraltete, nicht der Stand.
 
-**Kennzahlen:** 1885 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Am 31.08.2026 lagen Kästchen und Wirklichkeit ein zweites Mal auseinander, und
+diesmal in der anderen Richtung:** Schritt 15 galt als `[x]`, enthielt das
+Antippen der Gruppen aber ausdrücklich nicht. Seit dem Nachziehen ist er wirklich
+fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
+Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
+jetzt stimmt.
+
+**Kennzahlen:** 1979 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -56,18 +63,32 @@ siehe „Rechner einrichten".
 
 1. **E-48 beantworten, es ist die einzige neue Frage aus dieser Nacht.** Wohin
    zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist? Der Anker ist
-   gebaut, die Frage ist die Grösse, an der er misst. Belege im Abschnitt „Der
+   gebaut, die Frage ist die Größe, an der er misst. Belege im Abschnitt „Der
    `balloon`-Anker". **Der billigste Weg, sie ganz zu schließen:** einmal mit
    den Entwicklerwerkzeugen in der laufenden PWA die Breite eines Ballons bei
    zwei Zoomstufen ablesen. Die tragende Kette ist bis dahin hergeleitet und
    nicht gemessen.
 
-2. **Dairens Antworten haben drei Dinge freigemacht, und sie sind der nächste
-   Bauplan.** In dieser Reihenfolge, begründet in `REBUILD_STATUS.md`:
-   **das Antippen der Gruppen** aus Schritt 15 (D-12, der Kameravertrag bekommt
-   eine Rechteck-Absicht), **Schritt 14** die Kompass-Drehung (D-13, ein neues
-   Paket ist frei, welches ist zu recherchieren und zu begründen), und danach
-   ist Phase 2 bis auf Schritt 18 und 20 zu.
+2. **Schritt 14 wartet auf ein Wort von Janek, nicht auf Dairen.** Das Antippen
+   der Gruppen aus Schritt 15 ist am 31.08.2026 gebaut, D-12 ist umgesetzt (und
+   zwar **ohne** die vorhergesagte Änderung am Kameravertrag, die Begründung
+   steht in `REBUILD_STATUS.md`). Für die Kompass-Drehung ist die Paketfrage aus
+   D-13 recherchiert: empfohlen wird `flutter_rotation_sensor` und **nicht**
+   `flutter_compass` aus dem eingefrorenen Port, weil das seit November 2024
+   keinen Commit hat und auf iOS einen zweiten `CLLocationManager` neben
+   `geolocator` öffnet. Der Vorbehalt gehört dazu: sechs GitHub-Sterne, ein
+   Einzelbetreuer, „unverified uploader", keine Genauigkeitsangabe und kein
+   Sensor-Fallback. Nebenwirkung: das Paket verlangt Dart ≥ 3.12.1, die
+   `pubspec.yaml` deklariert heute `^3.9.0` und müsste mit angehoben werden.
+   **Ein neues Paket ist zustimmungspflichtig, also wandert ohne Janeks Ja
+   nichts in `pubspec.yaml`.** Danach ist Phase 2 bis auf 18 und 20 zu.
+
+   **Wenn das stillsteht, ist die unblockierte Arbeit Phase 7:** die Schritte
+   45 (Library), 46 (Cover und Illustrationen) und 48 (Leaderboard) stehen als
+   offen und nicht als blockiert. Schritt 20 steht formal offen, hat aber keine
+   Datenquelle für den Sammelzustand, `features/collection` existiert nicht; wer
+   dort anfängt, prüft **zuerst**, ob echtes Sammeln eine Backend-Entscheidung
+   auslöst. Dreizehn der siebenundzwanzig verbleibenden Schritte sind blockiert.
 
 3. **D-9 und D-14 sind entschieden und kosten keine Arbeit.** Lokale Typen
    bleiben. Die Umrechnung ist gemessen billig, fünf Aufrufstellen mit je zwei
@@ -94,8 +115,11 @@ siehe „Rechner einrichten".
    offen, solange die Lücke nur `test/` betrifft. **D-9** Variante (b), lokale
    Typen bleiben, denn die Umrechnung ist gemessen billig und die drei Typen
    sind keine Kopien. **D-14** hängt daran und bleibt deshalb wie es ist.
-   **D-15 und D-16 liegen weiter bei niemandem** und gehören in den nächsten
-   Block.
+   **D-15, D-16 und das neue D-17 sind am 31.08.2026 als Block an Dairen
+   gegangen**, zusammen mit zwei Meldungen, die keine Antwort brauchen: D-12s
+   vorhergesagter Preis fällt nicht an, und die Paketlücken-Tabelle behauptete
+   fälschlich, es gebe kein dauerhaftes Kamera-Padding. Wortlaut in
+   `REBUILD_STATUS.md`.
 6. **Ein Kartenanker fehlt noch.** Diese Zeile stand bis zum
    30.08.2026 falsch hier: `discovery_anchors.dart:24-30` sagt, dass `coins`,
    `modeFactFinder`, `modeTour` und `compass` sich seit dem Top-Chrome aus
@@ -116,6 +140,41 @@ siehe „Rechner einrichten".
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Schritt 15 ist wirklich fertig, und der Preis von D-12 fiel nicht an
+
+Das Antippen der Gruppen ist gebaut, in drei Blöcken mit je einer unabhängigen
+Review, 1885 → 1979 Tests. **Überraschend war, dass der von D-12 vorhergesagte
+Preis gar nicht anfiel.** Er sollte „ein neues Feld im gerade fertiggestellten
+Kameravertrag und einen zweiten Bewegungspfad im Host" kosten. Der naheliegende
+Weg dorthin, `CameraUpdate.newLatLngBounds`, übergibt der nativen Seite aber
+keinen Neigungswert, und ob die Neigung dadurch auf 0 fällt, ist im Pub-Cache
+**nicht** nachprüfbar. Eine Fahrt, die die 58 Grad möglicherweise still
+flachlegt, taugt nicht als Grundlage. Also ist das Rechteck eine Rechnung **vor**
+der Absicht: reine Geometrie in `map/domain/`, und am Ende eine gewöhnliche
+`MapCameraOneShot` mit Mittelpunkt und Zoom. Kameravertrag, Gate und
+Bewegungspfade sind unangetastet, erweitert ist nur die Fassade `MapHost`.
+
+**Der zweite Fund ist eine Untergrenze, die fast geschenkt war:** `clusterMaxZoom:
+15` heißt, dass es ab Zoom 16 überhaupt keine Gruppen mehr gibt. Ein Fahrziel von
+mindestens 16 lässt die angetippte Gruppe also sicher aufgehen, ohne dass irgendwer
+MapLibres Gruppierung nachrechnet. Damit ist die Näherung bei der Auswahl der
+Punkte bezahlbar: sie irrt in die sichere Richtung.
+
+**Der dritte und lehrreichste Fund gehört der Review, und sie brauchte dafür keine
+Mutation.** `_onGroupTap` hatte keine Sequenzsicherung, eine veraltete
+Projektionsantwort konnte die frische Absicht überschreiben. Gefunden hat sie es
+durch **Vergleich mit zwei Nachbarstellen**, die dasselbe Problem längst lösen und
+beide älter sind als der neue Code. Das ist Muster 10 in seiner unangenehmsten
+Form: nicht zwei Stellen, von denen eine ungeprüft ist, sondern eine dritte, die
+eine bereits bezahlte Lehre nicht mitgenommen hat. Wer hier nur mutiert, findet
+das nicht; man muss die Nachbarn lesen.
+
+Nebenbei zwei neue Blindheitsmuster, 20 und 21 in „Wie Tests hier blind werden",
+und eine falsche Zeile in der Paketlücken-Tabelle behoben: dauerhaftes
+Kamera-Padding gibt es doch, es heißt nur `updateContentInsets` und nicht
+`setPadding`. „Null Treffer im ganzen Paket" war eine Aussage über den
+Suchbegriff.
 
 ### 31.08.2026, Der `balloon`-Anker, und eine Schwelle, die das Gegenteil tut
 
