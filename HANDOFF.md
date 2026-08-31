@@ -575,6 +575,12 @@ verfälschter Hotspot-Name ließ alle 1792 Tests grün und schlug nur im
 Drift-Werkzeug an. Diese drei bleiben lokal, und **grün in CI heißt deshalb
 nicht, dass alles geprüft ist**.
 
+**Dass der Workflow auch rot wird, ist gemessen und nicht angenommen.** Ein
+grüner Lauf beweist nur, dass er läuft. Am 31.08.2026 lief deshalb eine
+Gegenprobe auf einem Wegwerf-Zweig: ein absichtlich fallender Test, Gates 1 bis
+3 grün, **Gate 4 rot, ganzer Lauf rot**. Zweig und Test sind danach gelöscht.
+Ein Gate, das nie gefallen ist, ist ein Gate, das niemand geprüft hat.
+
 ### Generierten Code neu erzeugen
 
 ```
