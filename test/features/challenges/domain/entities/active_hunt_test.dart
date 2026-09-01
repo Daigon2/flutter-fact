@@ -385,6 +385,16 @@ void main() {
       expect(hunt!.difficulty, isNull);
     });
 
+    test('difficulty als leerer String verwirft die Nutzlast genauso', () {
+      // Der Fall, den die Code-Review am 31.08.2026 als ungeprüft gefunden hat.
+      // Er ist nicht offensichtlich: ein leerer String sieht wie „keine Stufe"
+      // aus, ist aber eine **unauflösbare Zeichenkette** und läuft damit durch
+      // denselben Zweig wie `'episch'`. Ohne diese Zusicherung wäre ein
+      // künftiger Schreiber, der `''` statt `null` für „unbekannt" nimmt, ein
+      // lautlos verlorener Spielstand.
+      expect(ActiveHunt.tryFromPayload(payload(difficulty: '')), isNull);
+    });
+
     test('difficulty als unbekannte Zeichenkette verwirft die Nutzlast', () {
       // Derselbe Präzedenzfall wie bei einer unbekannten Dauer weiter unten:
       // eine Jagd, deren Stufe still von der abweicht, die der Spieler

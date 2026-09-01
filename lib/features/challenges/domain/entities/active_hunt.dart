@@ -213,6 +213,16 @@ final class ActiveHunt {
   /// Ein negativer Index wird abgewiesen: er kann in der Quelle nicht
   /// entstehen und ist damit ein Zeichen für eine kaputte Nutzlast, nicht für
   /// einen noch unbekannten gültigen Wert.
+  ///
+  /// **Die Länge der Liste ist ebenfalls nicht begrenzt, und das ist eine
+  /// Vertrauensannahme.** Eine Code-Review hat am 31.08.2026 gemessen, dass eine
+  /// Nutzlast mit 500.000 Einträgen anstandslos durchläuft, deduplizieren
+  /// inklusive. Tragbar ist das, weil die einzige Schreibquelle dieser Nutzlast
+  /// der Gerätespeicher dieser App ist und `toPayload` höchstens so viele
+  /// Indizes schreibt, wie es Hinweise gibt. Eine Obergrenze wäre eine erfundene
+  /// Geschäftsregel und träfe dieselbe Falle wie eine Obergrenze für den
+  /// Indexwert. **Sobald eine zweite Quelle diese Nutzlast schreibt, ist die
+  /// Annahme weg und die Grenze fällig.**
   final List<int> unlockedHintIndices;
 
   /// Schwierigkeitsstufe der Jagd, oder `null`, wenn keine bekannt ist.

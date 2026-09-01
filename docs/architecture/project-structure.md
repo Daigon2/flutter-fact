@@ -144,6 +144,16 @@ features/settings/
   a `lib/core/anchors/anchor_ids.dart` full of domain identifiers would pass the
   gate. Review enforces this rule, not the machine.
 
+- **`core/geo/` in the tree above is a plan that has since been decided
+  against, and it is kept here with that note rather than deleted.** D-9 was
+  answered on 2026-08-31 with *keep the local types*, and ADR-008 excludes a
+  shared coordinate type by admission rule 3. There are three coordinate types
+  today, in `facts/domain`, `map/domain` and `services/location`, and that is the
+  decided state, not a gap. `api-and-domain-design.md` still lists `GeoPoint`
+  among its examples of value objects worth creating; that list is about creating
+  domain types at all, not about a shared one, but a reader arriving from D-9
+  should know both places were written before the answer.
+
 - `kernel/` is the shared kernel (ADR-008), added on 2026-08-31. It holds value
   objects that two or more feature domains both need, and it is the only place
   outside its own feature that a domain layer may import (rule 23). It is

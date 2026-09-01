@@ -21,6 +21,15 @@ load_when:
 | Application | Domain, narrowly scoped Core |
 | Domain | Dart SDK, approved pure-Dart primitives, and the shared kernel |
 | Shared kernel (`lib/kernel/`) | Dart SDK and itself. Nothing else, and no entities |
+
+**Every row above may also import the shared kernel**, not only Domain. That is
+not a loophole, it is the only workable reading: `Fact.easiestPuzzleDifficulty`
+returns a kernel type, so a layer that may call a domain API must be able to name
+the types that API returns. The kernel sits below every layer, like `dart:core`,
+and the restriction that matters runs the other way: what the kernel itself may
+import. Stated here because listing it in the Domain row alone read as an
+exclusive permission, and an independent review measured that Application,
+Presentation and Data already import it.
 | Data | Domain, Core technical primitives, vendor SDKs |
 | App composition | All public feature entry points and services |
 | Services | Vendor SDKs, Core contracts; domain only through explicit adapters |
@@ -38,9 +47,13 @@ times and the third time could have diverged silently: an enumeration with
 meaning, copied, fails no test when the original grows. ADR-008 holds the four
 admission rules, the current contents and what is deliberately kept out,
 including the three coordinate types from D-9, which measurement showed should
-stay separate. Rule 23 enforces both directions, and the second one is the one
-that matters over time: the kernel may import almost nothing, because everything
-in it is seen by every domain.
+stay separate. Rule 23 has one enforceable half, and it is the one that matters over time: the
+kernel may import almost nothing, because everything in it is seen by everything
+else. The other half, that any layer may import the kernel, is a permission and
+therefore has no violation to detect. An earlier version of this paragraph and of
+ADR-008 claimed "both directions are machine-enforced", which an independent
+review measured as untrue and which is corrected here rather than above, so the
+correction stays visible.
 
 The map host under `lib/map/` is app and UI infrastructure, not a business
 domain. It owns the map surface and the camera; features hand it intentions
@@ -77,9 +90,11 @@ independent business domain.
 20. `maplibre_gl` may only be imported below `lib/map/`.
 21. `geolocator` and its platform packages may only be imported below `lib/services/location/`.
 22. `shared_preferences` and its platform packages may only be imported below `lib/services/preferences/`.
-23. Every feature domain may import `package:fact_app/kernel/`, the shared
-    kernel. The kernel itself may import only `dart:`, itself, and vetted
-    pure-Dart packages. See ADR-008.
+23. Every layer may import `package:fact_app/kernel/`, the shared kernel, and
+    the kernel itself may import only `dart:`, itself, and vetted pure-Dart
+    packages. **Only the second half is a restriction**, and only it is
+    enforced; the first half is a permission and has nothing to check. See
+    ADR-008.
 
 Rules 19 to 22 give a vendor SDK one home directory. They are not a ban, they
 are an assignment: the map SDK belongs to the map host, the geolocation SDK

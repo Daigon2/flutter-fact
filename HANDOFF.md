@@ -37,7 +37,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2144 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2148 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -264,6 +264,31 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Zwei nachgeholte Reviews, und beide Befunde lagen in meinen Dokumenten
+
+Der Shared Kernel ist ohne Prüfung eingegangen, obwohl `HANDOFF.md` den
+`architecture-guardian` **vor** den großen Brocken verlangt. Nachgeholt am selben
+Tag, zwei Prüfer, und es hat sich gelohnt: drei echte Befunde aus der Architektur,
+zwei aus der Umsetzung. Belege in `REBUILD_STATUS.md`.
+
+**Überraschend war, dass kein einziger Befund eine falsche Zeile Code war.** Alle
+fünf saßen in Dokumenten: eine Rücknahmebedingung, die als erfüllt las und zu
+einem Viertel erfüllt ist; eine Vorhersage, die auf die falsche Regel zeigte; die
+Behauptung „beide Richtungen maschinell durchgesetzt", die für eine Richtung
+nichts zu prüfen hat; eine Regel, die enger geschrieben war als sie gemeint sein
+kann; und ein Satz über den leeren String, der gemessen falsch war. Das ist
+genau die Klasse, die dieses Repository schon dreimal als teuersten Fund
+protokolliert hat, und diesmal habe ich sie selbst produziert.
+
+**Der nützlichste Befund war eine Regel, die keine Kontrolle war.** Aufnahmeregel
+4 von ADR-008 („jeder Eintrag steht im ADR") war eine Absichtserklärung: nichts
+hinderte einen Commit, einen Typ in den Kern zu legen. Jetzt prüft
+`kernel_admission_test.dart` das in beide Richtungen, und die Probe ist gefallen:
+ein Typ ohne Eintrag macht rot, ein Eintrag ohne Typ auch. Für Regel 1 und 3 ist
+**bewusst** keine Näherung gebaut, mit Begründung im ADR: eine Prüfung, die „zwei
+Importe existieren" mit „zwei Domänen brauchen es" verwechselt, sieht wie eine
+Kontrolle aus und ist keine.
 
 ### 31.08.2026, Nutzlast-Fassung 2, und ein falscher Reflex in meinem eigenen Test
 

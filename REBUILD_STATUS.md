@@ -1391,6 +1391,154 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
 
+## Die Architekturprüfung des Kerns, 31.08.2026
+
+Nachgeholt am Tag des Einbaus, weil `HANDOFF.md` verlangt, den
+`architecture-guardian` **vor** den großen Brocken zu fahren und nicht danach,
+und weil beim D-17-Block schon einmal die fehlende Prüfung als Risiko benannt
+stehen blieb. Sie hat drei echte Befunde gebracht, und der erste ist die Klasse,
+die hier historisch am teuersten war.
+
+### Befund 1: eine Rücknahmebedingung, die als erfüllt gelesen wird und nicht erfüllt ist
+
+**Der schwerste, und er stand in meinem eigenen ADR.** ADR-008 führte als
+Review-Auslöser: „`HuntPlan` and `HuntStop` move from `challenges/application` to
+`challenges/domain`. Their own takeback condition is tied to this decision; the
+move is behaviour-neutral and was deliberately left out of this change."
+
+Das liest ein Nachfolger als „Bedingung erfüllt, Umzug fällig". Nachgerechnet ist
+sie zu **einem Viertel** erfüllt: `hunt_plan.dart:14-21` nennt vier Fremdtypen,
+die der Umzug bräuchte, und ADR-008 löst genau einen davon.
+
+| Typ | Status nach ADR-008 |
+|---|---|
+| `PuzzleDifficulty` | gelöst, liegt im Kern |
+| `FactCoordinates` | gesperrt durch Aufnahmeregel 3, siehe D-9 |
+| `FactPuzzle` | **dauerhaft** gesperrt: eine Entität, und der Kern nimmt keine |
+| `FactId` | gesperrt durch Aufnahmeregel 1 |
+
+Der Fall `FactPuzzle` ist der entscheidende: das Verbot hängt **nicht** an D-9,
+sondern an einer eigenen Regel des Kerns, und keine künftige D-9-Antwort hebt es
+auf. Der Umzug „ohne Feldänderung", wie `hunt_plan.dart` es formuliert, ist damit
+nicht möglich, sondern setzt einen Umbau von `HuntStop` voraus, also genau eine
+Feldänderung. Behoben als Nachtrag in ADR-008.
+
+### Befund 2: die Vorhersage im ADR war die falsche Regel
+
+ADR-008 sagte, Aufnahmeregel 4 komme als erste unter Druck. Die Prüfung hat mit
+dem besseren Argument widersprochen: **Regel 3 bricht zuerst, und zwar an genau
+der Baustelle aus Befund 1.** `HuntStop.position` baut eine `MapPosition` aus
+`fact.coordinates`; wer den Umzug versucht, braucht `FactCoordinates` im Kern,
+und das ist der Typ, den Regel 3 mit der D-9-Messung ablehnt. Dann steht jemand
+vor der Wahl: Umzug bleibt liegen, oder Regel 3 wird für „nur die Lage, ohne
+Verhalten" aufgeweicht. Die Vorhersage steht jetzt im ADR, damit dieser Moment
+als der vorhergesagte erkennbar ist und nicht als neue Idee.
+
+### Befund 3: zwei der vier Aufnahmeregeln waren Ritual und keine Kontrolle
+
+Nur Regel 2 (reines Dart) ist maschinell, als Regel 23. Regel 4 („jeder Eintrag
+steht im ADR") war eine Absichtserklärung: nichts hinderte einen Commit daran,
+einen Typ nach `lib/kernel/` zu legen, ohne ADR-008 anzufassen.
+
+**Für Regel 4 gibt es eine billige maschinelle Näherung**, und sie ist gebaut:
+`test/kernel/kernel_admission_test.dart` liest jede Deklaration auf oberster
+Ebene unter `lib/kernel/` und vergleicht sie mit der Inhaltstabelle von ADR-008,
+**in beide Richtungen**. Ein Typ ohne Eintrag ist rot, ein Eintrag ohne Typ
+ebenso, denn eine veraltete Tabelle ist die einzige Buchführung dieses
+Kopplungskanals. Dazu eine dritte Zusicherung auf genau die zwei heute
+entschiedenen Typen: sie schlägt bei gewolltem Wachstum absichtlich an und macht
+ADR-008s eigenen Auslöser „the kernel grows past a handful of types" sichtbar.
+
+**Regel 1 und Regel 3 bleiben Review-Sache, und das ist kein Versäumnis.** Beide
+sind Aussagen über Bedeutung. Eine Prüfung, die „zwei Importe existieren" mit
+„zwei Domänen brauchen es" verwechselt, wäre schlechter als eine offene
+Review-Pflicht, weil sie wie eine Kontrolle aussähe. Das steht so im Kopf des
+Tests.
+
+### Zwei Präzisierungen, die keine Fehler waren
+
+**Die Ablehnung von `FactId` stand auf schwächerem Grund als der Rest**, und das
+war im ADR nicht kenntlich. `FactCoordinates` ist strukturell ausgeschlossen
+(rollengebundenes Verhalten, gemessen), `FactId` nur deshalb, weil
+`challenges/application` heute ganze `Fact`-Objekte hält. Das ist eine
+Momentaufnahme des Datenmodells und kippt, sobald `HuntStop` demselben Muster
+folgt wie `ActiveHunt`, das schon heute Koordinaten statt einer Entität trägt.
+Jetzt als Nachtrag benannt.
+
+**Die Abwägung gegen Option (c) war unvollständig.** Das ADR verwarf sie mit dem
+Wortlaut von ADR-007. Technisch war sie die billigste: Gate 6 sperrt nur die
+`domain`-Schicht, `hunt_plan.dart` importiert `facts/domain` aus `application`
+heute schon. Der tragende Grund gegen (c) ist ein anderer und stand nicht da: sie
+hätte D-18 gelöst und die zwei Kopien in `puzzles/domain` stehen gelassen, also
+ADR-006s benannten Preis nicht bezahlt und das Risiko der stillen Abweichung
+offen gelassen. Ergänzt.
+
+### Ein Widerspruch in zwei akzeptierten Dokumenten
+
+`project-structure.md` führt in seinem `core`-Baum ein `geo/`, und
+`api-and-domain-design.md` nennt `GeoPoint` unter den Beispielen für lohnende
+Wertobjekte. Beides ist vor der Antwort auf D-9 geschrieben und widerspricht ihr:
+es bleibt bei drei lokalen Koordinatentypen, und ADR-008 schließt einen geteilten
+über Regel 3 aus. Der `core`-Baum trägt jetzt eine Notiz dazu, statt gelöscht zu
+werden, denn ein stillschweigend entfernter Plan sieht aus wie ein Versehen.
+
+### Die zweite Prüfung, an der Umsetzung statt an der Entscheidung
+
+Parallel zur Architekturprüfung lief eine Code-Review über alle drei Blöcke des
+Tages, mit eigenen Wegwerf-Proben und selbst gefahrenen Gates. Sie hat zwei
+Befunde gebracht, und **beide betrafen meine Dokumente und nicht den Code**.
+
+**Befund A, der wichtigere: „Regel 23 setzt beide Richtungen durch" war falsch,
+und die Regel ist weiter als ich sie geschrieben hatte.** Gemessen mit Proben:
+die Innenseite des Kerns ist dicht, auch gegen einen relativen Import hinaus,
+gegen `export` statt `import` und in Unterordnern. Die andere Seite ist **keine
+Beschränkung**, sondern eine Erlaubnis, und die hat nichts zu prüfen.
+
+Dazu der Teil, der die Regel selbst ändert: `dependency-rules.md` führte den Kern
+nur in der Domänen-Zeile, und ADR-008 nannte ihn „the one place a **feature
+domain** may reach outside itself". Gemessen importieren ihn auch Application,
+Presentation und Data, in fünf Dateien. **Das ist kein Wildwuchs, sondern
+notwendig:** `Fact.easiestPuzzleDifficulty` gibt einen Kern-Typ zurück, eine
+Schicht, die ihn nicht nennen darf, könnte die Domänen-API nicht benutzen. Der
+Kern liegt unter allen Schichten, wie `dart:core`. Beides ist korrigiert, in der
+Tabelle, in Regel 23 und als Nachtrag in ADR-008.
+
+Der Preis davon ist benannt statt weggeredet: ein Kern-Typ kann in einer
+Widget-Signatur auftauchen, ohne dass ein Gate widerspricht. Heute harmlos, weil
+beide Einträge Wertobjekte ohne Verhalten sind. Harmlos bleibt es genau so lange,
+wie Aufnahmeregel 3 hält.
+
+**Befund B: ein Satz in diesem Dokument war gemessen falsch.** Er lautete „eine
+fehlende oder ausdrücklich leere Stufe bleibt gültig". Für den leeren String ist
+das falsch, er verwirft die Nutzlast wie jede andere unauflösbare Zeichenkette.
+Der Kommentar im Code war richtig, die Prosa nicht, und der Fall hatte keinen
+Test. Beides behoben, siehe den Abschnitt zur Nutzlast.
+
+**Ein dritter Punkt ist kein Fehler, sondern eine unbenannte Annahme.** Die Länge
+von `unlockedHintIndices` ist nicht begrenzt; eine Nutzlast mit 500.000 Einträgen
+lief anstandslos durch, gemessen. Tragbar, weil die einzige Schreibquelle der
+Gerätespeicher dieser App ist. Eine Obergrenze wäre eine erfundene
+Geschäftsregel. Die Annahme steht jetzt im Feldkommentar, mit dem Satz, der sie
+fällig macht: sobald eine zweite Quelle diese Nutzlast schreibt, ist sie weg.
+
+**Was die Code-Review nachgerechnet und bestätigt hat**, weil eine Zahl, die
+niemand nachrechnet, eine Behauptung ist: die 67 Zeilen netto, die 156 Zeilen
+Kern, die drei Domänendateien zum Stand des Kern-Commits, die Testzahl 2144, die
+vier Gates und die drei Drift-Werkzeuge. Dazu die Formangriffe auf die Nutzlast
+(Map, String, `null`-Element, ganzzahliger `double`, Rand-Leerzeichen), die
+Unveränderlichkeit der Indexliste und die reihenfolgeunabhängige Gleichheit. Und
+dass nach dem Löschen der drei Dateien **kein** Verweis auf die alten Namen
+zurückgeblieben ist, auch nicht in `docs/`.
+
+### Was die Prüfung ausdrücklich nicht beanstandet hat
+
+Der Kern ist nicht `core` mit anderem Namen: seine Zäunung ist strenger, in beide
+Richtungen maschinell, und mit ADR-Pflicht je Eintrag, während `core` nur Regel 11
+hat, eine Namensliste, die bei `core/anchors/` schon einmal nicht ausreichte. Und
+keine Cross-Feature-Kante verschwindet oder wird versteckt: `puzzles → facts`
+bleibt, weil der Übersetzer weiterhin eine **Entität** übersetzt und nicht nur
+die jetzt geteilten Werte.
+
 ## Die Jagd-Nutzlast auf Fassung 2, 31.08.2026
 
 Zwei Inhalte, **eine** Formänderung. 2131 → 2144 Tests, alle vier Gates auf
@@ -1418,8 +1566,16 @@ Liste aus der Iterationsreihenfolge eines `Set` baut, würde zufällig scheitern
 „wiederherstellen ohne Stufe". Der Präzedenzfall steht in derselben Datei:
 `_durationOfMinutes` verwirft bei einer unbekannten Dauer. Eine Jagd, deren Stufe
 still von der abweicht, die der Spieler gesehen hat, ist schlimmer als ein
-Neustart. Eine fehlende oder ausdrücklich leere Stufe bleibt gültig, denn ein
-Rätsel muss keine haben.
+Neustart.
+
+**Hier stand zuerst ein falscher Satz, und die Code-Review hat ihn gemessen.** Er
+lautete „eine fehlende oder ausdrücklich leere Stufe bleibt gültig". Richtig ist
+nur die erste Hälfte: ein fehlender Schlüssel und ein ausdrückliches `null` sind
+gültig und ergeben keine Stufe. Ein **leerer String** ist dagegen eine
+unauflösbare Zeichenkette und verwirft die Nutzlast, genau wie `'episch'`. Der
+Kommentar im Code hat das nie anders behauptet, die falsche Aussage stand
+ausschließlich hier. Der Fall hat jetzt einen eigenen Test, denn er hatte keinen:
+geprüft war nur `'episch'`.
 
 Keine Obergrenze für einen Index, aus dem Grund, der schon am alten Feld stand:
 die Zwei aus `HINT_COSTS` hängt an Schritt 37, und eine Prüfung darauf würde nach
