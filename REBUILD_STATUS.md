@@ -1391,6 +1391,73 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
 
+## Ein Fund beim Zuschnitt von Schritt 36, 31.08.2026
+
+Beim Lesen der Quelle für die laufende Jagd sind zwei Dinge aufgefallen, die
+zusammen eine Produktfrage ergeben. Beide sind mit `grep` über das ganze
+PWA-Verzeichnis gemessen, nicht aus dem Code geschlossen.
+
+### 1. Der Vorrangzweig der Hinweise ist tot
+
+`screen-map.jsx:1035` liest die Hinweise so:
+
+```js
+const hints = stop.locationHints || (dbHints && (...) ? [...] : [...]);
+```
+
+**`stop.locationHints` wird in der gesamten PWA nirgends gesetzt.** Die einzigen
+zwei Treffer im ganzen `02_Frontend/app/` sind diese Lesestelle und dieselbe
+Zeile in `screen-map.original.jsx`, also der Sicherungskopie. Der Vorrangzweig
+läuft damit **nie**, und der Rückfall auf `stop.nextHints` ist in Wirklichkeit
+der einzige Pfad.
+
+Das allein wäre nur toter Code. Es wird erst durch den zweiten Fund wichtig.
+
+### 2. Das Hinweis-Trio gehört der **nächsten** Station
+
+`hunt-generator.jsx:319-338`, wörtlich:
+
+```js
+const nextStop  = stops[i + 1];
+const trio      = nextHintsFor(nextFact, lang);
+stop.nextHints  = trio;
+```
+
+An Stopp `i` liegt also das Trio des Fakts von Stopp `i + 1`. Und die letzte
+Station bekommt ausdrücklich `nextHints = null`, sie hat gar keine.
+
+**Zusammengesetzt ergibt das:** die Pille zeigt an der aktuellen Station die
+Hinweise zur **übernächsten**. Denn `currentStopIdx` springt beim Lösen sofort
+auf die nächste Station (`app.jsx:915-918`), und die Pille liest immer
+`stops[currentStopIdx].nextHints`. Wer Station 3 sucht, bekommt Hinweise zu
+Station 4. Auf den Ort, den er gerade sucht, sieht er nie einen.
+
+### Zwei Lesarten, und ich entscheide sie nicht
+
+**Absicht.** Der Kommentar der Quelle nennt den ersten, kostenlosen Hinweis
+einen „atmospheric teaser", der „sofort sichtbar" sein soll. Als Vorschau auf
+den nächsten Ort ergibt das Sinn: man löst hier, und der Text stimmt einen auf
+das ein, was als Nächstes kommt.
+
+**Defekt.** Dagegen steht die Beschriftung des gesperrten Hinweises:
+„🔒 Tipp freischalten (−20 🪙 vom Fakt-Lohn)". Zwanzig und dreißig Münzen für
+einen Hinweis auf einen Ort, den man noch nicht sucht, ist keine Hilfe, sondern
+eine Fehlausgabe. Und die Navigationshilfen daneben (Pfeil und Distanz) zeigen
+eindeutig auf die **aktuelle** Station, die Pille mischt also zwei Ziele in einer
+Zeile.
+
+Festgehalten als **E-60**. Der Neubau kann beide Lesarten, der Unterschied ist
+ein Index, und die Struktur wird so gebaut, dass die Entscheidung eine Zeile
+kostet und keine Umstellung.
+
+### Was daran nicht offen ist
+
+Dass die **letzte** Station keine Hinweise hat, ist keine der beiden Lesarten,
+sondern folgt aus beiden: in der einen gibt es keinen nächsten Ort, in der
+anderen ist das Feld schlicht leer. Der Neubau muss diesen Fall also so oder so
+tragen, und die Quelle fällt dort auf einen einzigen Satz zurück
+(„Schau dich in der Umgebung aufmerksam um.").
+
 ## Schritt 14, die Wahl des Sensorpakets, 31.08.2026
 
 D-13 ist mit „ein neues Paket ist freigegeben" beantwortet worden, und die
@@ -3812,6 +3879,7 @@ eine Fundstelle.
 | E-57 | **Der Team-Ausgleich kann nicht wirken.** `_team_generate_orders` vergleicht die Wegstrecken über `sum(...) where id = any(v_a)` gegen `any(v_b)`; `v_a` und `v_b` sind Permutationen **derselben Menge**, also ist die Differenz immer 0, die Schwelle `<= 0.20` immer erfüllt und der dreifache Resampling-Apparat unerreichbar. Beide Teams laufen denselben Stationssatz in anderer Reihenfolge, und das ist laut Index-Kommentar gewollt; dann ist offen, was die Teams überhaupt unterscheiden soll. Dazu eine wirkungslose Winkelnormalisierung, `abs(((x-y)+pi())-pi())` kürzt sich zu `abs(x-y)`. Dieselbe Bauart wie die dreistufige Auswahl aus Schritt 33: eine Vorkehrung, die ihr Ergebnis nicht ändern kann. | 2 | Phase 5 |
 | E-58 | **Der Admin ist eine statische Seite mit dem `service_role`-Schlüssel im Browser.** `02_Frontend/admin/index.html` nimmt den Generalschlüssel entgegen, legt ihn in `localStorage` (`fact_admin_service_key`) und spricht damit direkt gegen Supabase; er umgeht **jede** RLS-Policy. Kein Admin-Server, keine Rollenprüfung, kein Protokoll darüber, wer wann was freigegeben hat. Dieselbe Bauart in der Pipeline: 11 Skripte lesen `service_role_key` aus `import_config.json`, gitignoriert, aber im Klartext in einem OneDrive-Ordner. Das ist kein Fehler in einer Zeile, sondern der Teil, der bei einem Backend-Neubau nicht mitgenommen werden kann: ohne Antwort hierauf ist der Neubau nach einem Tag wieder am Ausgangspunkt, weil jemand Fakten freigeben können muss. | **4** | vor dem Backend-Neubau |
 | E-59 | **Welchen Bezugsrahmen hat die Kompass-Richtung, magnetisch Nord oder wahres Nord?** Der Neubau setzt seit Schritt 14 ausdrücklich **magnetisch** Nord, weil der Android-Pfad der Quelle `deviceorientationabsolute` liest und das magnetometerbasiert ist. **Offen ist der iOS-Pfad:** `webkitCompassHeading` leitet sich aus `CLHeading` ab, und dort gibt es `trueHeading` **und** `magneticHeading`. Nimmt die Quelle dort das wahre Nord, sind ihre beiden Zweige nicht deckungsgleich, und der Unterschied ist die örtliche Missweisung, in Mitteleuropa ungefähr 2 bis 5 Grad. Das ist **mehr** als die Totzone von 1,5 Grad, also sichtbar, und es hiesse, dass die Karte auf iOS und Android unterschiedlich zeigt. Zu klären an einem iOS-Gerät oder an Apples Dokumentation; der Neubau kann beide Rahmen, die Umstellung ist eine Zeile im Adapter. Belege unter „Schritt 14, die Wahl des Sensorpakets". | 2 | vor Auslieferung |
+| E-60 | **Die gestuften Hinweise der Jagd beschreiben die Station nach der aktuellen, nicht die aktuelle.** Gemessen und nicht vermutet, siehe „Ein Fund beim Zuschnitt von Schritt 36". Der Generator legt an Stopp `i` das Hinweis-Trio des Fakts von Stopp `i+1` ab (`hunt-generator.jsx:319-338`), und die Pille liest an der aktuellen Station genau dieses Feld (`screen-map.jsx:1035-1043`). Weil `currentStopIdx` beim Lösen sofort weiterspringt, sieht der Spieler nie einen Hinweis auf den Ort, den er gerade sucht. Zwei Lesarten: **Absicht** (der erste Hinweis heißt im Kommentar „atmospheric teaser", also eine Vorschau auf den nächsten Ort) oder **Defekt** (dann zahlt man 20 und 30 Münzen für Hinweise auf einen Ort, den man noch nicht sucht). Zu entscheiden ist, welche gilt; der Neubau kann beide, der Unterschied ist ein Index. **Und die letzte Station hat gar keine Hinweise**, denn dort setzt der Generator `nextHints = null`. | 2 | vor Schritt 37 |
 
 ## Wie Tests hier blind werden
 

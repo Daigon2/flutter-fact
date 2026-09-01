@@ -233,6 +233,23 @@ ist die Reihenfolge danach.
    Er steht jetzt vollständig im Repository. **Wer den dritten Block schickt,
    legt ihn vorher dort ab.**
 
+4b. **Eine neue Frage an Janek, E-60, und sie ist beim Zuschnitt von Schritt 36
+   aufgefallen.** **Die gestuften Hinweise der Jagd beschreiben die Station
+   *nach* der aktuellen, nicht die aktuelle.** Gemessen: der Generator legt an
+   Stopp `i` das Trio des Fakts von Stopp `i+1` ab, die Pille liest an der
+   aktuellen Station genau dieses Feld, und `currentStopIdx` springt beim Lösen
+   sofort weiter. Wer Station 3 sucht, bekommt Hinweise zu Station 4.
+
+   Zwei Lesarten, beide vertretbar: **Absicht** (der erste Hinweis heißt im
+   Kommentar „atmospheric teaser", also eine Vorschau) oder **Defekt** (dann
+   zahlt man 20 und 30 Münzen für Hinweise auf einen Ort, den man nicht sucht,
+   während Pfeil und Distanz daneben auf die aktuelle Station zeigen). Dazu ein
+   Nebenbefund: der Vorrangzweig `stop.locationHints`, den die Pille zuerst
+   prüft, wird in der ganzen PWA **nie** befüllt.
+
+   Der Neubau kann beide Lesarten, der Unterschied ist ein Index. Belege in
+   `REBUILD_STATUS.md` unter „Ein Fund beim Zuschnitt von Schritt 36".
+
 5. **Vier Dinge sind an mich delegiert und können jederzeit gemacht werden:**
    der Kamera-Zweckwortlaut (E-20, muss Damals/Heute **und** Foto-Rätsel in
    einem Satz abdecken), der Tutorial-Pfeil ohne Ballon in der Nähe (E-48), der
