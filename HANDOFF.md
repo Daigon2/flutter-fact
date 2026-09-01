@@ -38,7 +38,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2192 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2212 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -303,6 +303,27 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Die Regeln der Jagd, und eine Meldung, die nichts bedeutet hat
+
+Der erste Teil des neu zugeschnittenen Schritts 36: Hinweiskosten,
+Navigations-Gating nach Schwierigkeit, Pfeilindex. 2192 → 2212 Tests, fünf
+Pflichtmutationen, fünf Fälle. Belege in `REBUILD_STATUS.md`.
+
+**Überraschend war, dass „completed" nichts über den Arbeitsbaum sagt.** Der
+bauende Agent geriet in eine Warteschleife und meldete dabei mehrfach „fertig",
+inhaltlich jedes Mal „ich warte noch". Ich habe die erste Meldung für das Ende
+gehalten und **eine Datei mitten in seiner Mutationsprobe gelesen**: für ein
+paar Minuten sah `isHuntHintFree` wie ein ausgelieferter Fehler aus. War es
+nicht, er hat sie zurückgenommen. Aber damit war **ich** der zweite Schreiber im
+Arbeitsbaum, also genau die Falle, die im Protokoll schon steht, nur mit
+vertauschten Rollen. Ein Agent in einer Warteschleife wird beendet, nicht
+abgewartet.
+
+**Und der Teil, den er nicht mehr geschafft hat, war der wichtigste.** Die
+Mutationsproben standen aus. Ohne sie wären drei Dateien mit grünen Tests
+eingegangen, ohne dass jemand wüsste, ob die Tests etwas halten. Ich habe sie
+selbst gefahren; sie halten, alle fünf.
 
 ### 31.08.2026, Schritt 14 ist zu, und das Meiste stand schon da
 

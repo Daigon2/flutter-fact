@@ -1391,6 +1391,89 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
 
+## Schritt 36, die reinen Regeln der laufenden Jagd, 31.08.2026
+
+2192 → 2212 Tests. Drei Dateien in `challenges/domain`, ohne Widget, ohne
+Zustand, ohne Riverpod. Das ist der erste Teil des neu zugeschnittenen Schritts
+36; die Phasen-Maschine und die Pille folgen.
+
+| Datei | Inhalt |
+|---|---|
+| `hunt_hints.dart` | `huntHintCosts = [0, 20, 30]`, `huntHintCount`, `isHuntHintFree` |
+| `hunt_navigation_aids.dart` | Pfeil und Distanz nach Schwierigkeitsstufe |
+| `hunt_arrow.dart` | Peilung in Grad auf einen von acht Pfeilindizes |
+
+**Fünf Pflichtmutationen, fünf Fälle.** `% 8` entfernt, Winkelnormalisierung
+entfernt, `null` wie `leicht` statt wie `mittel`, `schwer` wie `mittel`,
+`isHuntHintFree` auf `index <= 1`.
+
+### Der Ersatzwert für die fehlende Stufe hat jetzt einen Ort, und es ist der richtige
+
+ADR-008 verbietet einen Ersatzwert für `PuzzleDifficulty` **im geteilten Kern**,
+weil dort mehrere Domänen mit verschiedenen Antworten säßen: `puzzle-sheet.jsx`
+nimmt für die Münz-Berechnung `mittel`, der alte Flutter-Port nahm `leicht`.
+Derselbe Kommentar sagt, wohin die Entscheidung gehört, nämlich zu dem, der sie
+braucht.
+
+`HuntNavigationAids.forDifficulty(null)` verhält sich wie `mittel`, und das ist
+**nicht** dieselbe Entscheidung: die Quelle schreibt es an genau dieser Stelle so
+(`screen-map.jsx:1049`), und sie gilt nur für das Navigations-Gating. Über eine
+Belohnung sagt sie nichts. Das ist der erste Fall, in dem die Trennung aus
+ADR-008 praktisch trägt statt nur behauptet zu sein.
+
+### Die Pfeilformel ist nachgerechnet, und das war nötig
+
+`Math.round(((deg % 360) + 360) / 45) % 8` sieht nach einer reinen Übersetzung
+aus und ist keine. Zwei Unterschiede zwischen JavaScript und Dart stecken darin,
+beide gemessen und im Kopfkommentar festgehalten:
+
+1. **`%` bei negativen Zahlen.** JavaScript behält das Vorzeichen des
+   Dividenden, `-10 % 360` ist dort `-10`. Genau dafür steht in der Quelle das
+   `+ 360`. Dart rechnet euklidisch, `-10 % 360` ist `350`. Das `+ 360` ist in
+   Dart damit **beweisbar wirkungslos** und bleibt trotzdem stehen, damit der
+   Code Zeile für Zeile neben der Quelle lesbar ist. „Beweisbar wirkungslos" ist
+   ein anderer Zustand als „nicht geprüft".
+2. **`Math.round` gegen `.round()` bei `.5`.** JavaScript rundet aufwärts, Dart
+   von der Null weg. Der Unterschied ist hier **unerreichbar**, und zwar nicht
+   zufällig: weil `%` in Dart schon nach `[0, 360)` normalisiert, ist das
+   Argument von `.round()` immer mindestens `8` und nie negativ.
+
+**Und dazu ein Test, der die naive Übersetzung erschlägt.** Ohne die
+Normalisierung liefert `(-22.5 / 45).round() % 8` in Dart `7`, richtig wäre `0`.
+Dieser eine Eingabewert ist der einzige unter den erreichbaren, an dem der
+Unterschied sichtbar falsch wird statt nur zufällig richtig zu bleiben.
+
+### Eine Lehre über das Arbeiten mit Agenten, und sie hat fast etwas gekostet
+
+Der bauende Agent ist am Ende in eine **Warteschleife** geraten: er hat mehrfach
+eine „fertig"-Meldung ausgelöst, deren Inhalt jeweils „ich warte noch auf einen
+Testlauf" war. Ich habe die erste davon für das Ende gehalten, die Gates gefahren
+und angefangen, seine Dateien zu lesen.
+
+**Dabei habe ich eine Datei mitten in einer seiner Mutationsproben gelesen.**
+`isHuntHintFree` stand für einen Moment auf `index <= 1`, also auf genau der
+Mutation, die ich selbst beauftragt hatte. Für ein paar Minuten sah es aus wie
+ein ausgelieferter Fehler, den die Tests nicht fangen. Beides war falsch: der
+Agent hat die Probe kurz darauf zurückgenommen, und der Test fängt sie sehr wohl,
+nachgewiesen.
+
+Zwei Dinge folgen daraus, und beide gehören ins Protokoll:
+
+- **Eine „completed"-Meldung ist kein Beweis, dass der Arbeitsbaum still ist.**
+  Der Hinweistext sagt es sogar dazu: dieselbe Aufgabe kann mehrfach melden. Wer
+  danach misst, misst möglicherweise gegen einen halben Stand. Genau das ist die
+  Zwei-Schreiber-Falle aus dem Protokoll vom 31.08.2026, nur mit vertauschten
+  Rollen: diesmal war **ich** der zweite Schreiber.
+- **Ein Agent in einer Warteschleife wird beendet, nicht abgewartet.** Der
+  fachliche Teil seiner Arbeit war zu diesem Zeitpunkt fertig und gut; was fehlte,
+  waren die Mutationsproben, und die habe ich selbst gefahren. Danach `TaskStop`,
+  und erst dann war der Arbeitsbaum wirklich meiner.
+
+Der Wert der Sache liegt woanders: **die Mutationsproben waren der einzige Teil
+des Auftrags, den der Agent nicht mehr geschafft hat**, und ohne sie hätte ich
+drei Dateien mit grünen Tests eingecheckt, ohne zu wissen, ob die Tests etwas
+halten. Sie halten, alle fünf.
+
 ## Ein Fund beim Zuschnitt von Schritt 36, 31.08.2026
 
 Beim Lesen der Quelle für die laufende Jagd sind zwei Dinge aufgefallen, die
