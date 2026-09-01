@@ -75,8 +75,11 @@ void main() {
               .listSync(recursive: true)
               .whereType<File>()
               .where((File file) => file.path.endsWith('.dart'))) {
-        if (file.readAsStringSync().contains(_storeProvider)) {
-          offenders.add(file.path.replaceAll(r'\', '/'));
+        final String source = file.readAsStringSync();
+        for (final String forbidden in _writeAccessProviders) {
+          if (source.contains(forbidden)) {
+            offenders.add('${file.path.replaceAll(r'\', '/')} ($forbidden)');
+          }
         }
       }
 
@@ -89,21 +92,54 @@ void main() {
       );
     });
 
-    test('der bewachte Name existiert noch', () {
+    test('die bewachten Namen existieren noch', () {
       // Grenze 4 von oben, als eigene Zusicherung. Ohne sie wäre die Wache
       // nach einer Umbenennung dauerhaft grün, ohne noch etwas zu prüfen, und
       // das ist der Zustand, den man von außen nicht sieht.
+      //
+      // **Seit dem 31.08.2026 sind es zwei Namen, und der zweite ist der
+      // gefährlichere.** `huntRunProvider` ist ein `NotifierProvider`, und
+      // `.notifier` darauf ist ein vollwertiger Schreibzugang zum Jagdzustand.
+      // Der Zustandshalter selbst hat das gemeldet: die Wache kannte nur den
+      // Speicher, und damit hätte ein späterer Schritt der Kartenoberfläche
+      // Schreibrechte geben können, ohne dass hier etwas rot geworden wäre.
       final String providers = File(
         'lib/features/challenges/application/active_hunt_providers.dart',
       ).readAsStringSync();
 
-      expect(providers, contains('$_storeProvider ='));
+      for (final String forbidden in _writeAccessProviders) {
+        expect(
+          providers,
+          contains('$forbidden ='),
+          reason:
+              'Der bewachte Name $forbidden gibt es nicht mehr. Entweder ist '
+              'er umbenannt, dann gehört diese Liste nachgezogen, oder er ist '
+              'weg, dann bewacht diese Datei einen Namen ohne Gegenstück.',
+        );
+      }
     });
   });
 }
 
-/// Der Name, der in `discovery` nicht vorkommen darf.
+/// Die Namen, die in `discovery` nicht vorkommen dürfen.
 ///
-/// Als Konstante und nicht zweimal ausgeschrieben, damit die Suche und die
+/// Als Konstante und nicht mehrfach ausgeschrieben, damit die Suche und die
 /// Existenzprüfung nicht auseinanderlaufen können.
-const String _storeProvider = 'activeHuntStoreProvider';
+///
+/// **Zwei Einträge, und sie sperren zwei verschiedene Wege zum selben
+/// Schreibzugriff:**
+///
+///  * `activeHuntStoreProvider` führt am Zustandshalter vorbei direkt auf die
+///    Platte. Wer ihn schreibt, ändert den gespeicherten Wert, ohne dass ein
+///    Beobachter davon erfährt.
+///  * `huntRunProvider` ist ein `NotifierProvider`. `.notifier` darauf ist der
+///    reguläre Schreibzugang, und genau deshalb darf `discovery` ihn nicht
+///    sehen. Er ist am 31.08.2026 mit dem Zustandshalter entstanden, und der
+///    Bauende hat selbst gemeldet, dass die Wache ihn noch nicht kannte.
+///
+/// Der Lesezugang bleibt `activeHuntProvider`, ein `Provider<ActiveHunt?>` ohne
+/// `.notifier`, und der steht bewusst **nicht** auf dieser Liste.
+const List<String> _writeAccessProviders = <String>[
+  'activeHuntStoreProvider',
+  'huntRunProvider',
+];

@@ -1391,6 +1391,58 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
 
+## Schritt 36, der Zustandshalter, und damit ist Schritt 36 zu
+
+2232 → 2240 Tests. `HuntRunNotifier` besitzt die laufende Jagd, setzt sie und
+schreibt danach in den Speicher, genau wie es der Kopfkommentar von
+`active_hunt_providers.dart` seit Tagen vorschreibt. Die Naht ist geschlossen.
+
+`activeHuntProvider` behält seinen Typ und bekommt zwei Quellen mit klarer
+Rangfolge: **läuft eine Jagd, gilt der Halter; läuft keine, gilt der Speicher.**
+Die zweite Quelle ist kein Rest, sondern der Ertrag der Persistenz von heute
+Vormittag: eine Jagd, die einen Neustart überlebt hat, steht im Speicher und
+bleibt auf der Karte sichtbar, obwohl es keinen laufenden `HuntRun` gibt.
+
+**Keine Wiederherstellung eines spielbaren Laufs**, und das ist die von ADR-007
+gezogene Grenze: aus einem gespeicherten `ActiveHunt` lässt sich kein `HuntRun`
+bauen, weil der Plan mit Fakten und Rätseln nicht gespeichert wird. Das steht am
+`build()`, damit niemand es für eine Lücke hält.
+
+### Eine Mutation hat zuerst überlebt, und der Grund ist Muster 24
+
+„Lies immer aus dem Speicher" überlebte, weil der Test den Halter in genau den
+Speicher schreiben ließ, den er danach abfragte. Beide Quellen sagten dasselbe,
+die Rangfolge war also gar nicht geprüft. Der Test schreibt jetzt nach dem Start
+**am Halter vorbei** einen abweichenden Wert und erzwingt echte Divergenz.
+
+**Und eine Lehre über Mutationsproben selbst.** Ich habe die Gegenrichtung
+zuerst als `run != null || true` gefahren. Das wäre vermutlich schon am
+Übersetzer gescheitert, und ein Übersetzungsfehler macht `flutter test`
+ebenfalls rot: er ist damit ein **schwächerer** Beleg als ein fallender Test.
+Wiederholt in einer Fassung, die kompiliert und nur den Rückfallzweig auf `null`
+setzt.
+
+### Ein gemeldetes Risiko, sofort geschlossen
+
+Der Bauende hat selbst gemeldet, was sein Auftrag nicht abdeckte: die Wache
+`active_hunt_write_access_test.dart` bewachte `discovery` gegen den Namen
+`activeHuntStoreProvider`, und der neue `huntRunProvider` stand nicht darauf.
+Über `.notifier` ist der aber ein **vollwertiger Schreibzugang**, also genau
+das, was ADR-007 Regel 2 dem Kartenbildschirm verbietet.
+
+Die Wache führt jetzt eine Liste statt eines Namens. **Nachgewiesen, dass die
+neue Hälfte beißt:** eine Wegwerf-Datei unter `lib/features/discovery/`, die
+`huntRunProvider` nur erwähnt, macht sie rot, nach dem Löschen wieder grün.
+
+### Ein Framework-Befund, der beim nächsten Mal Zeit spart
+
+Riverpod 3 benachrichtigt Beobachter eines abgeleiteten Providers **nicht
+synchron**: der Scheduler sammelt sie bis zum Ende der Ereignisschleife, und
+zwar unabhängig von `await`. `container.read` liefert dabei immer den richtigen
+Wert, nur der Beobachter hinkt. Ein Benachrichtigungstest braucht deshalb
+`await container.pump()`. Steht jetzt im Testkommentar, weil es sonst wie ein
+Fehler des Notifiers aussieht.
+
 ## Schritt 36, die Phasen-Maschine, 31.08.2026
 
 2212 → 2232 Tests. Eine Datei, `challenges/application/hunt_run.dart`, mit
@@ -4235,6 +4287,17 @@ halben Tag.
     der aktuellen noch offen ist. Allgemein: eine Bedingung, die eine Richtung
     einschränkt, braucht einen Testfall, in dem die andere Richtung überhaupt
     einen Kandidaten hätte.
+24. **Zwei Wege, die zufällig dasselbe liefern, prüfen keine Rangfolge.**
+    Der Leseprovider der Jagd soll bei laufender Jagd den Zustandshalter
+    bevorzugen und nur sonst den Speicher lesen. Der Test ließ den Halter in
+    genau den Speicher schreiben, den er danach abfragte, und damit stand dort
+    **derselbe Wert**. Die Mutation „lies immer aus dem Speicher" überlebte,
+    weil beide Quellen ununterscheidbar waren. Belegt am 31.08.2026. Scharf
+    wird es erst, wenn die zweite Quelle **abweicht**: der Test schreibt jetzt
+    nach dem Start am Halter vorbei einen anderen Wert in den Speicher.
+    Allgemein: wer eine Rangfolge prüft, sorgt dafür, dass die verlierende
+    Quelle etwas anderes sagt, sonst prüft er nur, dass irgendeine von beiden
+    gelesen wird.
 
 ## Datenvertrag: die bekannten Fallen
 

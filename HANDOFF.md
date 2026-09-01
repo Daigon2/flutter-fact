@@ -38,7 +38,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2232 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2240 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -303,6 +303,28 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Schritt 36 ist zu, und eine Wache hatte eine Lücke
+
+Der Zustandshalter schließt die Naht, die `active_hunt_providers.dart` seit
+Tagen beschreibt: ein Notifier besitzt die Jagd, setzt sie und schreibt danach.
+`activeHuntProvider` behält seinen Typ und hat zwei Quellen mit Rangfolge.
+2232 → 2240 Tests.
+
+**Überraschend war, dass der Bauende eine Lücke gemeldet hat, die nicht in
+seinem Auftrag stand.** Die Wache gegen Schreibzugriffe aus `discovery` kannte
+nur den Speicher-Provider; der neue `huntRunProvider` gibt über `.notifier`
+denselben Zugriff und stand nicht darauf. Geschlossen, und die neue Hälfte ist
+mit einer Wegwerf-Datei nachweislich zum Beißen gebracht worden.
+
+**Und wieder hat eine Mutation zuerst überlebt**, jetzt Muster 24: der Test ließ
+den Halter in genau den Speicher schreiben, den er danach abfragte, also sagten
+beide Quellen dasselbe und die Rangfolge war gar nicht geprüft.
+
+**Eine Kleinigkeit über Mutationsproben selbst**, die ich mir merke: eine
+Mutation, die schon am Übersetzer scheitert, macht `flutter test` ebenfalls rot
+und ist trotzdem ein **schwächerer** Beleg als ein fallender Test.
+
 
 ### 31.08.2026, Die Phasen-Maschine, und zwei Mutationen, die zuerst überlebt haben
 
