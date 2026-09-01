@@ -1,10 +1,10 @@
 /// Die Kameraabsichten des Kartenbildschirms, als reine Funktionen.
 ///
-/// Fünf Anlässe, keine Zeile Oberfläche: Sky-Fall, GPS-Folgen, Neuzentrieren,
-/// der harte Reset und, seit Schritt 15 Block 3, der Tipp auf eine Gruppe.
-/// Jede Funktion nimmt entgegen, was sie wissen muss, und gibt eine Absicht
-/// zurück. Ob sie ausgeführt wird, entscheidet der Karten-Host mit
-/// `decideMapCameraIntent`.
+/// Sechs Anlässe, keine Zeile Oberfläche: Sky-Fall, GPS-Folgen, Neuzentrieren,
+/// der harte Reset, seit Schritt 15 Block 3 der Tipp auf eine Gruppe, und seit
+/// Schritt 14 Teil 2 das Folgen der Kompass-Blickrichtung. Jede Funktion
+/// nimmt entgegen, was sie wissen muss, und gibt eine Absicht zurück. Ob sie
+/// ausgeführt wird, entscheidet der Karten-Host mit `decideMapCameraIntent`.
 ///
 /// ## Warum das in `presentation/` liegt und nicht in `domain/`
 ///
@@ -175,6 +175,50 @@ MapCameraFollow userPositionFollowIntent(MapPosition target) => MapCameraFollow(
   deadZoneMeters: MapCameraThresholds.followDeadZoneMeters,
   minPause: MapCameraThresholds.followMinPause,
 );
+
+/// Die Blickrichtung folgt dem Kompass, `screen-map.jsx:2834-2839`.
+///
+/// Die vier Bedingungen der Quelle stehen alle in einer Zeile:
+/// `if (m && !m.isEasing() && !userInteracting && !manualBearingRef.current &&
+/// bearingDelta > 1.5) { m.setBearing(smoothBearing); }` (`:2837-2838`).
+///
+/// * **Keine Winkel-Totzone hier, ausdrücklich.** Die 1,5° stehen bereits als
+///   [MapCameraThresholds.bearingDeadZoneDegrees] und gehen als
+///   [MapCameraFollow.bearingDeadZoneDegrees] mit; das Gate prüft sie, diese
+///   Funktion tut es **nicht**. Genau das steht im Auftrag dieser Datei: eine
+///   Absicht entstehen zu lassen, nicht zu entscheiden, ob sie durchkommt.
+/// * **Weicht einer Geste**, anders als das GPS-Folgen. `!userInteracting`
+///   steht in der Bedingung (`:2837`), und der Kommentar direkt darüber
+///   (`:2833-2834`) nennt die Folge des Weglassens: „Without this, 60Hz
+///   setBearing interrupts user gestures and blocks pinch-zoom-out."
+/// * **`MapCameraImmediate` und keine Animation, und das ist keine Vermutung:
+///   die Quelle ruft `m.setBearing(...)` (`:2838`), und [MapCameraMotion]
+///   nennt `setBearing` wörtlich als das Gegenstück zu [MapCameraImmediate]**
+///   (`map_camera.dart:176-177`, „Entspricht `jumpTo` und `setBearing` der
+///   Quelle"). Ein `MapCameraAnimated` wäre für diesen Strom ohnehin die
+///   falsche Wahl: er liefert bis zu 60 neue Zielwerte je Sekunde, und jede
+///   neue Ausgabe unterbräche eine noch laufende Animation, bevor sie zu
+///   sehen war. Eine Animation, die nie zu Ende läuft, ist keine.
+///
+/// Nur die Blickrichtung ändert sich. Mittelpunkt, Zoom und Neigung bleiben
+/// `null`, also unverändert, dasselbe Prinzip wie bei [userPositionFollowIntent]
+/// mit vertauschten Rollen: dort ändert sich nur der Mittelpunkt.
+///
+/// **Die Glättung ist nicht Teil dieser Funktion.** [bearing] kommt bereits
+/// geglättet an, siehe `lib/map/domain/bearing_smoothing.dart`
+/// (`SmoothedBearing`). Diese Funktion weiß nichts von einem Rohwert und baut
+/// aus einer Zahl eine Absicht, dasselbe Verhältnis wie zwischen
+/// `map_camera_gate.dart`s Uhr-losen Schwellen und dem Aufrufer, der die Uhr
+/// tatsächlich liest.
+MapCameraFollow compassBearingFollowIntent({required double bearing}) =>
+    MapCameraFollow(
+      kind: MapCameraFollowKind.compassBearing,
+      change: MapCameraChange(bearing: bearing),
+      motion: const MapCameraImmediate(),
+      origin: MapCameraIntentOrigin.discovery,
+      yieldsToUserGesture: true,
+      bearingDeadZoneDegrees: MapCameraThresholds.bearingDeadZoneDegrees,
+    );
 
 /// Was das Neuzentrieren an der Kamera ändert, `screen-map.jsx:2983-2987`.
 ///

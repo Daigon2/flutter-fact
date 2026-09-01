@@ -37,7 +37,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2180 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2192 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -156,13 +156,13 @@ ist die Reihenfolge danach.
       ADR-007. Heute heißt es `purchasedHintCount` und trägt eine Anzahl; es soll
       die Indizes der freigeschalteten Hinweise tragen. Ändert einen
       Nutzlastschlüssel, dafür ist `payloadVersion` da.
-   c. **Schritt 14, Kompass: Teil 1 fertig am 31.08.2026, Teil 2 offen.**
-      Gebaut sind der Sensordienst unter `lib/services/orientation/`, die
-      Glättung in `map/domain/bearing_smoothing.dart` und Regel 24. **Offen ist
-      die Verdrahtung in `map_page.dart`**: der Kamera-Gate mit Totzone und
-      `bearingLocked` steht schon, es fehlt der Weg von der geglätteten
-      Richtung zur Kameraabsicht, dazu der 2-Sekunden-Takt des Wachhunds und
-      die abgeschwächte Anzeige bei totem Kompass.
+   c. ~~**Schritt 14, Kompass**~~ **fertig am 31.08.2026, in zwei Teilen.** Die
+      Karte folgt der Blickrichtung des Geräts: Sensordienst unter
+      `lib/services/orientation/`, Glättung in `map/domain/bearing_smoothing.dart`,
+      Regel 24, die Absicht `compassBearingFollowIntent` und der Wachhund im
+      Kartenbildschirm. **Am Gerät ungeprüft**, wie alles seit dem 29.08.2026:
+      dass sich die Karte beim Drehen des Telefons mitdreht, kann kein
+      Widget-Test zeigen.
 
       **Die Paketwahl hat sich beim Nachprüfen verschoben, und das war der Punkt
       der Recherche.** `^0.4.0` ist unerreichbar: 0.4.0 hat Web-Unterstützung
@@ -285,6 +285,30 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Schritt 14 ist zu, und das Meiste stand schon da
+
+Die Karte folgt dem Kompass. 2180 → 2192 Tests, vier Dateien geändert, keine
+neue. Vier von fünf Pflichtmutationen gefangen.
+
+**Überraschend war, wie wenig Teil 2 gekostet hat.** `MapCameraFollowKind.compassBearing`
+lag samt Fundstellen im Absichtstyp, die 1,5-Grad-Totzone im Gate,
+`isCompassDead` im Top-Chrome mit der Deckkraft der Quelle. Alles davon ist
+gebaut worden, **bevor** es einen Sensor gab, und es hat gepasst. Wer eine
+Schwelle einbaut, für die es noch keinen Erzeuger gibt, baut nicht auf Vorrat,
+sondern lässt die Naht offen, und hier war sie es.
+
+**Die fünfte Mutation ist nicht fangbar, und es steht kein erfundener Test da.**
+`setState` unbedingt statt bedingt ändert allein die Zahl der Neuaufbauten, und
+die ist von außen nicht beobachtbar. Ein Rebuild-Zähler wäre genau der Testhaken,
+den dieselbe Datei schon einmal begründet ausgebaut hat. Die richtige Fassung ist
+gebaut, nur unbewiesen, und das ist der ehrlichere Zustand als ein Test, der
+etwas anderes misst.
+
+**Und eine meiner Vorgaben war falsch.** Ich hatte `DateTime.now()` als
+Zeitquelle des Wachhunds vorgegeben; die wird von `fake_async` nicht
+mitverschoben, ein Test dagegen bräuchte ein neues Paket oder echtes Warten.
+Genommen ist das Muster, das der Karten-Layer dafür schon hat.
 
 ### 31.08.2026, Schritt 14 Teil 1, und eine Paketfalle zum zweiten Mal
 

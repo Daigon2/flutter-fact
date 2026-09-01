@@ -33,6 +33,9 @@ import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/services/location/device_position.dart';
 import 'package:fact_app/services/location/location_providers.dart';
 import 'package:fact_app/services/location/location_service.dart';
+import 'package:fact_app/services/orientation/device_heading.dart';
+import 'package:fact_app/services/orientation/orientation_providers.dart';
+import 'package:fact_app/services/orientation/orientation_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,15 +91,18 @@ void main() {
 
   late FakeMapHost host;
   late FakeLocationService location;
+  late FakeOrientationService orientation;
 
   setUp(() {
     host = FakeMapHost();
     location = FakeLocationService();
+    orientation = FakeOrientationService();
   });
 
   tearDown(() async {
     await host.close();
     await location.close();
+    await orientation.close();
   });
 
   /// Eine Überlagerung mit einem Fakt **auf** der Ortung und einem weit weg.
@@ -145,6 +151,7 @@ void main() {
         if (diagnostics != null)
           diagnosticSinkProvider.overrideWithValue(diagnostics),
         locationServiceProvider.overrideWithValue(location),
+        orientationServiceProvider.overrideWithValue(orientation),
         // **Ohne diesen Override endet jeder Test hier in „A Timer is still
         // pending".** Der Standard `unavailableFactRepository` wirft, und
         // Riverpod 3 wiederholt einen gescheiterten Provider von sich aus bis
@@ -167,6 +174,7 @@ void main() {
     WidgetTester tester, {
     required ProviderContainer container,
     bool branchIsActive = true,
+    Duration Function()? now,
   }) {
     return tester.pumpWidget(
       UncontrolledProviderScope(
@@ -187,6 +195,7 @@ void main() {
                   // Kompositions-Adapter auf App-Ebene: `discovery` darf
                   // `map/presentation/` nicht selbst importieren (Regel 18).
                   mapSurface: mapSurfaceStandIn,
+                  now: now,
                 ),
               ),
             ),
@@ -209,6 +218,9 @@ void main() {
     longitude: longitude,
     accuracyInMeters: accuracy,
   );
+
+  /// Ein geprüfter Kopfwert des Kompasses.
+  DeviceHeading headingAt(double degrees) => DeviceHeading.tryFrom(degrees)!;
 
   /// Die Karte meldet sich mit einer Startkamera, wie `bindSurface` es tut.
   Future<void> mapComesAlive(
@@ -758,6 +770,197 @@ void main() {
       await tester.pump();
 
       expect(host.intents, isEmpty);
+    });
+  });
+
+  group('Die Karte folgt dem Kompass, screen-map.jsx:2805-2895', () {
+    MapTopChrome chromeOf(WidgetTester tester) =>
+        tester.widget<MapTopChrome>(find.byType(MapTopChrome));
+
+    testWidgets('ein Kopfwert löst genau eine Absicht mit der geglätteten, '
+        'nicht der rohen Richtung aus', (tester) async {
+      // 0 (Startwert der Glättung) und ein Kopfwert von 100 ergeben 25, nicht
+      // 100: `0 + (100 - 0) * 0.25 = 25`.
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      orientation.emit(headingAt(100));
+      await tester.pump();
+
+      final MapCameraIntent intent = host.intents.single;
+      expect(intent, isA<MapCameraFollow>());
+      expect(
+        (intent as MapCameraFollow).kind,
+        MapCameraFollowKind.compassBearing,
+      );
+      expect(
+        intent.change.bearing,
+        25,
+        reason: 'die geglättete Richtung, nicht der Rohwert 100',
+      );
+    });
+
+    testWidgets('mehrere Kopfwerte laufen durch dieselbe Glättung, nicht '
+        'jeder für sich', (tester) async {
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      orientation.emit(headingAt(100));
+      await tester.pump();
+      orientation.emit(headingAt(100));
+      await tester.pump();
+
+      expect(host.intents, hasLength(2));
+      expect(
+        host.intents[0].change.bearing,
+        25,
+        reason: 'erster Schritt: 0 nach 100 ergibt 25',
+      );
+      expect(
+        host.intents[1].change.bearing,
+        43.75,
+        reason:
+            'zweiter Schritt von 25 aus, nicht noch einmal von 0: '
+            '25 + (100 - 25) * 0.25 = 43.75. Würde jeder Kopfwert für sich '
+            'geglättet, stünde hier wieder 25',
+      );
+    });
+
+    testWidgets('ohne Kopfwerte entsteht keine Absicht', (tester) async {
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(
+        host.intents.where(
+          (intent) =>
+              intent is MapCameraFollow &&
+              intent.kind == MapCameraFollowKind.compassBearing,
+        ),
+        isEmpty,
+      );
+    });
+
+    testWidgets('ohne lebende Karte bleibt der Kopfwert ohne Absicht', (
+      tester,
+    ) async {
+      // Derselbe Wächter wie beim GPS-Folgen, `_canSteer`.
+      await pumpPage(tester, container: newContainer());
+
+      orientation.emit(headingAt(100));
+      await tester.pump();
+      await tester.pump();
+
+      expect(host.intents, isEmpty);
+    });
+
+    testWidgets('im unsichtbaren Zweig bleibt der Kopfwert ohne Absicht', (
+      tester,
+    ) async {
+      // Ein einzelner, wiederverwendeter Container über den ganzen Test, wie
+      // bei „beim Sichtbarwerden wird der Sky-Fall nachgeholt": zwei frische
+      // Container in einem Test ließen den `factOverlayProvider` des ersten
+      // ungenutzt und unversorgt stehen liegen.
+      final ProviderContainer container = newContainer();
+      await pumpPage(tester, container: container, branchIsActive: false);
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      orientation.emit(headingAt(100));
+      await tester.pump();
+      await tester.pump();
+
+      expect(host.intents, isEmpty);
+    });
+
+    testWidgets(
+      'der Wachhund meldet einen toten Kompass nach mehr als 5 Sekunden, '
+      'davor nicht, und ein neuer Kopfwert setzt ihn zurück',
+      (tester) async {
+        final TestClock clock = TestClock();
+        await pumpPage(tester, container: newContainer(), now: clock.call);
+        await tester.pump();
+
+        expect(
+          chromeOf(tester).isCompassDead,
+          isFalse,
+          reason: 'unmittelbar nach dem Start ist der Kompass nicht tot',
+        );
+
+        // Vier Sekunden, zwei Wachhund-Takte (bei 2 und 4 Sekunden), beide
+        // noch unter der 5-Sekunden-Schwelle.
+        clock.advance(const Duration(seconds: 4));
+        await tester.pump(const Duration(seconds: 4));
+        expect(
+          chromeOf(tester).isCompassDead,
+          isFalse,
+          reason: 'vier Sekunden liegen unter der Schwelle von fünf',
+        );
+
+        // Zwei weitere Sekunden, macht sechs seit dem Start: über der
+        // Schwelle, und der nächste Takt (bei 6 Sekunden) muss das melden.
+        clock.advance(const Duration(seconds: 2));
+        await tester.pump(const Duration(seconds: 2));
+        expect(
+          chromeOf(tester).isCompassDead,
+          isTrue,
+          reason: 'sechs Sekunden liegen über der Schwelle von fünf',
+        );
+
+        // Ein neuer Kopfwert setzt den Wachhund zurück, ohne auf den
+        // nächsten Takt zu warten. Zweimal gepumpt, wie bei einer Ortung: der
+        // erste Umlauf stellt die Stromausgabe zu, der Zuhörer setzt den
+        // Zustand, erst der zweite baut die Oberfläche neu.
+        orientation.emit(headingAt(10));
+        await tester.pump();
+        await tester.pump();
+        expect(chromeOf(tester).isCompassDead, isFalse);
+      },
+    );
+
+    testWidgets('die Nadel dreht weiter nach der Kartenblickrichtung, ein '
+        'Kopfwert allein bewegt sie nicht', (tester) async {
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester, bearing: 40);
+      await tester.pump();
+      expect(chromeOf(tester).bearingDegrees, 40);
+
+      // Ein Kopfwert allein löst zwar eine Absicht an den Host aus (siehe
+      // oben), aber der Doppelgänger führt sie nicht aus und meldet keine
+      // neue Kamera zurück; die Nadel darf sich deshalb nicht bewegen.
+      orientation.emit(headingAt(200));
+      await tester.pump();
+      expect(chromeOf(tester).bearingDegrees, 40);
+
+      // Eine echte Kameraänderung dagegen schon.
+      await mapComesAlive(tester, bearing: 55);
+      await tester.pump();
+      expect(chromeOf(tester).bearingDegrees, 55);
+    });
+
+    testWidgets('die Kündigung des Kompass-Abonnements im Entsorgen wirkt', (
+      tester,
+    ) async {
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      // Ohne die Kündigung riefe der Strom `_onHeading` auf einem längst
+      // entsorgten `State` auf, entweder mit einer Ausnahme beim `setState`
+      // (falls der Kompass zwischenzeitlich als tot markiert war) oder,
+      // unauffälliger, mit einer weiteren Absicht an einen `ref`, der nicht
+      // mehr gültig ist.
+      orientation.emit(headingAt(100));
+      await tester.pump();
+
+      expect(host.intents, isEmpty);
+      expect(tester.takeException(), isNull);
     });
   });
 
@@ -1824,4 +2027,36 @@ class FakeLocationService implements LocationService {
 
   /// Schließt den Strom.
   Future<void> close() => _controller.close();
+}
+
+/// Ein Orientierungsdienst, dessen Kopfwerte der Test selbst setzt.
+///
+/// Dasselbe Muster wie [FakeLocationService], nur für [DeviceHeading].
+class FakeOrientationService implements OrientationService {
+  /// `broadcast`, aus demselben Grund wie bei [FakeLocationService].
+  final StreamController<DeviceHeading> _controller =
+      StreamController<DeviceHeading>.broadcast();
+
+  @override
+  Stream<DeviceHeading> headingUpdates() => _controller.stream;
+
+  /// Schiebt einen Kopfwert in den Strom.
+  void emit(DeviceHeading heading) => _controller.add(heading);
+
+  /// Schließt den Strom.
+  Future<void> close() => _controller.close();
+}
+
+/// Eine von Hand vorspulbare Uhr für den Kompass-Wachhund.
+///
+/// Dasselbe Muster wie `TestClock` in `map_camera_host_test.dart`: der Test
+/// stellt [now] selbst weiter, ohne echtes Warten und ohne sich auf die
+/// Verzahnung von `Stopwatch` und `fake_async` zu verlassen, die
+/// `map_page.dart`s eigener Kommentar bei `_now` beschreibt.
+class TestClock {
+  Duration now = Duration.zero;
+
+  Duration call() => now;
+
+  void advance(Duration by) => now += by;
 }

@@ -107,6 +107,70 @@ void main() {
     });
   });
 
+  group('Blickrichtung folgt dem Kompass, screen-map.jsx:2834-2839', () {
+    test('ändert nur die Blickrichtung', () {
+      final intent = compassBearingFollowIntent(bearing: 77);
+
+      expect(intent.change.bearing, 77);
+      expect(intent.change.center, isNull);
+      expect(intent.change.zoom, isNull);
+      expect(intent.change.pitch, isNull);
+      expect(intent.change.changesBearing, isTrue);
+    });
+
+    test('ist die Dauerabsicht compassBearing, weicht einer Geste und '
+        'springt ohne Animation', () {
+      final intent = compassBearingFollowIntent(bearing: 77);
+
+      expect(intent.kind, MapCameraFollowKind.compassBearing);
+      expect(intent.rank, 4);
+      expect(intent.origin, MapCameraIntentOrigin.discovery);
+      expect(
+        intent.yieldsToUserGesture,
+        isTrue,
+        reason:
+            '`!userInteracting` in der Bedingung (`:2837`), ohne das '
+            'unterbräche ein 60-Hz-`setBearing` jede Geste des Nutzers',
+      );
+      expect(
+        intent.motion,
+        const MapCameraImmediate(),
+        reason:
+            'die Quelle ruft `m.setBearing(...)` (`:2838`), und '
+            '`MapCameraImmediate` ist deren dokumentiertes Gegenstück, nicht '
+            'geraten',
+      );
+    });
+
+    test('trägt die Winkel-Totzone der Quelle und keine Strecken-Totzone '
+        'oder Pause', () {
+      final intent = compassBearingFollowIntent(bearing: 77);
+
+      expect(intent.bearingDeadZoneDegrees, 1.5);
+      expect(
+        intent.deadZoneMeters,
+        isNull,
+        reason: 'die Streckenprüfung gehört dem GPS-Folgen',
+      );
+      expect(
+        intent.minPause,
+        isNull,
+        reason:
+            'die vier Bedingungen in `:2837` kennen keine Pause, anders als '
+            'das GPS-Folgen mit seinen 800 ms',
+      );
+    });
+
+    test('löst weder das Einrasten noch den Anker', () {
+      // Nur ein `MapCameraCommand` darf das, und eine Dauerabsicht ist
+      // keiner.
+      final intent = compassBearingFollowIntent(bearing: 77);
+
+      expect(releasesBearingLock(intent), isFalse);
+      expect(clearsFollowAnchor(intent), isFalse);
+    });
+  });
+
   group('Neuzentrieren, screen-map.jsx:2983-2987', () {
     test('der Zoom ist das Maximum aus aktuellem Zoom und 15', () {
       // Beide Seiten der Rechnung, sonst käme ein `min` ebenso durch wie ein

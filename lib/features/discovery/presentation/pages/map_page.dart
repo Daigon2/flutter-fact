@@ -15,6 +15,7 @@ import 'package:fact_app/features/discovery/presentation/notifiers/map_mode_prov
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
 import 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome.dart';
 import 'package:fact_app/map/application/map_host_providers.dart';
+import 'package:fact_app/map/domain/bearing_smoothing.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
@@ -24,6 +25,8 @@ import 'package:fact_app/map/domain/map_position_rect.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
 import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/services/location/device_position.dart';
+import 'package:fact_app/services/orientation/device_heading.dart';
+import 'package:fact_app/services/orientation/orientation_providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -140,7 +143,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Kartenmitte (`screen-map.jsx:310-322`, `:2992-3008`) gehört `features/city`.
 class MapPage extends ConsumerStatefulWidget {
   /// Erzeugt den Karten-Bildschirm mit der Kartenfläche [mapSurface].
-  const MapPage({required this.mapSurface, super.key});
+  const MapPage({required this.mapSurface, this.now, super.key});
 
   /// Die Kartenfläche, die unter dem Top-Chrome liegt.
   ///
@@ -148,6 +151,14 @@ class MapPage extends ConsumerStatefulWidget {
   /// und eine Karte, die aus Versehen fehlt, sähe dann genauso aus wie eine,
   /// die noch lädt.
   final Widget mapSurface;
+
+  /// Die Uhr des Kompass-Wachhunds, siehe `_MapPageState._now`.
+  ///
+  /// `null` im echten Betrieb: dann legt der Zustand selbst eine laufende
+  /// [Stopwatch] an. Ein Test setzt einen eigenen Rückgabewert, um die
+  /// verstrichene Zeit ohne echtes Warten vorzuspulen, dasselbe Muster wie
+  /// `now` bei `MapCameraHost`.
+  final Duration Function()? now;
 
   /// Münzstand ohne `features/progression`.
   static const int placeholderCoins = 0;
@@ -233,6 +244,20 @@ class _MapPageState extends ConsumerState<MapPage> {
   ///
   /// **Der Ortungsstrom läuft weiter**, nur die Kamera folgt nicht, siehe
   /// `notifiers/user_location_providers.dart`.
+  ///
+  /// **Der Kompass läuft aus derselben Erwägung weiter mit, seit Schritt 14
+  /// Teil 2.** [_headingSubscription] bleibt bestehen und [_compassWatchdog]
+  /// tickt unbedingt weiter, auch während dieser Zweig unsichtbar ist; nur
+  /// [compassBearingFollowIntent] geht nicht an den Host, solange [_canSteer]
+  /// `false` ist, siehe [_onHeading]. Die Nebenwirkung, die das in Kauf
+  /// nimmt: der Sensor bleibt an und [_smoothedBearing] läuft weiter, auch
+  /// während der Nutzer einen anderen Reiter ansieht. Der Gewinn ist derselbe
+  /// wie beim GPS: kommt der Nutzer zurück, folgt die Karte sofort einer
+  /// eingelebten Richtung statt eines kaltgestarteten Werts, der erst wieder
+  /// anlaufen müsste, und der Wachhund zeigt beim Zurückkommen den wahren
+  /// Stand, keine künstliche Pause, die nur am Tabwechsel lag. Der
+  /// Gegenkandidat, das Abonnement beim Verstecken abzubauen, spart den
+  /// Sensor, kostet aber genau diesen kalten Neustart der Glättung.
   bool _branchIsActive = true;
 
   /// Die Blickrichtung der Karte in Grad, wie die Kompassnadel sie braucht.
@@ -249,6 +274,67 @@ class _MapPageState extends ConsumerState<MapPage> {
   double _bearingDegrees = MapPage.placeholderCamera.bearing;
 
   StreamSubscription<MapCameraView>? _cameraSubscription;
+
+  /// Die geglättete Kompass-Blickrichtung, siehe [SmoothedBearing.towards].
+  ///
+  /// **Startwert 0, aus zwei Gründen und nicht nur, weil die Quelle so
+  /// beginnt.** `let smoothBearing = 0;` (`screen-map.jsx:2805`) ist der
+  /// Startwert dort, aber ein Nachbau, der nur deshalb 0 wählt, hätte hier
+  /// keine eigene Begründung, sondern nur die abgeschriebene. Die zweite,
+  /// eigene: [MapPage.placeholderCamera.bearing] ist ebenfalls 0, die
+  /// Startkamera zeigt also bereits genau dorthin, wo diese Glättung
+  /// beginnt. Ein anderer Startwert liefe der sichtbaren Kamera von der
+  /// ersten Sekunde an hinterher, ohne dass ein einziger Kopfwert das
+  /// verlangt hätte.
+  SmoothedBearing _smoothedBearing = SmoothedBearing(
+    MapPage.placeholderCamera.bearing,
+  );
+
+  /// Zuhörer auf rohe Kopfwerte des Kompasses, siehe [_onHeading].
+  StreamSubscription<DeviceHeading>? _headingSubscription;
+
+  /// Wann der letzte Kopfwert einging, gemessen mit [_now].
+  ///
+  /// Bekommt in [initState] schon vor dem ersten Kopfwert einen Startwert,
+  /// dieselbe „Baseline, damit der Wachhund nicht sofort anschlägt" wie
+  /// `compassLastEventRef.current = Date.now()` bei der Registrierung der
+  /// Quelle (`screen-map.jsx:2858`). Ohne sie wäre der Kompass in der Sekunde
+  /// zwischen Bildschirmstart und erstem Sensorwert fälschlich „tot".
+  Duration? _lastHeadingAt;
+
+  /// Der Wachhund-Takt, `screen-map.jsx:2846-2853`: alle 2 Sekunden geprüft,
+  /// ob seit [_lastHeadingAt] mehr als [compassStaleAfter] vergangen ist,
+  /// siehe [_checkCompassAlive].
+  Timer? _compassWatchdog;
+
+  /// Ob der Kompass gerade als tot gilt, siehe [_checkCompassAlive]. Geht an
+  /// [MapTopChrome.isCompassDead].
+  bool _isCompassDead = false;
+
+  /// Jetzt, als Abstand zu einem monotonen Nullpunkt. Nur der Wachhund
+  /// braucht das, um zu messen, wie lange der letzte Kopfwert her ist.
+  ///
+  /// ## Warum eine [Duration] und keine [DateTime]
+  ///
+  /// Dieselbe Erwägung wie in `map_camera_gate.dart` und
+  /// `map/presentation/map_camera_host.dart`: eine Uhr, die rückwärts
+  /// springen kann, ist für eine Karenzzeit die falsche Uhr. Anders als dort
+  /// hat `map_page.dart` selbst noch kein eigenes Muster dafür, aber
+  /// `MapCameraHost` hat exakt eines, für exakt dieselbe Aufgabenklasse
+  /// (`Duration Function()? now`, Standard eine laufende [Stopwatch]), und es
+  /// ist bereits geprüft: `map_camera_host_test.dart` steuert es über einen
+  /// `TestClock`, ohne echtes Warten. Diese Datei übernimmt das Muster
+  /// unverändert, statt ein zweites, eigenes zu erfinden.
+  ///
+  /// **Das ist die eine Stelle, an der diese Datei von der wörtlichen Vorgabe
+  /// abweicht, `DateTime.now` als Standard zu nehmen, und der Grund ist
+  /// mehr als Geschmack:** `DateTime.now()` springt bei `tester.pump(Duration)`
+  /// nicht mit vor, `fake_async` (das dahinterliegt) verspult nur `Timer`,
+  /// `Future.delayed` und `Stopwatch`, nicht die Wanduhr. Ein Wachhund-Test
+  /// gegen `DateTime.now()` bräuchte entweder `package:clock` (ein neues
+  /// Paket, freigabepflichtig) oder echtes Warten (von `.claude/rules/tests.md`
+  /// verboten). Der `Duration`-Weg braucht beides nicht.
+  late final Duration Function() _now;
 
   /// Zuhörer auf Gruppen-Tipps, siehe [_onGroupTap].
   ///
@@ -356,6 +442,21 @@ class _MapPageState extends ConsumerState<MapPage> {
         .read(mapHostProvider)
         .groupTaps
         .listen(_onGroupTap);
+
+    // Der Kompass, seit Schritt 14 Teil 2. Keine Reihenfolge-Zwangslage wie
+    // bei den beiden Strömen oben: `OrientationService` hängt an keinem Kind
+    // dieses Bildschirms, ein später eintreffender erster Kopfwert geht nicht
+    // verloren, er wartet einfach auf sein Abonnement.
+    _now = widget.now ?? _stopwatchClock();
+    _lastHeadingAt = _now();
+    _headingSubscription = ref
+        .read(orientationServiceProvider)
+        .headingUpdates()
+        .listen(_onHeading);
+    _compassWatchdog = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _checkCompassAlive(),
+    );
 
     // **`listenManual` und nicht `ref.listen` im `build`, und der Grund ist
     // `fireImmediately`.** `ref.listen` kennt den Schalter in
@@ -489,6 +590,10 @@ class _MapPageState extends ConsumerState<MapPage> {
     _cameraSubscription = null;
     unawaited(_groupTapSubscription?.cancel());
     _groupTapSubscription = null;
+    unawaited(_headingSubscription?.cancel());
+    _headingSubscription = null;
+    _compassWatchdog?.cancel();
+    _compassWatchdog = null;
     super.dispose();
   }
 
@@ -512,6 +617,65 @@ class _MapPageState extends ConsumerState<MapPage> {
     if (view.bearing != _bearingDegrees) {
       setState(() => _bearingDegrees = view.bearing);
     }
+  }
+
+  /// Ein roher Kopfwert des Kompasses ist da, `screen-map.jsx:2817-2843`.
+  ///
+  /// Drei Dinge passieren, und nur eines davon bedingt:
+  ///
+  /// 1. [_lastHeadingAt] wird **unbedingt** nachgeführt, der Wachhund-Puls.
+  /// 2. War der Kompass als tot markiert, wird das **hier** zurückgenommen,
+  ///    nicht erst beim nächsten Takt des Wachhunds: `if (compassDead)
+  ///    setCompassDead(false);` steht in der Quelle im Kopfwert-Zweig
+  ///    (`:2828`), nicht im Zwei-Sekunden-Takt.
+  /// 3. Die Glättung zieht in Richtung [heading], **immer**, siehe
+  ///    [_smoothedBearing].
+  ///
+  /// Erst danach die eine bedingte Wirkung: die Absicht geht nur an den Host,
+  /// wenn [_canSteer] gilt. Läuft der Bildschirm im unsichtbaren Zweig oder
+  /// ohne lebende Karte, bleiben Glättung und Zeitstempel trotzdem aktuell,
+  /// siehe die Begründung bei [_branchIsActive].
+  ///
+  /// **`setState` nur, wenn sich [_isCompassDead] wirklich ändert.** Ein
+  /// Strom, der bis zu 60 Mal je Sekunde einen neuen Kopfwert liefert, darf
+  /// nicht bei jedem einzelnen den ganzen Bildschirm neu bauen; dieselbe
+  /// Zusicherung wie bei [_onCameraChange] für `view.bearing`, nur auf der
+  /// Zeitachse statt auf der Winkelachse. Die Glättung selbst braucht kein
+  /// `setState`: [_smoothedBearing] wird nirgends direkt gezeichnet, sie geht
+  /// nur in die nächste Absicht ein.
+  void _onHeading(DeviceHeading heading) {
+    _lastHeadingAt = _now();
+    if (_isCompassDead) {
+      setState(() => _isCompassDead = false);
+    }
+    _smoothedBearing = _smoothedBearing.towards(heading.degrees);
+    if (!_canSteer) {
+      return;
+    }
+    ref
+        .read(mapHostProvider)
+        .submitIntent(
+          compassBearingFollowIntent(bearing: _smoothedBearing.degrees),
+        );
+  }
+
+  /// Der Wachhund-Takt, `screen-map.jsx:2846-2853`: prüft alle 2 Sekunden, ob
+  /// der Kompass seit mehr als [compassStaleAfter] keinen Kopfwert mehr
+  /// geliefert hat, und meldet das Ergebnis an [MapTopChrome.isCompassDead].
+  ///
+  /// **`setState` nur bei echter Änderung**, aus demselben Grund wie in
+  /// [_onHeading]: ein Takt, der bei jedem Aufruf neu baut, obwohl sich am
+  /// Ergebnis nichts geändert hat, ist derselbe Fehler wie ein 60-Hz-Strom
+  /// ohne Totzone, nur langsamer.
+  void _checkCompassAlive() {
+    final Duration? lastHeadingAt = _lastHeadingAt;
+    final bool dead =
+        lastHeadingAt != null &&
+        isCompassStale(sinceLastHeading: _now() - lastHeadingAt);
+    if (dead == _isCompassDead) {
+      return;
+    }
+    setState(() => _isCompassDead = dead);
   }
 
   /// Ein Tipp auf eine Gruppe, `screen-map.jsx:2439-2459`.
@@ -830,16 +994,31 @@ class _MapPageState extends ConsumerState<MapPage> {
           // zurück, auch ohne Position (`:3170`).
           onCompassTap: _onCompassTap,
           onCompassLongPress: _onCompassLongPress,
-          // Die Nadel dreht gegen die Kartenblickrichtung (`:1792`), und die
-          // kommt aus dem Kamerastrom, den dieser Bildschirm ohnehin
-          // abonniert. **Der Gerätekompass gehört nicht dazu**: die Karte
-          // seiner Ausrichtung folgen zu lassen (`:2805-2840`) ist Schritt 14
-          // und braucht ein Sensorpaket, das es hier nicht gibt.
+          // Die Nadel dreht weiterhin gegen die **Kartenblickrichtung**
+          // (`:1792`) und nicht gegen den Rohwert des Kompasses; das ist ein
+          // Unterschied und keine Doppelung mit dem Kompass-Folgen seit
+          // Schritt 14 Teil 2. Der Gerätekompass (`:2805-2840`, [_onHeading])
+          // lässt die Karte seiner Richtung folgen, aber nur, wenn die
+          // Winkel-Totzone und das Gate es zulassen; wie weit die Karte
+          // wirklich gedreht hat, kommt unverändert aus dem Kamerastrom, den
+          // dieser Bildschirm ohnehin abonniert, und genau den zeigt die
+          // Nadel.
           bearingDegrees: _bearingDegrees,
+          // Der Wachhund meldet einen toten Kompass, siehe
+          // [_checkCompassAlive].
+          isCompassDead: _isCompassDead,
           // `isDark` bleibt beim Standard `false`, weil `mapDark` in der
           // Quelle nie `true` wird, siehe `MapTopChrome.isDark`.
         ),
       ],
     );
+  }
+
+  /// Die Standarduhr des Kompass-Wachhunds: eine laufende [Stopwatch], die
+  /// dieser Zustand selbst anlegt. Wortgleiches Vorbild:
+  /// `MapCameraHost._stopwatchClock` in `map/presentation/map_camera_host.dart`.
+  static Duration Function() _stopwatchClock() {
+    final Stopwatch watch = Stopwatch()..start();
+    return () => watch.elapsed;
   }
 }

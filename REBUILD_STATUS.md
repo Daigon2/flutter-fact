@@ -1052,7 +1052,7 @@ das nächste Mal an Phase 2 arbeitet, prüft, ob noch etwas fehlt, und setzt gen
 eine der beiden Stellen richtig.
 
 - [x] 12. MapLibre mit gebackenem Style · [x] 13. Kamera-Verhalten
-- [~] 14. Kompass-Rotation (Paket gewählt und begründet, Sensordienst und Glättung gebaut, Verdrahtung in der Karte offen) ·
+- [x] 14. Kompass-Rotation (am 31.08.2026 in zwei Teilen gebaut; am Gerät ungeprüft wie alles seit dem 29.08.2026) ·
   [x] 15. Cluster-Layer **und Antippen** (das Antippen am 31.08.2026 nachgezogen)
   · [x] 16. Einzel-Marker
 - [x] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (die 2D-Entscheidung vom 31.08.2026 ist am selben Tag aufgehoben, „bau doch gleich 3D"; die 3D-Laufzeit liegt bei Janek)
@@ -1598,6 +1598,93 @@ wären ihre beiden Zweige nicht deckungsgleich, und die Abweichung wäre die
 örtliche Missweisung, in Mitteleuropa je nach Ort ungefähr 2 bis 5 Grad, also
 **mehr** als die Totzone von 1,5 Grad und damit sichtbar. Als E-59
 festgehalten.
+
+### Schritt 14 Teil 2: die Verdrahtung, und damit ist Schritt 14 zu
+
+2180 → 2192 Tests. Vier Dateien geändert, keine neue. Die Karte folgt jetzt der
+Blickrichtung des Geräts.
+
+**Wie wenig dafür nötig war, ist der eigentliche Befund.** Alles Tragende stand
+schon: `MapCameraFollowKind.compassBearing` samt Fundstellen im Absichtstyp, die
+1,5-Grad-Totzone und die Unterdrückungsgründe im Gate, `isCompassDead` im
+Top-Chrome mit der Deckkraft 0,55 der Quelle. Gefehlt hat das Bindeglied, und das
+sind eine Absichtsfunktion und ein Abonnement.
+
+| Stelle | Was dazukam |
+|---|---|
+| `map_camera_intents.dart` | `compassBearingFollowIntent`, die sechste Absicht |
+| `map_page.dart` | Abonnement, Glättungszustand, Wachhund-Takt, `isCompassDead` |
+
+**Der Bewegungstyp ist `MapCameraImmediate`, und das ist nachgelesen und nicht
+gewählt:** `map_camera.dart` sagt wörtlich, dieser Typ entspreche `jumpTo`
+**und** `setBearing` der Quelle, und `screen-map.jsx:2838` ist genau der Aufruf
+dieser Absicht. Eine Animation wäre bei einem bis zu 60 Hz schnellen Strom
+ohnehin falsch: jede neue Ausgabe unterbräche die vorherige, bevor sie zu sehen
+wäre.
+
+#### Ein Paritätsdetail, das nicht im Auftrag stand
+
+Der Wachhund bekommt beim Start eine **Grundlinie**, bevor der erste Sensorwert
+da ist. Die Quelle tut dasselbe und sagt auch warum: `compassLastEventRef.current
+= Date.now()` beim Registrieren der Zuhörer (`screen-map.jsx:2858`, Kommentar
+„give watchdog a baseline so it doesn't fire instantly"). Ohne sie gälte der
+Kompass in der Sekunde zwischen Bildschirmstart und erstem Wert als tot, und die
+Nadel wäre beim Öffnen der Karte kurz abgeblendet.
+
+#### Die Entscheidung zum unsichtbaren Reiter, und ihr Preis
+
+Abonnement und Wachhund laufen weiter, nur die Absicht geht nicht an den Host,
+solange der Zweig unsichtbar ist. Dieselbe Abwägung wie beim Ortungsstrom, der
+aus demselben Grund weiterläuft.
+
+**Der Preis ist benannt:** der Sensor bleibt an, auch wenn niemand hinsieht. Der
+Gewinn ist, dass die Karte beim Zurückkommen sofort einer eingelebten Richtung
+folgt statt einer kaltgestarteten, und dass der Wachhund den wahren Stand zeigt
+statt einer Pause, die nur am Tabwechsel lag.
+
+#### Vier von fünf Mutationen gefangen, und die fünfte ist ehrlich offen
+
+Rohwert statt Glättung (2 Tests rot), fehlende Kündigung im `dispose` (ein
+`StateError` beim Entsorgen), Wachhund-Takt von 2 auf 60 Sekunden (der Kompass
+bleibt fälschlich lebendig), `isCompassDead` fest auf `false` (derselbe Test).
+
+**Die fünfte ist nicht fangbar, und es ist kein Test dafür erfunden worden.**
+`setState` bei jedem Kopfwert statt nur bei einer echten Änderung ändert allein
+die **Zahl der Neuaufbauten**, und die ist von außen nicht beobachtbar:
+`_smoothedBearing` wird nirgends gezeichnet. Ein Rebuild-Zähler wäre genau der
+Testhaken, den dieselbe Datei an anderer Stelle (`debugBuildBalloonImages`) schon
+einmal begründet wieder ausgebaut hat. Die bedingte Fassung ist trotzdem gebaut,
+sie ist richtig, nur unbewiesen.
+
+#### Eine Abweichung von meiner Vorgabe, und sie war nötig
+
+Ich hatte `DateTime.now()` als Rückfall für die Zeitquelle des Wachhunds
+vorgegeben. Das wäre falsch gewesen: `DateTime.now()` wird von `fake_async` und
+`tester.pump()` **nicht** mitverschoben, ein Test dagegen bräuchte also entweder
+`package:clock` (ein neues, zustimmungspflichtiges Paket) oder echtes Warten, und
+Warten verbietet `.claude/rules/tests.md`. Übernommen ist stattdessen das im
+Karten-Layer schon geprüfte Muster: eine `Duration Function()` mit einer
+laufenden `Stopwatch` als Vorgabe, wie in `map_camera_host.dart`.
+
+#### Zwei Testaufbau-Fallen, beide schon dokumentiert und trotzdem getreten
+
+Sie stehen hier, weil sie beim nächsten Mal wieder Zeit kosten:
+
+1. **Zwei frische `ProviderContainer` in einem Test** lassen den ersten mit einem
+   unversorgten Timer aus `factOverlayProvider` zurück, und das fällt erst in der
+   Invariantenprüfung auf. Die bestehende Suite verwendet an anderer Stelle
+   deshalb einen Container weiter.
+2. **Eine über einen Strom ausgelöste Zustandsänderung braucht zwei `pump()`**,
+   einen für die Zustellung und einen für den Neuaufbau. Dasselbe Muster wie bei
+   `emitFix`.
+
+#### Was jetzt gilt und was nicht
+
+Schritt 14 ist **im Code und in den Tests fertig**. Ungeprüft bleibt er **am
+Gerät**: dass sich die Karte beim Drehen des Telefons wirklich mitdreht, kann
+kein Widget-Test zeigen, und der Emulator braucht weiterhin den Neustart des
+Rechners. Die Aussage „die Karte folgt dem Kompass" ist damit strukturell belegt
+und optisch unbestätigt, wie alles seit dem 29.08.2026.
 
 ## Die Architekturprüfung des Kerns, 31.08.2026
 
