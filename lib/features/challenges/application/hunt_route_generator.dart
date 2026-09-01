@@ -57,7 +57,7 @@ import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 
 /// Harte Untergrenze zwischen zwei Stationen, `hunt-generator.jsx:125`.
@@ -168,7 +168,7 @@ double huntDistanceScore(double distanceInMeters) {
 /// bei fünf, sieben oder neun Stationen erreicht wird.
 HuntPlan? generateHuntRoute({
   required List<Fact> facts,
-  required FactPuzzleDifficulty difficulty,
+  required PuzzleDifficulty difficulty,
   required HuntDuration duration,
   MapPosition? startNear,
   List<String> genres = const <String>[],
@@ -206,10 +206,10 @@ HuntPlan? generateHuntRoute({
   // Die Stufen der Auffindbarkeit tragen dieselben Wörter wie die
   // Rätselstufen; `HG_TIER` (`:183`) ist kumulativ, `mittel` erlaubt also
   // `leicht` und `mittel`. Das ist hier die Reihenfolge von
-  // [FactPuzzleDifficulty] und wird daraus abgeleitet statt abgeschrieben.
-  final Set<String> allowedFindability = FactPuzzleDifficulty.values
+  // [PuzzleDifficulty] und wird daraus abgeleitet statt abgeschrieben.
+  final Set<String> allowedFindability = PuzzleDifficulty.values
       .take(difficulty.index + 1)
-      .map((FactPuzzleDifficulty value) => value.code)
+      .map((PuzzleDifficulty value) => value.code)
       .toSet();
   pool = pool
       .where((Fact fact) => _findabilityOf(fact) != FactPuzzle.notFindable)

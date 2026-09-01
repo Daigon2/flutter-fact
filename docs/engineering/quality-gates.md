@@ -84,6 +84,11 @@ A repository script, kept simple and deterministic, fails CI for:
 10. `presentation` importing a `data` directory, including its own feature's.
 11. a feature importing `map/presentation` or `map/data`.
 12. `webview_flutter` outside `lib/map/presentation/avatar/`.
+13. `maplibre_gl` outside `lib/map/`, `geolocator` outside
+    `lib/services/location/`, `shared_preferences` outside
+    `lib/services/preferences/`.
+14. Anything in the shared kernel `lib/kernel/` that is not `dart:`, the kernel
+    itself or a vetted pure-Dart package.
 
 Checks 1 to 3 read "below `features/**/...`" until 2026-08-28. They now apply to
 every `presentation`, `domain`, `application` and `data` segment below `lib/`.
@@ -102,6 +107,19 @@ Check 12 has no trigger today: `webview_flutter` is not a dependency of this
 project and needs a separate approval (E-10). The rule exists ahead of the
 package on purpose, because "encapsulate behind a clear interface" without an
 enforced line is an intention, not a boundary.
+
+**Check 6 gained an exception on 2026-08-31, and check 14 is its counterweight.**
+A feature domain may now import `package:fact_app/kernel/`, the shared kernel
+(ADR-008, rule 23). That is the only loosening: one additional permitted import
+path, granted because the strictness had been paid for three times and the third
+case, an enumeration with meaning, could have diverged without a failing test.
+
+Check 14 is why the loosening is not a hole. It is an **allow-list** and not a
+ban list, for the same reason check 6 is: a vendor package nobody anticipated has
+to be rejected rather than slip through. Everything in the kernel is visible to
+every domain, so a foreign import there would be the most expensive one in the
+tree. Both directions are enforced, and the four admission rules for what may
+live in the kernel are in ADR-008, not here.
 
 `tool/check_architecture.dart` implements these checks. Its own black-box suite
 is `test/tool/check_architecture_test.dart`: every check has a probe that must

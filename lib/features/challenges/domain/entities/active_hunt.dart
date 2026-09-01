@@ -47,7 +47,7 @@
 /// * **Die Schwierigkeitsstufe.** `screen-map.jsx:1049-1051` staffelt daran die
 ///   Navigationshilfen (leicht: Pfeil und Distanz, mittel: nur Distanz, schwer:
 ///   nichts), und `screen-challenge.jsx:2828` zeigt sie im Pause-Bildschirm.
-///   Sie fehlt hier, weil `FactPuzzleDifficulty` der Domäne `facts` gehört und
+///   Sie fehlt hier, weil `PuzzleDifficulty` der Domäne `facts` gehört und
 ///   Gate 6 einer Feature-Domäne nur das Dart-SDK und die eigene Domäne
 ///   erlaubt. Eine wortgleiche Kopie wäre die dritte Wiederholung von D-9, die
 ///   `hunt_plan.dart` ausdrücklich abgelehnt hat. **Das ist eine offene Frage

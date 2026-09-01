@@ -19,7 +19,8 @@ load_when:
 |---|---|
 | Presentation | Application, Domain, narrowly scoped Core |
 | Application | Domain, narrowly scoped Core |
-| Domain | Dart SDK and approved pure-Dart primitives only |
+| Domain | Dart SDK, approved pure-Dart primitives, and the shared kernel |
+| Shared kernel (`lib/kernel/`) | Dart SDK and itself. Nothing else, and no entities |
 | Data | Domain, Core technical primitives, vendor SDKs |
 | App composition | All public feature entry points and services |
 | Services | Vendor SDKs, Core contracts; domain only through explicit adapters |
@@ -30,6 +31,16 @@ A feature's `presentation` and `data` directories are private to that feature.
 Only app composition under `lib/app/` may read them, which is the row above.
 This holds for every caller, not only for another feature: `lib/services/` and
 `lib/map/` are bound by it as well.
+
+The shared kernel under `lib/kernel/` is the one place a feature domain may
+reach outside itself. It exists because the strictness above was paid for three
+times and the third time could have diverged silently: an enumeration with
+meaning, copied, fails no test when the original grows. ADR-008 holds the four
+admission rules, the current contents and what is deliberately kept out,
+including the three coordinate types from D-9, which measurement showed should
+stay separate. Rule 23 enforces both directions, and the second one is the one
+that matters over time: the kernel may import almost nothing, because everything
+in it is seen by every domain.
 
 The map host under `lib/map/` is app and UI infrastructure, not a business
 domain. It owns the map surface and the camera; features hand it intentions
@@ -66,6 +77,9 @@ independent business domain.
 20. `maplibre_gl` may only be imported below `lib/map/`.
 21. `geolocator` and its platform packages may only be imported below `lib/services/location/`.
 22. `shared_preferences` and its platform packages may only be imported below `lib/services/preferences/`.
+23. Every feature domain may import `package:fact_app/kernel/`, the shared
+    kernel. The kernel itself may import only `dart:`, itself, and vetted
+    pure-Dart packages. See ADR-008.
 
 Rules 19 to 22 give a vendor SDK one home directory. They are not a ban, they
 are an assignment: the map SDK belongs to the map host, the geolocation SDK

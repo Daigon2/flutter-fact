@@ -90,9 +90,12 @@ for the concept.
 ## Consequences
 
 - One canonical puzzle engine with two consumers.
-- The duplicated difficulty scale and operand value object in `puzzles/domain`
-  stay, because gate 6 still forbids the import. They are a known, measured cost
-  of the domain boundary, not an oversight.
+- ~~The duplicated difficulty scale and operand value object in
+  `puzzles/domain` stay, because gate 6 still forbids the import.~~ **Resolved
+  on 2026-08-31 by ADR-008.** Both files are deleted; `PuzzleDifficulty` and
+  `PuzzleOperand` live in the shared kernel and are imported by both domains.
+  The cost recorded here was real for four weeks and is now gone, along with the
+  two translation functions that carried it.
 - `domain-map.md`, `architecture-overview.md` and `project-structure.md` name
   `puzzles` from now on.
 
@@ -109,5 +112,21 @@ for the concept.
 - A third consumer appears that is not a tour or a challenge.
 - `puzzles` needs to read state owned by `tours` or `challenges`, which would
   make the graph cyclic.
-- Gate 6 gains an allow-list entry that lets domain layers share value objects,
-  which would remove the duplication cost recorded above.
+- ~~Gate 6 gains an allow-list entry that lets domain layers share value
+  objects, which would remove the duplication cost recorded above.~~ **Fired on
+  2026-08-31.** It was not an allow-list entry but a shared kernel, and the
+  effect is the one predicted here. See ADR-008.
+
+## Amendments
+
+### 2026-08-31: the duplication cost is paid off
+
+This ADR named a cost and predicted the event that would remove it, and both
+turned out right. Worth keeping because the prediction is the useful part: a
+consequence written as *"known, measured cost, not an oversight"* with a matching
+review trigger is what let the next decision find it without searching.
+
+What ADR-008 changes here is only the cost, not the boundary. `puzzles` still
+does not import `facts/domain`, `puzzle_from_fact_puzzle.dart` is still the only
+file that sees both sides, and `FactPuzzle` is still an entity of `facts`. The
+kernel holds value objects; the boundary this ADR drew stands.

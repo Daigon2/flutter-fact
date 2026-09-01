@@ -218,6 +218,24 @@ One branch stays unproven and is named rather than hidden: the path where
 `SharedPreferencesStorePlatform` from `shared_preferences_platform_interface`,
 which is another approval-bound package for one branch.
 
+### 2026-08-31: the group hunt trigger is answered, and this ADR stays as it is
+
+The review trigger below, *"the group hunt (Phase 6) needs shared state across
+devices, which is server state and not a local store"*, was raised with the
+architect and answered on the same day: **Supabase Realtime, and it sits beside
+this ADR rather than breaking it.** The reasoning and the conditions are in
+ADR-009.
+
+Nothing in this document changes. That is the substantive part of the answer, not
+a formality: this ADR decides where a *local* hunt's state lives and who may
+write it, and a group hunt's state is server state, which this ADR already said.
+Two decisions, two questions, no contradiction.
+
+One condition from ADR-009 reaches back into the shape used here. The group hunt
+contract must not name its transport, in the same way `ActiveHuntStore` does not
+name `shared_preferences`. The pattern this ADR established is the pattern
+ADR-009 reuses.
+
 ## Review triggers
 
 - A second feature needs write access to a running hunt.

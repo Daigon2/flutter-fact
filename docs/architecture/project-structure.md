@@ -40,6 +40,8 @@ lib/
 │   ├── geo/
 │   └── widgets/
 │
+├── kernel/
+│
 ├── services/
 │   ├── supabase/
 │   ├── analytics/
@@ -141,6 +143,15 @@ features/settings/
   in `tool/check_architecture.dart` splits the path and never reads the file, so
   a `lib/core/anchors/anchor_ids.dart` full of domain identifiers would pass the
   gate. Review enforces this rule, not the machine.
+
+- `kernel/` is the shared kernel (ADR-008), added on 2026-08-31. It holds value
+  objects that two or more feature domains both need, and it is the only place
+  outside its own feature that a domain layer may import (rule 23). It is
+  deliberately **not** part of `core/`: the root `CLAUDE.md` invariant keeps
+  business concepts out of `core`, and kernel contents are business concepts.
+  Admission is bound to four rules in ADR-008, and adding a type means amending
+  that ADR in the same change. Today it holds two types, `PuzzleDifficulty` and
+  `PuzzleOperand`, and it started by deleting more code than it added.
 
 - `map/` is the map host: app and UI infrastructure that belongs to no business
   domain. It owns the map surface and the camera. Features hand it intentions

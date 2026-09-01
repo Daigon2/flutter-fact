@@ -37,7 +37,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2112 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2131 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -138,16 +138,18 @@ ist die Reihenfolge danach.
       fünf Speicher sind dauerhaft, `bootstrap()` lädt einmal vor dem ersten
       Bild, das Paket sitzt hinter `KeyValueStore` und hat mit Regel 22 ein
       Heimatverzeichnis. Belege im Protokoll unten.
-   a2. **Den Shared Kernel einführen, und zwar vor (b).** Dairens Antwort auf
-      D-18 vom 31.08.2026, siehe Punkt 4. Er ist strukturell und macht alles
-      danach billiger, insbesondere (b): **die Jagd-Nutzlast bekommt sonst zwei
-      Formänderungen statt einer.** D-18 hängt eine Schwierigkeitsstufe hinein,
-      (b) ersetzt eine Anzahl durch Indizes, und beides erhöht
-      `ActiveHunt.payloadVersion`. Zwei Erhöhungen hintereinander verwerfen den
-      Spielstand zweimal, eine verwirft ihn einmal. Also: Kernel, dann (b) und
-      D-18 in **einem** Zug.
-   b. **Das Hinweis-Feld auf Indizes umstellen**, zusammen mit der
-      Schwierigkeitsstufe aus D-18. Durch (a) ist es teurer und wichtiger
+   a2. ~~**Den Shared Kernel einführen**~~ **fertig am 31.08.2026, ADR-008.**
+      `lib/kernel/` hält `PuzzleDifficulty` und `PuzzleOperand`, die beiden
+      Kopien in `puzzles/domain` sind gelöscht, `lib/` ist netto 67 Zeilen
+      kleiner, und Regel 23 setzt beide Richtungen maschinell durch. **D-18 ist
+      damit freigemacht, aber noch nicht gebaut**, siehe (b).
+   b. **Jetzt dran: das Hinweis-Feld auf Indizes umstellen, zusammen mit der
+      Schwierigkeitsstufe aus D-18, in EINEM Zug.** Der Grund steht in ADR-008
+      und ist der einzige, der die Reihenfolge bindet: beide Änderungen erhöhen
+      `ActiveHunt.payloadVersion`, und **zwei Erhöhungen hintereinander verwerfen
+      einen gespeicherten Spielstand zweimal.** Seit der Persistenz von heute
+      liegen echte Nutzlasten auf echten Geräten, das ist kein theoretischer
+      Preis mehr. Durch (a) ist es teurer und wichtiger
       geworden: ab jetzt liegen echte Nutzlasten auf echten Geräten, und eine
       Formänderung trifft sie. Der Zweig, der sie verwirft, ist geprüft
       (`key_value_active_hunt_store_test.dart`, „eine Nutzlast der falschen
@@ -263,6 +265,28 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Der geteilte Kern, und ein Kommentar, der seine eigene Fälligkeit kannte
+
+ADR-008 ist gebaut: `lib/kernel/` mit zwei Typen, die beiden Kopien in
+`puzzles/domain` gelöscht, die zwei Umrechnungen im Übersetzer mit ihnen.
+2112 → 2131 Tests, `lib/` netto **67 Zeilen kleiner**. Dazu ADR-009 für die
+Gruppen-Jagd und Regel 23 im Prüfskript, beide Richtungen. Belege in
+`REBUILD_STATUS.md`.
+
+**Überraschend war zum zweiten Mal an einem Tag, dass die Regel schon
+geschrieben war, bevor sie galt.** Bei `shared_preferences` heute Vormittag stand
+die Ablaufbedingung im Kommentar, hier stand sie in ADR-006: die Doppelung war
+als „known, measured cost" geführt, und der Review-Auslöser nannte wörtlich den
+Fall, der jetzt eingetreten ist. Beide Male hat das die nächste Entscheidung
+finden lassen, ohne dass jemand suchen musste. Wer einen Preis benennt, soll
+gleich die Bedingung dazuschreiben, unter der er zurückgezahlt wird.
+
+**Der teuerste Teil war nicht der Kern, sondern das Nein.** Die Aufnahmeregeln in
+ADR-008 lehnen mehr ab als sie zulassen: die drei Geo-Typen aus D-9, `FactId`,
+einen Ersatzwert für die Stufe, jede Entität. Ohne diese Liste wäre aus dem Kern
+in vier Wochen der Ablageort geworden, an dem jede Domäne an jeder hängt, und der
+wäre teurer als die Doppelung, die er ersetzt hat.
 
 ### 31.08.2026, Fünf technische Antworten, und der Block, der sie erklärt
 

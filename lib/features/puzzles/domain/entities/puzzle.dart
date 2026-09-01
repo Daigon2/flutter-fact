@@ -68,8 +68,8 @@
 /// Münzen. Das ist Schritt 28 bis 32 und hängt an E-08 und E-06.
 library;
 
-import 'package:fact_app/features/puzzles/domain/value_objects/puzzle_difficulty.dart';
-import 'package:fact_app/features/puzzles/domain/value_objects/puzzle_operand.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_operand.dart';
 
 /// Ein Rätsel in der Form, in der es gespielt wird.
 ///

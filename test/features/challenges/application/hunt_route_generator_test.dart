@@ -7,8 +7,8 @@ import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_coordinates.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -34,7 +34,7 @@ void main() {
         facts: <Fact>[
           _fact(1, north: 0, east: 0, puzzles: const <FactPuzzle>[]),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         seed: 'probe',
       );
@@ -45,7 +45,7 @@ void main() {
     test('ein Fakt ohne Koordinate ist kein Kandidat', () {
       final HuntPlan? plan = generateHuntRoute(
         facts: <Fact>[_fact(1, north: 0, east: 0).copyWithoutCoordinates()],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         seed: 'probe',
       );
@@ -57,7 +57,7 @@ void main() {
       expect(
         generateHuntRoute(
           facts: const <Fact>[],
-          difficulty: FactPuzzleDifficulty.leicht,
+          difficulty: PuzzleDifficulty.leicht,
           duration: HuntDuration.thirty,
           seed: 'probe',
         ),
@@ -75,7 +75,7 @@ void main() {
           'Stationen', () {
         final HuntPlan? plan = generateHuntRoute(
           facts: _gridFacts(),
-          difficulty: FactPuzzleDifficulty.leicht,
+          difficulty: PuzzleDifficulty.leicht,
           duration: duration,
           startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
         );
@@ -88,7 +88,7 @@ void main() {
     test('keine Station kommt zweimal vor', () {
       final HuntPlan? plan = generateHuntRoute(
         facts: _gridFacts(),
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.ninety,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -106,7 +106,7 @@ void main() {
           _fact(1, north: 0, east: 0),
           _fact(2, north: 300, east: 0),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -126,7 +126,7 @@ void main() {
 
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         genres: const <String>['Geschichte'],
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
@@ -150,7 +150,7 @@ void main() {
 
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         genres: const <String>['Geschichte'],
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
@@ -171,7 +171,7 @@ void main() {
 
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         genres: const <String>['Geschichte'],
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
@@ -211,7 +211,7 @@ void main() {
 
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -242,7 +242,7 @@ void main() {
 
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -267,7 +267,7 @@ void main() {
 
       final HuntPlan? plan = generateHuntRoute(
         facts: facts,
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -292,7 +292,7 @@ void main() {
           facts: <Fact>[
             for (int i = 0; i < 10; i++) _fact(i + 1, north: i * 400, east: 0),
           ],
-          difficulty: FactPuzzleDifficulty.leicht,
+          difficulty: PuzzleDifficulty.leicht,
           duration: HuntDuration.thirty,
           seed: 'probe',
         );
@@ -305,7 +305,7 @@ void main() {
       List<int> run() => _ids(
         generateHuntRoute(
           facts: _gridFacts(),
-          difficulty: FactPuzzleDifficulty.leicht,
+          difficulty: PuzzleDifficulty.leicht,
           duration: HuntDuration.thirty,
           seed: 'muc-1',
         )!,
@@ -322,7 +322,7 @@ void main() {
           facts: <Fact>[
             for (int i = 0; i < 10; i++) _fact(i + 1, north: i * 400, east: 0),
           ],
-          difficulty: FactPuzzleDifficulty.leicht,
+          difficulty: PuzzleDifficulty.leicht,
           duration: HuntDuration.thirty,
           seed: seed,
         )!,
@@ -340,7 +340,7 @@ void main() {
           _fact(2, north: 120, east: 0),
           _fact(3, north: 460, east: 0),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -356,7 +356,7 @@ void main() {
           _fact(1, north: 3000, east: 0),
           _fact(2, north: 1400, east: 0),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -378,7 +378,7 @@ void main() {
           _fact(1, north: 0, east: 0, puzzles: both),
           _fact(2, north: 420, east: 0, puzzles: both),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -403,7 +403,7 @@ void main() {
             puzzles: <FactPuzzle>[_puzzle(type: 'inschrift')],
           ),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -424,13 +424,11 @@ void main() {
             2,
             north: 420,
             east: 0,
-            puzzles: <FactPuzzle>[
-              _puzzle(difficulty: FactPuzzleDifficulty.schwer),
-            ],
+            puzzles: <FactPuzzle>[_puzzle(difficulty: PuzzleDifficulty.schwer)],
           ),
           _fact(3, north: 840, east: 0),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -447,9 +445,7 @@ void main() {
             1,
             north: 0,
             east: 0,
-            puzzles: <FactPuzzle>[
-              _puzzle(difficulty: FactPuzzleDifficulty.schwer),
-            ],
+            puzzles: <FactPuzzle>[_puzzle(difficulty: PuzzleDifficulty.schwer)],
           ),
           _fact(
             2,
@@ -458,7 +454,7 @@ void main() {
             puzzles: <FactPuzzle>[_puzzle(difficulty: null)],
           ),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -480,7 +476,7 @@ void main() {
           ),
           _fact(3, north: 840, east: 0),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -526,7 +522,7 @@ void main() {
             _fact(2, north: 420, east: 0),
             _fact(3, north: -420, east: 0, qualityScore: 3),
           ],
-          difficulty: FactPuzzleDifficulty.leicht,
+          difficulty: PuzzleDifficulty.leicht,
           duration: HuntDuration.thirty,
           startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
         );
@@ -550,7 +546,7 @@ void main() {
             puzzles: <FactPuzzle>[_puzzle(type: 'zaehlen')],
           ),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -567,7 +563,7 @@ void main() {
           _fact(2, north: 420, east: 0),
           _fact(3, north: -420, east: 0),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -587,7 +583,7 @@ void main() {
           _fact(2, north: 840, east: 0),
           _fact(3, north: -900, east: 0, qualityScore: 3),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -625,7 +621,7 @@ void main() {
             puzzles: <FactPuzzle>[_puzzle(type: 'zaehlen')],
           ),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -648,7 +644,7 @@ void main() {
             puzzles: <FactPuzzle>[_puzzle(type: 'zaehlen')],
           ),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -667,7 +663,7 @@ void main() {
           _fact(3, north: -622, east: 0, qualityScore: 3),
           _fact(4, north: 0, east: 300),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -685,7 +681,7 @@ void main() {
           _fact(3, north: -655, east: 0, qualityScore: 3),
           _fact(4, north: 0, east: 300),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -701,7 +697,7 @@ void main() {
           _fact(2, north: 420, east: 0),
           _fact(3, north: -534, east: 0, qualityScore: 2),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -718,7 +714,7 @@ void main() {
           _fact(2, north: 420, east: 0),
           _fact(3, north: -572, east: 0, qualityScore: 2),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -737,7 +733,7 @@ void main() {
           _fact(2, north: 420, east: 0),
           _fact(3, north: -420, east: 0, qualityScore: 1),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -757,7 +753,7 @@ void main() {
           _fact(2, north: 150, east: 0),
           _fact(3, north: 420, east: 0),
         ],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -778,7 +774,7 @@ void main() {
       // jemand die Rechnung der Quelle wieder einsetzt.
       final HuntPlan? plan = generateHuntRoute(
         facts: _gridFacts(),
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -794,7 +790,7 @@ void main() {
       // ließe sich auch mit einer festverdrahteten 30 erfüllen.
       final HuntPlan? plan = generateHuntRoute(
         facts: _gridFacts(),
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.ninety,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -806,18 +802,18 @@ void main() {
     test('die Stufe der Anfrage steht im Plan', () {
       final HuntPlan? plan = generateHuntRoute(
         facts: _gridFacts(),
-        difficulty: FactPuzzleDifficulty.mittel,
+        difficulty: PuzzleDifficulty.mittel,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
 
-      expect(plan!.difficulty, FactPuzzleDifficulty.mittel);
+      expect(plan!.difficulty, PuzzleDifficulty.mittel);
     });
 
     test('der Ort einer Station ist der Ort ihres Fakts', () {
       final HuntPlan? plan = generateHuntRoute(
         facts: <Fact>[_fact(1, north: 0, east: 0)],
-        difficulty: FactPuzzleDifficulty.leicht,
+        difficulty: PuzzleDifficulty.leicht,
         duration: HuntDuration.thirty,
         startNear: const MapPosition(latitude: _lat0, longitude: _lng0),
       );
@@ -843,7 +839,7 @@ List<int> _ids(HuntPlan plan) =>
 
 FactPuzzle _puzzle({
   String? type = 'inschrift',
-  FactPuzzleDifficulty? difficulty = FactPuzzleDifficulty.leicht,
+  PuzzleDifficulty? difficulty = PuzzleDifficulty.leicht,
   String? findability,
 }) {
   return FactPuzzle(

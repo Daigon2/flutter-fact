@@ -7,8 +7,8 @@ import 'package:fact_app/features/facts/domain/value_objects/fact_coordinates.da
 import 'package:fact_app/features/facts/domain/value_objects/fact_defect.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_import_report.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Verhalten der Entität selbst, ohne Datenschicht.
@@ -213,23 +213,23 @@ void main() {
     test('sie nimmt die leichteste vorhandene Stufe', () {
       final fact = factWith(
         puzzles: const <FactPuzzle>[
-          FactPuzzle(question: 'a', difficulty: FactPuzzleDifficulty.schwer),
-          FactPuzzle(question: 'b', difficulty: FactPuzzleDifficulty.mittel),
+          FactPuzzle(question: 'a', difficulty: PuzzleDifficulty.schwer),
+          FactPuzzle(question: 'b', difficulty: PuzzleDifficulty.mittel),
         ],
       );
 
-      expect(fact.easiestPuzzleDifficulty, FactPuzzleDifficulty.mittel);
+      expect(fact.easiestPuzzleDifficulty, PuzzleDifficulty.mittel);
     });
 
     test('Rätsel ohne Stufe werden übersprungen', () {
       final fact = factWith(
         puzzles: const <FactPuzzle>[
           FactPuzzle(question: 'a'),
-          FactPuzzle(question: 'b', difficulty: FactPuzzleDifficulty.schwer),
+          FactPuzzle(question: 'b', difficulty: PuzzleDifficulty.schwer),
         ],
       );
 
-      expect(fact.easiestPuzzleDifficulty, FactPuzzleDifficulty.schwer);
+      expect(fact.easiestPuzzleDifficulty, PuzzleDifficulty.schwer);
     });
   });
 
@@ -494,37 +494,28 @@ void main() {
     });
   });
 
-  group('FactPuzzleDifficulty', () {
+  group('PuzzleDifficulty', () {
     test('bekannte Codes werden erkannt', () {
-      expect(
-        FactPuzzleDifficulty.fromCode('leicht'),
-        FactPuzzleDifficulty.leicht,
-      );
-      expect(
-        FactPuzzleDifficulty.fromCode('MITTEL'),
-        FactPuzzleDifficulty.mittel,
-      );
-      expect(
-        FactPuzzleDifficulty.fromCode(' schwer '),
-        FactPuzzleDifficulty.schwer,
-      );
+      expect(PuzzleDifficulty.fromCode('leicht'), PuzzleDifficulty.leicht);
+      expect(PuzzleDifficulty.fromCode('MITTEL'), PuzzleDifficulty.mittel);
+      expect(PuzzleDifficulty.fromCode(' schwer '), PuzzleDifficulty.schwer);
     });
 
     test('unbekannte und fehlende Codes ergeben null', () {
-      expect(FactPuzzleDifficulty.fromCode('brutal'), isNull);
-      expect(FactPuzzleDifficulty.fromCode(null), isNull);
-      expect(FactPuzzleDifficulty.fromCode(''), isNull);
+      expect(PuzzleDifficulty.fromCode('brutal'), isNull);
+      expect(PuzzleDifficulty.fromCode(null), isNull);
+      expect(PuzzleDifficulty.fromCode(''), isNull);
     });
 
     test('die Reihenfolge geht von leicht nach schwer', () {
       // Darauf verlässt sich Fact.easiestPuzzleDifficulty.
       expect(
-        FactPuzzleDifficulty.leicht.index,
-        lessThan(FactPuzzleDifficulty.mittel.index),
+        PuzzleDifficulty.leicht.index,
+        lessThan(PuzzleDifficulty.mittel.index),
       );
       expect(
-        FactPuzzleDifficulty.mittel.index,
-        lessThan(FactPuzzleDifficulty.schwer.index),
+        PuzzleDifficulty.mittel.index,
+        lessThan(PuzzleDifficulty.schwer.index),
       );
     });
   });

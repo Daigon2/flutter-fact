@@ -346,3 +346,38 @@ muss.
 kostet eine Minute Zugriff, er ist die Grundlage für alle drei Fragen oben, und
 solange er fehlt, ist jeder Satz in diesem Dokument mit „laut Dateien"
 eingeschränkt.
+
+---
+
+## 6. Was am Backend schon entschieden ist, bevor es dran ist
+
+Am 31.08.2026 sind fünf technische Fragen beantwortet worden, und drei der
+Antworten sind **Backend-Arbeit**. Sie stehen hier, weil sie sonst im
+Entscheidungsdokument versauern, bis jemand sie sucht. Reihenfolge und Zuschnitt
+gehören in den Backend-Auftrag, nicht in den Client.
+
+| Auftrag | Kommt aus | Was zu tun ist |
+|---|---|---|
+| **Zeit serverseitig rechnen** | E-19, Antwort (a) | Sitzungsende und Bonusfaktor entstehen aus serverseitigen Größen. Der Client zeigt einen Ablauf, er verbucht ihn nicht. |
+| **Trophäen und Punktestände dichtmachen** | E-49 plus E-16 plus E-55 | Der Server ist die einzige Wahrheit. `user_trophies` und `user_city_scores` sind heute für jeden lesbar **und** vom Besitzer schreibbar; die Leseseite braucht eine Entscheidung zum Schalter „Echten Namen zeigen", die Schreibseite braucht dieselbe Behandlung wie `profiles` in Migration 1. |
+| **Die defekte Ableitung in der PWA entfernen** | E-49 | `wltDeriveTrophies` (`screen-wallet.jsx:114-128`) rechnet den Trophäenstand clientseitig neu und liegt dabei für Stadt-, Rang- und Geheim-Trophäen dauerhaft falsch. Das ist PWA-Arbeit, nicht Datenbank. |
+| **Gruppen-Jagd: Realtime bleibt, drei Löcher nicht** | ADR-009 | E-21 (`start_group_session` doppelt definiert), E-54 (Coins über Sitzungen farmbar), E-57 (Team-Ausgleich wirkungslos). Schritt 40 baut gegen diese drei, ob sie behoben sind oder nicht. |
+
+**Zwei Dinge, die diese Liste nicht sagt und die dazugehören.**
+
+Erstens: **nichts davon ist eine Reihenfolge.** E-06 und E-24 haben eine
+entschiedene Reihenfolge (Abschnitt „Entscheidungsstand" in
+`backend-security-fixes.md`), diese vier haben keine. Wer sie plant, plant sie
+zusammen mit dem Schema-Dump aus Abschnitt 2.
+
+Zweitens: **die Reihenfolge Frontend zuerst hat eine Kante, und sie liegt bei
+E-19.** Das Sitzungsende in Phase 5 ist bis zur serverseitigen Zeit nicht
+parität-treu baubar. Anzeigen ja, verbuchen nein. Wer Phase 5 abschließen will,
+ohne das Backend anzufassen, baut entweder einen clientseitigen Timer, und das
+ist genau die Ausnahme, die am 31.08.2026 abgelehnt wurde, oder er lässt den
+Moment offen, in dem aus Zeit Punkte werden.
+
+**OD-002 gehört ausdrücklich nicht auf diese Liste.** Die lokale
+Datenbanktechnologie ist am 31.08.2026 offen geblieben, mit Begründung: sie wird
+entschieden, wenn ein echtes Offline-Ticket die Abfragen und die Datenmenge
+liefert, und nicht, weil ADR-007 ein paar Werte persistieren musste.

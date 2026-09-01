@@ -222,6 +222,13 @@ Forbidden mechanisms:
 - Duplicating canonical entities under multiple features.
 - Placing business models in `core`.
 
+Since 2026-08-31 there is one sanctioned way out of the first of those two, and
+it is narrow: a **value object** that two or more domains both need may live in
+the shared kernel (ADR-008). An **entity** may not. `FactPuzzle` stays in Facts
+even though Puzzles would like it; only the difficulty scale and the operand went
+to the kernel. The anti-pattern above is unchanged: the kernel removes the reason
+to copy, it does not license the copy.
+
 ## 6. Ownership examples
 
 - `Fact` belongs to Facts.
@@ -237,6 +244,10 @@ Forbidden mechanisms:
   belongs to Challenges as well, not to the consuming presentation layer, because
   Discovery must not restate what a hunt is.
 - `CityId` belongs to City and may be used as a shared domain value type through an explicit public domain contract.
+- `PuzzleDifficulty` and `PuzzleOperand` belong to **no** feature. They are the
+  contents of the shared kernel as of 2026-08-31, because Facts reads them,
+  Puzzles evaluates them and Challenges carries the difficulty of a running hunt.
+  Ownership by three domains at once is precisely the case ADR-008 exists for.
 
 ## 7. Initial domain decisions made by architecture
 

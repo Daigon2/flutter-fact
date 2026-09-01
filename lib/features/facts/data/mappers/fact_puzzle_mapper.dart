@@ -1,6 +1,7 @@
 import 'package:fact_app/features/facts/data/mappers/raw_record_reader.dart';
 import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_operand.dart';
 
 /// Baut ein `FactPuzzle` aus einem Element von `facts.puzzle_fit`.
 ///
@@ -110,7 +111,7 @@ class FactPuzzleMapper {
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  static FactPuzzleDifficulty? _difficulty(
+  static PuzzleDifficulty? _difficulty(
     RawRecordReader element,
     RawRecordReader reader,
     String path,
@@ -119,20 +120,20 @@ class FactPuzzleMapper {
     if (code == null) {
       return null;
     }
-    final difficulty = FactPuzzleDifficulty.fromCode(code);
+    final difficulty = PuzzleDifficulty.fromCode(code);
     if (difficulty == null) {
       reader.recordDefect('$path.difficulty', 'unbekannte Stufe');
     }
     return difficulty;
   }
 
-  static FactPuzzleOperand? _operand(RawRecordReader element, String field) {
+  static PuzzleOperand? _operand(RawRecordReader element, String field) {
     final raw = element.optionalObject(field);
     if (raw == null) {
       return null;
     }
     final operandReader = RawRecordReader(raw);
-    final operand = FactPuzzleOperand(
+    final operand = PuzzleOperand(
       label: operandReader.optionalString('hint'),
       description: operandReader.optionalString('description'),
     );

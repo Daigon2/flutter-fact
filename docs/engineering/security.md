@@ -30,6 +30,31 @@ Never rely on client code for:
 
 Use Supabase RLS, database constraints, trusted functions and backend validation.
 
+### No exception, decided 2026-08-31
+
+Two of the bullets above were put up for an exception and the exception was
+refused, in these words: *"Keine Ausnahme von security.md"* (architect, on E-19).
+Both are now standing rules of the rebuild, and both are stated positively so
+they can be applied rather than only cited:
+
+- **The client never determines a credited amount.** Every credit comes from a
+  server call that derives the amount itself. Decided by the product owner on
+  2026-08-31 while answering the reward economy.
+- **The client never computes time a reward depends on.** Not a session end, not
+  a bonus factor. The client may show a countdown; the server decides when the
+  session ended and what it was worth.
+
+**What this costs, so nobody has to rediscover it.** The 45-minute timer and the
+final-points factor of 1.5 are client-side in the behavioural source. The session
+end in phase 5 is therefore **not** buildable with parity until the backend
+change exists: displaying the run is in scope, turning it into points is not. A
+client-side timer here would be exactly the exception that was refused.
+
+Related open findings, all recorded in `REBUILD_STATUS.md`: E-06 and E-24 leave
+the amount and the profile row writable today, and E-52, E-54 and E-55 extend
+that to foreign accounts, group coin farming and the leaderboard tables. A clean
+client does not fix any of them.
+
 ## 2. Secrets
 
 Do not commit:

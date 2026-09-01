@@ -21,8 +21,8 @@ import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_city.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_coordinates.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -106,7 +106,7 @@ void main() {
     await goToStepTwo(tester);
     await tapAt(
       tester,
-      find.byKey(ChallengeSetupView.difficultyKey(FactPuzzleDifficulty.leicht)),
+      find.byKey(ChallengeSetupView.difficultyKey(PuzzleDifficulty.leicht)),
     );
     await tapAt(
       tester,
@@ -184,9 +184,7 @@ void main() {
 
       expect(find.byKey(ChallengeSetupView.startKey), findsNothing);
       expect(
-        find.byKey(
-          ChallengeSetupView.difficultyKey(FactPuzzleDifficulty.leicht),
-        ),
+        find.byKey(ChallengeSetupView.difficultyKey(PuzzleDifficulty.leicht)),
         findsNothing,
       );
       expect(find.byType(ChallengeGenreFilter), findsNothing);
@@ -209,8 +207,7 @@ void main() {
         find.text(stringsOf().text('challenge.difficulty').toUpperCase()),
         findsOneWidget,
       );
-      for (final FactPuzzleDifficulty difficulty
-          in FactPuzzleDifficulty.values) {
+      for (final PuzzleDifficulty difficulty in PuzzleDifficulty.values) {
         expect(
           find.byKey(ChallengeSetupView.difficultyKey(difficulty)),
           findsOneWidget,
@@ -269,9 +266,7 @@ void main() {
       await goToStepTwo(tester);
       await tapAt(
         tester,
-        find.byKey(
-          ChallengeSetupView.difficultyKey(FactPuzzleDifficulty.leicht),
-        ),
+        find.byKey(ChallengeSetupView.difficultyKey(PuzzleDifficulty.leicht)),
       );
       await tapAt(
         tester,
@@ -299,9 +294,7 @@ void main() {
 
       await tapAt(
         tester,
-        find.byKey(
-          ChallengeSetupView.difficultyKey(FactPuzzleDifficulty.schwer),
-        ),
+        find.byKey(ChallengeSetupView.difficultyKey(PuzzleDifficulty.schwer)),
       );
       // `:1615`: **beides** wird verlangt, nicht eines von beiden.
       expect(_startEnabled(tester), isFalse);
@@ -324,9 +317,7 @@ void main() {
 
       await tapAt(
         tester,
-        find.byKey(
-          ChallengeSetupView.difficultyKey(FactPuzzleDifficulty.leicht),
-        ),
+        find.byKey(ChallengeSetupView.difficultyKey(PuzzleDifficulty.leicht)),
       );
       await tapAt(
         tester,

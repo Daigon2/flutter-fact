@@ -1391,6 +1391,85 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
 
+## Der geteilte Kern, 31.08.2026
+
+ADR-008, Antwort auf D-18. Nicht einer der 50 Schritte, sondern die Änderung des
+Grenzverlaufs, an dem drei Schritte hingen. 2112 → 2131 Tests, alle vier Gates
+auf Exit-Code 0, die drei Drift-Werkzeuge mit `--check` auf 0.
+
+**Der Kern nimmt weniger Platz ein, als er freimacht.** `lib/` schrumpft netto um
+**67 Zeilen**: 156 Zeilen neuer Kern gegen 289 gelöschte, davon 178 aus drei
+gelöschten Dateien.
+
+| Was | Vorher | Nachher |
+|---|---|---|
+| Schwierigkeitsstufe | `FactPuzzleDifficulty` in `facts/domain` **plus** wortgleiche Kopie `PuzzleDifficulty` in `puzzles/domain` | `PuzzleDifficulty` in `lib/kernel/` |
+| Operand | `FactPuzzleOperand` in `fact_puzzle.dart` **plus** Kopie `PuzzleOperand` in `puzzles/domain` | `PuzzleOperand` in `lib/kernel/` |
+| Übersetzer | `_difficulty` als `switch`, `_operand` als Feldkopie | beide gelöscht, die Umrechnung ist eine Zuweisung |
+
+### Was daran die Auflockerung ist, und wie klein sie gehalten wurde
+
+**Genau ein zusätzlich erlaubter Importpfad** für Domänen:
+`package:fact_app/kernel/`. Kein Loch in Regel 11, keine Ausnahme je Fall, keine
+Erlaubnisliste, die jemand pflegen muss. Das ist Regel 23 in
+`dependency-rules.md`.
+
+Die Gegenrichtung ist die wichtigere und deshalb ebenfalls maschinell: der Kern
+selbst darf **nur** `dart:`, sich selbst und die leere Liste
+`_domainAllowedPackages`. Als **Erlaubnisliste** und nicht als Verbotsliste, aus
+demselben Grund wie bei der Domäne: ein Vendor-Paket, an das niemand gedacht hat,
+muss abgelehnt werden und nicht durchrutschen. Alles im Kern sieht jede Domäne.
+
+**Beide Richtungen sind an der echten Ablage nachgewiesen, nicht nur im Test.**
+Drei Domänendateien in zwei Features importieren den Kern heute
+(`facts/domain/entities/fact.dart`, `fact_puzzle.dart`,
+`puzzles/domain/entities/puzzle.dart`), und Gate 3 steht dabei auf 0. Eine
+Wegwerf-Probe `lib/kernel/_probe.dart` mit einem Supabase-Import hat Gate 3 auf
+**Exit-Code 1** gebracht, mit genau der Regel-23-Meldung; nach dem Löschen wieder
+0. Dazu fünf feste Testfälle unter „Ä14" in `check_architecture_test.dart`, drei
+Verstoßproben und zwei stille.
+
+### Was der Kern ausdrücklich nicht bekommt
+
+- **Die drei Geo-Typen aus D-9.** Aufnahmeregel 3 in ADR-008 lehnt sie ab, und
+  das ist die Messung von D-9 als Regel geschrieben: `FactCoordinates` prüft
+  Rohwerte, `MapPosition` rechnet Haversine, ein geteilter Typ müsste beide
+  Rollen tragen. D-9 bleibt bei Variante (b).
+- **`FactId`.** `challenges/application` hält heute ganze `Fact`-Objekte und
+  braucht die Kennung nicht einzeln. Aufnahmeregel 1 nicht erfüllt.
+- **Einen Ersatzwert für die Stufe.** Der Kern wäre der bequemste Ort und
+  deshalb der schlechteste: welcher Ersatzwert gilt, ist eine Belohnungsfrage von
+  `puzzles` und `progression`. Im Kern wäre sie vor allen drei Domänen versteckt.
+- **Entitäten.** `FactPuzzle` bleibt in `facts/domain`, und `puzzles/domain` darf
+  es weiterhin nicht sehen. Der Übersetzer in `puzzles/application` bleibt genau
+  deshalb bestehen.
+
+### D-18 ist freigemacht und noch nicht gebaut, und das ist Absicht
+
+Die laufende Jagd **kann** ihre Stufe jetzt tragen. Sie bekommt sie trotzdem in
+dieser Änderung nicht, denn beides zusammen wäre teurer als nacheinander, und
+zwar in der falschen Richtung: die Umstellung des Hinweis-Felds von einer Anzahl
+auf Indizes erhöht `ActiveHunt.payloadVersion`, die Schwierigkeitsstufe ebenso.
+**Zwei Erhöhungen hintereinander verwerfen einen gespeicherten Spielstand
+zweimal, eine verwirft ihn einmal.** Seit dem 31.08.2026 liegen echte Nutzlasten
+auf echten Geräten, das ist also kein theoretischer Preis mehr. Beides gehört in
+einen Zug.
+
+### Zwei Nachwirkungen in akzeptierten Dokumenten
+
+**ADR-006 hat seinen eigenen Auslöser vorhergesagt und damit recht gehabt.** Es
+führte die Doppelung als „known, measured cost of the domain boundary" und nannte
+als Review-Auslöser wörtlich den Fall, der jetzt eingetreten ist. Beides steht
+dort nun als bezahlt. Der nützliche Teil daran ist die Vorhersage: eine als Preis
+benannte Konsequenz mit passendem Auslöser hat die nächste Entscheidung finden
+lassen, ohne dass jemand suchen musste.
+
+**`HuntPlan` und `HuntStop` bleiben in `challenges/application`.** Ihre
+Rücknahmebedingung hängt an genau dieser Entscheidung („zieht ohne Feldänderung
+nach `domain/` um"), und sie ist damit fällig. Der Umzug ändert kein Verhalten
+und ist deshalb nicht mitgemacht; er steht als Review-Auslöser in ADR-008 und
+gehört als **Mitteilung** in den nächsten Dairen-Block, nicht als Frage.
+
 ## Die erste Persistenz, 31.08.2026
 
 Nicht einer der 50 Schritte, aber Voraussetzung für die Schritte 36 und 37 und

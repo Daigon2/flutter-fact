@@ -13,7 +13,7 @@ import 'package:fact_app/features/challenges/presentation/widgets/hunt_start_poi
 import 'package:fact_app/features/facts/application/fact_providers.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_city.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,7 +82,7 @@ class ChallengesPage extends ConsumerStatefulWidget {
 /// (`:4331-4358`). Der Modus fehlt, weil dieser Assistent nur den Solo-Pfad
 /// zu Ende führt, und `routeKey` fehlt mit den kuratierten Themenrouten.
 typedef _HuntChoice = ({
-  FactPuzzleDifficulty difficulty,
+  PuzzleDifficulty difficulty,
   HuntDuration duration,
   List<String> genres,
 });
@@ -117,7 +117,7 @@ class _ChallengesPageState extends ConsumerState<ChallengesPage> {
 
   /// `handleSetupStart` für den Solo-Pfad, `:4319-4329`.
   void _onSetupDone(
-    FactPuzzleDifficulty difficulty,
+    PuzzleDifficulty difficulty,
     HuntDuration duration,
     List<String> genreCodes,
   ) {

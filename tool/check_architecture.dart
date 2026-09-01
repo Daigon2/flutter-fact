@@ -516,6 +516,20 @@ const _mapHome = 'lib/map/';
 /// nach `services/` und in kein Feature.
 const _locationHome = 'lib/services/location/';
 
+/// Der geteilte Kern, ADR-008.
+///
+/// Der einzige Ort außerhalb der eigenen Feature-Domäne, aus dem eine Domäne
+/// importieren darf. Was hier liegt, ist in ADR-008 namentlich aufgeführt; ein
+/// weiterer Eintrag ist eine Ergänzung dieses ADR und keine Datei.
+const _kernelHome = 'lib/kernel/';
+
+/// Der Kern, wie er in einem Import steht.
+///
+/// Abgeleitet aus [_kernelHome], damit Verzeichnis und Importpfad nicht
+/// auseinanderlaufen können.
+final _kernelImportPrefix =
+    'package:fact_app/${_kernelHome.substring('lib/'.length)}';
+
 /// Der Präferenz-Adapter, der einzige Ort, an dem der Gerätespeicher
 /// vorkommen darf.
 ///
@@ -1162,6 +1176,41 @@ bool _isAllowedDomainImport(
       _hasSegment(resolved.substring(modulwurzel.length), 'domain')) {
     return true;
   }
+  // Regel 23, ADR-008: der geteilte Kern. Die eine Auflockerung von Gate 6,
+  // und sie ist absichtlich die kleinste, die D-18 löst: **ein** zusätzlicher
+  // erlaubter Importpfad, kein Loch in Regel 11 und keine Ausnahmeliste, die
+  // jemand pflegen müsste. Was im Kern liegen darf, steht in ADR-008 und wird
+  // von [_kernelBans] und [_isAllowedKernelImport] eng gehalten.
+  if (resolved.startsWith(_kernelImportPrefix)) {
+    return true;
+  }
+  for (final package in _domainAllowedPackages) {
+    if (resolved == 'package:$package' ||
+        resolved.startsWith('package:$package/')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Regel 23, zweite Hälfte: was der Kern selbst importieren darf.
+///
+/// Eine Erlaubnisliste und keine Verbotsliste, aus demselben Grund, aus dem die
+/// Domäne eine hat: ein neues Vendor-Paket, an das niemand gedacht hat, muss
+/// **abgelehnt** werden und nicht durchrutschen. Der Kern liegt tiefer als jede
+/// Domäne, ein Fremdimport dort wäre der teuerste im ganzen Baum.
+///
+/// Erlaubt sind genau drei Dinge: das Dart-SDK, der Kern selbst, und die
+/// geprüften reinen Dart-Pakete aus [_domainAllowedPackages], die heute leer
+/// ist. Insbesondere **nicht** erlaubt: `core`, `features`, `map`, `services`,
+/// `app`, Flutter, Riverpod und jedes Vendor-SDK.
+bool _isAllowedKernelImport(String resolved) {
+  if (resolved.startsWith('dart:')) {
+    return true;
+  }
+  if (resolved.startsWith(_kernelImportPrefix)) {
+    return true;
+  }
   for (final package in _domainAllowedPackages) {
     if (resolved == 'package:$package' ||
         resolved.startsWith('package:$package/')) {
@@ -1181,6 +1230,7 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
       .where((l) => l.pathMatch.hasMatch(posixPath))
       .toList();
   final istDomaene = _domainPath.hasMatch(posixPath);
+  final istKern = posixPath.startsWith(_kernelHome);
   final istPresentation = _presentationPath.hasMatch(posixPath);
   final domaenenModul = _modulwurzel(posixPath, 'domain');
   // Regel 8 und 9 gelten für alles unter `lib/`, nicht nur innerhalb von
@@ -1192,9 +1242,14 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
   //  * `lib/core/`: [_coreBans] verbietet `package:fact_app/features/` schon
   //    pauschal und nennt dabei die genauere Regel 11. Ohne diese Ausnahme
   //    stünden für denselben Import zwei Sätze im Bericht.
+  //  * `lib/kernel/`: dieselbe Abgrenzung wie bei `lib/core/`. Die
+  //    Erlaubnisliste des Kerns lehnt `package:fact_app/features/` ohnehin ab
+  //    und nennt dabei Regel 23, die genauere Aussage. Ohne diese Ausnahme
+  //    stünden für denselben Import zwei Sätze im Bericht.
   final pruefeFremdeFeatureSchichten =
       posixPath.startsWith('lib/') &&
       !posixPath.startsWith(_appComposition) &&
+      !posixPath.startsWith(_kernelHome) &&
       !posixPath.startsWith('lib/core/');
 
   for (final directive in view.directives) {
@@ -1243,6 +1298,26 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
                 '(dependency-rules.md, Tabelle '
                 '"Allowed layer dependencies"). Technik gehört hinter einen '
                 'Domain-Vertrag, also nach data oder services',
+          ),
+        );
+      }
+
+      // Regel 23, ADR-008: der Kern bleibt rein. Steht direkt neben der
+      // Erlaubnisliste der Domäne, weil es dieselbe Bauform ist, nur strenger:
+      // die Domäne darf ihre eigene Domäne und den Kern, der Kern darf nur
+      // sich selbst.
+      if (istKern && !_isAllowedKernelImport(resolved)) {
+        found.add(
+          Violation(
+            file: posixPath,
+            line: lineNo,
+            detail: detail,
+            rule:
+                '[kernel] Regel 23: der geteilte Kern darf nur das Dart-SDK, '
+                'sich selbst und geprüfte reine Dart-Pakete importieren. Was '
+                'im Kern liegt, sehen alle Domänen; ein Fremdimport hier '
+                'koppelt jede von ihnen. Der Kern ist kein Ablageort, siehe '
+                'ADR-008',
           ),
         );
       }

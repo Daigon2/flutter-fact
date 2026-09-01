@@ -560,6 +560,32 @@ import 'package:shared_preferences_platform_interface/shared_preferences_platfor
 
 class PraeferenzFamilie {}
 ''',
+  // Ä14: der Kern darf keine Feature-Domäne importieren. Regel 23 dreht die
+  // Aufnahmerichtung um: eine Domäne darf den Kern sehen (D-18), der Kern darf
+  // niemals zurückblicken. Sonst wäre der Kern kein geteilter Ort mehr,
+  // sondern eine versteckte Abhängigkeit auf `facts`.
+  'lib/kernel/greift_auf_feature.dart': r'''
+import 'package:fact_app/features/facts/domain/entities/fact.dart';
+
+class GreiftAufFeature {}
+''',
+  // Ä14: auch `core` ist dem Kern verwehrt. `core` liegt selbst schon tiefer
+  // als jedes Feature, aber der Kern liegt laut ADR-008 noch darunter, und
+  // die Erlaubnisliste in [_isAllowedKernelImport] nennt `core` bewusst nicht.
+  'lib/kernel/greift_auf_core.dart': r'''
+import 'package:fact_app/core/types/result.dart';
+
+class GreiftAufCore {}
+''',
+  // Ä14: Flutter selbst ist verboten. Regel 2 aus ADR-008 verlangt reines
+  // Dart, damit jede Domäne den Kern ohne Widget-Abhängigkeit importieren
+  // kann; ein einziger Flutter-Import hier würde das für alle drei zugleich
+  // aufheben.
+  'lib/kernel/holt_flutter.dart': r'''
+import 'package:flutter/material.dart';
+
+class HoltFlutter {}
+''',
   // Ä10: webview_flutter ist auf lib/map/presentation/avatar/ beschränkt.
   'lib/features/discovery/presentation/avatar_versuch.dart': r'''
 import 'package:webview_flutter/webview_flutter.dart';
@@ -600,6 +626,25 @@ Map<String, String> _stilleProben() => <String, String>{
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PraeferenzAdapter {}
+''',
+  // Ä14 Gegenprobe: eine Feature-Domäne darf den Kern importieren. Das ist die
+  // Gegenprobe, um die es Dairen mit D-18 ging: ohne sie ist Regel 23 nur eine
+  // Behauptung, dass eine Richtung erlaubt bleibt, ohne dass ein Test es prüft.
+  'lib/features/tours/domain/entities/nutzt_kern.dart': r'''
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
+
+class NutztKern {}
+''',
+  // Ä14 Gegenprobe: der Kern darf das Dart-SDK und sich selbst importieren.
+  // Ohne sie könnte [_isAllowedKernelImport] versehentlich auf eine leere
+  // Erlaubnisliste schrumpfen, und der Kern könnte sich nicht mehr selbst
+  // zusammensetzen.
+  'lib/kernel/nutzt_dart_und_sich_selbst.dart': r'''
+import 'dart:convert';
+
+import 'package:fact_app/kernel/puzzle_operand.dart';
+
+class NutztDartUndSichSelbst {}
 ''',
   // Gegenprobe zu Regel 8 und 9: Import innerhalb des eigenen Features,
   // absolut und relativ.
@@ -959,6 +1004,9 @@ void main() {
         'lib/features/settings/data/praeferenz_familie.dart',
         'lib/app/praeferenz_daneben.dart',
         'lib/core/greift_auf_feature.dart',
+        'lib/kernel/greift_auf_feature.dart',
+        'lib/kernel/greift_auf_core.dart',
+        'lib/kernel/holt_flutter.dart',
       }, reason: verstoss.bericht);
     });
   });
@@ -1758,6 +1806,58 @@ void main() {
             'angesprochen werden darf. ${still.bericht}',
       );
     });
+
+    test('Ä14: der Kern importiert eine Feature-Domäne', () {
+      // Regel 23 dreht die Aufnahmerichtung von D-18 um: eine Domäne darf den
+      // Kern sehen, aber der Kern darf niemals zu einem Feature zurückgreifen.
+      erwarteFunde(
+        verstoss,
+        'lib/kernel/greift_auf_feature.dart',
+        <(int, String)>[
+          (1, '[kernel] Regel 23: der geteilte Kern darf nur das Dart-SDK'),
+        ],
+      );
+    });
+
+    test('Ä14: der Kern importiert core', () {
+      // `core` liegt selbst schon tiefer als jedes Feature, aber ADR-008
+      // zieht den Kern noch eine Ebene darunter, und [_isAllowedKernelImport]
+      // nennt `core` deshalb bewusst nicht in seiner Erlaubnisliste.
+      erwarteFunde(verstoss, 'lib/kernel/greift_auf_core.dart', <(int, String)>[
+        (1, '[kernel] Regel 23: der geteilte Kern darf nur das Dart-SDK'),
+      ]);
+    });
+
+    test('Ä14: der Kern importiert Flutter', () {
+      // Regel 2 aus ADR-008 verlangt reines Dart im Kern, damit jede der drei
+      // Domänen ihn ohne Widget-Abhängigkeit importieren kann.
+      erwarteFunde(verstoss, 'lib/kernel/holt_flutter.dart', <(int, String)>[
+        (1, '[kernel] Regel 23: der geteilte Kern darf nur das Dart-SDK'),
+      ]);
+    });
+
+    test('Ä14 Gegenprobe: eine Feature-Domäne darf den Kern importieren', () {
+      expect(
+        still.fuer('lib/features/tours/domain/entities/nutzt_kern.dart'),
+        isEmpty,
+        reason:
+            'Sonst hätte D-18 keinen Weg, die Schwierigkeitsstufe aus dem '
+            'Kern in einer Domäne zu nutzen.\n${still.bericht}',
+      );
+    });
+
+    test(
+      'Ä14 Gegenprobe: der Kern importiert das Dart-SDK und sich selbst',
+      () {
+        expect(
+          still.fuer('lib/kernel/nutzt_dart_und_sich_selbst.dart'),
+          isEmpty,
+          reason:
+              'Sonst könnte sich der Kern nicht mehr selbst zusammensetzen.\n'
+              '${still.bericht}',
+        );
+      },
+    );
 
     test('Ä13 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
       // Dieselbe Abgrenzung wie bei Regel 20 und 21. Regel 4 verbietet

@@ -2,7 +2,7 @@ import 'package:fact_app/features/facts/data/mappers/fact_mapper.dart';
 import 'package:fact_app/features/facts/data/mappers/fact_puzzle_mapper.dart';
 import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_defect.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fact_row_fixtures.dart';
@@ -34,7 +34,7 @@ void main() {
       final puzzle = onlyPuzzle(puzzleRowKombi());
 
       expect(puzzle.type, 'kombi');
-      expect(puzzle.difficulty, FactPuzzleDifficulty.mittel);
+      expect(puzzle.difficulty, PuzzleDifficulty.mittel);
       expect(puzzle.question, startsWith('Am Sockel der Statue'));
       expect(puzzle.expectedAnswer, '78 Jahre');
       expect(puzzle.explanation, startsWith('Tartini wurde 1692'));
@@ -82,7 +82,7 @@ void main() {
       expect(puzzle.choices, hasLength(3));
       expect(puzzle.hasChoices, isTrue);
       expect(puzzle.choices[1], puzzle.expectedAnswer);
-      expect(puzzle.difficulty, FactPuzzleDifficulty.schwer);
+      expect(puzzle.difficulty, PuzzleDifficulty.schwer);
       expect(puzzle.hints, hasLength(2));
       expect(puzzle.hint, startsWith('Vergleiche die schlichte Fassade'));
     });
@@ -247,7 +247,7 @@ void main() {
         puzzleRow(overrides: <String, Object?>{'difficulty': ' Leicht '}),
       );
 
-      expect(puzzle.difficulty, FactPuzzleDifficulty.leicht);
+      expect(puzzle.difficulty, PuzzleDifficulty.leicht);
     });
 
     test('ein Typ, den die PWA-Tabelle nicht kennt, bleibt erhalten', () {
