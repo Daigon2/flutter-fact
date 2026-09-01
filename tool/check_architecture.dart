@@ -158,6 +158,17 @@ const _domainBans = <Ban>[
     r'^package:geolocator',
     'Regel 4: Domain darf keine Geräte-SDK importieren',
   ),
+  // Kein eigener Eintrag für flutter_rotation_sensor: der Paketname beginnt
+  // selbst mit `flutter_` und fällt damit bereits unter das Flutter-Verbot
+  // zwei Zeilen weiter oben, dieselbe Lage wie bei flutter_riverpod im Test
+  // „Ä2". Ein zweiter, engerer Eintrag träfe denselben Import ein zweites
+  // Mal. native_device_orientation trägt dieses Präfix nicht und bekommt
+  // deshalb unten einen eigenen Eintrag, siehe die Begründung bei
+  // [_orientationSdkBans].
+  Ban(
+    r'^package:native_device_orientation',
+    'Regel 4: Domain darf keine Geräte-SDK importieren',
+  ),
   Ban(
     r'^package:maplibre',
     'Regel 4: Domain darf keine Karten-SDK importieren',
@@ -379,6 +390,56 @@ const _prefsSdkBans = <Ban>[
   ),
 ];
 
+/// Regel 24: den Kompass-Sensor kennt nur der Orientierungsdienst.
+///
+/// Dieselbe Bauart wie die Regeln 21 und 22, und dieselbe Begründung:
+/// `lib/features/README.md` gibt `services/` als Ort für „Vendor-Adapter ohne
+/// Oberfläche", und `flutter_rotation_sensor` ist genau das für den
+/// Kompass-Sensor.
+///
+/// **Zwei Einträge und nicht einer.** Anders als bei Regel 21 und 22 fängt ein
+/// Präfix auf den Paketnamen selbst hier nicht die ganze Familie: die
+/// transitive Abhängigkeit `native_device_orientation` (`pubspec.lock`,
+/// Version 2.1.1) trägt einen eigenen Paketnamen, der nicht mit
+/// `flutter_rotation_sensor` beginnt, anders als `geolocator_platform_interface`
+/// oder `shared_preferences_platform_interface`, die den Namen ihres
+/// Hauptpakets als Präfix tragen. `native_device_orientation` bringt eine
+/// eigene Gerätestellungs-API mit und ist damit der naheliegendste Umweg am
+/// Orientierungsdienst vorbei, genau wie `geolocator_platform_interface` es
+/// für Regel 21 ist. Beide Paketnamen stehen deshalb als eigene [Ban]-Einträge.
+///
+/// ## Warum [_domainBans] hier nur einen Eintrag für `native_device_orientation`
+/// bekommt und keinen für `flutter_rotation_sensor`
+///
+/// `flutter_rotation_sensor` beginnt selbst mit `flutter_` und fällt in einer
+/// Domäne bereits unter das allgemeine Flutter-Verbot aus [_domainBans]. Ein
+/// zweiter, engerer Eintrag dort träfe denselben Import ein zweites Mal, mit
+/// zwei Sätzen für dieselbe Zeile; siehe den Test „Ä2: ein benanntes Verbot
+/// verdrängt die allgemeine Meldung" für dasselbe Prinzip an anderer Stelle.
+/// `native_device_orientation` trägt kein `flutter_`-Präfix, würde also ohne
+/// eigenen Eintrag nur die allgemeine Domain-Erlaubnisliste treffen, und
+/// bekommt deshalb einen eigenen Eintrag in [_domainBans], damit eine Domäne
+/// dieselbe genaue Regel 4 liest wie bei `geolocator` für Regel 21.
+///
+/// Die Regel gilt wie 19 bis 22 nur unterhalb von `lib/`. Ein Test darf beide
+/// Pakete importieren, und
+/// `test/services/orientation/rotation_sensor_orientation_service_test.dart`
+/// tut es, soweit die Testdatei es ohne Plattformkanal kann.
+const _orientationSdkBans = <Ban>[
+  Ban(
+    r'^package:flutter_rotation_sensor',
+    'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst unter '
+        '$_orientationHome. Der Rest der App kennt nur den Domain-Vertrag '
+        'des Dienstes, nicht das Vendor-Paket',
+  ),
+  Ban(
+    r'^package:native_device_orientation',
+    'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst unter '
+        '$_orientationHome. Der Rest der App kennt nur den Domain-Vertrag '
+        'des Dienstes, nicht das Vendor-Paket',
+  ),
+];
+
 /// Gate 7: ADR-005 verbietet ein zweites DI-System, projektweit.
 const _globalBans = <Ban>[
   Ban(r'^package:get_it', 'ADR-005: GetIt ist ausgeschlossen'),
@@ -457,6 +518,11 @@ final _layers = <LayerRule>[
     name: 'praeferenz-sdk',
     pathMatch: _ausserhalbPreferencesHome,
     bans: _prefsSdkBans,
+  ),
+  LayerRule(
+    name: 'orientierungs-sdk',
+    pathMatch: _ausserhalbOrientationHome,
+    bans: _orientationSdkBans,
   ),
   // Gate 7 gilt projektweit, nicht nur im Produktionscode. Ein GetIt-Container
   // in einem Test, einem Integrationstest oder einem Werkzeugskript ist
@@ -537,6 +603,13 @@ final _kernelImportPrefix =
 /// Der Vertrag dazu steht in `lib/core/preferences/key_value_store.dart`.
 const _preferencesHome = 'lib/services/preferences/';
 
+/// Der Orientierungsdienst, der einzige Ort, an dem der Kompass-Sensor
+/// vorkommen darf.
+///
+/// Wie [_locationHome] eine unterstützende Technik und keine Geschäftsdomäne,
+/// siehe den Kopfkommentar von `lib/services/orientation/orientation_service.dart`.
+const _orientationHome = 'lib/services/orientation/';
+
 /// Alles unterhalb von `lib/`, außer [_mapHome] und außer jeder Domäne.
 ///
 /// Die erste Ausnahme ist der Zweck der Regel: der Host darf das SDK.
@@ -577,6 +650,16 @@ final _ausserhalbLocationHome = RegExp(
 /// dort schon seit langem, und zwar bevor es das Paket in `pubspec.yaml` gab.
 final _ausserhalbPreferencesHome = RegExp(
   '^lib/(?!${_preferencesHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
+);
+
+/// Alles unterhalb von `lib/`, außer [_orientationHome] und außer jeder
+/// Domäne.
+///
+/// Wortgleich zu [_ausserhalbLocationHome] und [_ausserhalbPreferencesHome]
+/// aufgebaut und aus denselben zwei Gründen: der Dienst darf sein SDK, und in
+/// einer Domäne ist die Meldung von Regel 4 die genauere.
+final _ausserhalbOrientationHome = RegExp(
+  '^lib/(?!${_orientationHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
 );
 
 /// Alles unterhalb von `lib/`, außer [_avatarHome] und außer jeder Domäne.

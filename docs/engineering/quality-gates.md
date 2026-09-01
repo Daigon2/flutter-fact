@@ -86,7 +86,8 @@ A repository script, kept simple and deterministic, fails CI for:
 12. `webview_flutter` outside `lib/map/presentation/avatar/`.
 13. `maplibre_gl` outside `lib/map/`, `geolocator` outside
     `lib/services/location/`, `shared_preferences` outside
-    `lib/services/preferences/`.
+    `lib/services/preferences/`, `flutter_rotation_sensor` and
+    `native_device_orientation` outside `lib/services/orientation/`.
 14. Anything in the shared kernel `lib/kernel/` that is not `dart:`, the kernel
     itself or a vetted pure-Dart package.
 

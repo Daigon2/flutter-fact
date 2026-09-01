@@ -37,7 +37,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2148 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2180 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -156,8 +156,29 @@ ist die Reihenfolge danach.
       ADR-007. Heute heißt es `purchasedHintCount` und trägt eine Anzahl; es soll
       die Indizes der freigeschalteten Hinweise tragen. Ändert einen
       Nutzlastschlüssel, dafür ist `payloadVersion` da.
-   c. **Schritt 14, Kompass.** `flutter_rotation_sensor` ist freigegeben. Dabei
-      `pubspec.yaml` von `^3.9.0` auf `^3.12.1` anheben, das Paket verlangt es.
+   c. **Schritt 14, Kompass: Teil 1 fertig am 31.08.2026, Teil 2 offen.**
+      Gebaut sind der Sensordienst unter `lib/services/orientation/`, die
+      Glättung in `map/domain/bearing_smoothing.dart` und Regel 24. **Offen ist
+      die Verdrahtung in `map_page.dart`**: der Kamera-Gate mit Totzone und
+      `bearingLocked` steht schon, es fehlt der Weg von der geglätteten
+      Richtung zur Kameraabsicht, dazu der 2-Sekunden-Takt des Wachhunds und
+      die abgeschwächte Anzeige bei totem Kompass.
+
+      **Die Paketwahl hat sich beim Nachprüfen verschoben, und das war der Punkt
+      der Recherche.** `^0.4.0` ist unerreichbar: 0.4.0 hat Web-Unterstützung
+      bekommen und dafür `intl ^0.20.3` aufgenommen, während
+      `flutter_localizations` aus der SDK `intl 0.20.2` festnagelt.
+      **Dasselbe Muster wie bei `maplibre_gl 0.27.0`, zum zweiten Mal.**
+      Aufgenommen ist `^0.3.1`, und das ist kein Verzicht: der Bezugsrahmen kam
+      in 0.3.0, und 0.3.1 hat „corrected iOS orientation values". Begründung mit
+      Quellen in `REBUILD_STATUS.md` unter „Schritt 14, die Wahl des
+      Sensorpakets".
+
+      **Neu offen: E-59**, der Bezugsrahmen. Der Neubau setzt magnetisch Nord,
+      weil der Android-Pfad der Quelle magnetometerbasiert ist. Ob die Quelle auf
+      iOS dasselbe tut, ist offen; der Unterschied wäre die örtliche Missweisung
+      und damit mehr als die Totzone von 1,5 Grad.
+
    d. **Schritt 36 und 37**, die Phasen-Maschine und die Active-UI, auf dem
       Vertrag aus ADR-007.
 
@@ -264,6 +285,37 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Schritt 14 Teil 1, und eine Paketfalle zum zweiten Mal
+
+Der Kompass hat eine Quelle: Sensordienst, Glättung, Regel 24, sechs
+Pflichtmutationen, sechs Fälle. 2148 → 2180 Tests. Die Verdrahtung in der Karte
+ist Teil 2 und absichtlich getrennt.
+
+**Überraschend war, dass die freigegebene Paketfassung nicht auflösbar ist.**
+`flutter_rotation_sensor 0.4.0` hat Web-Unterstützung bekommen und dafür
+`intl ^0.20.3` aufgenommen, und `flutter_localizations` aus der festgenagelten
+Flutter-SDK hält `intl 0.20.2`. Das ist **dasselbe Muster wie bei
+`maplibre_gl 0.27.0`**, zum zweiten Mal in diesem Projekt: eine festgenagelte SDK
+friert eine transitive Abhängigkeit ein und macht die neueste Fassung eines
+Pakets unerreichbar. `^0.3.1` ist die Antwort und kostet nichts, weil dort nur
+das Web-Plugin fehlt.
+
+**Und die Regelmechanik hatte einen Fall, den ich nicht vorhergesehen habe.**
+`flutter_rotation_sensor` ist das erste Vendor-Paket, dessen Name selbst mit
+`flutter_` beginnt, und fällt in einer Domäne damit schon unter Regel 1. Ein
+zusätzlicher Regel-4-Eintrag hätte zwei Meldungen für denselben Import erzeugt.
+Wer das nächste Heimatverzeichnis baut, prüft zuerst, ob sein Paket schon unter
+Regel 1 fällt.
+
+**Ein Befund bleibt offen, und ich sage es lieber selbst.** `dart analyze` meldet
+24 Hinweise (`prefer_initializing_formals`), Gate 2 bleibt trotzdem auf 0, weil
+ein `info` es nicht kippt. Vier mögliche Ursachen habe ich einzeln gemessen und
+ausgeschlossen: die SDK-Anhebung, die Sprachfassung, `analysis_options.yaml` und
+die Lint-Fassungen. Zugleich hat `dart analyze` in dieser Sitzung mehrfach
+wörtlich „No issues found!" ausgegeben. **Beides kann nicht stimmen, und welche
+Beobachtung falsch ist, habe ich nicht aufgelöst.** Belege in
+`REBUILD_STATUS.md`.
 
 ### 31.08.2026, Zwei nachgeholte Reviews, und beide Befunde lagen in meinen Dokumenten
 

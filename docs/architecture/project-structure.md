@@ -50,6 +50,7 @@ lib/
 │   ├── notifications/
 │   ├── permissions/
 │   ├── location/
+│   ├── orientation/
 │   ├── preferences/
 │   ├── deep_links/
 │   └── background_tasks/
@@ -179,6 +180,18 @@ features/settings/
   the most obvious detour open. As with `map/`, the rule checks the import and
   never the content. A service that hands the user's whereabouts somewhere it
   does not belong passes it; that is E-07 and stays a review concern.
+
+- `services/orientation/` is the compass sensor, the fourth home directory of
+  this kind, added on 2026-08-31 with step 14. The whole package family may
+  appear nowhere else (rule 24), by prefix because
+  `native_device_orientation` is the transitive dependency and therefore the
+  obvious detour. The service hands out an absolute heading and **nothing else**:
+  the smoothing that the behavioural source applies lives in
+  `map/domain/bearing_smoothing.dart`, because a calculation inside a vendor
+  adapter would only ever run on a device, and one no test can reach does not
+  survive the next rewrite. That is the same split, and the same reason, as
+  `locationAccuracyLimitInMeters` sitting with the contract instead of in the
+  geolocator adapter.
 
 - `services/preferences/` is the device key-value store, the third home
   directory of this kind, added on 2026-08-31 with `shared_preferences` itself.

@@ -110,6 +110,7 @@ Flutter application
 │   └── value objects two or more domains both need
 │
 ├── services/
+│   ├── orientation (compass heading)
 │   ├── analytics
 │   ├── crash reporting
 │   ├── notifications

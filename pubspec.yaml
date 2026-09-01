@@ -4,7 +4,18 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.9.0
+  # Am 31.08.2026 von ^3.9.0 angehoben, weil `flutter_rotation_sensor 0.4.0` es
+  # verlangt (`environment.sdk: ^3.12.1`, an der pub.dev-API nachgelesen und
+  # nicht vermutet).
+  #
+  # **Das ist kein bequemer Spielraum, sondern genau die installierte Fassung.**
+  # Die lokale SDK ist Dart 3.12.1, und `.github/workflows/gates.yml` nagelt
+  # Flutter 3.44.1 fest, das dieselbe Dart-Fassung mitbringt. Der Neubau baut
+  # damit ab jetzt **nicht** mehr auf einer älteren Flutter-Fassung, und wer
+  # eine ältere benutzt, bekommt einen Auflösungsfehler und keinen stillen
+  # Rückfall. Beabsichtigt: ein Auflösungsfehler ist die billigste Form dieser
+  # Nachricht.
+  sdk: ^3.12.1
 
 dependencies:
   flutter:
@@ -13,6 +24,33 @@ dependencies:
     sdk: flutter
   flutter_riverpod: ^3.4.2
   flutter_svg: ^2.3.0
+  # Die absolute Geräteorientierung für die Kompass-Drehung, Schritt 14.
+  # Am 31.08.2026 freigegeben (D-13), die Auswahl war ausdrücklich zu
+  # recherchieren und zu begründen; die Begründung steht in
+  # `REBUILD_STATUS.md` unter „Schritt 14, die Wahl des Sensorpakets".
+  #
+  # Kurz: die Quelle braucht eine **absolute** Richtung und verwirft relative
+  # Ereignisse ausdrücklich (`screen-map.jsx:2817-2823`). `sensors_plus` liefert
+  # nur Rohwerte und keine Fusion, `flutter_compass` ist seit 21 Monaten ohne
+  # Veröffentlichung. Dieses Paket liefert den Azimut der Plattform und lässt
+  # seit 0.3.0 den Bezugsrahmen wählen.
+  #
+  # **Bewusst unter 0.4.0 gehalten, und zwar gemessen.** `^0.3.1` heisst bei
+  # einer 0.x-Fassung `>=0.3.1 <0.4.0`, schliesst 0.4.0 also von selbst aus. Der
+  # Grund ist derselbe wie bei `maplibre_gl` weiter unten, nur an einer anderen
+  # Stelle: 0.4.0 hat Web-Unterstützung bekommen und dafür `intl ^0.20.3`
+  # aufgenommen, während `flutter_localizations` aus der Flutter-SDK `intl
+  # 0.20.2` festnagelt. `flutter pub get` bricht damit mit
+  # "version solving failed" ab. Web braucht dieser Neubau nicht, 0.3.1 ist für
+  # ihn also kein Verzicht, sondern die Fassung ohne das Web-Plugin.
+  #
+  # 0.3.1 und nicht 0.3.0: der Änderungseintrag von 0.3.1 nennt ausgerechnet
+  # "corrected iOS orientation values".
+  #
+  # Wieder anheben, sobald die Flutter-SDK `intl 0.20.3` mitbringt.
+  #
+  # Heimatverzeichnis `lib/services/orientation/`, durchgesetzt als Regel 24.
+  flutter_rotation_sensor: ^0.3.1
   geolocator: ^14.0.3
   go_router: ^18.0.0
   # Bewusst auf 0.26.x festgenagelt, nicht auf 0.27.0. Belegt am 27.08.2026 beim

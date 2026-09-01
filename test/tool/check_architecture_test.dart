@@ -202,6 +202,8 @@ import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+import 'package:native_device_orientation/native_device_orientation.dart';
 
 class Tour {}
 ''',
@@ -615,6 +617,33 @@ import 'package:fact_app/features/tours/presentation/pages/tour_page.dart';
 
 class GreiftAufFeature {}
 ''',
+  // Ä15: der Kompass-Sensor gehört dem Orientierungsdienst. Wie bei Regel 21
+  // und 22 verbietet Regel 4 ihn nur in einer Domäne; jedes andere Verzeichnis
+  // unterhalb von lib/ durfte ihn vor Regel 24 holen.
+  'lib/features/discovery/presentation/orientierung_versuch.dart': r'''
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+
+class OrientierungVersuch {}
+''',
+  // Ä15: auch die App-Komposition bekommt ihn nicht, obwohl sie den Dienst
+  // per Override einsetzt. Sie holt ihn über den Provider und sieht das Paket
+  // nie.
+  'lib/app/orientierung_daneben.dart': r'''
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+
+class OrientierungDaneben {}
+''',
+  // Ä15: das Verbot trifft beide Pakete der Familie. Anders als bei Regel 21
+  // und 22 teilen sie sich kein gemeinsames Namenspräfix, siehe die
+  // Begründung bei _orientationSdkBans im Skript: `native_device_orientation`
+  // ist die transitive Abhängigkeit, in der eine eigene Gerätestellungs-API
+  // liegt, und damit der naheliegendste Umweg.
+  'lib/features/discovery/presentation/orientierung_familie.dart': r'''
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+import 'package:native_device_orientation/native_device_orientation.dart';
+
+class OrientierungFamilie {}
+''',
 };
 
 /// Baum 2: alles, was still bleiben muss. Enthält die Gegenproben und die
@@ -626,6 +655,13 @@ Map<String, String> _stilleProben() => <String, String>{
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PraeferenzAdapter {}
+''',
+  // Ä15 Gegenprobe: im Orientierungsdienst ist der Kompass-Sensor erlaubt.
+  // Sonst hätte Regel 24 kein Ziel, sondern wäre ein Verbot ohne Ort.
+  'lib/services/orientation/orientierungs_adapter.dart': r'''
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+
+class OrientierungsAdapter {}
 ''',
   // Ä14 Gegenprobe: eine Feature-Domäne darf den Kern importieren. Das ist die
   // Gegenprobe, um die es Dairen mit D-18 ging: ohne sie ist Regel 23 nur eine
@@ -1007,6 +1043,9 @@ void main() {
         'lib/kernel/greift_auf_feature.dart',
         'lib/kernel/greift_auf_core.dart',
         'lib/kernel/holt_flutter.dart',
+        'lib/features/discovery/presentation/orientierung_versuch.dart',
+        'lib/app/orientierung_daneben.dart',
+        'lib/features/discovery/presentation/orientierung_familie.dart',
       }, reason: verstoss.bericht);
     });
   });
@@ -1028,6 +1067,11 @@ void main() {
           (6, 'Regel 4: Domain darf keine Geräte-SDK importieren'),
           (7, 'Regel 4: Domain darf keine Storage-SDK importieren'),
           (8, 'Regel 4: Domain darf keine Karten-SDK importieren'),
+          // flutter_rotation_sensor trifft das Flutter-Verbot, nicht das
+          // Geräte-SDK-Verbot: der Paketname beginnt selbst mit `flutter_`.
+          // Dieselbe Lage wie bei flutter_riverpod in Zeile 3.
+          (9, 'Regel 1: Domain darf Flutter nicht importieren'),
+          (10, 'Regel 4: Domain darf keine Geräte-SDK importieren'),
         ],
       );
     });
@@ -1411,13 +1455,13 @@ void main() {
     );
 
     test('Ä2: ein benanntes Verbot verdrängt die allgemeine Meldung', () {
-      // technik_importe.dart hat acht Importe, die alle ein benanntes Verbot
+      // technik_importe.dart hat zehn Importe, die alle ein benanntes Verbot
       // treffen. Gäbe es zusätzlich die allgemeine Meldung, stünden hier
-      // sechzehn Funde und der Leser bekäme zwei Sätze für denselben Import.
+      // zwanzig Funde und der Leser bekäme zwei Sätze für denselben Import.
       final funde = verstoss.fuer(
         'lib/features/tours/domain/entities/technik_importe.dart',
       );
-      expect(funde, hasLength(8), reason: verstoss.bericht);
+      expect(funde, hasLength(10), reason: verstoss.bericht);
       expect(
         funde.where((f) => f.regel.contains('Domain-Erlaubnisliste')),
         isEmpty,
@@ -1859,6 +1903,52 @@ void main() {
       },
     );
 
+    test('Ä15: der Kompass-Sensor außerhalb des Orientierungsdienstes', () {
+      // Vor Regel 24 lief dieser Import überall unterhalb von lib/ durch,
+      // außer in einem domain/-Segment. Der Kompass-Sensor ist eine
+      // unterstützende Technik wie die Ortung, damit ist
+      // lib/services/orientation/ sein Ort und kein anderer.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/orientierung_versuch.dart',
+        <(int, String)>[
+          (1, 'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst'),
+        ],
+      );
+      erwarteFunde(
+        verstoss,
+        'lib/app/orientierung_daneben.dart',
+        <(int, String)>[
+          (1, 'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst'),
+        ],
+      );
+    });
+
+    test('Ä15: das Verbot trifft beide Pakete der Familie', () {
+      // Anders als bei Regel 21 und 22 teilen sich die beiden Pakete kein
+      // gemeinsames Namenspräfix: `native_device_orientation` ist die
+      // transitive Abhängigkeit mit einer eigenen Gerätestellungs-API und
+      // damit der naheliegendste Umweg am Orientierungsdienst vorbei.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/orientierung_familie.dart',
+        <(int, String)>[
+          (1, 'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst'),
+          (2, 'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst'),
+        ],
+      );
+    });
+
+    test('Ä15 Gegenprobe: im Orientierungsdienst ist der Sensor erlaubt', () {
+      expect(
+        still.fuer('lib/services/orientation/orientierungs_adapter.dart'),
+        isEmpty,
+        reason:
+            'Sonst hat der Kompass-Sensor keinen Ort mehr, an dem er '
+            'angesprochen werden darf.\n${still.bericht}',
+      );
+    });
+
     test('Ä13 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
       // Dieselbe Abgrenzung wie bei Regel 20 und 21. Regel 4 verbietet
       // Storage-SDKs in jeder Domäne und ist dort die genauere Aussage.
@@ -1900,6 +1990,24 @@ void main() {
 
       expect(zeile8, hasLength(1), reason: verstoss.bericht);
       expect(zeile8.single.regel, contains('Regel 4: Domain darf keine'));
+    });
+
+    test('Ä15 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
+      // Für native_device_orientation, nicht für flutter_rotation_sensor:
+      // dessen Paketname beginnt selbst mit `flutter_` und trifft in einer
+      // Domäne bereits Regel 1, siehe Zeile 9 im Test „Domain darf keine
+      // Technik importieren" und die Begründung bei [_orientationSdkBans] im
+      // Skript. Für native_device_orientation gilt dieselbe Abgrenzung wie
+      // bei Regel 21 und 22: Regel 4 verbietet Geräte-SDKs in jeder Domäne
+      // und ist dort die genauere Aussage. Regel 24 lässt Domänen deshalb
+      // aus, sonst stünden für denselben Import zwei Meldungen da.
+      final zeile10 = verstoss
+          .fuer('lib/features/tours/domain/entities/technik_importe.dart')
+          .where((fund) => fund.zeile == 10)
+          .toList();
+
+      expect(zeile10, hasLength(1), reason: verstoss.bericht);
+      expect(zeile10.single.regel, contains('Regel 4: Domain darf keine'));
     });
   });
 

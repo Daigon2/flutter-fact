@@ -1052,10 +1052,10 @@ das nächste Mal an Phase 2 arbeitet, prüft, ob noch etwas fehlt, und setzt gen
 eine der beiden Stellen richtig.
 
 - [x] 12. MapLibre mit gebackenem Style · [x] 13. Kamera-Verhalten
-- [ ] 14. Kompass-Rotation (Paket am 31.08.2026 freigegeben) ·
+- [~] 14. Kompass-Rotation (Paket gewählt und begründet, Sensordienst und Glättung gebaut, Verdrahtung in der Karte offen) ·
   [x] 15. Cluster-Layer **und Antippen** (das Antippen am 31.08.2026 nachgezogen)
   · [x] 16. Einzel-Marker
-- [x] 17. Münz-Proximity-Animation · [ ] 18. 3D-Avatar (am 31.08.2026 entschieden: 2D in Flutter, kein WebView)
+- [x] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (die 2D-Entscheidung vom 31.08.2026 ist am selben Tag aufgehoben, „bau doch gleich 3D"; die 3D-Laufzeit liegt bei Janek)
 - [x] 19. Top-Chrome (vorgezogen, D-5 am 29.08.2026 abgeschlossen) · [ ] 20. Sammel-Erlebnis
 
 ## Phase 3, Fakt-Akte und Audio
@@ -1390,6 +1390,214 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 `map_screen_point.dart` und die Liste „Was bewusst fehlt" sagten alle drei noch
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
+
+## Schritt 14, die Wahl des Sensorpakets, 31.08.2026
+
+D-13 ist mit „ein neues Paket ist freigegeben" beantwortet worden, und die
+Auswahl war ausdrücklich zu recherchieren und zu begründen. Hier ist sie, mit
+Quellen, damit niemand sie nachschlagen muss.
+
+### Das entscheidende Kriterium steht in der Quelle, nicht im Paketvergleich
+
+`screen-map.jsx:2817-2823` liest die Richtung so:
+
+```js
+if (e.webkitCompassHeading != null) {
+  heading = e.webkitCompassHeading;           // iOS
+} else if (e.absolute && e.alpha != null) {
+  heading = (360 - e.alpha + 360) % 360;      // Android absolute
+} else {
+  return;                                      // relatives Event — ignorieren
+}
+```
+
+**Der `else`-Zweig ist das Kriterium.** Die Quelle braucht eine **absolute**
+Richtung und verwirft eine relative ausdrücklich. Ein Paket, das nur Rohwerte
+liefert, erfüllt das nicht, ohne dass wir die Sensorfusion selbst schreiben.
+
+### Die drei Kandidaten, am 31.08.2026 auf pub.dev nachgelesen
+
+| Paket | Absolute Richtung? | Letzte Veröffentlichung | Befund |
+|---|---|---|---|
+| `flutter_rotation_sensor` | ja, Azimut, Bezugsrahmen wählbar seit 0.3.0 | 0.4.0 am 27.08.2026 | **gewählt**, in `^0.3.1` |
+| `flutter_compass` | ja, 0 bis 360 | 0.8.1, seit 21 Monaten nichts | Präzedenzfall des eingefrorenen Ports, aber ohne Pflege |
+| `sensors_plus` | **nein** | 7.1.0, vor zwei Monaten | nur Rohwerte, keine Fusion |
+
+**`sensors_plus` fällt am Kriterium.** Es liefert `AccelerometerEvent`,
+`UserAccelerometerEvent`, `GyroscopeEvent`, `MagnetometerEvent` und
+`BarometerEvent`, also fünf Rohströme und **keine** fusionierte Orientierung.
+Wir müssten Azimut, Neigungskompensation und Tiefpass selbst rechnen. Das macht
+die Plattform besser, und es wäre Gerätelogik in unserem Baum, die kein Test
+erreicht. Dass es ein Flutter Favorite mit verifiziertem Herausgeber ist, ändert
+daran nichts: es ist das richtige Paket für eine andere Aufgabe.
+
+**`flutter_compass` fällt an der Pflege**, nicht an der Fähigkeit. Es liefert
+genau, was gebraucht wird, und der eingefrorene Port unter `08_Flutter/` benutzt
+es. Aber seine letzte Veröffentlichung liegt 21 Monate zurück, und dieses
+Repository weiß aus dem `maplibre_gl`-Eintrag weiter unten sehr genau, was ein
+Paket kostet, das der Werkzeugkette nicht mehr folgt. Zusatzbefund aus seiner
+eigenen Dokumentation: auf Android liefert es `null` als Richtung, wenn kein
+Sensor da ist, was den Wachhund der Quelle nicht ersetzt, aber immerhin nicht
+verschleiert.
+
+### Warum `^0.3.1` und ausdrücklich nicht `^0.4.0`
+
+**Das ist gemessen und nicht vorsichtshalber.** Mit `^0.4.0` bricht
+`flutter pub get` ab:
+
+> Because flutter_rotation_sensor >=0.4.0 depends on intl ^0.20.3 and every
+> version of flutter_localizations from sdk depends on intl 0.20.2,
+> flutter_rotation_sensor >=0.4.0 is incompatible with flutter_localizations
+> from sdk.
+
+Die Ursache steht im Änderungseintrag: **0.4.0 hat Web-Unterstützung bekommen**
+und dafür `flutter_web_plugins`, `web` und `intl` aufgenommen. Die Flutter-SDK
+nagelt `intl 0.20.2` fest, unser `flutter_localizations` hängt daran, und damit
+ist 0.4.0 für dieses Projekt unerreichbar, solange die SDK nicht nachzieht.
+
+**Web brauchen wir nicht.** 0.3.1 ist deshalb kein Verzicht, sondern die Fassung
+ohne das Web-Plugin. Sie hat den Bezugsrahmen (seit 0.3.0) und ausgerechnet
+„corrected iOS orientation values" (0.3.1, 13.08.2026).
+
+Und die Notation trägt es von selbst: bei einer 0.x-Fassung bedeutet `^0.3.1`
+`>=0.3.1 <0.4.0`, 0.4.0 ist also ausgeschlossen, ohne dass jemand daran denken
+muss. Wieder anheben, sobald die Flutter-SDK `intl 0.20.3` mitbringt.
+
+**Das ist dasselbe Muster wie bei `maplibre_gl 0.27.0`**, zum zweiten Mal: die
+neueste Fassung eines Pakets ist unerreichbar, weil eine festgenagelte
+Flutter-SDK eine transitive Abhängigkeit einfriert. Wer hier ein drittes Mal
+darauf trifft, weiß jetzt, wo er nachsieht.
+
+### Die Dart-Untergrenze steigt, und zwar ohne Spielraum
+
+`flutter_rotation_sensor 0.3.1` verlangt `sdk: ^3.12.1`, nachgelesen an der
+pub.dev-API und nicht vermutet. `pubspec.yaml` stand auf `^3.9.0` und steht jetzt
+auf `^3.12.1`.
+
+**Die installierte SDK ist Dart 3.12.1, also genau die Untergrenze.**
+`.github/workflows/gates.yml` nagelt Flutter 3.44.1 fest, das dieselbe
+Dart-Fassung mitbringt. Der Neubau baut damit ab jetzt nicht mehr auf einer
+älteren Flutter-Fassung. Wer eine ältere benutzt, bekommt einen
+Auflösungsfehler, und das ist die billigste Form dieser Nachricht.
+
+Zwei Pakete kommen dadurch in den Bau, nicht eines: `flutter_rotation_sensor
+0.3.1` und transitiv `native_device_orientation 2.1.1`. Das zweite ist der Grund,
+warum Regel 24 die **Paketfamilie** per Präfix verbietet und nicht nur den einen
+Namen, genau wie Regel 21 es bei `geolocator_platform_interface` tut.
+
+### Schritt 14 Teil 1: der Sensordienst und die Glättung
+
+2148 → 2180 Tests. Vier neue Dateien unter `lib/services/orientation/`, eine
+unter `lib/map/domain/`, dazu Regel 24 und vier Testdateien. **Die Verdrahtung in
+`map_page.dart` ist ausdrücklich nicht dabei**, das ist Teil 2.
+
+| Datei | Rolle |
+|---|---|
+| `services/orientation/device_heading.dart` | Wertobjekt, Zugang nur über `tryFrom` |
+| `services/orientation/orientation_service.dart` | Vertrag plus untätiger Standard |
+| `services/orientation/rotation_sensor_orientation_service.dart` | Vendor-Adapter, einziger Ort mit dem Paket |
+| `services/orientation/orientation_providers.dart` | Provider |
+| `map/domain/bearing_smoothing.dart` | Glättung und Wachhund-Schwelle, reine Rechnung |
+
+**Der Zuschnitt spiegelt den Ortungsdienst**, bis zur Begründung: der Dienst
+liefert die Richtung und glättet **nicht**. Eine Glättung im Vendor-Adapter liefe
+nur auf einem Gerät, und eine Rechnung, die kein Test erreicht, ist beim nächsten
+Umbau weg. Dieselbe Arbeitsteilung wie bei `locationAccuracyLimitInMeters`, das
+beim Vertrag steht und nicht im Geolocator-Adapter.
+
+**Sechs Pflichtmutationen, sechs Fälle.** Glättungsfaktor auf 1,0 (3 Tests rot),
+Winkelnormalisierung entfernt (2), abschließendes `% 360` entfernt (6),
+`NaN`-Abweisung entfernt (1), Normalisierung auf `[0, 360)` entfernt (5), das
+`>` des Wachhunds zu `>=` (1).
+
+#### Zwei Abweichungen von meiner Vorgabe, beide gemeldet und beide richtig
+
+**1. Die Glättung ruft `shortestBearingDeltaDegrees` auf, statt die Formel
+abzuschreiben.** Mein Auftrag sagte „wörtlich in derselben Form", was eine eigene
+Kopie zugelassen hätte. Die Konstruktion `((x + 540) % 360) - 180` steht aber
+schon geprüft in `map_camera_gate.dart`, und dieselbe Datei warnt im eigenen Kopf
+vor getrennten Kopien („Getrennt driften sie"). Der Aufruf ist die konsequentere
+Wahl, und beide liegen in derselben Domäne, Gate 6 erlaubt ihn also.
+
+**2. Regel 24 bekommt keinen Eintrag für `flutter_rotation_sensor` in
+`_domainBans`, und das war beim Schreiben des Auftrags nicht vorhersehbar.** Der
+Paketname beginnt selbst mit `flutter_`, und damit greift in einer Domäne bereits
+Regel 1 („Domain darf Flutter nicht importieren"). Ein zusätzlicher Regel-4-Eintrag
+hätte für denselben Import **zwei** Meldungen erzeugt, also genau das Muster, das
+das Skript an drei anderen Stellen ausdrücklich vermeidet (Test „Ä2"). Den
+Regel-4-Eintrag hat deshalb `native_device_orientation` bekommen, das kein
+`flutter_`-Präfix trägt.
+
+**Das ist ein neuer Fall in der Regelmechanik:** `flutter_rotation_sensor` ist das
+erste Vendor-Paket des Projekts, dessen Name mit `flutter_` beginnt. Wer das
+nächste Heimatverzeichnis baut, prüft zuerst, ob sein Paket schon unter Regel 1
+fällt.
+
+#### Was die Paket-API tatsächlich hergibt, nachgelesen im Pub-Cache
+
+- `RotationSensor` ist eine `@sealed class` mit **nur statischen** Mitgliedern,
+  ohne Konstruktor. Anders als bei `Geolocator` gibt es damit **keine
+  injizierbare Naht** für einen Testdoppelgänger. Das begrenzt, was am Adapter
+  prüfbar ist, und steht im Kopf der Testdatei.
+- Bezugsrahmen über `RotationSensor.referenceFrame`, Aufzählung `ReferenceFrame`,
+  Standard `magneticNorth`. Der Adapter setzt ihn **ausdrücklich**, damit eine
+  Änderung des Pakets nicht still die Richtung dreht.
+- Der Azimut steht als `OrientationEvent.eulerAngles.azimuth` in **Radiant**,
+  Bereich `[0, 2π)`, 0 bei Blick nach Norden, π/2 bei Osten. Derselbe Drehsinn
+  wie eine Kompass-Gradzahl, die Umrechnung ist reine Skalierung.
+- **Empirisch geprüft und nicht angenommen:** ein Quaternion mit einer
+  `NaN`-Komponente trägt die `NaN` ohne Ausnahme bis zum Azimut durch, und genau
+  deshalb hat `DeviceHeading.tryFrom` seine `NaN`-Wache. Ein **Null**-Quaternion
+  dagegen löst in `Quaternion.toRotationMatrix()` ein `assert` aus (`l != 0.0`);
+  unter `flutter test` sind Asserts aktiv, dieser Weg taugt also nicht als
+  Testfall und ist verworfen.
+
+#### Ein Befund am Rand, den ich nicht erklären kann
+
+`dart analyze` meldet **24 Hinweise**, alle `prefer_initializing_formals`,
+verteilt über 15 Dateien. Gate 2 bleibt auf Exit-Code 0, denn ein `info` kippt
+`dart analyze` nicht.
+
+**Ich habe vier Ursachen einzeln ausgeschlossen, alle gemessen:**
+
+1. Die Anhebung der Dart-Untergrenze. Mit `^3.9.0` sind es dieselben 24.
+2. Die Sprachfassung im `package_config.json`. Von Hand auf `3.9` gesetzt, wieder
+   dieselben 24.
+3. `analysis_options.yaml`. Unverändert, `git diff` leer.
+4. Die Fassungen von `flutter_lints` und `lints`. In `pubspec.lock` unverändert;
+   die 17 neuen Zeilen dort sind die zwei Sensorpakete und die SDK-Zeile.
+
+Dazu eine Gegenprobe, die die Sache nur schärfer macht: `anchor_registry.dart`
+wurde zuletzt am **28.08.2026** geändert, und einzeln analysiert meldet es den
+Hinweis heute. Der Auslöser liegt also nicht im Code von heute.
+
+**Und trotzdem passt es nicht zusammen.** Mehrfach an diesem Tag hat
+`dart analyze` in dieser Sitzung wörtlich „No issues found!" ausgegeben, zwei
+Zeilen Ausgabe insgesamt. Beide Beobachtungen können nicht gleichzeitig wahr
+sein, und **welche falsch ist, habe ich nicht aufgelöst.** Die bequeme
+Schlussfolgerung wäre „vorbestehend, also nicht mein Problem"; die ziehe ich
+nicht, weil sie nicht belegt ist.
+
+Zu entscheiden ist daran nichts Dringendes, aber zwei Dinge gehören gewusst: der
+Vertrag von Gate 2 ist der Exit-Code, und der hält. Ob das Projekt `--fatal-infos`
+will, ist eine eigene Frage, und die 24 Hinweise sind billig zu beheben, bis auf
+sechs in der **erzeugten** Datei `app_strings.dart`, die dem Generator gehören
+und nicht der Hand.
+
+### Der Bezugsrahmen ist eine offene Verhaltensfrage, siehe E-59
+
+Gewählt ist **magnetisch Nord**, der Standard des Pakets, und im Adapter
+ausdrücklich gesetzt statt stillschweigend übernommen. Begründung: der
+Android-Pfad der Quelle liest `deviceorientationabsolute`, und das ist
+magnetometerbasiert.
+
+**Offen ist, ob die Quelle auf iOS dasselbe tut.** `webkitCompassHeading` ist
+nach Apples Dokumentation aus `CLHeading` abgeleitet, und dort gibt es
+`trueHeading` **und** `magneticHeading`. Träfe die Quelle dort das wahre Nord,
+wären ihre beiden Zweige nicht deckungsgleich, und die Abweichung wäre die
+örtliche Missweisung, in Mitteleuropa je nach Ort ungefähr 2 bis 5 Grad, also
+**mehr** als die Totzone von 1,5 Grad und damit sichtbar. Als E-59
+festgehalten.
 
 ## Die Architekturprüfung des Kerns, 31.08.2026
 
@@ -3516,6 +3724,7 @@ eine Fundstelle.
 | E-56 | **Drei Stadtschlüssel-Normalisierungen nebeneinander, und Rom fällt durch alle.** `lower(city)` im Trigger und in beiden Ranglisten-Funktionen, `_slugify(city)` in `_team_generate_orders`, eine feste Liste in `_city_default_meeting`. Für München geht es gut, weil jede Funktion von genau einer Stelle gerufen wird: Glück, keine Konstruktion. Für Rom bildet der Trigger-Rückfall `nr LIKE 'ROM%'` auf `Rom` ab, der Backfill vom 07.06. dasselbe Präfix auf `Rome`, und das Frontend schickt `rom`. **Zusatzverdacht, unbestätigt:** `migrate_nr_codes.py:24-31` vergibt Präfixe nach Breitengrad mit `lat > 48.5 → PAU`; Regensburg, Nürnberg und Weimar liegen darüber. Wenn das je über die ganze Tabelle lief, sind es falsche Stammdaten und kein Anzeigefehler. Konkretisiert E-11. | 3 | vor Schritt 45 |
 | E-57 | **Der Team-Ausgleich kann nicht wirken.** `_team_generate_orders` vergleicht die Wegstrecken über `sum(...) where id = any(v_a)` gegen `any(v_b)`; `v_a` und `v_b` sind Permutationen **derselben Menge**, also ist die Differenz immer 0, die Schwelle `<= 0.20` immer erfüllt und der dreifache Resampling-Apparat unerreichbar. Beide Teams laufen denselben Stationssatz in anderer Reihenfolge, und das ist laut Index-Kommentar gewollt; dann ist offen, was die Teams überhaupt unterscheiden soll. Dazu eine wirkungslose Winkelnormalisierung, `abs(((x-y)+pi())-pi())` kürzt sich zu `abs(x-y)`. Dieselbe Bauart wie die dreistufige Auswahl aus Schritt 33: eine Vorkehrung, die ihr Ergebnis nicht ändern kann. | 2 | Phase 5 |
 | E-58 | **Der Admin ist eine statische Seite mit dem `service_role`-Schlüssel im Browser.** `02_Frontend/admin/index.html` nimmt den Generalschlüssel entgegen, legt ihn in `localStorage` (`fact_admin_service_key`) und spricht damit direkt gegen Supabase; er umgeht **jede** RLS-Policy. Kein Admin-Server, keine Rollenprüfung, kein Protokoll darüber, wer wann was freigegeben hat. Dieselbe Bauart in der Pipeline: 11 Skripte lesen `service_role_key` aus `import_config.json`, gitignoriert, aber im Klartext in einem OneDrive-Ordner. Das ist kein Fehler in einer Zeile, sondern der Teil, der bei einem Backend-Neubau nicht mitgenommen werden kann: ohne Antwort hierauf ist der Neubau nach einem Tag wieder am Ausgangspunkt, weil jemand Fakten freigeben können muss. | **4** | vor dem Backend-Neubau |
+| E-59 | **Welchen Bezugsrahmen hat die Kompass-Richtung, magnetisch Nord oder wahres Nord?** Der Neubau setzt seit Schritt 14 ausdrücklich **magnetisch** Nord, weil der Android-Pfad der Quelle `deviceorientationabsolute` liest und das magnetometerbasiert ist. **Offen ist der iOS-Pfad:** `webkitCompassHeading` leitet sich aus `CLHeading` ab, und dort gibt es `trueHeading` **und** `magneticHeading`. Nimmt die Quelle dort das wahre Nord, sind ihre beiden Zweige nicht deckungsgleich, und der Unterschied ist die örtliche Missweisung, in Mitteleuropa ungefähr 2 bis 5 Grad. Das ist **mehr** als die Totzone von 1,5 Grad, also sichtbar, und es hiesse, dass die Karte auf iOS und Android unterschiedlich zeigt. Zu klären an einem iOS-Gerät oder an Apples Dokumentation; der Neubau kann beide Rahmen, die Umstellung ist eine Zeile im Adapter. Belege unter „Schritt 14, die Wahl des Sensorpakets". | 2 | vor Auslieferung |
 
 ## Wie Tests hier blind werden
 

@@ -95,8 +95,10 @@ independent business domain.
     packages. **Only the second half is a restriction**, and only it is
     enforced; the first half is a permission and has nothing to check. See
     ADR-008.
+24. `flutter_rotation_sensor` and `native_device_orientation` may only be
+    imported below `lib/services/orientation/`.
 
-Rules 19 to 22 give a vendor SDK one home directory. They are not a ban, they
+Rules 19 to 22 and rule 24 give a vendor SDK one home directory. They are not a ban, they
 are an assignment: the map SDK belongs to the map host, the geolocation SDK
 belongs to the location service, and the WebView belongs to the avatar. Rule 4
 already keeps the map and geolocation SDKs out of every `domain` directory, but
@@ -110,6 +112,14 @@ the supporting technical capabilities and not among the business domains, in the
 same list as map rendering. The rule enforces that placement, it does not decide
 it. Rule 20 was enforced in `tool/check_architecture.dart` from 2026-08-28 and
 is written down here only now.
+
+Rule 24 was added on 2026-08-31 with the compass sensor, and it is the third
+application of the same shape. The device store, the geolocation provider and now
+the orientation sensor are all supporting technical capabilities, so each gets one
+home under `services/` and appears nowhere else. It bans the family by prefix for
+the reason rule 21 gives: `native_device_orientation` is the transitive
+dependency of `flutter_rotation_sensor`, and reaching for the transitive package
+is the obvious way around the adapter.
 
 Rule 22 was added on 2026-08-31, together with the package itself.
 `tool/check_architecture.dart` had until then carried `shared_preferences` as a
