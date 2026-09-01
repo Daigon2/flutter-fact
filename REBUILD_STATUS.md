@@ -2789,10 +2789,16 @@ rechnet, Server speichert nur.
 
 **Gewählt: (a), plus zwei Aufträge, die nicht auf der Liste standen.**
 
-1. **Der Server ist die einzige Wahrheit.** Für den Neubau ist das billig: die
-   Trophäenliste aus Schritt 49 nimmt den Freischaltstand schon heute als
-   Parameter und legt sich nicht fest. Sie bekommt ihn künftig aus
-   `user_trophies` und rechnet nichts nach.
+1. **Der Server ist die einzige Wahrheit.** Für den Neubau ist das billig, und
+   das ist am 31.08.2026 nachgeprüft und nicht behauptet:
+   `trophiesInDisplayOrder({required Set<String> unlockedKeys})`
+   (`progression/application/trophy_catalog.dart:39-45`) nimmt den
+   Freischaltstand als Parameter und **sortiert nur**. Das einzige `>=` in der
+   ganzen Domäne sitzt in `trophyTierOf`
+   (`domain/value_objects/trophy_tier.dart:67`) und bestimmt die Stufe Bronze,
+   Silber oder Gold aus der Katalogdefinition, also eine Anzeigeeigenschaft und
+   nicht den verdienten Zustand. Der Neubau hat die defekte Ableitung der Quelle
+   also nie gehabt, und sie bekommt er auch nicht.
 2. **Die defekte Client-Ableitung wird entfernt, nicht nachgebaut.**
    `wltDeriveTrophies` steht in der PWA (`screen-wallet.jsx:114-128`), also im
    anderen Repository. Hier heißt „entfernen" deshalb: sie wird **nicht
