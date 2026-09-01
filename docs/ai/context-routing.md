@@ -109,6 +109,14 @@ Load the smallest sufficient context packet. Start with the task and code; add d
 | Documentation change | Documentation standard, canonical source, affected code/decision | ADR template | Unrelated standards |
 | AI system maintenance | AI operating model, context routing, evaluation, affected agent/skill/hook | engineering quality gates | Product details except evaluation task needs |
 
+## Shared kernel
+
+Any change below `lib/kernel/`, and any proposal to move a type there, loads
+ADR-008 first. The four admission rules live there and nowhere else, and the
+decision to add a type is an amendment to that ADR rather than a new file. This
+row exists because the kernel is the one place where a wrong addition is cheap to
+make and expensive to undo: every feature domain sees it.
+
 ## Document budget
 
 Typical task: 1 global instruction + 1 rule/skill + 1–3 canonical docs + affected code/tests.

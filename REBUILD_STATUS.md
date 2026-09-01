@@ -1285,7 +1285,7 @@ führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
 - [x] 33. Wizard · [x] 34. Solo-Setup · [x] 35. Hotspot-Picker
 - [ ] 36. Phasen-Maschine (E-43 und D-16 entschieden, seit dem 31.08.2026 frei) · [ ] 37. Active-UI (dito)
   · [!] 38. Rätsel und Ökonomie
-- [ ] 39. Pause und Results · [!] 40. Gruppen-Flow (Realtime-Entscheidung)
+- [ ] 39. Pause und Results · [ ] 40. Gruppen-Flow (Realtime mit ADR-009 entschieden, seit dem 31.08.2026 frei; erbt E-21, E-54 und E-57 aus dem Backend)
 
 ## Phase 6, Tour
 
