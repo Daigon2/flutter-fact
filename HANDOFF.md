@@ -38,7 +38,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2212 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2232 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -303,6 +303,25 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Die Phasen-Maschine, und zwei Mutationen, die zuerst überlebt haben
+
+`HuntRun` steht: die Übergänge der laufenden Jagd, rein und unveränderlich, ohne
+Uhr. 2212 → 2232 Tests. Belege in `REBUILD_STATUS.md`.
+
+**Überraschend war, warum zwei der sechs Pflichtmutationen zuerst überlebt
+haben, denn beide Gründe sind allgemein und stehen jetzt als Muster 22 und 23
+im Katalog.** Die Untergrenze `max(0, punkte - kosten)` war unsichtbar, weil der
+Test 50 gegen 50 prüfte und beide Formeln dort 0 liefern. Und die Bedingung
+„nächste offene Station mit **größerem** Index" war unsichtbar, weil in jedem
+naheliegenden Aufbau vor der aktuellen Station ohnehin nichts mehr offen war.
+Beide Male hat nicht der Testentwurf den Fehler gefunden, sondern die
+Mutationsprobe.
+
+**Die Lehre daraus ist eine Regel für den Testentwurf**, nicht für die Probe:
+wer eine Untergrenze prüft, wählt Eingaben, die sie **auslösen**; wer eine
+Richtungsbedingung prüft, baut einen Fall, in dem die andere Richtung überhaupt
+einen Kandidaten hätte.
 
 ### 31.08.2026, Die Regeln der Jagd, und eine Meldung, die nichts bedeutet hat
 

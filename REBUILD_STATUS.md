@@ -1391,6 +1391,86 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
 
+## Schritt 36, die Phasen-Maschine, 31.08.2026
+
+2212 → 2232 Tests. Eine Datei, `challenges/application/hunt_run.dart`, mit
+`HuntStopStatus`, `HuntRunStop` und `HuntRun`. Rein, unveränderlich, ohne
+Riverpod, ohne Widget, ohne Uhr.
+
+**In `application` und nicht in `domain`**, weil `HuntRun` einen `HuntPlan` hält
+und der `Fact` und `FactPuzzle` trägt. Das ist die bestehende, in
+`hunt_plan.dart` begründete Ausnahme, nicht eine neue.
+
+| Übergang | Was er tut |
+|---|---|
+| `start` | alle Stationen offen, Zeiger auf 0, Punkte 0 |
+| `unlockHint` | Kosten auf die **aktuelle** Station, Index in die Liste |
+| `solveStop` | Nettopunkte, Status gelöst, Weiterschaltung |
+| `skipStop` | Status übersprungen, dieselbe Weiterschaltung |
+| `collectStop` | Status eingesammelt, **keine** Weiterschaltung |
+| `toActiveHunt` | die dauerhafte Projektion, eins-basiert |
+
+### Uhrenfrei, und das ist eine Entscheidung mit Beleg
+
+Die Quelle schreibt `solvedAt` und `finishedAt` als Zeitstempel. Hier gibt es
+keine, und `isFinished` ist abgeleitet statt gespeichert. Der Grund steht in
+E-19: `finishedAt` wird in der Ergebnisansicht als **Dauer** gelesen
+(`screen-challenge.jsx:2954`), und der Client rechnet keine Zeit, an der eine
+Belohnung hängt. Die Zeitstempel gehören zu Schritt 39 und zum Backend-Auftrag.
+Das steht im Kopfkommentar, damit sie niemand später beiläufig einbaut.
+
+**`collected` zählt ausdrücklich nicht als erledigt**, das ist die Quelle:
+`allDone` prüft nur `solved` und `skipped`. Ein Fakt kann eingesammelt sein,
+ohne dass sein Rätsel gelöst ist.
+
+### Zwei Mutationen haben zuerst überlebt, und das ist der Ertrag dieser Runde
+
+Sechs Pflichtmutationen, vier fielen sofort. Die anderen zwei überlebten, und
+beide Gründe sind allgemein genug, dass sie jetzt als Muster **22** und **23**
+in „Wie Tests hier blind werden" stehen.
+
+**Die Untergrenze war unsichtbar, weil die Zahlen gleich waren.** Der Test
+prüfte 50 Punkte gegen 50 Münzen Hinweiskosten und erwartete 0. Genau diese
+Zahlen machen `max(0, 50 - 50)` und `50 - 50` ununterscheidbar. Scharf wird es
+erst, wenn die Kosten die Punkte übersteigen: 10 gegen 50 ergibt 0 statt −40.
+
+**Die Weiterschaltung war unsichtbar, weil vor der aktuellen Station nie etwas
+offen war.** Die Jagd sucht die nächste offene Station mit **größerem** Index.
+In jedem naheliegenden Testaufbau waren die früheren Stationen längst gelöst,
+und dann findet eine Suche ab Index 0 dieselbe Station wie eine ab `index + 1`.
+Scharf wird es erst, wenn eine Station **vor** der aktuellen noch offen ist.
+
+Nach dem Nachschärfen fallen alle sechs. **Ich habe drei davon selbst
+nachgefahren**, die zwei vorher überlebenden und die Projektion auf die Platte;
+alle drei fallen auch bei mir.
+
+### Vier Zugaben des Bauenden, alle gemeldet und alle richtig
+
+- `HuntRunStop` hat einen **privaten** Konstruktor. Damit kann von außen keine
+  Station mit widersprüchlichem Zustand entstehen, etwa `pending` mit
+  vergebenen Punkten. Dasselbe Muster wie bei `ActiveHunt`.
+- `solveStop`, `skipStop` und `collectStop` **werfen** bei einem Index außerhalb
+  des Bereichs, statt still nichts zu tun. Das ist ein Programmfehler des
+  Aufrufers und keine ungeprüfte Eingabe von außen, dieselbe Linie wie bei
+  `isHuntHintFree`.
+- Zwei zusätzliche Tests zum gratis Hinweis, der kostenlos bleibt und nicht in
+  die Liste wandert.
+- **Der Hinweiszustand wird nur zurückgesetzt, wenn sich der Zeiger wirklich
+  bewegt.** Das ist genauer als mein Auftrag und näher an der Quelle: dort hängt
+  der Rücksetz-Effekt an einer Änderung von `currentStopIdx`, und die bleibt an
+  der letzten Station aus. Praktische Folge: wer die letzte Station löst,
+  behält seine freigeschalteten Hinweise, statt sie im letzten Moment zu
+  verlieren.
+
+### Was `toActiveHunt` bei `null` bedeutet
+
+`ActiveHunt.tryFrom` kann an einer Jagd aus dieser Maschine nur an **einem**
+scheitern: an einer kaputten Koordinate des zugrunde liegenden Fakts.
+`currentStopIndex` liegt strukturell in `[0, stops.length - 1]`, und
+`unlockHint` lässt keinen ungültigen Index in die Liste. Ein `null` heißt
+deshalb „diese Jagd ist nicht speicherbar" und wird nicht repariert, dieselbe
+Doktrin wie bei `ActiveHunt` selbst.
+
 ## Schritt 36, die reinen Regeln der laufenden Jagd, 31.08.2026
 
 2192 → 2212 Tests. Drei Dateien in `challenges/domain`, ohne Widget, ohne
@@ -4136,6 +4216,25 @@ halben Tag.
     der Ersatzwert ein **anderes** Ergebnis erzwingt, und den Grund für die
     Wahl in den Test schreiben, sonst macht der Nächste sie beim Aufräumen
     wieder harmlos.
+
+22. **Gleiche Zahlen verstecken den Unterschied zwischen zwei Formeln.** Ein
+    Test prüfte 50 Punkte gegen 50 Münzen Hinweiskosten und erwartete 0. Genau
+    diese Zahlen machen `max(0, 50 - 50)` und `50 - 50` ununterscheidbar, und
+    die Mutation, die die Untergrenze entfernt, **überlebt**. Belegt am
+    31.08.2026 an der Phasen-Maschine der Jagd. Der Testfall ist erst scharf,
+    wenn die Kosten die Punkte **übersteigen**: 10 Punkte gegen 50 Kosten
+    ergeben 0 statt −40. Allgemein: wer eine Untergrenze prüft, wählt Eingaben,
+    die sie **auslösen**, nicht solche, die sie gerade eben nicht brauchen.
+23. **Ein Suchlauf, dessen Startpunkt nie zählt, weil davor schon alles
+    erledigt ist.** Die Jagd sucht die nächste offene Station mit **größerem**
+    Index. In jedem naheliegenden Test waren die Stationen davor längst gelöst
+    oder übersprungen, und dann findet eine Suche ab Index 0 dieselbe Station
+    wie eine Suche ab `index + 1`. Die Mutation, die die Bedingung entfernt,
+    **überlebte** deshalb. Belegt am 31.08.2026, gefunden von der Mutationsprobe
+    und nicht vom Testentwurf. Scharf wird es erst, wenn eine Station **vor**
+    der aktuellen noch offen ist. Allgemein: eine Bedingung, die eine Richtung
+    einschränkt, braucht einen Testfall, in dem die andere Richtung überhaupt
+    einen Kandidaten hätte.
 
 ## Datenvertrag: die bekannten Fallen
 
