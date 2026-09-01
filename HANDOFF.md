@@ -20,11 +20,12 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 **Zuletzt aktualisiert:** 31.08.2026
 
 Phase 0 und Phase 1 sind abgeschlossen. Aus Phase 2 sind laut Protokoll die
-Schritte 12, 13, 15, 16, 17 und 19 fertig, offen bleiben dort 14, 18 und 20.
+Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
 den Schritten 33, 34 und 35.
 
-**Fertig sind 22 von 50:** 1 bis 13, dazu 15, 16, 17, 19, 21, 27, 33, 34 und 35. Der
+**Fertig sind 23 von 50:** 1 bis 17, dazu 19, 21, 27, 33, 34 und 35. Schritt 14 ist
+am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
 steht und D-5 ihn am selben Tag zur geschlossenen Einheit umgebaut hat. Das
