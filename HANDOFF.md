@@ -138,10 +138,18 @@ ist die Reihenfolge danach.
       fünf Speicher sind dauerhaft, `bootstrap()` lädt einmal vor dem ersten
       Bild, das Paket sitzt hinter `KeyValueStore` und hat mit Regel 22 ein
       Heimatverzeichnis. Belege im Protokoll unten.
-   b. **Das Hinweis-Feld auf Indizes umstellen.** Das ist jetzt der nächste
-      Schritt, und er ist durch (a) teurer und wichtiger geworden: ab jetzt
-      liegen echte Nutzlasten auf echten Geräten, und eine Formänderung trifft
-      sie. Der Zweig, der sie verwirft, ist geprüft
+   a2. **Den Shared Kernel einführen, und zwar vor (b).** Dairens Antwort auf
+      D-18 vom 31.08.2026, siehe Punkt 4. Er ist strukturell und macht alles
+      danach billiger, insbesondere (b): **die Jagd-Nutzlast bekommt sonst zwei
+      Formänderungen statt einer.** D-18 hängt eine Schwierigkeitsstufe hinein,
+      (b) ersetzt eine Anzahl durch Indizes, und beides erhöht
+      `ActiveHunt.payloadVersion`. Zwei Erhöhungen hintereinander verwerfen den
+      Spielstand zweimal, eine verwirft ihn einmal. Also: Kernel, dann (b) und
+      D-18 in **einem** Zug.
+   b. **Das Hinweis-Feld auf Indizes umstellen**, zusammen mit der
+      Schwierigkeitsstufe aus D-18. Durch (a) ist es teurer und wichtiger
+      geworden: ab jetzt liegen echte Nutzlasten auf echten Geräten, und eine
+      Formänderung trifft sie. Der Zweig, der sie verwirft, ist geprüft
       (`key_value_active_hunt_store_test.dart`, „eine Nutzlast der falschen
       Fassung wird verworfen"). Siehe den zweiten Nachtrag in
       ADR-007. Heute heißt es `purchasedHintCount` und trägt eine Anzahl; es soll
@@ -165,13 +173,42 @@ ist die Reihenfolge danach.
    beschrieben in `map_camera_fit.dart`. Beide brauchen eine kurze, wieder
    entfernte Sonde, weil der Diagnosekanal absichtlich nicht druckt.
 
-4. **Bei Dairen liegen zwei Fragen, D-11 und D-18.** D-18 blockiert die
-   vollständige Wiederherstellung einer Jagd (die Schwierigkeitsstufe kommt
-   nicht über die Domänengrenze), D-11 blockiert nichts. Der technische
-   Fragenblock ist am 31.08.2026 formuliert und enthält zwei Fragen, die vorher
-   falsch bei Janek einsortiert waren: **Trusted Time** (E-19) und **die
-   Trophäen-Quelle** (E-49) sind Fragen nach der Vertrauensgrenze und nach einer
-   einzigen Wahrheit, keine Produktfragen.
+4. **Der zweite Fragenblock ist beantwortet, alle fünf, und bei Dairen liegt
+   nichts mehr.** Wortlaut der Fragen **und** der Antworten stehen in
+   `REBUILD_STATUS.md` unter „Der zweite Fragenblock an Dairen, 31.08.2026".
+   Kurz:
+
+   - **D-18: Shared Kernel.** Keine der drei vorgelegten Optionen, sondern der
+     vierte Weg, den der Fragetext nur nebenbei nannte. Die Architektur wird an
+     dieser Stelle ausdrücklich als zu streng bewertet und **minimal**
+     aufgelockert, die Kopien in `puzzles/domain` werden über denselben Weg
+     aufgelöst, und beides gehört als Architekturentscheidung festgehalten. Das
+     ist der größte offene Bauauftrag und steht als Nächstes.
+   - **E-19: der Server rechnet, keine Ausnahme von `security.md`.** Regel für
+     den Neubau: **der Client rechnet keine Zeit, an der eine Belohnung hängt.**
+     Zwillingsregel zu „der Client bestimmt nie einen gutgeschriebenen Betrag".
+     Die Umsetzung ist Backend, damit ist das Sitzungsende in Phase 5 bis dahin
+     nicht parität-treu baubar; anzeigen ja, verbuchen nein.
+   - **E-49: der Server ist die einzige Wahrheit**, dazu zwei Aufträge, die
+     nicht auf der Liste standen: die defekte Client-Ableitung
+     (`wltDeriveTrophies`) wird **nicht portiert**, und **E-16 wird
+     mitgeschlossen**. E-16 hängt an E-55, denn dieselben zwei Tabellen sind
+     nicht nur lesbar, sondern schreibbar.
+   - **Gruppen-Jagd: Supabase Realtime, und es passt neben ADR-007** statt es
+     aufzubrechen. Ein Folge-ADR für Group Hunt Synchronization gehört dazu, und
+     **der Transport bleibt austauschbar**: der Vertrag darf nicht auf
+     `postgres_changes` zeigen.
+   - **D-11: (b), so lassen.** Geschlossen, kostet keine Arbeit.
+   - **OD-002 bleibt offen**, bis ein echtes Offline-Ticket die Anforderungen
+     liefert. Der `KeyValueStore` von heute ist ausdrücklich keine
+     Vorentscheidung dafür.
+
+   **Die Lehre daneben ist teurer als eine der fünf Antworten.** Der Fragenblock
+   stand wieder nur im Chat, und die Antworten kamen als Liste „1. bis 5.". Zwei
+   davon waren ohne den Fragetext nicht auflösbar, und das ist genau der Fehler,
+   den `REBUILD_STATUS.md` für den **ersten** Block schon protokolliert hatte.
+   Er steht jetzt vollständig im Repository. **Wer den dritten Block schickt,
+   legt ihn vorher dort ab.**
 
 5. **Vier Dinge sind an mich delegiert und können jederzeit gemacht werden:**
    der Kamera-Zweckwortlaut (E-20, muss Damals/Heute **und** Foto-Rätsel in
@@ -226,6 +263,27 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Fünf technische Antworten, und der Block, der sie erklärt
+
+Dairen hat den zweiten Fragenblock beantwortet: **Shared Kernel** für D-18,
+**Server rechnet** für E-19, **Server ist die Wahrheit** für E-49 samt E-16,
+**Realtime passt neben ADR-007** für die Gruppen-Jagd, **(b)** für D-11, und
+OD-002 bleibt offen. Kein Code geändert. Wortlaut und Folgen in
+`REBUILD_STATUS.md`.
+
+**Überraschend war, dass die Antwort auf D-18 keine der drei Optionen war.**
+Vorgelegt waren Kopieren, Zeichenkette und Umlagerung nach `application`, alle
+drei Umgehungen. Gewählt wurde der vierte Weg, der im Fragetext nur als Nebensatz
+stand: den Grenzverlauf selbst ändern. Wer drei Wege vorlegt, die alle das
+Symptom behandeln, bekommt zu Recht keinen davon.
+
+**Und derselbe Fehler ist zum zweiten Mal passiert, obwohl er protokolliert
+war.** Der Fragenblock lebte wieder nur im Chat, die Antworten kamen als Liste
+„1. bis 5.", und zwei waren nicht auflösbar. Für Block 1 stand die Lehre seit dem
+29.08.2026 im Repository, und sie hat Block 2 nicht geschützt: eine
+aufgeschriebene Lehre wirkt erst, wenn sie an der Stelle steht, an der die
+nächste Handlung passiert, nicht dort, wo die letzte erklärt wird.
 
 ### 31.08.2026, Die erste Persistenz, und eine Lücke, die zur Regel wurde
 
