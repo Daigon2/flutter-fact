@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:fact_app/features/challenges/domain/entities/active_hunt.dart';
 import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Das Lesemodell der laufenden Jagd und seine Prüfregeln.
@@ -22,7 +23,11 @@ import 'package:flutter_test/flutter_test.dart';
 /// * Dauer 30 Minuten (fünf Stationen laut [HuntDuration]) bei sieben
 ///   Stationen: wer [ActiveHunt.stationCount] aus der Dauer ableitete, bekäme
 ///   5 statt 7.
-/// * Ein gekaufter Hinweis, nicht null und nicht so viele wie die Minutenzahl.
+/// * Genau ein freigeschalteter Hinweis mit Index 0, nicht 1: eine
+///   Verwechslung von „ein freigeschalteter Hinweis" mit „Index 1" fiele
+///   sonst nicht auf.
+/// * Standard-Stufe `mittel`, nicht `leicht` oder `schwer`: unterscheidbar von
+///   den Stufen, die eigene Tests gezielt verwenden.
 void main() {
   /// Kurzform von [ActiveHunt.tryFrom] mit gültigen Vorgaben, damit jeder
   /// Prüftest genau **ein** Feld nennt.
@@ -32,7 +37,8 @@ void main() {
     String stationTitle = 'Glyptothek',
     double stationLatitude = 48.1467,
     double stationLongitude = 170.5,
-    int purchasedHintCount = 1,
+    List<int> unlockedHintIndices = const <int>[0],
+    PuzzleDifficulty? difficulty = PuzzleDifficulty.mittel,
     HuntDuration duration = HuntDuration.thirty,
   }) => ActiveHunt.tryFrom(
     stationOrdinal: stationOrdinal,
@@ -40,7 +46,8 @@ void main() {
     stationTitle: stationTitle,
     stationLatitude: stationLatitude,
     stationLongitude: stationLongitude,
-    purchasedHintCount: purchasedHintCount,
+    unlockedHintIndices: unlockedHintIndices,
+    difficulty: difficulty,
     duration: duration,
   );
 
@@ -57,7 +64,8 @@ void main() {
     String stationTitle = 'Glyptothek',
     double stationLatitude = 48.1467,
     double stationLongitude = 170.5,
-    int purchasedHintCount = 1,
+    List<int> unlockedHintIndices = const <int>[0],
+    PuzzleDifficulty? difficulty = PuzzleDifficulty.mittel,
     HuntDuration duration = HuntDuration.thirty,
   }) => checked(
     stationOrdinal: stationOrdinal,
@@ -65,18 +73,20 @@ void main() {
     stationTitle: stationTitle,
     stationLatitude: stationLatitude,
     stationLongitude: stationLongitude,
-    purchasedHintCount: purchasedHintCount,
+    unlockedHintIndices: unlockedHintIndices,
+    difficulty: difficulty,
     duration: duration,
   )!;
 
   Map<String, Object?> payload({
-    Object? version = 1,
+    Object? version = 2,
     Object? stationOrdinal = 3,
     Object? stationCount = 7,
     Object? stationTitle = 'Glyptothek',
     Object? latitude = 48.1467,
     Object? longitude = 170.5,
-    Object? purchasedHints = 1,
+    Object? hintIndices = const <int>[0],
+    Object? difficulty = 'mittel',
     Object? durationMinutes = 30,
   }) => <String, Object?>{
     'v': version,
@@ -85,7 +95,8 @@ void main() {
     'stationTitle': stationTitle,
     'lat': latitude,
     'lng': longitude,
-    'purchasedHints': purchasedHints,
+    'hintIndices': hintIndices,
+    'difficulty': difficulty,
     'durationMinutes': durationMinutes,
   };
 
@@ -97,7 +108,8 @@ void main() {
         stationTitle: 'Glyptothek',
         stationLatitude: 48.1467,
         stationLongitude: 170.5,
-        purchasedHintCount: 1,
+        unlockedHintIndices: const <int>[0, 2],
+        difficulty: PuzzleDifficulty.schwer,
         duration: HuntDuration.thirty,
       );
 
@@ -107,7 +119,8 @@ void main() {
       expect(hunt.stationTitle, 'Glyptothek');
       expect(hunt.stationLatitude, 48.1467);
       expect(hunt.stationLongitude, 170.5);
-      expect(hunt.purchasedHintCount, 1);
+      expect(hunt.unlockedHintIndices, <int>[0, 2]);
+      expect(hunt.difficulty, PuzzleDifficulty.schwer);
       expect(hunt.duration, HuntDuration.thirty);
       // Die Stationszahl kommt **nicht** aus der Dauer. `HuntPlan` beschreibt
       // den Fall ausdrücklich: findet der Generator weniger Stationen als die
@@ -139,11 +152,6 @@ void main() {
       expect(checked(stationOrdinal: 1, stationCount: 1), isNotNull);
     });
 
-    test('verwirft eine negative Zahl gekaufter Hinweise', () {
-      expect(checked(purchasedHintCount: -1), isNull);
-      expect(checked(purchasedHintCount: 0), isNotNull);
-    });
-
     test('verwirft eine Lage außerhalb der Erde und jede nicht-endliche', () {
       expect(checked(stationLatitude: 90.1), isNull);
       expect(checked(stationLatitude: -90.1), isNull);
@@ -173,21 +181,49 @@ void main() {
       expect(checked(stationTitle: ''), isNotNull);
     });
 
-    test('höher als drei gekaufte Hinweise wird bewusst nicht verworfen', () {
-      // Die Obergrenze wäre heute ableitbar (drei Hinweise je Fakt, der erste
-      // gratis). Sie hängt aber an der Preistabelle aus Schritt 37, und eine
-      // gültige Nutzlast zu verwerfen ist der teurere Fehler. Der Test hält
-      // die Entscheidung fest, damit sie nicht als Versehen gilt.
-      expect(checked(purchasedHintCount: 9), isNotNull);
+    test('die Hinweisindizes werden sortiert und dedupliziert', () {
+      // Die Menge zählt, nicht die Reihenfolge oder eine Mehrfachnennung, wie
+      // im Feldkommentar begründet.
+      final ActiveHunt hunt = munich(unlockedHintIndices: const <int>[2, 0, 2]);
+
+      expect(hunt.unlockedHintIndices, <int>[0, 2]);
+    });
+
+    test('die Hinweisindizes sind unveränderlich', () {
+      final ActiveHunt hunt = munich();
+
+      // Ohne `List.unmodifiable` bliebe die Kanonisierung ein Versprechen für
+      // den Moment der Erzeugung, aber niemand hinderte einen Aufrufer daran,
+      // sie danach zu brechen.
+      expect(() => hunt.unlockedHintIndices.add(9), throwsUnsupportedError);
+    });
+
+    test('ein negativer Hinweisindex wird abgewiesen, 0 wird angenommen', () {
+      expect(checked(unlockedHintIndices: const <int>[-1]), isNull);
+      expect(checked(unlockedHintIndices: const <int>[0]), isNotNull);
+    });
+
+    test('eine leere Hinweisliste ist gültig', () {
+      // Keine freigeschalteten Hinweise ist der Normalzustand jeder frisch
+      // begonnenen Station, keine kaputte Nutzlast.
+      expect(checked(unlockedHintIndices: const <int>[]), isNotNull);
+    });
+
+    test('ein hoher Hinweisindex wird bewusst nicht verworfen', () {
+      // Gegenprobe zu „keine Obergrenze": dieselbe Begründung wie vorher bei
+      // der Anzahl gilt jetzt für die Indizes. Eine Obergrenze hängt an der
+      // Preistabelle aus Schritt 37, und eine Prüfung darauf würde nach einer
+      // Preisänderung eine gültige Nutzlast verwerfen.
+      expect(checked(unlockedHintIndices: const <int>[99]), isNotNull);
     });
   });
 
   group('Nutzlast', () {
-    test('die Fassung ist 1', () {
+    test('die Fassung ist 2', () {
       // Absichtlich gegen die Zahl und nicht gegen die Konstante, siehe
       // Muster 18: `expect(x.payloadVersion, ActiveHunt.payloadVersion)` wäre
       // immer wahr.
-      expect(ActiveHunt.payloadVersion, 1);
+      expect(ActiveHunt.payloadVersion, 2);
     });
 
     test('die Schlüssel und Werte stehen fest', () {
@@ -195,13 +231,14 @@ void main() {
       // im Hin-und-Zurück-Test unsichtbar, weil derselbe Code schreibt und
       // liest; erst diese Zusicherung sieht ihn.
       expect(munich().toPayload(), <String, Object?>{
-        'v': 1,
+        'v': 2,
         'stationOrdinal': 3,
         'stationCount': 7,
         'stationTitle': 'Glyptothek',
         'lat': 48.1467,
         'lng': 170.5,
-        'purchasedHints': 1,
+        'hintIndices': <int>[0],
+        'difficulty': 'mittel',
         'durationMinutes': 30,
       });
     });
@@ -213,6 +250,40 @@ void main() {
 
       expect(read, written);
       expect(identical(read, written), isFalse);
+    });
+
+    test('hin und zurück erhält die Hinweisindizes und die Stufe', () {
+      final ActiveHunt written = munich(
+        unlockedHintIndices: const <int>[2, 0],
+        difficulty: PuzzleDifficulty.schwer,
+      );
+
+      final ActiveHunt? read = ActiveHunt.tryFromPayload(written.toPayload());
+
+      expect(read, written);
+      expect(read!.unlockedHintIndices, <int>[0, 2]);
+      expect(read.difficulty, PuzzleDifficulty.schwer);
+    });
+
+    test('hin und zurück ohne Stufe bleibt ohne Stufe', () {
+      final ActiveHunt written = munich(difficulty: null);
+
+      final ActiveHunt? read = ActiveHunt.tryFromPayload(written.toPayload());
+
+      expect(read, written);
+      expect(read!.difficulty, isNull);
+    });
+
+    test('jede Schwierigkeitsstufe übersteht die Nutzlast', () {
+      for (final PuzzleDifficulty difficulty in PuzzleDifficulty.values) {
+        final ActiveHunt written = munich(difficulty: difficulty);
+
+        expect(
+          ActiveHunt.tryFromPayload(written.toPayload())?.difficulty,
+          difficulty,
+          reason: 'Stufe $difficulty übersteht den Rundlauf nicht',
+        );
+      }
     });
 
     test('eine Koordinate ohne Nachkommastelle kommt als int zurück', () {
@@ -235,7 +306,8 @@ void main() {
       expect(hunt.stationLongitude, 170.5);
       expect(hunt.stationOrdinal, 3);
       expect(hunt.stationCount, 7);
-      expect(hunt.purchasedHintCount, 1);
+      expect(hunt.unlockedHintIndices, <int>[0]);
+      expect(hunt.difficulty, PuzzleDifficulty.mittel);
       expect(hunt.duration, HuntDuration.thirty);
     });
 
@@ -259,17 +331,17 @@ void main() {
     });
 
     test('eine fremde Fassung wird verworfen und nicht gelesen', () {
-      // Beide Richtungen: die ältere Nutzlast einer früheren Fassung und die
-      // neuere eines Downgrades. Reparieren ist ausdrücklich verboten
-      // (ADR-007).
-      expect(ActiveHunt.tryFromPayload(payload(version: 0)), isNull);
-      expect(ActiveHunt.tryFromPayload(payload(version: 2)), isNull);
-      expect(ActiveHunt.tryFromPayload(payload(version: '1')), isNull);
-      // Eine `1.0` kommt durch, und das ist kein Versehen: in Dart ist
-      // `1.0 == 1` wahr. Eine Fassungsnummer, die als Kommazahl auf der Platte
+      // Beide Richtungen: die Nutzlast vor der Umstellung auf Indizes und
+      // Stufe (Fassung 1) und eine hypothetische neuere. Reparieren ist
+      // ausdrücklich verboten (ADR-007).
+      expect(ActiveHunt.tryFromPayload(payload(version: 1)), isNull);
+      expect(ActiveHunt.tryFromPayload(payload(version: 3)), isNull);
+      expect(ActiveHunt.tryFromPayload(payload(version: '2')), isNull);
+      // Eine `2.0` kommt durch, und das ist kein Versehen: in Dart ist
+      // `2.0 == 2` wahr. Eine Fassungsnummer, die als Kommazahl auf der Platte
       // landet, meint dieselbe Fassung, und daran eine Jagd zu verwerfen wäre
       // Strenge ohne Gewinn.
-      expect(ActiveHunt.tryFromPayload(payload(version: 1.0)), isNotNull);
+      expect(ActiveHunt.tryFromPayload(payload(version: 2.0)), isNotNull);
       expect(ActiveHunt.tryFromPayload(payload(version: null)), isNull);
     });
 
@@ -280,7 +352,7 @@ void main() {
         'stationTitle',
         'lat',
         'lng',
-        'purchasedHints',
+        'hintIndices',
         'durationMinutes',
       ]) {
         final Map<String, Object?> broken = payload()..remove(key);
@@ -293,6 +365,37 @@ void main() {
       }
     });
 
+    test('ein fehlendes difficulty-Feld ist gültig und ergibt keine Stufe', () {
+      // `difficulty` steht bewusst nicht in der Liste oben: anders als bei den
+      // übrigen Feldern ist ein fehlender Schlüssel hier kein Defekt.
+      final Map<String, Object?> broken = payload()..remove('difficulty');
+
+      final ActiveHunt? hunt = ActiveHunt.tryFromPayload(broken);
+
+      expect(hunt, isNotNull);
+      expect(hunt!.difficulty, isNull);
+    });
+
+    test('difficulty explizit null ist gültig und ergibt keine Stufe', () {
+      final ActiveHunt? hunt = ActiveHunt.tryFromPayload(
+        payload(difficulty: null),
+      );
+
+      expect(hunt, isNotNull);
+      expect(hunt!.difficulty, isNull);
+    });
+
+    test('difficulty als unbekannte Zeichenkette verwirft die Nutzlast', () {
+      // Derselbe Präzedenzfall wie bei einer unbekannten Dauer weiter unten:
+      // eine Jagd, deren Stufe still von der abweicht, die der Spieler
+      // gesehen hat, ist schlimmer als ein Neustart.
+      expect(ActiveHunt.tryFromPayload(payload(difficulty: 'episch')), isNull);
+    });
+
+    test('difficulty als Zahl statt Zeichenkette wird verworfen', () {
+      expect(ActiveHunt.tryFromPayload(payload(difficulty: 2)), isNull);
+    });
+
     test('ein Feld mit falschem Typ wird verworfen', () {
       expect(ActiveHunt.tryFromPayload(payload(stationOrdinal: '3')), isNull);
       expect(ActiveHunt.tryFromPayload(payload(stationOrdinal: 3.0)), isNull);
@@ -300,8 +403,33 @@ void main() {
       expect(ActiveHunt.tryFromPayload(payload(stationTitle: 7)), isNull);
       expect(ActiveHunt.tryFromPayload(payload(latitude: '48.1')), isNull);
       expect(ActiveHunt.tryFromPayload(payload(longitude: true)), isNull);
-      expect(ActiveHunt.tryFromPayload(payload(purchasedHints: '1')), isNull);
+      expect(
+        ActiveHunt.tryFromPayload(payload(hintIndices: 'kein array')),
+        isNull,
+      );
       expect(ActiveHunt.tryFromPayload(payload(durationMinutes: '30')), isNull);
+    });
+
+    test('hintIndices als Nicht-Liste wird verworfen', () {
+      expect(
+        ActiveHunt.tryFromPayload(payload(hintIndices: 'kein array')),
+        isNull,
+      );
+      expect(ActiveHunt.tryFromPayload(payload(hintIndices: 1)), isNull);
+      expect(ActiveHunt.tryFromPayload(payload(hintIndices: null)), isNull);
+    });
+
+    test('hintIndices mit einem Nicht-int-Element wird verworfen', () {
+      expect(
+        ActiveHunt.tryFromPayload(
+          payload(hintIndices: const <Object?>[0, '1']),
+        ),
+        isNull,
+      );
+      expect(
+        ActiveHunt.tryFromPayload(payload(hintIndices: const <Object?>[0.5])),
+        isNull,
+      );
     });
 
     test('eine unbekannte Dauer wird verworfen', () {
@@ -330,7 +458,10 @@ void main() {
       // durchlassen.
       expect(ActiveHunt.tryFromPayload(payload(stationOrdinal: 9)), isNull);
       expect(ActiveHunt.tryFromPayload(payload(stationCount: 0)), isNull);
-      expect(ActiveHunt.tryFromPayload(payload(purchasedHints: -1)), isNull);
+      expect(
+        ActiveHunt.tryFromPayload(payload(hintIndices: const <int>[-1])),
+        isNull,
+      );
       expect(ActiveHunt.tryFromPayload(payload(latitude: 91)), isNull);
       expect(ActiveHunt.tryFromPayload(payload(longitude: -181)), isNull);
     });
@@ -440,8 +571,26 @@ void main() {
       expect(reference, isNot(munich(stationTitle: 'Alte Pinakothek')));
       expect(reference, isNot(munich(stationLatitude: 48.1468)));
       expect(reference, isNot(munich(stationLongitude: 170.6)));
-      expect(reference, isNot(munich(purchasedHintCount: 2)));
+      expect(reference, isNot(munich(unlockedHintIndices: const <int>[1])));
+      expect(reference, isNot(munich(difficulty: PuzzleDifficulty.leicht)));
       expect(reference, isNot(munich(duration: HuntDuration.sixty)));
+    });
+
+    test('die Reihenfolge der Hinweisindizes ist bedeutungslos', () {
+      // Das ist die Gegenprobe zur Normalisierung: zwei Jagden, deren Indizes
+      // nur in der Eingabereihenfolge auseinanderliefen, sind dieselbe Jagd.
+      // Ohne Normalisierung wären `[0, 1]` und `[1, 0]` zwei verschiedene
+      // Werte, und ein `Provider<ActiveHunt?>` sähe bei jedem Neuaufbau eine
+      // Änderung, wo keine ist.
+      final ActiveHunt sortedInput = munich(
+        unlockedHintIndices: const <int>[0, 1],
+      );
+      final ActiveHunt reversedInput = munich(
+        unlockedHintIndices: const <int>[1, 0],
+      );
+
+      expect(sortedInput, reversedInput);
+      expect(sortedInput.hashCode, reversedInput.hashCode);
     });
 
     test('ein anderer Typ ist nicht gleich', () {

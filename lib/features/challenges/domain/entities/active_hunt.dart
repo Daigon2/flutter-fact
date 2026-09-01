@@ -26,9 +26,16 @@
 /// * [ActiveHunt.stationLatitude] und [ActiveHunt.stationLongitude] sind der
 ///   Punkt, aus dem die Quelle Entfernung und Peilung rechnet (`:1053-1054`).
 ///   Datenquelle ist `HuntStop.position`.
-/// * [ActiveHunt.purchasedHintCount] ist „wie viele Hinweise gekauft sind" aus
-///   ADR-007. Die Quelle bucht den Kauf am Stopp (`:1067` ruft
-///   `onHuntHintCost`, `app.jsx:927-935` addiert `hintCostSpent`).
+/// * [ActiveHunt.unlockedHintIndices] sind die Indizes der an der aktuellen
+///   Station freigeschalteten Hinweise. ADR-007, Nachtrag „superseded by the
+///   owner's answer": die Quelle bucht den Kauf am Stopp (`:1067` ruft
+///   `onHuntHintCost`, `app.jsx:927-935` addiert `hintCostSpent`), aber weder
+///   die Anzahl noch die Münzsumme sind die richtige Nutzlast, weil beide aus
+///   den Indizes folgen und nicht umgekehrt. Details am Feld selbst.
+/// * [ActiveHunt.difficulty] ist die Schwierigkeitsstufe der Jagd (D-18).
+///   `screen-map.jsx:1049-1051` staffelt daran die Navigationshilfen,
+///   `screen-challenge.jsx:2828` zeigt sie im Pause-Bildschirm. Details am
+///   Feld selbst.
 /// * [ActiveHunt.duration] steht hier nicht für `discovery`, sondern weil die
 ///   Ansage die Jagd überleben muss. Die Begründung steht schon in
 ///   `HuntPlan.duration`: „der Pause-Bildschirm zeigt sie nach einem Neustart
@@ -44,14 +51,6 @@
 ///   wird. Der Verbraucher rechnet sie aus Lage und Nutzerposition mit
 ///   `MapPosition.distanceInMetersTo`, genau wie `hunt_start_options.dart` das
 ///   für den Startpunkt-Picker tut.
-/// * **Die Schwierigkeitsstufe.** `screen-map.jsx:1049-1051` staffelt daran die
-///   Navigationshilfen (leicht: Pfeil und Distanz, mittel: nur Distanz, schwer:
-///   nichts), und `screen-challenge.jsx:2828` zeigt sie im Pause-Bildschirm.
-///   Sie fehlt hier, weil `PuzzleDifficulty` der Domäne `facts` gehört und
-///   Gate 6 einer Feature-Domäne nur das Dart-SDK und die eigene Domäne
-///   erlaubt. Eine wortgleiche Kopie wäre die dritte Wiederholung von D-9, die
-///   `hunt_plan.dart` ausdrücklich abgelehnt hat. **Das ist eine offene Frage
-///   für Schritt 36 und keine hier getroffene Entscheidung.**
 /// * **Die Stationsliste, das gewählte Rätsel je Station, Punkte, Startzeit und
 ///   der Zustand je Stopp.** Alles Felder, die heute niemand fortschreibt.
 ///   `hunt_plan.dart` hat dieselbe Grenze für die Erzeugung gezogen: „Ein Feld,
@@ -78,9 +77,19 @@
 /// Verhalten trüge nichts davon, und erreichbar wäre hier ohnehin keiner der
 /// drei (Gate 6). Der Verbraucher baut sich eine `MapPosition`, wie
 /// `HuntStop.position` und `hunt_start_options.dart` es schon tun.
+///
+/// ## Warum [PuzzleDifficulty] hier stehen darf
+///
+/// Bis ADR-008 hätte [difficulty] eine vierte Kopie einer Schwierigkeitsstufe
+/// gebraucht, denn Gate 6 erlaubt einer Feature-Domäne nur das Dart-SDK und die
+/// eigene Domäne. ADR-008, Regel 23 öffnet dafür genau eine Ausnahme: der
+/// geteilte Kern unter `lib/kernel/` ist für Typen gedacht, die mehrere
+/// Feature-Domänen ungeprüft brauchen, und [PuzzleDifficulty] ist so ein Typ.
+/// Das ist D-18, umgesetzt.
 library;
 
 import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 
 /// Die laufende Jagd als unveränderlicher Wert.
 ///
@@ -111,7 +120,8 @@ final class ActiveHunt {
     required this.stationTitle,
     required this.stationLatitude,
     required this.stationLongitude,
-    required this.purchasedHintCount,
+    required this.unlockedHintIndices,
+    required this.difficulty,
     required this.duration,
   });
 
@@ -124,7 +134,17 @@ final class ActiveHunt {
   /// eine Jagd, die zum Zeitpunkt des Updates läuft, ist weg. Eine Nutzlast
   /// halb zu lesen und den Rest zu erfinden wäre schlimmer, weil der Nutzer
   /// dann eine Jagd weiterspielt, die es nicht mehr gibt.
-  static const int payloadVersion = 1;
+  ///
+  /// **Von 1 auf 2 in einem Zug, mit zwei Inhalten zugleich, und das ist
+  /// Absicht.** Sowohl die Umstellung von `purchasedHintCount` auf
+  /// [unlockedHintIndices] als auch die Aufnahme von [difficulty] ändern die
+  /// Form der Nutzlast, beide hätten also für sich genommen diese Zahl erhöht.
+  /// Seit `shared_preferences` echte Nutzlasten auf echten Geräten liegen,
+  /// verwirft jede Erhöhung einen gespeicherten Spielstand; zwei Erhöhungen
+  /// hintereinander würden ihn zweimal verwerfen, für zwei Änderungen, die
+  /// dieselbe Sitzung ohnehin gemeinsam hätte kosten müssen. Deshalb steht hier
+  /// eine Erhöhung für beide Inhalte.
+  static const int payloadVersion = 2;
 
   /// Größter gültiger Breitengrad, wie `FactCoordinates.maxLatitude`.
   static const double _maxLatitude = 90;
@@ -159,17 +179,55 @@ final class ActiveHunt {
   /// Längengrad der aktuellen Station.
   final double stationLongitude;
 
-  /// Wie viele Hinweise an der aktuellen Station **gekauft** sind.
+  /// Indizes der an der aktuellen Station **freigeschalteten** Hinweise,
+  /// kanonisch: aufsteigend sortiert, ohne Duplikate, `List.unmodifiable`.
+  ///
+  /// Ersetzt seit [payloadVersion] 2 die Anzahl `purchasedHintCount`.
+  /// Begründung in ADR-007, Nachtrag „superseded by the owner's answer": die
+  /// Indizes tragen bei gleicher Größe strikt mehr Information als eine Anzahl
+  /// oder eine Münzsumme. Anzahl **und** ausgegebene Münzen folgen aus den
+  /// Indizes (Summe über `HINT_COSTS[i]`), umgekehrt nicht: bei
+  /// `HINT_COSTS = [0, 20, 30]` bedeuten die Summen 20 und 30 beide „ein
+  /// Hinweis". Anzahl und Kosten sind damit abgeleitete Werte ohne eigenen
+  /// Speicher.
+  ///
+  /// **Normalisiert, nicht repariert.** [tryFrom] sortiert aufsteigend,
+  /// entfernt Duplikate und liefert eine `List.unmodifiable`. Das sieht nach
+  /// einem Verstoß gegen ADR-007s „verwerfen statt reparieren" aus und ist
+  /// keiner: die freigeschalteten Hinweise sind eine **Menge**, Reihenfolge
+  /// und Mehrfachnennung tragen keine Bedeutung. Normalisieren wählt also nur
+  /// eine kanonische Darstellung desselben Werts, es repariert keinen kaputten.
+  /// Ohne diese Regel wären `[0, 1]` und `[1, 0]` zwei verschiedene Jagden, und
+  /// ein Aufrufer, der die Liste aus der Iterationsreihenfolge eines `Set`
+  /// baut, würde zufällig scheitern.
   ///
   /// Die Obergrenze ist absichtlich nicht geprüft, obwohl sie ableitbar wäre:
   /// `Fact.stationHints` trägt genau drei Einträge (`import_facts.py:225`), und
   /// der erste ist in der Quelle kostenlos und von Anfang an offen
-  /// (`screen-map.jsx:1013-1014`), womit heute höchstens zwei gekauft sein
-  /// können.
-  /// Diese Zwei hängt aber an der Preistabelle `HINT_COSTS` (`:1031`) und damit
-  /// an Schritt 37. Eine Prüfung darauf würde nach einer Preisänderung eine
-  /// **gültige** Nutzlast verwerfen, und das ist der teurere Fehler.
-  final int purchasedHintCount;
+  /// (`screen-map.jsx:1013-1014`), womit heute höchstens zwei Indizes
+  /// freigeschaltet sein können. Diese Zwei hängt aber an der Preistabelle
+  /// `HINT_COSTS` (`:1031`) und damit an Schritt 37. Eine Prüfung darauf würde
+  /// nach einer Preisänderung eine **gültige** Nutzlast verwerfen, und das ist
+  /// der teurere Fehler.
+  ///
+  /// Ein negativer Index wird abgewiesen: er kann in der Quelle nicht
+  /// entstehen und ist damit ein Zeichen für eine kaputte Nutzlast, nicht für
+  /// einen noch unbekannten gültigen Wert.
+  final List<int> unlockedHintIndices;
+
+  /// Schwierigkeitsstufe der Jagd, oder `null`, wenn keine bekannt ist.
+  ///
+  /// Seit ADR-008, Regel 23 darf `challenges/domain` [PuzzleDifficulty] aus dem
+  /// geteilten Kern importieren; D-18 war genau diese Frage, und dieses Feld
+  /// ist ihre Antwort. `screen-map.jsx:1049-1051` staffelt daran die
+  /// Navigationshilfen (leicht: Pfeil und Distanz, mittel: nur Distanz, schwer:
+  /// nichts), `screen-challenge.jsx:2828` zeigt sie im Pause-Bildschirm.
+  ///
+  /// **Nullbar und ohne Ersatzwert.** Ein Rätsel muss keine Stufe haben, siehe
+  /// [PuzzleDifficulty]s eigene Begründung „kein Standardwert". Welcher
+  /// Ersatzwert bei einer fehlenden Stufe gälte, ist eine Belohnungsfrage
+  /// (`puzzles`, `progression`) und keine Frage dieses Lesemodells.
+  final PuzzleDifficulty? difficulty;
 
   /// Die im Assistenten gewählte Dauer.
   final HuntDuration duration;
@@ -179,7 +237,9 @@ final class ActiveHunt {
   /// Hier stehen die Regeln, die für **jede** Herkunft gelten: für die
   /// Projektion aus einem `HuntPlan` genauso wie für eine wiederhergestellte
   /// Nutzlast. Es wird nichts geworfen und nichts zurechtgebogen; der Aufrufer
-  /// entscheidet, ob ein `null` eine Meldung wert ist.
+  /// entscheidet, ob ein `null` eine Meldung wert ist. Die einzige Ausnahme ist
+  /// [unlockedHintIndices]: dort **normalisiert** diese Methode statt bloß zu
+  /// prüfen, aus dem Grund, der am Feld steht.
   ///
   /// **Der einzige Weg zu einem [ActiveHunt]**, siehe den privaten
   /// Konstruktor. Daran hängen zwei Eigenschaften, die ohne diese Enge nicht
@@ -200,7 +260,8 @@ final class ActiveHunt {
     required String stationTitle,
     required double stationLatitude,
     required double stationLongitude,
-    required int purchasedHintCount,
+    required List<int> unlockedHintIndices,
+    required PuzzleDifficulty? difficulty,
     required HuntDuration duration,
   }) {
     // Diese eine Regel trägt zugleich „mindestens eine Station": aus
@@ -214,8 +275,13 @@ final class ActiveHunt {
     if (stationOrdinal < 1 || stationOrdinal > stationCount) {
       return null;
     }
-    if (purchasedHintCount < 0) {
-      return null;
+    // Ein negativer Index kann in der Quelle nicht entstehen, siehe die
+    // Begründung am Feld. Diese Wache läuft **vor** der Normalisierung, sonst
+    // würde ein negativer Index unbemerkt einsortiert statt verworfen.
+    for (final int index in unlockedHintIndices) {
+      if (index < 0) {
+        return null;
+      }
     }
     // `NaN` braucht eine eigene Regel, weil **jeder** Vergleich mit `NaN`
     // falsch ist: `double.nan.abs() > 90` ist `false`, die Bereichsregel
@@ -235,7 +301,10 @@ final class ActiveHunt {
       stationTitle: stationTitle,
       stationLatitude: stationLatitude,
       stationLongitude: stationLongitude,
-      purchasedHintCount: purchasedHintCount,
+      unlockedHintIndices: List<int>.unmodifiable(
+        <int>{...unlockedHintIndices}.toList()..sort(),
+      ),
+      difficulty: difficulty,
       duration: duration,
     );
   }
@@ -276,7 +345,7 @@ final class ActiveHunt {
     final Object? stationTitle = payload['stationTitle'];
     final Object? latitude = payload['lat'];
     final Object? longitude = payload['lng'];
-    final Object? purchasedHints = payload['purchasedHints'];
+    final Object? hintIndices = payload['hintIndices'];
     final Object? durationMinutes = payload['durationMinutes'];
     // Ganzzahlen müssen Ganzzahlen sein, die Lage darf `num` sein: JSON
     // schreibt eine Koordinate ohne Nachkommastelle als `11` und nicht als
@@ -287,8 +356,42 @@ final class ActiveHunt {
         stationTitle is! String ||
         latitude is! num ||
         longitude is! num ||
-        purchasedHints is! int ||
+        hintIndices is! List ||
         durationMinutes is! int) {
+      return null;
+    }
+    // Jedes Element muss ein `int` sein, sonst wird die ganze Nutzlast
+    // verworfen. Eine leere Liste ist gültig: keine freigeschalteten
+    // Hinweise ist ein normaler Zustand, keine kaputte Nutzlast.
+    final List<int> parsedHintIndices = <int>[];
+    for (final Object? element in hintIndices) {
+      if (element is! int) {
+        return null;
+      }
+      parsedHintIndices.add(element);
+    }
+    // Fehlt der Schlüssel oder ist er `null`, ist die Stufe unbekannt und die
+    // Nutzlast bleibt gültig, denn ein Rätsel ohne Stufe ist ein normaler
+    // Zustand (siehe [difficulty]). Ist der Wert weder `null` noch eine
+    // Zeichenkette, ist die Nutzlast kaputt. Ist er eine Zeichenkette, die
+    // [PuzzleDifficulty.fromCode] nicht auflöst, wird die **ganze** Nutzlast
+    // verworfen: dieselbe Entscheidung, die [_durationOfMinutes] weiter unten
+    // für eine unbekannte Dauer schon trifft, und der Präzedenzfall ist das
+    // Argument. Eine Jagd, deren Stufe still von der abweicht, die der Spieler
+    // gesehen hat, ist schlimmer als ein Neustart.
+    final Object? rawDifficulty = payload['difficulty'];
+    final PuzzleDifficulty? difficulty;
+    if (rawDifficulty == null) {
+      difficulty = null;
+    } else if (rawDifficulty is String) {
+      final PuzzleDifficulty? resolved = PuzzleDifficulty.fromCode(
+        rawDifficulty,
+      );
+      if (resolved == null) {
+        return null;
+      }
+      difficulty = resolved;
+    } else {
       return null;
     }
     final HuntDuration? duration = _durationOfMinutes(durationMinutes);
@@ -301,7 +404,8 @@ final class ActiveHunt {
       stationTitle: stationTitle,
       stationLatitude: latitude.toDouble(),
       stationLongitude: longitude.toDouble(),
-      purchasedHintCount: purchasedHints,
+      unlockedHintIndices: parsedHintIndices,
+      difficulty: difficulty,
       duration: duration,
     );
   }
@@ -323,8 +427,12 @@ final class ActiveHunt {
 
   /// Die Nutzlast für den Gerätespeicher.
   ///
-  /// Nur flache Zahlen und Zeichenketten, damit `jsonEncode` in der
-  /// Datenschicht ohne eigenes Wissen über diesen Typ auskommt.
+  /// Nur flache Zahlen, Zeichenketten und eine flache Liste von Zahlen, damit
+  /// `jsonEncode` in der Datenschicht ohne eigenes Wissen über diesen Typ
+  /// auskommt. [difficulty] steht als `code`, nicht als Aufzählungsname, aus
+  /// demselben Grund wie [duration] ihre Minuten speichert statt ihres Namens:
+  /// siehe [_durationOfMinutes]. Ein umbenannter Aufzählungswert soll keine
+  /// gespeicherte Jagd verwerfen.
   ///
   /// **Und `jsonEncode` darauf kann nicht scheitern.** Die einzigen Werte, an
   /// denen es das könnte, sind `NaN` und die beiden Unendlichkeiten, und die
@@ -338,7 +446,8 @@ final class ActiveHunt {
     'stationTitle': stationTitle,
     'lat': stationLatitude,
     'lng': stationLongitude,
-    'purchasedHints': purchasedHintCount,
+    'hintIndices': unlockedHintIndices,
+    'difficulty': difficulty?.code,
     'durationMinutes': duration.minutes,
   };
 
@@ -350,7 +459,8 @@ final class ActiveHunt {
       other.stationTitle == stationTitle &&
       other.stationLatitude == stationLatitude &&
       other.stationLongitude == stationLongitude &&
-      other.purchasedHintCount == purchasedHintCount &&
+      _sameHintIndices(other.unlockedHintIndices, unlockedHintIndices) &&
+      other.difficulty == difficulty &&
       other.duration == duration;
 
   @override
@@ -360,9 +470,28 @@ final class ActiveHunt {
     stationTitle,
     stationLatitude,
     stationLongitude,
-    purchasedHintCount,
+    Object.hashAll(unlockedHintIndices),
+    difficulty,
     duration,
   );
+
+  /// Elementweiser Vergleich zweier Indexlisten für `==`.
+  ///
+  /// Steht hier und nicht in `core`, weil ein neues Paket für diese eine
+  /// Vergleichszeile nicht gerechtfertigt ist: `List` hat aus `dart:core`
+  /// keine Werthgleichheit, und [tryFrom] normalisiert jede Liste ohnehin
+  /// schon vor dem Speichern, sodass ein einfacher Elementvergleich genügt.
+  static bool _sameHintIndices(List<int> a, List<int> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   /// Ohne Lage **und ohne Titel**, aus demselben Grund wie
   /// `FactCoordinates.toString()` und `MapPosition.toString()`:

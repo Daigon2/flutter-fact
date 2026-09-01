@@ -1391,6 +1391,69 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
 
+## Die Jagd-Nutzlast auf Fassung 2, 31.08.2026
+
+Zwei Inhalte, **eine** Formänderung. 2131 → 2144 Tests, alle vier Gates auf
+Exit-Code 0. Das Hinweis-Feld trägt jetzt die Indizes der freigeschalteten
+Hinweise (`unlockedHintIndices`), und die Jagd trägt ihre Schwierigkeitsstufe
+(`difficulty`, nullbar). `payloadVersion` steht auf 2, die Schlüssel heißen
+`hintIndices` und `difficulty`.
+
+**Warum zusammen und nicht nacheinander.** Jede Erhöhung von `payloadVersion`
+verwirft einen gespeicherten Spielstand. Seit der Persistenz von heute Vormittag
+liegen echte Nutzlasten auf echten Geräten, das ist also kein theoretischer Preis
+mehr: nacheinander hätte zwei Spielstände gekostet, zusammen kostet es einen.
+
+### Zwei Entscheidungen, die nach Regelbruch aussehen und keiner sind
+
+**1. `tryFrom` normalisiert die Indexliste, statt eine unsortierte abzuweisen.**
+Sortieren und Duplikate entfernen sieht wie das „Reparieren" aus, das ADR-007
+verbietet. Es ist keins: die freigeschalteten Hinweise sind eine **Menge**,
+Reihenfolge und Mehrfachnennung tragen keine Bedeutung, also wählt das
+Normalisieren nur eine kanonische Darstellung desselben Werts. Ohne die Regel
+wären `[0, 1]` und `[1, 0]` zwei verschiedene Jagden, und ein Aufrufer, der die
+Liste aus der Iterationsreihenfolge eines `Set` baut, würde zufällig scheitern.
+
+**2. Ein unbekannter Stufen-Code verwirft die ganze Nutzlast.** Nicht
+„wiederherstellen ohne Stufe". Der Präzedenzfall steht in derselben Datei:
+`_durationOfMinutes` verwirft bei einer unbekannten Dauer. Eine Jagd, deren Stufe
+still von der abweicht, die der Spieler gesehen hat, ist schlimmer als ein
+Neustart. Eine fehlende oder ausdrücklich leere Stufe bleibt gültig, denn ein
+Rätsel muss keine haben.
+
+Keine Obergrenze für einen Index, aus dem Grund, der schon am alten Feld stand:
+die Zwei aus `HINT_COSTS` hängt an Schritt 37, und eine Prüfung darauf würde nach
+einer Preisänderung eine **gültige** Nutzlast verwerfen.
+
+### Sieben Pflichtmutationen, sieben Fälle
+
+Alle sieben sind gefallen, keine hat überlebt. Sortierung entfernen (3 Tests
+rot), Duplikat-Entfernung entfernen (1), `List.unmodifiable` durch eine normale
+Liste ersetzen (1), Abweisung negativer Indizes entfernen (2), Elementprüfung der
+Liste entfernen (1), unbekannten Stufen-Code still durchlassen (1),
+`payloadVersion` auf 1 zurücksetzen (8).
+
+**Ein Ergebnis ist genauer als „gefallen" und gehört dazu.** Bei der fünften
+Probe fällt der Test nicht über den `null`-Rückgabewert, sondern über einen
+`CastError`: weil die geparste Liste auf `List<int>` typisiert ist, erzwingt das
+Entfernen der Wache eine implizite Umwandlung, und die wirft. Der Test wird rot,
+die Wache ist also nachgewiesen, aber die Fehlerform ist eine andere als bei den
+übrigen sechs. Wer das nicht weiß, hält den Zweig für stärker geprüft, als er
+ist.
+
+### Ein Fund am Rand, und er lag in meinem eigenen Test
+
+`key_value_active_hunt_store_test.dart` baute die kaputte Nutzlast über
+`toPayload().map((k, v) => MapEntry(k, v!))`. Mit einer nullbaren Stufe stirbt
+dieser `!` an `null`. Der erste Reflex war, die Testvorgabe an das Konstrukt
+anzupassen, also der Jagd eine Stufe zu geben, damit der `!` nicht mehr trifft.
+**Der Reflex war falsch, und die Richtung ist die Lehre:** der `!` war von Anfang
+an überflüssig, ich hatte nur das innere Literal auf `<String, Object>` statt
+`<String, Object?>` getippt, und `jsonEncode` nimmt `Object?`. Behoben ist jetzt
+das Konstrukt. Die Stufe bleibt trotzdem gesetzt, aber aus dem richtigen Grund:
+so trägt der Rundlauf durch `jsonEncode` eine echte Stufe, und der Weg über
+`fromCode` wäre sonst in dieser Datei nirgends geprüft.
+
 ## Der geteilte Kern, 31.08.2026
 
 ADR-008, Antwort auf D-18. Nicht einer der 50 Schritte, sondern die Änderung des
@@ -3282,8 +3345,8 @@ eine Fundstelle.
 | E-47 | **Drei Bedienelemente im Challenge-Reiter tun bis Schritt 35 nichts.** Seit Schritt 33 zeigt der Reiter den Assistenten. Wer ihn zu Ende bedient, drückt einen vollflächigen roten Knopf „Starten", sieht die Drück-Animation und danach passiert nichts, weil der Startpunkt-Picker fehlt. Dasselbe gilt für die Kachel „Gruppe" und für „Mit Code beitreten", deren Formulare Sitzungen über Supabase anlegen müssten, die es im Neubau nicht gibt. **Eine Sackgasse ist es nicht**, der Zurück-Knopf und die Tab-Leiste bleiben erreichbar, gemessen im Widget-Test. Aber es ist derselbe Zustand, den E-33 beim Kästchen „Angemeldet bleiben" beanstandet, und der Bau begründet an anderer Stelle ausdrücklich, warum die Zufallskarte **nicht** antippbar ist („ein Tipp, der nichts ändert, ist ein Bedienelement, das nichts tut"). Die Ungleichbehandlung ist bewusst, weil eine erfundene Navigation schlechter wäre als keine, aber sie gehört gewusst. Löst sich mit den Schritten 35 und 40 von selbst auf. | 2 | Schritt 35 |
 | E-48 | **Wohin zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist?** Die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, und ein ruhender Ballon ist selbst nur 26 breit; sie zeigt also nur dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ein festes Rechteck in der unteren Bildmitte. Der Neubau misst statt des Kopfes die Zeichenfläche samt Schattenrand und wählt deshalb ab Zoom 14,6 auch ferne Ballons. **Parität** hieße, den Kopf zu messen; **Abweichung** hieße, es so zu lassen, und der Pfeil fände fast immer einen echten Ballon, was möglicherweise besser aussieht. Zu entscheiden ist auch, ob die Zoomsperre des Ankers auf `factAnimationRunsAt` verschärft wird: das schnitte den Löwenanteil der Plattformkanal-Aufrufe weg und schlösse nebenbei die Gruppierungslücke unter Zoom 15, um den Preis, dass unter Zoom 16 das Ersatzrechteck steht. **Die tragende Kette ist hergeleitet und nicht am Browser gemessen**, siehe „Der `balloon`-Anker". | 2 | vor Auslieferung |
 | E-49 | **Zwei verschiedene Wahrheiten darüber, ob eine Trophäe verdient ist.** Der Profil-Bildschirm liest den Freischaltstand vom Server (`user_trophies`) und färbt danach. Das Reiseregal rechnet ihn **clientseitig neu**: `wltDeriveTrophies` (`screen-wallet.jsx:114-128`) zählt die gesammelten Fakten je Kategorie und setzt `earned` auf `counts[t.cat] >= t.threshold`. Beide können auseinanderlaufen, und beide zeigen dieselben 36 Definitionen. **Zusätzlich ist die Client-Rechnung unvollständig:** nur die Kategorie-Trophäen tragen ein `threshold`; die Stadt-, Rang- und Geheim-Trophäen haben keins, und `>= undefined` ist in JavaScript immer falsch. Im Reiseregal sind sie damit **dauerhaft** unverdient, egal was der Server sagt. Zu entscheiden ist, welche Quelle im Neubau gilt, bevor Schritt 45 gebaut wird; die Trophäenliste aus Schritt 49 nimmt heute den Stand als Parameter entgegen und legt sich nicht fest. Berührt E-16, weil `user_trophies` für jeden lesbar ist. **Am 31.08.2026 entschieden: der Server ist die einzige Wahrheit.** Dazu zwei Aufträge, die nicht auf der Liste standen: die defekte Client-Ableitung wird nicht portiert, und E-16 wird mitgeschlossen. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“. | 3 | vor Schritt 45 |
-| E-50 | **Gekaufte Hinweise gehen beim Neustart verloren, die Schuld dafür nicht.** `unlockedHints` ist Komponentenzustand (`screen-map.jsx:1014`) und wird nie gespeichert; `stop.hintCostSpent` überlebt dagegen (`app.jsx:927-935`), und `:908-909` zieht genau diesen Betrag vom Stopp-Lohn ab (`netPoints = max(0, pointsAwarded - hintCost)`). Nach einem Neustart sieht der Nutzer die Hinweise wieder verschlossen, **zahlt erneut**, und der erste Kauf wird weiterhin abgezogen. Derselbe Commit, der die Wiederherstellung eingeführt hat, hat diese Hälfte vergessen. Das ist ein Defekt der Quelle und **keine Paritätsvorlage**: im Neubau gehört entweder beides gespeichert oder keins. | 3 | vor Schritt 37 |
-| E-51 | **Die gespeicherte Münzsumme kann nicht sagen, welche Hinweise gekauft waren.** `hintCostSpent` ist eine Summe, und `HINT_COSTS = [0, 20, 30]` (`screen-map.jsx:1031`) ist nicht eindeutig umkehrbar: die Summen 20 und 30 bedeuten beide „ein Hinweis“. Die *Anzahl* ist heute zufällig noch ableitbar, die *Identität* nicht, und ab einem vierten Kostenwert wäre auch die Anzahl mehrdeutig. Wer nach einem Neustart dieselben Hinweise offen zeigen will, braucht die Indizes und nicht die Summe. Hängt an E-50, ist aber der allgemeinere Fund. | 2 | vor Schritt 37 |
+| E-50 | **Gekaufte Hinweise gehen beim Neustart verloren, die Schuld dafür nicht.** `unlockedHints` ist Komponentenzustand (`screen-map.jsx:1014`) und wird nie gespeichert; `stop.hintCostSpent` überlebt dagegen (`app.jsx:927-935`), und `:908-909` zieht genau diesen Betrag vom Stopp-Lohn ab (`netPoints = max(0, pointsAwarded - hintCost)`). Nach einem Neustart sieht der Nutzer die Hinweise wieder verschlossen, **zahlt erneut**, und der erste Kauf wird weiterhin abgezogen. Derselbe Commit, der die Wiederherstellung eingeführt hat, hat diese Hälfte vergessen. Das ist ein Defekt der Quelle und **keine Paritätsvorlage**: im Neubau gehört entweder beides gespeichert oder keins. **Im Neubau am 31.08.2026 gelöst, und zwar in die Richtung, die der Eigentümer entschieden hat:** `ActiveHunt` speichert die **Indizes** der freigeschalteten Hinweise, `payloadVersion` steht auf 2. Damit überleben die Hinweise selbst den Neustart, nicht nur die Schuld dafür. Der Defekt der Quelle bleibt im anderen Repository und ist **keine** Paritätsvorlage. | 3 | vor Schritt 37 |
+| E-51 | **Die gespeicherte Münzsumme kann nicht sagen, welche Hinweise gekauft waren.** `hintCostSpent` ist eine Summe, und `HINT_COSTS = [0, 20, 30]` (`screen-map.jsx:1031`) ist nicht eindeutig umkehrbar: die Summen 20 und 30 bedeuten beide „ein Hinweis“. Die *Anzahl* ist heute zufällig noch ableitbar, die *Identität* nicht, und ab einem vierten Kostenwert wäre auch die Anzahl mehrdeutig. Wer nach einem Neustart dieselben Hinweise offen zeigen will, braucht die Indizes und nicht die Summe. Hängt an E-50, ist aber der allgemeinere Fund. **Im Neubau am 31.08.2026 gegenstandslos:** gespeichert werden die Indizes und nicht die Summe. Anzahl und ausgegebene Münzen folgen daraus, umgekehrt nicht, und ein vierter Kostenwert ändert daran nichts mehr. | 2 | vor Schritt 37 |
 | E-52 | **Nicht nur `increment_coins`: drei Funktionen nehmen die Nutzerkennung als Parameter, und alle sind ohne Anmeldung erreichbar.** `unlock_trophy(p_user_id, p_trophy_key)` und `collect_fact_validated(p_user_id, …)` prüfen `auth.uid()` genauso wenig wie `increment_coins`. Dazu stehen im gesamten Backend **fünf** `GRANT`/`REVOKE`-Zeilen, alle fünf für `ai_consume` und `ai_refund`; für jede andere Funktion gilt der PostgreSQL-Standard `EXECUTE` an `PUBLIC`, und `PUBLIC` schließt `anon` ein. `get_leaderboard` gibt die Kennungen mit aus und ist ebenfalls offen. Die Kette lautet: ohne Konto Kennungen abholen, ohne Konto darauf schreiben. Schärft E-06 und ändert nicht die Migration, sondern die Aufgabenstellung. Beleg: `docs/operations/backend-inventory.md`. | **4** | mit E-06 |
 | E-53 | **Nutzer-Fakten können sich selbst freigeben.** Die INSERT-Policy auf `facts` prüft `created_by` und `is_user_created`, aber **nicht** `is_approved`. Dass `api.jsx:167` `false` setzt, ist Höflichkeit des Clients und keine Regel des Servers. Wer die Anfrage selbst formuliert, veröffentlicht unmoderierten Text für alle Nutzer, in einer App, deren Inhalt das Produkt ist; der Trigger `on_user_fact_created` legt die Autoren-Trophäen gleich mit an. | **4** | vor Schritt 44 |
 | E-54 | **Coins sind über Gruppensitzungen unbegrenzt farmbar.** `collect_group_fact` bucht 50 Coins, die Sperre gegen Doppelvergabe ist der UNIQUE-Index auf `(session_id, fact_id)`, also **pro Sitzung**. Sitzungen legt der Client an und bestimmt dabei `p_fact_ids`, im Team-Modus zusätzlich den Treffpunkt, an dem `tag_endpoint` weitere 100 gibt. An einem Fakt stehen und die Schleife wiederholen ergibt rund 150 Coins je Durchlauf, ohne einen Schritt zu gehen. `collected_facts` bleibt sauber (`on conflict do nothing`), betroffen ist nur die Währung. Folge für die Ökonomie: solange Betrag und Anlass im Client bestimmbar sind, darf für Coins nichts zu haben sein, was Geld wert ist. | **4** | Phase 5 |

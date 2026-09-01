@@ -166,11 +166,27 @@ This is the third shape this one field has had in a day. The sequence is kept
 visible on purpose: a count (implemented), a cost (decided, never implemented),
 the indices (decided). Only the last one is to be built.
 
-**Not yet implemented.** The field in `active_hunt.dart` is still
-`purchasedHintCount` and still holds a count. The change touches a payload key,
-which is what `payloadVersion` exists for. Until it lands, ADR and code disagree
-on this single field, and that disagreement is named here rather than left for a
-reader to discover.
+**Implemented on 2026-08-31**, together with the difficulty from D-18 and in
+the same `payloadVersion` step, which is now 2. The field is
+`unlockedHintIndices`, a sorted, deduplicated, unmodifiable `List<int>`; the
+count and the spent cost are derived and have no storage.
+
+Two decisions were made while building it, and both are the kind that look like
+a rule violation until the reason is stated:
+
+- **`tryFrom` normalizes the list instead of rejecting a non-canonical one.**
+  Sorting and removing duplicates looks like the "repair" this ADR forbids, and
+  it is not: the unlocked hints are a **set**, so order and multiplicity carry no
+  meaning, and normalizing chooses a canonical representation of the same value
+  rather than fixing a broken one. Without it, `[0, 1]` and `[1, 0]` would be two
+  different hunts, and a caller building the list from a `Set` iteration order
+  would fail at random.
+- **An unknown difficulty code discards the whole payload.** Not "restore with no
+  difficulty". The precedent is `_durationOfMinutes` in the same file, which
+  discards on an unknown duration, and the argument is the same: a hunt whose
+  difficulty silently differs from the one the player saw is worse than a
+  restart. A missing or explicitly null difficulty stays valid, because a puzzle
+  need not have one.
 
 **What this does not decide.** *Which* hints are unlocked is separate state, and
 the read model does not carry it yet. The source cannot serve as a template
@@ -179,14 +195,22 @@ here, because it loses that state on every restart while keeping the debt for it
 route and the chosen puzzle, and `payloadVersion` exists for exactly that
 extension. The **contract** does not change when it happens.
 
-### Still open, and blocking full restoration
+### 2026-08-31: no longer open, and the answer changed the gate rather than the hunt
 
-The difficulty of a hunt has no way across the domain boundary:
-`FactPuzzleDifficulty` belongs to `facts`, and gate 6 locks it out of
-`challenges/domain`. Until that is decided, a restored hunt cannot know its own
-difficulty. Recorded as D-18 in `REBUILD_STATUS.md`, with the three candidate
-ways and why none of them is cheap. This ADR does not decide it: it is the same
-family as D-9 and touches the gate, not the hunt.
+This section read *"still open, and blocking full restoration"*: the difficulty
+of a hunt had no way across the domain boundary, because `FactPuzzleDifficulty`
+belonged to `facts` and gate 6 locked it out of `challenges/domain`. Three
+candidate ways were put to the architect, all of them workarounds.
+
+**None was chosen.** ADR-008 introduces a shared kernel instead, and
+`PuzzleDifficulty` lives there. `challenges/domain` imports it under rule 23,
+`FactPuzzleDifficulty` no longer exists, and the two verbatim copies in
+`puzzles/domain` are deleted along with the translation functions that carried
+them.
+
+The sentence this ADR wrote at the time still holds and is worth keeping: the
+question touched *the gate, not the hunt*. That turned out to be the reason the
+answer was a change to the gate.
 
 ### 2026-08-31: the mechanism is decided, approved and built
 

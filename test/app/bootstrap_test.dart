@@ -312,7 +312,8 @@ void main() {
         stationTitle: 'Station 3',
         stationLatitude: 48.1467,
         stationLongitude: 11.5661,
-        purchasedHintCount: 0,
+        unlockedHintIndices: const <int>[],
+        difficulty: null,
         duration: HuntDuration.sixty,
       )!;
       final container = ProviderContainer(

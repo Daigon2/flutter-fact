@@ -5,6 +5,7 @@ import 'package:fact_app/core/preferences/key_value_store.dart';
 import 'package:fact_app/features/challenges/data/key_value_active_hunt_store.dart';
 import 'package:fact_app/features/challenges/domain/entities/active_hunt.dart';
 import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Senke, die mitschreibt.
@@ -31,7 +32,12 @@ void main() {
     stationTitle: 'Station $stationOrdinal',
     stationLatitude: 48.1467,
     stationLongitude: 11.5661,
-    purchasedHintCount: 0,
+    unlockedHintIndices: const <int>[],
+    // Gesetzt und nicht `null`, damit der Rundlauf durch `jsonEncode` und
+    // `jsonDecode` eine **echte** Stufe trägt. Mit `null` wäre der Schlüssel im
+    // JSON zwar da, aber leer, und der Weg über `PuzzleDifficulty.fromCode`
+    // beim Wiederherstellen bliebe in jedem Test dieser Datei ungeprüft.
+    difficulty: PuzzleDifficulty.mittel,
     duration: HuntDuration.sixty,
   )!;
 
@@ -166,15 +172,14 @@ void main() {
   });
 
   test('eine Nutzlast der falschen Fassung wird verworfen', () {
-    // Der Fall, für den `payloadVersion` überhaupt da ist. Er kommt beim
-    // nächsten Schritt: das Hinweis-Feld wird von einer Anzahl auf Indizes
-    // umgestellt, und dann trifft genau dieser Zweig jede Jagd, die vorher
-    // gespeichert wurde.
+    // Der Fall, für den `payloadVersion` überhaupt da ist, und er ist am
+    // 31.08.2026 eingetreten: das Hinweis-Feld ist von einer Anzahl auf Indizes
+    // umgestellt worden, die Schwierigkeitsstufe kam dazu, und die Fassung
+    // steht seither auf 2. Jede Jagd, die vorher gespeichert wurde, läuft
+    // genau durch diesen Zweig.
     final KeyValueStore preferences = InMemoryKeyValueStore(<String, Object>{
-      KeyValueActiveHuntStore.storageKey: jsonEncode(<String, Object>{
-        ...huntAt(3).toPayload().map(
-          (String key, Object? value) => MapEntry<String, Object>(key, value!),
-        ),
+      KeyValueActiveHuntStore.storageKey: jsonEncode(<String, Object?>{
+        ...huntAt(3).toPayload(),
         'v': ActiveHunt.payloadVersion + 1,
       }),
     });

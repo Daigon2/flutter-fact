@@ -37,7 +37,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2131 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2144 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -143,13 +143,12 @@ ist die Reihenfolge danach.
       Kopien in `puzzles/domain` sind gelöscht, `lib/` ist netto 67 Zeilen
       kleiner, und Regel 23 setzt beide Richtungen maschinell durch. **D-18 ist
       damit freigemacht, aber noch nicht gebaut**, siehe (b).
-   b. **Jetzt dran: das Hinweis-Feld auf Indizes umstellen, zusammen mit der
-      Schwierigkeitsstufe aus D-18, in EINEM Zug.** Der Grund steht in ADR-008
-      und ist der einzige, der die Reihenfolge bindet: beide Änderungen erhöhen
-      `ActiveHunt.payloadVersion`, und **zwei Erhöhungen hintereinander verwerfen
-      einen gespeicherten Spielstand zweimal.** Seit der Persistenz von heute
-      liegen echte Nutzlasten auf echten Geräten, das ist kein theoretischer
-      Preis mehr. Durch (a) ist es teurer und wichtiger
+   b. ~~**Das Hinweis-Feld auf Indizes umstellen**~~ **fertig am 31.08.2026,
+      zusammen mit der Schwierigkeitsstufe aus D-18 in einem Zug.**
+      `payloadVersion` steht auf 2, die Felder heißen `unlockedHintIndices` und
+      `difficulty`. Sieben Pflichtmutationen, sieben Fälle. **Damit sind E-50 und
+      E-51 im Neubau gelöst**, und D-18 ist nicht mehr nur freigemacht, sondern
+      gebaut. Durch (a) ist es teurer und wichtiger
       geworden: ab jetzt liegen echte Nutzlasten auf echten Geräten, und eine
       Formänderung trifft sie. Der Zweig, der sie verwirft, ist geprüft
       (`key_value_active_hunt_store_test.dart`, „eine Nutzlast der falschen
@@ -265,6 +264,27 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Nutzlast-Fassung 2, und ein falscher Reflex in meinem eigenen Test
+
+Die laufende Jagd trägt jetzt die Indizes ihrer freigeschalteten Hinweise **und**
+ihre Schwierigkeitsstufe, in einer Formänderung statt zwei. 2131 → 2144 Tests,
+sieben Pflichtmutationen, sieben Fälle. Damit sind E-50 und E-51 im Neubau
+gelöst und D-18 ist gebaut, nicht nur freigemacht.
+
+**Überraschend war, wohin der erste Reflex zeigte, und er war meiner.** Mein
+Speicher-Test baute die kaputte Nutzlast mit einem `!` über jeden Wert, und mit
+einer nullbaren Stufe stirbt das. Der naheliegende Griff ist, die Testvorgabe zu
+ändern, damit der `!` nicht mehr trifft. Genau das ist die falsche Richtung: der
+`!` war von Anfang an überflüssig, ich hatte nur ein Literal zu eng getippt.
+**Wenn eine neue Vorgabe an einem Testkonstrukt scheitert, ist erst das Konstrukt
+verdächtig und dann die Vorgabe.**
+
+**Und ein Mutationsergebnis war genauer als „gefallen".** Das Entfernen der
+Elementprüfung in der Nutzlast lässt den Test nicht über den Rückgabewert
+scheitern, sondern über einen `CastError` aus einer erzwungenen Umwandlung. Rot
+ist rot, aber die Fehlerform ist eine andere, und wer das nicht weiß, hält den
+Zweig für stärker geprüft als er ist.
 
 ### 31.08.2026, Der geteilte Kern, und ein Kommentar, der seine eigene Fälligkeit kannte
 

@@ -18,7 +18,8 @@ void main() {
     stationTitle: 'Station $stationOrdinal',
     stationLatitude: 48.1467,
     stationLongitude: 11.5661,
-    purchasedHintCount: 0,
+    unlockedHintIndices: const <int>[],
+    difficulty: null,
     duration: HuntDuration.sixty,
   )!;
 
