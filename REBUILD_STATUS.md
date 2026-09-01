@@ -1533,6 +1533,27 @@ Festgehalten als **E-60**. Der Neubau kann beide Lesarten, der Unterschied ist
 ein Index, und die Struktur wird so gebaut, dass die Entscheidung eine Zeile
 kostet und keine Umstellung.
 
+### Eine Verschärfung, gefunden beim Prüfen des Faktvertrags
+
+`Fact.stationHints` ist in unserem eigenen Vertrag als „`next_hints`, gestufte
+Hinweise auf den **Ort dieses Fakts**" dokumentiert. Die Spalte beschreibt also
+den Ort des Fakts, an dem sie hängt. Der Generator liest sie vom Fakt der
+**nächsten** Station und legt sie an der aktuellen ab. Damit ist die Kette
+lückenlos: die Hinweise an Station `i` beschreiben nachweislich den Ort von
+Station `i+1`, und das ist keine Auslegung mehr, sondern zwei zusammenpassende
+Belege.
+
+**Und die Stufe `schwer` macht daraus möglicherweise mehr als einen Schönheitsfehler.**
+Dort schaltet die Quelle Pfeil **und** Distanz ab, der Kommentar sagt „nichts;
+reines Rätsel, Hints geben nur Text". Wer auf `schwer` spielt, hat zum Finden der
+Station also nur den Stationstitel und die Hinweise, und die Hinweise
+beschreiben einen anderen Ort.
+
+Ob das die Jagd auf `schwer` unspielbar macht, hängt daran, ob der Titel allein
+genügt („Dom St. Stephan" findet man auch ohne Hinweis, ein „Brunnen im
+Hinterhof" nicht). Das ist eine Produktfrage und keine technische, und sie
+gehört mit E-60 zusammen entschieden.
+
 ### Was daran nicht offen ist
 
 Dass die **letzte** Station keine Hinweise hat, ist keine der beiden Lesarten,
