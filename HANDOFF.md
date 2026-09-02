@@ -26,14 +26,33 @@ sondern im Quelltext ausgeliefert: `index.html:180` lädt sie als
 `<script type="text/babel" src="audio-player.jsx?v=5">`. Wer die Seite offen
 hatte, konnte den Schlüssel lesen.
 
-Genau eine Fundstelle, geprüft: nicht im Backend, nicht im eingefrorenen
-Flutter-Port. **Der Schlüssel steht bewusst nirgends in diesem Repository**,
-auch nicht in `REBUILD_STATUS.md`; dieses Repository ist öffentlich.
+**Vier Fundstellen, und die erste Zählung hier war falsch.** Sie stand kurz
+als „genau eine", weil meine Suche auf `02_Frontend` begrenzt war und gebaute
+Artefakte übersprungen hat. Tatsächlich:
 
-**Die Behebung ist kein Code und liegt beim Eigentümer:** den Schlüssel bei
-OpenAI zurückziehen und neu ausstellen. Ihn nur aus der Datei zu löschen
-genügt nicht, er steht in der Versionsgeschichte des anderen Repositories und
-war ausgeliefert. Steht als E-70, Stufe 4.
+1. `02_Frontend/app/audio-player.jsx:12`, die Quelle.
+2. `02_Frontend/dist/assets/index-4JDjuKco.js`, das **gebaute Web-Bündel**.
+3. `02_Frontend/android/app/src/main/assets/public/assets/index-4JDjuKco.js`,
+   dasselbe Bündel **in den Android-Assets**. Wenn dieses Paket je verteilt
+   wurde, ist der Schlüssel mitgegangen.
+4. `06_Planung/plans/2026-05-14-openai-tts.md:275`, das Planungsdokument.
+
+Nicht im Backend und nicht im eingefrorenen Flutter-Port. **Der Schlüssel
+steht bewusst nirgends in diesem Repository**, auch nicht in
+`REBUILD_STATUS.md`; dieses Repository ist öffentlich.
+
+**Es war eine bewusste Entscheidung, nicht ein Versehen.** Punkt 4 sagt es im
+Wortlaut: der Schlüssel werde im Quelltext sichtbar sein, das sei „acceptable
+for a personal project at this scale", und man solle rotieren, falls
+unerwartete Kosten auftauchen. Das war am 14.05.2026. Seither gibt es einen
+DACH-Rollout-Plan und den Weg in die App Stores, und „personal project at this
+scale" trifft es nicht mehr. **Ob die Abwägung heute noch gilt, ist eine
+Entscheidung des Eigentümers und wurde von hier aus nicht getroffen.**
+
+**Die Behebung ist kein Code:** den Schlüssel bei OpenAI zurückziehen und neu
+ausstellen. Ihn nur aus den Dateien zu löschen genügt nicht, er steht in der
+Versionsgeschichte des anderen Repositories und war ausgeliefert. Steht als
+E-70, Stufe 4.
 
 Für den Neubau ändert das nichts, es bestätigt die Entscheidung: E-15 heißt
 „Gerät zuerst", und die Cloud-Variante läuft laut derselben Entscheidung über
