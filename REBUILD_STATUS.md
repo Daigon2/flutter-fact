@@ -3637,6 +3637,159 @@ Teile von `lib/core/` gemeint sind. Das Skript kann nichts prüfen, was nicht
 dasteht.
 
 
+## Janeks Antworten auf den dritten Block, 02.09.2026
+
+Vier Fragen, vier Antworten, und drei davon ziehen Arbeit nach sich, die vorher
+nicht auf der Liste stand. Der Wortlaut der Fragen steht im Abschnitt darüber.
+
+### J-A: die Überschrift, und eine Entscheidung über mich
+
+> „Ja das passt, mach die Überschriften so. Sowas kannst du ehrlicherweise auch
+> einfach selbst entscheiden, das klingt immer plausibel, was du bei sowas sagst
+> und wenn es nicht passt mache ich es später rückgängig.“
+
+Der Wortlaut ist damit **„Session-Code eingeben"** und **„Enter session code"**.
+
+**Der zweite Satz wiegt mehr als der erste.** Kurze Oberflächentexte, wo die
+Quelle keinen Wortlaut hat, entscheide ich ab jetzt selbst, schreibe die
+Entscheidung hin und melde sie in einem Satz. Nicht mehr fragen. Zu Janek gehen
+weiter: was ein Nutzer sehen **darf**, wie sich das Spiel **verhält**, und alles,
+was mehrere Bildschirme oder die Datenstruktur berührt.
+
+**Der Schlüssel kommt trotzdem noch nicht in die Ergänzung**, und das ist keine
+Trägheit. `group.join.title` ist eine Lücke der **PWA**, und genau die verfolgt
+`_knownMissingSourceKeys` in `tool/generate_i18n.dart`. Trüge unsere Ergänzung
+den Schlüssel, würde die Quellprüfung über diese PWA-Lücke schweigen, ohne dass
+unsere App den Text irgendwo zeigt: der Beitritts-Dialog ist Schritt 40. Der
+Wortlaut steht deshalb hier, und der Schlüssel entsteht mit dem Bildschirm.
+Dasselbe Muster wie bei E-28, nur zeitlich getrennt.
+
+### J-B: Sichtbarkeit, und der echte Name fällt ganz weg
+
+> „jemand der nicht angemeldet ist natürlich nichts, sonst nur Rang und
+> Punktestand und Anzahl an Städten, vielleiht noch ein Toggle im Proifil mit
+> Städtenamen teilen? oder ist das zu viel gedacht? aber stalking ist schon ein
+> punkt... [...] ich würde fast sagen es gibt immer nur ein Username und sonst
+> nichts. Keinen echten namen etc. in Games ist das ja auch immer so.“
+
+**Entschieden ist damit:** ohne Anmeldung **nichts**. Mit Anmeldung **Rang,
+Punktestand und Anzahl der Städte**, keine Städtenamen. Und es gibt **nur einen
+Username**, keinen echten Namen.
+
+**Zum Toggle, weil ausdrücklich gefragt: nicht bauen.** Rang, Punktestand und
+Städte**zahl** sind eine Rangliste. Städte**namen** sind ein Bewegungsprofil,
+und genau darin liegt das Stalking-Risiko, das die Frage selbst benennt. Ein
+Schalter macht das Riskante zur Entscheidung des Nutzers, und zwar mit einem
+Standardwert, der für die Mehrheit falsch sein wird, egal wie er gesetzt ist.
+Wenn es später einen Grund gibt, Städte zu teilen, hat der einen Empfänger
+(etwa Freunde) und ist dann ein eigener Schnitt mit eigener Sichtbarkeit. Ein
+Schalter ohne Empfänger ist eine Veröffentlichung mit Zusatzschritt.
+
+**Der Neubau macht die Username-Regel bereits, nachgeprüft am 02.09.2026.**
+`signup_page.dart` sammelt Username, E-Mail, Passwort und Heimatstadt, kein
+Namensfeld. `signup_notifier.dart:174` füllt das Feld `name` mit dem
+**Username**, mit dem Kommentar, dass der Rückfalltext der Quelle dort toter
+Code ist. Die Entscheidung bestätigt also den Bestand, statt Arbeit zu
+erzeugen. Sie steht hier trotzdem, damit niemand später ein Namensfeld
+*ergänzt*, weil `profiles.name` existiert.
+
+**Was sie im Backend ändert, ist mehr:**
+
+* `get_leaderboard` gibt heute Nutzerkennungen **ohne Konto** heraus. Nach
+  dieser Antwort verlangt sie eine Sitzung und liefert Rang, Punktestand und
+  Städtezahl, sonst nichts.
+* Die beiden `USING (true)`-Leserechte auf `user_city_scores` und
+  `user_trophies` fallen. **E-16 ist damit beantwortbar**, es fehlte genau diese
+  Aussage.
+* **Der Schalter „Echten Namen zeigen" verschwindet als Begriff.** Damit
+  entfällt auch der Grund, `profiles.name` von `profiles.username` zu
+  unterscheiden, und der Befund um das clientbeschreibbare
+  `raw_user_meta_data` verliert seine Spitze: wer dort schreibt, faelscht seinen
+  eigenen Anzeigenamen, und der ist ohnehin der Username.
+* **Die Anmeldeseite gehört nochmal angesehen**, sagt Janek selbst. Das ist ein
+  eigener Punkt und keine Folge dieser Antwort.
+
+### J-C: Ein Fakt gibt zweimal Coins, aus zwei verschiedenen Gründen
+
+> „Jeder Fakt gibt nur einmal Coins. Aber: wenn man den Fakt in einer
+> Schnitzeljagd findet bekommt man trotzdem nochmal die Coins, weil damit ja die
+> Suche belohnt wird. nur in diesem Fall darf man zwei mal belohnt werden. [...]
+> Startet man etwas neues und findet den Fakt erneut bekommt man dafür nicht
+> nochmal punkte. belohnt wird das finden, man hat es schon einmal gefunden in
+> einer Jagd, dann wird man dafür natürlich nicht nochmal belohnt.“
+
+**Die Regel, ausformuliert:** je Nutzer und Fakt gibt es **zwei** mögliche
+Belohnungsanlässe, und **jeder genau einmal, für immer**:
+
+1. **Entdecken.** Den Fakt normal einsammeln.
+2. **Finden.** Denselben Fakt in einer Schnitzeljagd oder Gruppensitzung finden.
+
+Zweimal belohnt werden ist also erlaubt, aber nur einmal je Anlass. Eine neue
+Jagd mit demselben Fakt gibt **nichts** mehr. In Gruppen bekommt **jeder**
+Teilnehmer den Finde-Anlass, unabhängig davon, ob er den Fakt vorher schon
+entdeckt hatte, und auch dort nur einmal je Nutzer und Fakt.
+
+**Das ist mit dem heutigen Backend nicht ausdrückbar, und zwar prinzipiell.**
+Die Sperre wirkt über einen Index auf `group_collects`, also **pro Sitzung**,
+und `group_collects` hat keine Spalte für den Nutzer. Ein Index kann
+„einmal für immer je Nutzer, Fakt und Anlass" nicht ausdrücken, wenn zwei der
+drei Dimensionen in der Tabelle fehlen.
+
+**Damit ist entschieden, was Abschnitt 9 der Fix-Datei als „nächster Schritt"
+vorgeschlagen hatte:** es braucht ein Buchungsjournal,
+`coin_ledger(user_id, fact_id, reason, delta, created_at)` mit einem
+`UNIQUE (user_id, fact_id, reason)`. Dann ist die Regel **die Tabelle selbst**
+und keine Prüfung, die jemand vergessen kann. Nebenwirkung, die ohnehin
+gefordert war: Coins bekommen eine Historie, und nach einem Missbrauch ist
+zurückrechenbar, was passiert ist.
+
+**Eine neue Tabelle ist eine Stufe-3-Entscheidung** und geht an Dairen, siehe
+den vierten Fragenblock. Was hier entschieden ist, ist die **Regel**; der Ort,
+an dem sie erzwungen wird, ist die Architekturfrage.
+
+### J-D: Die Teams laufen dieselben Stationen gegeneinander, mit gleichem Ziel
+
+> „Es trennen sie der Wettlauf gegen einander. Entsprechend der Wettlauf gegen
+> die Zeit. man hat die selben Stationen aber man zeiht nicht gemeinsam los
+> sondern in unterschiedliche Richtungen. Der letzte Fakt ist aber gleich bei
+> beiden. Wer dort zuerst ankommt hat gewonnen. Aber NUR wenn man dabei auch
+> mehr oder gleich viele Coins gesammelt hat. jemand der nur skippt bis zum
+> finalen hinweis und durch rennt, soll nicht belohnt werden.“
+
+**Zwei Befunde daraus, und der zweite ist neu.**
+
+**Erstens: der Ausgleich ist nicht nur tot, er ist überflüssig.** E-57 hat
+gemessen, dass `_team_generate_orders` die Wegstrecken über `any(v_a)` und
+`any(v_b)` summiert, also über zwei Permutationen **derselben Menge**; das
+Ergebnis ist immer gleich, `v_balance` ist immer 0, und die Schleife bricht in
+der ersten Runde ab. Bisher stand das als Fehler da. Mit dieser Antwort ist es
+**kein Fehler mehr, sondern gegenstandslos**: gleiche Stationen für beide Teams
+sind ausdrücklich gewollt, gleich lange Wege folgen daraus, und entschieden wird
+über Zeit und Coins. Der Ausgleich prüft eine Eigenschaft, die der Entwurf
+garantiert. Er kann weg.
+
+**Zweitens, und das ist der neue Befund: „der letzte Fakt ist bei beiden gleich"
+gibt es im Code nicht.** Nachgesehen am 02.09.2026: `v_a` ist nach Entfernung
+zum Treffpunkt sortiert, und `v_b` ist im ersten Zweig
+`array_agg(id order by ord desc)`, also die **Umkehrung** von `v_a`. Damit ist
+die letzte Station von B die **erste** von A. Der zweite Zweig sortiert noch
+anders. Beide Fassungen verletzen die Regel.
+
+Die Regel braucht also: eine Station wird als **Finale** festgelegt und ist für
+beide Teams die letzte; nur die Stationen davor laufen in umgekehrter
+Reihenfolge. Das ist eine kleine Änderung an der Funktion und eine echte
+Anforderung, die vorher nirgends stand.
+
+**Und eine Frage bleibt offen, klein aber entscheidend für die Auswertung.**
+„Mehr oder gleich viele Coins" ist ein Vergleich, aber es steht nicht dabei,
+**gegen wen und wann**. Die naheliegende Lesart: im Moment, in dem das erste
+Team das Finale erreicht, wird sein Coin-Stand mit dem des anderen Teams
+verglichen; liegt er darunter, zählt der Sieg nicht. Offen bleibt, was **dann**
+gilt, denn das andere Team ist noch nicht angekommen. Gewinnt es, sobald es das
+Finale erreicht? Gewinnt es sofort über die Coins? Oder gibt es keinen Sieger?
+Das gehört in den vierten Fragenblock.
+
+
 ## Der zweite Fragenblock an Dairen, 31.08.2026, mit Antworten
 
 **Der Wortlaut steht hier, und zwar aus demselben Grund wie beim ersten Block.**
@@ -4430,7 +4583,7 @@ eine Fundstelle.
 | E-13 | **AI-Zugang.** Anthropic-Schlüssel niemals im Client, `ai_proxy` und Edge Function nutzen, Quota serverseitig. | **4** | Phase 7 |
 | E-14 | **OpenRouteService** für Fußweg-Routen: Konto, Kosten, Rate Limits, Fallback. | **4** | Phase 6 |
 | E-15 | **TTS-Weg.** Gerät (`flutter_tts`) oder Cloud. Cloud heißt laufende Kosten. | 4 bei Cloud, sonst 3 | Phase 3 |
-| E-16 | **Leaderboard-Sichtbarkeit.** `user_city_scores` und `user_trophies` haben `USING (true)` für SELECT. Alle Punktestände und Trophäen sind für jeden lesbar. Zusammenspiel mit dem Schalter „Echten Namen zeigen". **Am 31.08.2026 zur Schliessung beauftragt**, gemeinsam mit E-49. Haengt an E-55: dieselben zwei Tabellen sind nicht nur lesbar, sondern vom Client schreibbar, und eine Antwort nur zur Leseseite lässt die teurere Hälfte stehen. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“. | **4** | Phase 7 |
+| E-16 | **Leaderboard-Sichtbarkeit.** `user_city_scores` und `user_trophies` haben `USING (true)` für SELECT. Alle Punktestände und Trophäen sind für jeden lesbar. Zusammenspiel mit dem Schalter „Echten Namen zeigen". **Am 31.08.2026 zur Schliessung beauftragt**, gemeinsam mit E-49. Haengt an E-55: dieselben zwei Tabellen sind nicht nur lesbar, sondern vom Client schreibbar, und eine Antwort nur zur Leseseite lässt die teurere Hälfte stehen. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“.  **Am 02.09.2026 beantwortet, damit ist die Leseseite entschieden.** Janek: ohne Anmeldung sieht niemand etwas; mit Anmeldung Rang, Punktestand und **Anzahl** der Städte, keine Städtenamen. Ein Schalter zum Teilen von Städtenamen ist erwogen und **nicht** gebaut: Städtenamen sind ein Bewegungsprofil, und ein Schalter macht das Riskante zur Entscheidung des Nutzers mit einem Standardwert, der für die Mehrheit falsch ist. Dazu die weiter reichende Entscheidung: **es gibt nur einen Username, keinen echten Namen.** Damit verschwindet der Schalter „Echten Namen zeigen“ als Begriff und mit ihm der Grund, `profiles.name` von `profiles.username` zu unterscheiden. Der Neubau macht die Username-Regel schon, nachgeprüft: kein Namensfeld in der Registrierung, `signup_notifier.dart:174` füllt `name` mit dem Username. Umzusetzen bleibt im Backend: `get_leaderboard` verlangt eine Sitzung, die zwei `USING (true)`-Leserechte fallen. Wortlaut im Abschnitt „Janeks Antworten auf den dritten Block“. | **4** | Phase 7 |
 | E-17 | **Creator-Foto.** Storage-Bucket, Policy, Moderation vor `is_approved`. | 3, Bucket-Anlage 4 | Phase 8 |
 | E-19 | **Trusted Time.** Der 45-Minuten-Timer für das Session-Ende und die Finale-Punkte ×1.5 rechnen clientseitig. `security.md` §1 verbietet vertrauenswürdige Zeitstempel aus dem Client. **Am 31.08.2026 entschieden: der Server rechnet, keine Ausnahme von `security.md`.** Regel für den Neubau: der Client rechnet keine Zeit, an der eine Belohnung hängt. Die Umsetzung ist eine Backend-Änderung, damit ist das Sitzungsende in Phase 5 bis dahin nicht parität-treu baubar. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“. | 3 | Phase 5 |
 | E-20 | **Kamera-Permission** für Damals/Heute und Foto-Rätsel, mit Zweckbindung. | 3 | Phase 3 |
@@ -4452,16 +4605,16 @@ eine Fundstelle.
 | E-51 | **Die gespeicherte Münzsumme kann nicht sagen, welche Hinweise gekauft waren.** `hintCostSpent` ist eine Summe, und `HINT_COSTS = [0, 20, 30]` (`screen-map.jsx:1031`) ist nicht eindeutig umkehrbar: die Summen 20 und 30 bedeuten beide „ein Hinweis“. Die *Anzahl* ist heute zufällig noch ableitbar, die *Identität* nicht, und ab einem vierten Kostenwert wäre auch die Anzahl mehrdeutig. Wer nach einem Neustart dieselben Hinweise offen zeigen will, braucht die Indizes und nicht die Summe. Hängt an E-50, ist aber der allgemeinere Fund. **Im Neubau am 31.08.2026 gegenstandslos:** gespeichert werden die Indizes und nicht die Summe. Anzahl und ausgegebene Münzen folgen daraus, umgekehrt nicht, und ein vierter Kostenwert ändert daran nichts mehr. | 2 | vor Schritt 37 |
 | E-52 | **Nicht nur `increment_coins`: drei Funktionen nehmen die Nutzerkennung als Parameter, und alle sind ohne Anmeldung erreichbar.** `unlock_trophy(p_user_id, p_trophy_key)` und `collect_fact_validated(p_user_id, …)` prüfen `auth.uid()` genauso wenig wie `increment_coins`. Dazu stehen im gesamten Backend **fünf** `GRANT`/`REVOKE`-Zeilen, alle fünf für `ai_consume` und `ai_refund`; für jede andere Funktion gilt der PostgreSQL-Standard `EXECUTE` an `PUBLIC`, und `PUBLIC` schließt `anon` ein. `get_leaderboard` gibt die Kennungen mit aus und ist ebenfalls offen. Die Kette lautet: ohne Konto Kennungen abholen, ohne Konto darauf schreiben. Schärft E-06 und ändert nicht die Migration, sondern die Aufgabenstellung. Beleg: `docs/operations/backend-inventory.md`. | **4** | mit E-06 |
 | E-53 | **Nutzer-Fakten können sich selbst freigeben.** Die INSERT-Policy auf `facts` prüft `created_by` und `is_user_created`, aber **nicht** `is_approved`. Dass `api.jsx:167` `false` setzt, ist Höflichkeit des Clients und keine Regel des Servers. Wer die Anfrage selbst formuliert, veröffentlicht unmoderierten Text für alle Nutzer, in einer App, deren Inhalt das Produkt ist; der Trigger `on_user_fact_created` legt die Autoren-Trophäen gleich mit an. | **4** | vor Schritt 44 |
-| E-54 | **Coins sind über Gruppensitzungen unbegrenzt farmbar.** `collect_group_fact` bucht 50 Coins, die Sperre wirkt **pro Sitzung**. **Am 02.09.2026 richtiggestellt:** das `UNIQUE (session_id, fact_id)` ist am 05.06.2026 gedroppt und durch zwei partielle Indizes ersetzt worden (`2026-06-05_team_sessions.sql:54-67`); am Befund ändert das nichts, im Team-Modus ist es eine Sperre weniger. **Und die naheliegende Behebung ist keine Änderung eines Indexbereichs:** `group_collects` hat keine Spalte `user_id`, die Gutschrift geht an alle Teilnehmer, „einmal je Nutzer und Fakt“ verlangt also ein anderes Datenmodell. Sitzungen legt der Client an und bestimmt dabei `p_fact_ids`, im Team-Modus zusätzlich den Treffpunkt, an dem `tag_endpoint` weitere 100 gibt. An einem Fakt stehen und die Schleife wiederholen ergibt rund 150 Coins je Durchlauf, ohne einen Schritt zu gehen. `collected_facts` bleibt sauber (`on conflict do nothing`), betroffen ist nur die Währung. Folge für die Ökonomie: solange Betrag und Anlass im Client bestimmbar sind, darf für Coins nichts zu haben sein, was Geld wert ist. | **4** | Phase 5 |
+| E-54 | **Coins sind über Gruppensitzungen unbegrenzt farmbar.** `collect_group_fact` bucht 50 Coins, die Sperre wirkt **pro Sitzung**. **Am 02.09.2026 richtiggestellt:** das `UNIQUE (session_id, fact_id)` ist am 05.06.2026 gedroppt und durch zwei partielle Indizes ersetzt worden (`2026-06-05_team_sessions.sql:54-67`); am Befund ändert das nichts, im Team-Modus ist es eine Sperre weniger. **Und die naheliegende Behebung ist keine Änderung eines Indexbereichs:** `group_collects` hat keine Spalte `user_id`, die Gutschrift geht an alle Teilnehmer, „einmal je Nutzer und Fakt“ verlangt also ein anderes Datenmodell. Sitzungen legt der Client an und bestimmt dabei `p_fact_ids`, im Team-Modus zusätzlich den Treffpunkt, an dem `tag_endpoint` weitere 100 gibt. An einem Fakt stehen und die Schleife wiederholen ergibt rund 150 Coins je Durchlauf, ohne einen Schritt zu gehen. `collected_facts` bleibt sauber (`on conflict do nothing`), betroffen ist nur die Währung. Folge für die Ökonomie: solange Betrag und Anlass im Client bestimmbar sind, darf für Coins nichts zu haben sein, was Geld wert ist.  **Am 02.09.2026 zur Regel entschieden, und die Regel verlangt eine neue Tabelle.** Janek: je Nutzer und Fakt gibt es **zwei** Belohnungsanlässe, Entdecken und Finden, und **jeder genau einmal für immer**. Eine neue Jagd mit demselben Fakt gibt nichts mehr; in Gruppen bekommt jeder Teilnehmer den Finde-Anlass, unabhängig von früherem Entdecken, und auch dort nur einmal. **Mit dem heutigen Backend ist das prinzipiell nicht ausdrückbar**, weil die Sperre ein Index auf `group_collects` ist und dieser Tabelle sowohl der Nutzer als auch der Anlass fehlt. Damit ist entschieden, was Abschnitt 9 der Fix-Datei als nächsten Schritt vorgeschlagen hatte: ein `coin_ledger(user_id, fact_id, reason, delta, created_at)` mit `UNIQUE (user_id, fact_id, reason)`. Dann ist die Regel die Tabelle und keine Prüfung, die jemand vergessen kann, und die Coins bekommen die Historie, die `security.md` ohnehin verlangt. Eine neue Tabelle ist Stufe 3 und geht an Dairen. | **4** | Phase 5 |
 | E-55 | **Rangliste und Trophäen sind vom Client direkt schreibbar.** `user_city_scores` und `user_trophies` tragen `FOR ALL USING (auth.uid() = user_id)` ohne `WITH CHECK`; ohne `WITH CHECK` gilt der `USING`-Ausdruck auch für neue Zeilen. Dieselbe Lücke wie E-24 auf `profiles`, nur auf den beiden Tabellen, die ausdrücklich für den Wettbewerb da sind, und `get_leaderboard` liest im Modus „alltime, Stadt“ direkt aus `user_city_scores`. E-16 beschreibt an denselben Tabellen die Leseseite; das hier ist die teurere Hälfte. | **4** | mit E-24 |
 | E-56 | **Drei Stadtschlüssel-Normalisierungen nebeneinander, und Rom fällt durch alle.** `lower(city)` im Trigger und in beiden Ranglisten-Funktionen, `_slugify(city)` in `_team_generate_orders`, eine feste Liste in `_city_default_meeting`. Für München geht es gut, weil jede Funktion von genau einer Stelle gerufen wird: Glück, keine Konstruktion. Für Rom bildet der Trigger-Rückfall `nr LIKE 'ROM%'` auf `Rom` ab, der Backfill vom 07.06. dasselbe Präfix auf `Rome`, und das Frontend schickt `rom`. **Zusatzverdacht, unbestätigt:** `migrate_nr_codes.py:24-31` vergibt Präfixe nach Breitengrad mit `lat > 48.5 → PAU`; Regensburg, Nürnberg und Weimar liegen darüber. Wenn das je über die ganze Tabelle lief, sind es falsche Stammdaten und kein Anzeigefehler. Konkretisiert E-11. | 3 | vor Schritt 45 |
-| E-57 | **Der Team-Ausgleich kann nicht wirken.** `_team_generate_orders` vergleicht die Wegstrecken über `sum(...) where id = any(v_a)` gegen `any(v_b)`; `v_a` und `v_b` sind Permutationen **derselben Menge**, also ist die Differenz immer 0, die Schwelle `<= 0.20` immer erfüllt und der dreifache Resampling-Apparat unerreichbar. Beide Teams laufen denselben Stationssatz in anderer Reihenfolge, und das ist laut Index-Kommentar gewollt; dann ist offen, was die Teams überhaupt unterscheiden soll. Dazu eine wirkungslose Winkelnormalisierung, `abs(((x-y)+pi())-pi())` kürzt sich zu `abs(x-y)`. Dieselbe Bauart wie die dreistufige Auswahl aus Schritt 33: eine Vorkehrung, die ihr Ergebnis nicht ändern kann. | 2 | Phase 5 |
+| E-57 | **Der Team-Ausgleich kann nicht wirken.** `_team_generate_orders` vergleicht die Wegstrecken über `sum(...) where id = any(v_a)` gegen `any(v_b)`; `v_a` und `v_b` sind Permutationen **derselben Menge**, also ist die Differenz immer 0, die Schwelle `<= 0.20` immer erfüllt und der dreifache Resampling-Apparat unerreichbar. Beide Teams laufen denselben Stationssatz in anderer Reihenfolge, und das ist laut Index-Kommentar gewollt; dann ist offen, was die Teams überhaupt unterscheiden soll. Dazu eine wirkungslose Winkelnormalisierung, `abs(((x-y)+pi())-pi())` kürzt sich zu `abs(x-y)`. Dieselbe Bauart wie die dreistufige Auswahl aus Schritt 33: eine Vorkehrung, die ihr Ergebnis nicht ändern kann.  **Am 02.09.2026 beantwortet, und die Antwort dreht den Befund.** Janek: dieselben Stationen für beide Teams, in **unterschiedlicher Richtung**, mit **demselben letzten Fakt**; wer dort zuerst ankommt gewinnt, aber nur bei mehr oder gleich vielen Coins. **Der Ausgleich ist damit nicht kaputt, sondern gegenstandslos**: gleich lange Wege sind gewollt und folgen aus gleichen Stationen, entschieden wird über Zeit und Coins. Er kann weg. **Neuer Befund an derselben Stelle:** die Regel „gleicher letzter Fakt“ gibt es im Code nicht. Nachgesehen: `v_b` ist im ersten Zweig `array_agg(id order by ord desc)`, also die Umkehrung von `v_a`, damit ist die letzte Station von B die **erste** von A; der zweite Zweig sortiert noch anders. Nötig ist eine als Finale festgelegte Station, die für beide die letzte ist, und nur die Stationen davor umgekehrt. **Offen bleibt eine kleine Frage mit großer Wirkung:** gegen wen und wann werden die Coins verglichen, und was gilt, wenn das schnellere Team weniger hat. Im vierten Fragenblock. | 2 | Phase 5 |
 | E-58 | **Der Admin ist eine statische Seite mit dem `service_role`-Schlüssel im Browser.** `02_Frontend/admin/index.html` nimmt den Generalschlüssel entgegen, legt ihn in `localStorage` (`fact_admin_service_key`) und spricht damit direkt gegen Supabase; er umgeht **jede** RLS-Policy. Kein Admin-Server, keine Rollenprüfung, kein Protokoll darüber, wer wann was freigegeben hat. Dieselbe Bauart in der Pipeline: 11 Skripte lesen `service_role_key` aus `import_config.json`, gitignoriert, aber im Klartext in einem OneDrive-Ordner. Das ist kein Fehler in einer Zeile, sondern der Teil, der bei einem Backend-Neubau nicht mitgenommen werden kann: ohne Antwort hierauf ist der Neubau nach einem Tag wieder am Ausgangspunkt, weil jemand Fakten freigeben können muss. | **4** | vor dem Backend-Neubau |
 | E-59 | **Welchen Bezugsrahmen hat die Kompass-Richtung, magnetisch Nord oder wahres Nord?** Der Neubau setzt seit Schritt 14 ausdrücklich **magnetisch** Nord, weil der Android-Pfad der Quelle `deviceorientationabsolute` liest und das magnetometerbasiert ist. **Offen ist der iOS-Pfad:** `webkitCompassHeading` leitet sich aus `CLHeading` ab, und dort gibt es `trueHeading` **und** `magneticHeading`. Nimmt die Quelle dort das wahre Nord, sind ihre beiden Zweige nicht deckungsgleich, und der Unterschied ist die örtliche Missweisung, in Mitteleuropa ungefähr 2 bis 5 Grad. Das ist **mehr** als die Totzone von 1,5 Grad, also sichtbar, und es hiesse, dass die Karte auf iOS und Android unterschiedlich zeigt. Zu klären an einem iOS-Gerät oder an Apples Dokumentation; der Neubau kann beide Rahmen, die Umstellung ist eine Zeile im Adapter. Belege unter „Schritt 14, die Wahl des Sensorpakets". | 2 | vor Auslieferung |
 | E-60 | **Die gestuften Hinweise der Jagd beschreiben die Station nach der aktuellen, nicht die aktuelle.** Gemessen und nicht vermutet, siehe „Ein Fund beim Zuschnitt von Schritt 36". Der Generator legt an Stopp `i` das Hinweis-Trio des Fakts von Stopp `i+1` ab (`hunt-generator.jsx:319-338`), und die Pille liest an der aktuellen Station genau dieses Feld (`screen-map.jsx:1035-1043`). Weil `currentStopIdx` beim Lösen sofort weiterspringt, sieht der Spieler nie einen Hinweis auf den Ort, den er gerade sucht. Zwei Lesarten: **Absicht** (der erste Hinweis heißt im Kommentar „atmospheric teaser", also eine Vorschau auf den nächsten Ort) oder **Defekt** (dann zahlt man 20 und 30 Münzen für Hinweise auf einen Ort, den man noch nicht sucht). Zu entscheiden ist, welche gilt; der Neubau kann beide, der Unterschied ist ein Index. **Und die letzte Station hat gar keine Hinweise**, denn dort setzt der Generator `nextHints = null`. | 2 | vor Schritt 37 |
 | E-61 | **Die Beschriftungen der Jagd-Pille gibt es nur auf Deutsch, und das ist Parität.** Geprüft: die Quelle hält „Station {n} / {total}", „Tipps", „Tipp freischalten (−20 🪙 vom Fakt-Lohn)", „Schließen" und den Rückfallsatz „Schau dich in der Umgebung aufmerksam um." als **hartcodiertes Deutsch** in `screen-map.jsx`, ohne einen einzigen i18n-Schlüssel. Englischsprachige Nutzer sehen dort also Deutsch. Der Neubau trägt sie über die Ergänzungs-Map aus E-39 ein, **nur auf Deutsch**, und der Rückfall auf die Fallback-Sprache erzeugt genau dasselbe Verhalten. **Erfundener englischer Nutzertext wäre die schlechtere Lösung**, dieselbe Linie wie bei E-28. Zu entscheiden ist, ob die Pille englische Texte bekommen soll; dann sind es fünf bis sechs Sätze, und die bessere Behebung wäre ein Schlüssel in der PWA, weil die Gegenprüfung des Generators den lokalen Eintrag dann von selbst wieder abräumt. Verwandt mit E-08, wo dieselbe Sorglosigkeit ein Rätsel auf Englisch unlösbar macht.  **Am 02.09.2026 aufgehoben, und zwar grundsätzlich.** Janek: „englischsprachige Nutzer sollen natürlich nur englisch sehen“ und „klar besser als die Quelle machen“. Hartcodiertes Deutsch ohne i18n-Schlüssel ist damit ein **Defekt der Quelle** und keine Paritätsvorlage. Folge, und sie ist Arbeit: alle Ergänzungs-Schlüssel, die heute in der englischen Karte einen deutschen Wert tragen, brauchen echtes Englisch. Betroffen sind die Blöcke `challenge.huntPill.*`, `challenge.huntPause.*` und `challenge.huntResult.*`, dazu jeder frühere Eintrag mit derselben Begründung. Der Grundsatz steht jetzt in `CLAUDE.md` unter „The PWA is a reference, not a gold standard“. | 2 | vor Auslieferung |
 | E-62 | **Der Pause- und der Ergebnisbildschirm der Jagd zeigen keine Zeit, sondern den Platzhalter `—`.** Die Quelle rechnet dort `Date.now() - hunt.startedAt` (`screen-challenge.jsx:2807-2808` und `:2954`) und lässt dafür einen Sekundentakt laufen. `HuntRun` trägt bewusst keine Zeitstempel, und der gespeicherte Vertrag `ActiveHunt` auch nicht: E-19 ist mit „der Server rechnet“ entschieden, und Dairens Satz dazu lautet „der baubare Teil ist alles, was den Ablauf anzeigt“. Angezeigt wird hier nichts, was der Client kennt, also steht der Platzhalter da, den die Quelle selbst für fehlende Werte benutzt (`:2828`). **Die Kachel und die Zeile bleiben stehen**, damit das Layout stimmt und der Tag, an dem ein Startzeitstempel vom Server kommt, eine Zeile kostet und keinen Umbau. Kein Sicherheitsbefund, sondern eine sichtbare Lücke mit bekannter Ursache und bekannter Behebung. | 2 | Schritt 39, Behebung mit dem Backend-Auftrag |
-| E-63 | **Der Beitritts-Dialog der Gruppe zeigt seinen eigenen Schlüsselnamen als Überschrift, und der dafür geschriebene Rückfall kann nie greifen.** Am 31.08.2026 gemessen, nicht vermutet. `screen-challenge.jsx:2025` schreibt `t('group.join.title', lang) || 'Session-Code eingeben'`. Den Schlüssel `group.join.title` gibt es in `translations.jsx` nicht, weder deutsch noch englisch; seine Geschwister `group.join.cta`, `.invalidCode` und `.submit` gibt es alle drei. **Der Rückfall ist toter Code:** `window.t` (`translations.jsx:1600-1605`) gibt bei fehlendem Schlüssel den **Schlüssel selbst** zurück, und der ist wahrheitswertig, also feuert `||` nie. Auf dem Bildschirm steht damit in beiden Sprachen die Zeichenkette `group.join.title`. Dieselbe Fehlerklasse wie E-28, gefunden mit derselben Messung, die auch die Prüfung im i18n-Generator begründet. Für den Neubau heißt das: Schritt 40 erfindet hier eine Überschrift oder übernimmt den hartcodierten deutschen Satz, den der Autor gemeint hat, und beides gehört entschieden statt stillschweigend gewählt. | 2 | Schritt 40 |
+| E-63 | **Der Beitritts-Dialog der Gruppe zeigt seinen eigenen Schlüsselnamen als Überschrift, und der dafür geschriebene Rückfall kann nie greifen.** Am 31.08.2026 gemessen, nicht vermutet. `screen-challenge.jsx:2025` schreibt `t('group.join.title', lang) \|\| 'Session-Code eingeben'`. Den Schlüssel `group.join.title` gibt es in `translations.jsx` nicht, weder deutsch noch englisch; seine Geschwister `group.join.cta`, `.invalidCode` und `.submit` gibt es alle drei. **Der Rückfall ist toter Code:** `window.t` (`translations.jsx:1600-1605`) gibt bei fehlendem Schlüssel den **Schlüssel selbst** zurück, und der ist wahrheitswertig, also feuert `\|\|` nie. Auf dem Bildschirm steht damit in beiden Sprachen die Zeichenkette `group.join.title`. Dieselbe Fehlerklasse wie E-28, gefunden mit derselben Messung, die auch die Prüfung im i18n-Generator begründet. Für den Neubau heißt das: Schritt 40 erfindet hier eine Überschrift oder übernimmt den hartcodierten deutschen Satz, den der Autor gemeint hat, und beides gehört entschieden statt stillschweigend gewählt.  **Am 02.09.2026 entschieden:** „Session-Code eingeben“ und „Enter session code“. Der Schlüssel kommt bewusst **noch nicht** in die Ergänzung: er ist eine Lücke der PWA, und genau die verfolgt `_knownMissingSourceKeys`. Trüge unsere Ergänzung ihn, schwiege die Quellprüfung über eine offene PWA-Lücke, ohne dass unsere App den Text zeigt; der Beitritts-Dialog ist Schritt 40. Der Schlüssel entsteht mit dem Bildschirm. | 2 | Schritt 40 |
 | E-64 | **Dieses Repository ist öffentlich, und es enthält das geprüfte Verzeichnis der Backend-Lücken zusammen mit der Projekt-URL der laufenden Instanz.** Am 31.08.2026 festgestellt, nicht vermutet: `gh repo view` meldet für `Daigon2/flutter-fact` die Sichtbarkeit `PUBLIC`, und `docs/operations/backend-inventory.md` nennt die Projekt-URL. Das Register in dieser Datei führt E-06, E-07, E-23, E-24, E-54 und E-58 mit Tabellen-, Policy- und Funktionsnamen. Der Schlüssel selbst liegt **nicht** im Repository, `SupabaseConfig` liest ihn über `String.fromEnvironment`; der öffentliche Schlüssel der PWA ist aber ohnehin aus jedem Browser zu holen, er ist dafür gedacht. **Damit steht öffentlich, welche Tür offen ist und wo sie sitzt.** **Zwei Dinge sind zu trennen.** Erstens: die Sichtbarkeit umzustellen behebt nichts rückwirkend, was einmal öffentlich war, kann kopiert und indiziert sein. Zweitens: die eigentliche Behebung ist ohnehin, die Lücken zu schließen, und die sind laut Backend-Bestandsaufnahme überwiegend wenige Zeilen SQL. Die Sichtbarkeit zu ändern verringert nur, was ab jetzt dazukommt. **Beides ist eine Entscheidung des Eigentümers und wurde von hier aus nicht getroffen.** | **4** | sofort |
 | E-65 | **Die Persistenz der laufenden Jagd wird nirgends gelesen, und die Produktvorgabe aus ADR-007 ist damit an keiner Stelle eingelöst.** Am 02.09.2026 von einer unabhängigen Prüfung gefunden und nachgezählt: `activeHuntProvider` hat in `lib/` **keinen einzigen Verbraucher**. `HuntPill` liest seit Schritt 37 direkt `huntRunProvider` (`hunt_pill.dart:136`), weil sie Stationen, Hinweise und Punkte braucht, die ein `ActiveHunt` nicht trägt. Der Schreibweg funktioniert, der Leseweg hat keinen Abnehmer. **Folge:** eine Jagd, die einen App-Neustart überlebt, ist weder auf der Karte noch im Challenge-Reiter sichtbar, und `bootstrap.dart:180-183` zitiert genau diesen Fall als das, was ADR-007 ausschließt. **Zweite Folge, kleiner aber unsauber:** der Eintrag `fact_active_challenge` lässt sich dann auch nicht mehr löschen, weil `HuntRunNotifier.end()` bei `state == null` sofort zurückkehrt; er wird erst von der nächsten Jagd überschrieben. **Zur Wahl stehen zwei Wege.** (a) Die Pille bekommt eine abgespeckte Lesart aus `ActiveHunt`: Stationszähler, Titel und Entfernung stehen dort alle, Hinweise und Punkte nicht. Das löst die Vorgabe ein, ohne den Plan zu speichern. (b) Der Start räumt einen nicht fortsetzbaren Eintrag auf und die Vorgabe wird als unerfüllbar zurückgegeben, dann gehört ADR-007 geändert. **Die Wahl ist nicht von hier aus getroffen worden.** Der Fund ist kein Codefehler dieser Nacht, sondern eine Lücke aus Schritt 37, die eine falsche Behauptung in vier Dokumentstellen als erledigt aussehen ließ; die Behauptung ist berichtigt.  **Am 02.09.2026 entschieden, und die Entscheidung geht weiter als beide vorgelegten Wege.** Janek: „man sollte sowohl sehen was da ist und auch weitermachen können. also sollte es so sein, als hätte man nie aufgehört.“ Damit fällt (b) weg, und (a) reicht nicht: eine sichtbare, aber nicht fortsetzbare Jagd ist ausdrücklich nicht die Antwort. Verlangt ist die **vollständige Wiederherstellung**, also auch der `HuntPlan` mit Fakt und Rätsel je Station. Genau den schließt ADR-007 heute bewusst von der Nutzlast aus. **Das ist jetzt eine Architekturfrage an Dairen**, samt Folge-ADR, siehe den Fragenblock. | 3 | vor Schritt 40 |
 
