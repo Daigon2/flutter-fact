@@ -1454,6 +1454,13 @@ Damit niemand die drei Migrationen für eine abgeschlossene Absicherung hält:
 
 **Keine.** Nach allen drei Migrationen scheitert in `lib/` keine Stelle.
 
+> **Nachtrag vom 02.09.2026 zur Methode, nicht zum Ergebnis.** Ein Griff nach
+> `.rpc(` findet den **einzigen** RPC-Aufruf dieses Repositories nicht: er heißt
+> `_client.rpc<Object?>(`, das Typargument steht zwischen Name und Klammer. Das
+> Ergebnis oben bleibt richtig, nachgeprüft mit
+> `grep -rnE "\.(from|rpc)\s*(<[^>]*>)?\s*\(" lib/`, aber wer die Prüfung
+> wiederholt, nimmt dieses Muster und nicht das naheliegende.
+
 Belegt durch die vollständige Liste der Schreibzugriffe dieses Repositories auf
 Supabase, ermittelt über `.insert(`, `.upsert(`, `.update(`, `.delete(` und
 `.rpc(` in `lib/` ohne generierte Dateien. Es gibt genau einen:
@@ -1475,3 +1482,1552 @@ sinnvoll, aber das ist ein eigener Auftrag und wird hier nicht ausgeführt.
 Port hat beide Wege angebunden (`08_Flutter/lib/services/supabase_service.dart:119`
 und `:127`) und den unsicheren im Zweifel benutzt. Dieser Fehler darf sich nicht
 wiederholen.
+
+---
+
+## 11. Nachtrag 02.09.2026: E-52, E-53 und E-55
+
+**Was dieser Nachtrag ist.** Drei weitere Migrationen, für drei Befunde aus
+`backend-inventory.md`, Abschnitt 3. Er steht in derselben Datei, weil er
+dieselben Tabellen, dieselben Definer-Funktionen und dieselbe Rechtelogik
+betrifft wie die Migrationen 1 bis 3. Die Abschnitte 0 bis 10 sind unverändert;
+nichts hier ersetzt etwas dort. Die Nummerierung läuft weiter: **Migration 4
+(E-52), Migration 5 (E-53), Migration 6 (E-55)**.
+
+**Dieselben Grenzen wie oben.** Nichts davon wurde ausgeführt, auch nicht
+lesend. Das Backend liegt im anderen Repository und wird von hier nicht
+verändert. Zeilenangaben beziehen sich auf das Referenz-Repository, nachgeprüft
+am 02.09.2026.
+
+**Und dieselbe Vorbedingung, verschärft.** `backend-inventory.md`, Abschnitt 2:
+es gibt kein Migrationssystem, keine Ledger-Tabelle, und zwei Funktionen sind
+doppelt definiert. Aus dem Repository ist nicht zu sehen, was in der laufenden
+Datenbank steht. Alle drei Blöcke unten sind deshalb idempotent, sie geben nach
+jedem `revoke` ausdrücklich zurück, was gebraucht wird, statt auf einen
+vorhandenen Grant zu vertrauen, und die Ausführrechte werden über eine Schleife
+auf `pg_proc` gesetzt statt über eine Liste von Signaturen. Warum die Schleife
+und nicht die Liste, steht in 11.4.
+
+### 11.0 Acht Befunde, die diesen Auftrag korrigieren
+
+Wie Abschnitt 0: die Ergebnisse der Prüfung am echten SQL stehen vor den
+Migrationen, weil jedes einzelne ändert, was zu tun ist.
+
+**1. Für `INSERT` prüft ein `WITH CHECK` die Spalte sehr wohl.** Der Auftrag
+verlangte für E-53 den Umweg aus Abschnitt 3, also Spaltenrechte. Der ist hier
+nicht nötig und wäre sogar schädlich. Abschnitt 3 begründet die Spaltenrechte
+mit `UPDATE`: dort sieht `WITH CHECK` nur die neue Zeile und kann „darf sich
+nicht ändern" nicht ausdrücken. Bei `INSERT` gibt es keine alte Zeile, und
+`is_approved is not true` ist eine vollständige, exakte Bedingung.
+**Schädlich wäre der Umweg, weil die PWA die Spalte namentlich mitschickt**
+(`02_Frontend/app/api.jsx:176`, `is_approved: false`). Ein
+`revoke insert (is_approved)` würde diesen Aufruf mit `42501` abweisen, obwohl
+er inhaltlich richtig ist. Die Policy lässt ihn durch.
+
+**2. „Der Eigentümer darf seine Zeile bearbeiten" beschreibt keinen Zustand,
+den es gibt.** Auf `public.facts` existieren genau zwei Policies,
+`read facts` (`supabase-schema.sql:145-146`) und `insert own fact`
+(`:149-150`). Es gibt **keine** `UPDATE`- und keine `DELETE`-Policy, also kann
+ein Nutzer seinen Fakt heute nicht ändern und nicht löschen, unabhängig von
+allen Spaltenrechten. Migration 5 öffnet das Bearbeiten deshalb **nicht**:
+das wäre eine neue Fähigkeit, kein Sicherheitsfix, und sie brächte genau die
+Frage mit, die Abschnitt 3 für `profiles` schon beantwortet hat. Das Rezept für
+später steht in 11.5, ausgeschrieben und ungenutzt.
+
+**3. E-52 ist zu zwei Dritteln bereits geschrieben, und der eine offene Teil ist
+nicht blockiert.** E-52 nennt drei Funktionen. `increment_coins` erledigt
+**Block 2a**, `collect_fact_validated` erledigt **Block 3b**, beide oben, beide
+mit derselben Konto-Bindung und demselben `revoke ... from public, anon`.
+Migration 4 fügt deshalb nur `unlock_trophy` hinzu und schließt die
+Ausführrechte des restlichen Funktionsbestands. **Wichtig, weil es leicht
+übersehen wird: Block 3b ist nicht durch den PWA-Release blockiert.** Blockiert
+ist Block 3**a**, der Insert-Weg. `collect_fact_validated` wird in der PWA von
+niemandem gerufen (Abschnitt 2, „Aufrufe von `collect_fact_validated`"), also
+kann 3b sofort laufen und E-52 für diese Funktion sofort schließen.
+
+**4. Ein pauschales Revoke gegen `anon` bricht die Registrierung, und zwar in
+beiden Clients.** `check_username` wird **vor** der Anmeldung gerufen, während
+der Nutzer den Namen eintippt: PWA `screen-auth.jsx:600`, dieses Repository
+`lib/features/identity/presentation/notifiers/username_check_notifier.dart:144`
+über `supabase_auth_remote_data_source.dart:295`. Zu diesem Zeitpunkt gibt es
+kein Konto und keine Sitzung, der Aufruf läuft als `anon`. Wer E-52 als
+„revoke execute on all functions in schema public from anon" liest, nimmt
+beiden Clients die Namensprüfung weg, und zwar **stillschweigend**: die PWA
+fängt den Fehler ab und bleibt auf `idle` (`screen-auth.jsx:601`), dieses
+Repository ebenso (`username_check_notifier.dart:142-151`, Kommentar „ein
+Fehlschlag der Prüfung ist kein Fehler des Nutzers"). Der Nutzer bekommt dann
+bei der Registrierung eine Unique-Verletzung statt eines Hinweises.
+Migration 4 gibt `check_username` deshalb ausdrücklich an `anon` frei, statt
+sich auf den Standard zu verlassen.
+
+**5. Ein Trophäenschlüssel enthält einen Umlaut.** Die naheliegende Prüfung
+einer Zeichenklasse auf `p_trophy_key` wäre falsch: `nachtschwärmer` ist ein
+echter Schlüssel (`wallet-colors.jsx:133`, gerufen in `app.jsx:726`), und die
+Stadt-Trophäen des Triggers heißen `<stadt>_first` mit `lower(city)` als
+Präfix, also `münchen_first` (`supabase-schema.sql:275-279`). Migration 4 prüft
+deshalb nur die **Länge**. Eine Schlüsselliste in der Datenbank wäre die
+richtige Prüfung, ist aber eine neue Tabelle und damit eine Entscheidung, keine
+Migration.
+
+**6. E-55 macht die Schreibseite nicht zu, sondern kleiner.** Nach Migration 6
+kann kein Client mehr in `user_trophies` und `user_city_scores` schreiben.
+`unlock_trophy` bleibt aber der reguläre Weg der PWA (`api.jsx:243`), und der
+Client entscheidet dort weiter, **welche** Trophäe er sich holt: `app.jsx:551`
+schreibt jeden Schlüssel, den `rnkMaybeUnlock` bekommt, und die Aufrufer sind
+clientseitige Bedingungen wie `rnkH >= 22` (`app.jsx:726`). Migration 6
+verkleinert den Angriff also von „jeder Wert in jeder eigenen Zeile beider
+Tabellen" auf „jeder Trophäenschlüssel für das eigene Konto". Für
+`user_city_scores` ist die Behebung vollständig, weil dort **kein** Client
+schreibt. Für `user_trophies` ist sie es nicht, und das ist E-49, nicht E-55.
+
+**7. `_is_group_member` darf das Ausführrecht nicht verlieren.** Die Funktion
+ist ein Definer-Helfer, sieht wie interner Kram aus und steckt in **drei
+RLS-Policies** (`2026-06-04_group_sessions_rls_fix.sql:30-47`).
+Policy-Ausdrücke werden mit den Rechten der **abfragenden** Rolle ausgewertet,
+nicht mit denen des Tabelleneigentümers. Wer ihr das `EXECUTE` für
+`authenticated` entzieht, macht jedes Lesen von `group_sessions`,
+`group_participants` und `group_collects` zu einem „permission denied for
+function _is_group_member". Der Gruppenmodus wäre tot. Migration 4 nimmt sie
+darum ausdrücklich aus der Helfer-Liste heraus.
+
+**8. Eine Zeilenangabe der Bestandsaufnahme stimmt nicht.** E-53 nennt
+`api.jsx:167` für `is_approved: false`. Dort steht `kategorie`. Die Zuweisung
+ist `api.jsx:176`, im selben `insert`-Objekt (`:165-177`). Der Befund selbst ist
+richtig, nur der Zeiger nicht.
+
+### 11.1 Ist-Zustand am echten SQL
+
+#### E-52: `unlock_trophy` und die Ausführrechte
+
+`03_Backend/supabase-schema.sql:514-519`
+
+```sql
+CREATE OR REPLACE FUNCTION public.unlock_trophy(p_user_id UUID, p_trophy_key TEXT)
+RETURNS VOID LANGUAGE sql SECURITY DEFINER AS $$
+  INSERT INTO public.user_trophies (user_id, trophy_key)
+    VALUES (p_user_id, p_trophy_key)
+    ON CONFLICT DO NOTHING;
+$$;
+```
+
+Vier Defekte in fünf Zeilen: die Kennung kommt vom Aufrufer und wird mit nichts
+verglichen, der Schlüssel wird nicht geprüft, `search_path` ist nicht gesetzt,
+und ein Ausführrecht wurde nie entzogen. Die fremde UUID liefert
+`get_leaderboard` mit (`supabase-schema.sql:371`), und `get_leaderboard` ist
+selbst ohne Anmeldung erreichbar.
+
+Die Rechtelage ist nachgezählt: im gesamten `03_Backend/` gibt es **fünf**
+`GRANT`- oder `REVOKE`-Zeilen, alle in `2026-06-20_ai_proxy.sql:51-54,61`, alle
+für `ai_consume`, `ai_refund` und die zwei AI-Spalten. Für die anderen 28
+Funktionen gilt der PostgreSQL-Standard, und der ist `EXECUTE` an `PUBLIC`.
+`PUBLIC` ist jede Rolle der Datenbank, `anon` eingeschlossen. Die Aussage aus
+E-52 ist damit aus den Dateien belegt; **in der Datenbank ist sie mit Abfrage K
+in einer Sekunde zu bestätigen**, und nur die Datenbank zählt.
+
+#### E-53: die Freigabespalte fehlt in der Insert-Policy
+
+`03_Backend/supabase-schema.sql:148-150`
+
+```sql
+-- Facts: authenticated users insert user-created facts
+create policy "insert own fact" on public.facts
+  for insert with check (auth.uid() = created_by and is_user_created = true);
+```
+
+`is_approved` (`:33`, `boolean default false`, nullable) kommt nicht vor. Der
+Kommentar in `api.jsx:161-163` beschreibt die Absicht („bleibt false bis ein
+Admin den Fakt freigibt"), und `api.jsx:176` hält sie ein. Beides ist Client.
+
+Gegenprobe, was ein selbst freigegebener Fakt bewirkt: die Lese-Policy
+`read facts` (`:145-146`) gibt jede Zeile mit `is_approved = true` an **jeden**
+heraus, auch an `anon`. Der Fakt steht damit in der Liste aller Nutzer
+(`api.jsx:123`) und in diesem Repository ebenfalls, weil
+`supabase_fact_remote_data_source.dart:48` genau auf `is_approved = true`
+filtert. Unmoderierter Text in einer App, deren Inhalt das Produkt ist.
+
+#### E-55: `FOR ALL` ohne `WITH CHECK` auf den beiden Wettbewerbstabellen
+
+`03_Backend/supabase-schema.sql:212-214` und `:222-224`
+
+```sql
+ALTER TABLE public.user_city_scores ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read city scores" ON public.user_city_scores FOR SELECT USING (true);
+CREATE POLICY "own city scores" ON public.user_city_scores FOR ALL USING (auth.uid() = user_id);
+
+ALTER TABLE public.user_trophies ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read trophies" ON public.user_trophies FOR SELECT USING (true);
+CREATE POLICY "own trophies" ON public.user_trophies FOR ALL USING (auth.uid() = user_id);
+```
+
+Dieselbe Mechanik wie E-24, nachzulesen in Abschnitt 0, Befund 1: ohne
+`WITH CHECK` benutzt PostgreSQL den `USING`-Ausdruck auch für neue und
+geänderte Zeilen. `FOR ALL` schließt `INSERT`, `UPDATE` und `DELETE` ein. Ein
+Nutzer setzt seinen Punktestand je Stadt auf jeden Wert und trägt sich jede
+Trophäe ein.
+
+Anders als bei `profiles` braucht es hier **keine** Spaltenrechte. Der
+Unterschied: auf `profiles` sind drei von zwölf Spalten legitim
+clientschreibbar, die Grenze liegt also innerhalb der Zeile. Auf diesen beiden
+Tabellen schreibt kein Client legitim **irgendetwas**, die Grenze liegt an der
+Tabelle. Ein Entzug von `insert, update, delete` ist damit die vollständige und
+die einfachere Antwort.
+
+Wer schreibt heute wirklich hinein:
+
+| Tabelle | Schreiber | Fundstelle |
+|---|---|---|
+| `user_city_scores` | nur Trigger `handle_fact_collected` | `supabase-schema.sql:261-265` |
+| `user_trophies` | Trigger `handle_fact_collected` | `:268-334` |
+| `user_trophies` | Trigger `handle_user_fact_created` | `:347-359` |
+| `user_trophies` | RPC `unlock_trophy` | `:514-519`, gerufen aus `api.jsx:243` |
+
+Vollständig gesucht in `02_Frontend/app/`, `02_Frontend/admin/`,
+`04_Datenpipeline/scripts/`, `supabase/functions/`, `08_Flutter/lib/` und
+`lib/`. **Kein direkter Schreibzugriff eines Clients auf eine der beiden
+Tabellen existiert.** Der eingefrorene Port liest `user_trophies`
+(`08_Flutter/lib/services/supabase_service.dart:66,238`) und schreibt über
+`unlock_trophy` (`:245`), wie die PWA.
+
+### 11.2 Ergänzung zu Abschnitt 2: die Ausführrechte je Funktion
+
+Abschnitt 2 erhebt, wer wohin schreibt. Für E-52 fehlt die zweite Hälfte: wer
+darf überhaupt rufen. Aus den Dateien abgeleitet, in der Datenbank mit Abfrage
+K zu prüfen.
+
+| Funktion | Ruft heute wer | Braucht `anon`? | Migration 4 |
+|---|---|---|---|
+| `check_username(text)` | `screen-auth.jsx:600`, `username_check_notifier.dart:144` | **ja, vor der Anmeldung** | ausdrücklich an `anon` und `authenticated` |
+| `get_leaderboard(text,text)` | `screen-profil.jsx:20` | offen, gehört zu E-16 | **nicht angefasst** |
+| `get_my_rank(uuid,text,text)` | `app.jsx:267`, nur mit Sitzung | nein | `anon` und `PUBLIC` weg |
+| `unlock_trophy(uuid,text)` | `api.jsx:243` | nein | Konto-Bindung, `anon` weg |
+| `increment_coins(uuid,int)` | `api.jsx:157` | nein | erledigt **Block 2a** |
+| `collect_fact_validated(...)` | niemand in der PWA | nein | erledigt **Block 3b** |
+| 12 Gruppen- und Team-RPCs | `api.jsx:337-446` | nein | `anon` und `PUBLIC` weg |
+| `ai_consume()`, `ai_refund()` | `supabase/functions/llm/index.ts:62,84` | nein | schon zu, `ai_proxy.sql:51-54` |
+| `_group_code_gen`, `_haversine_m`, `_city_default_meeting`, `_team_generate_orders`, `_slugify` | nur aus Definer-Funktionen | nein | `anon`, `PUBLIC` **und** `authenticated` weg |
+| `_is_group_member(uuid,uuid)` | **drei RLS-Policies** | fraglich, siehe unten | **nicht angefasst**, Befund 7 |
+| `handle_new_user`, `handle_fact_collected`, `handle_user_fact_created` | Trigger | nein | **nicht angefasst**, Begründung unten |
+| `fact_i18n_langs(facts)` | niemand | nein | **nicht angefasst** |
+
+**Warum die zwölf Gruppen-RPCs trotzdem in die Migration gehören, obwohl sie
+heute schon scheitern.** Alle zwölf lesen `auth.uid()` selbst und brechen mit
+`raise exception 'not_authenticated'` ab, wenn sie nichts bekommen
+(`2026-06-04_group_sessions.sql:120-126` als Muster). Ein `anon`-Aufruf richtet
+heute also keinen Schaden an. Er ist trotzdem einer zu viel: die Prüfung liegt
+im Funktionsrumpf und damit an einer Stelle, die jede künftige Änderung
+mitnehmen muss. Ein entzogenes Ausführrecht liegt außerhalb des Rumpfes und
+übersteht jedes `create or replace`. Das ist der Unterschied zwischen einer
+Zusicherung und einer Gewohnheit.
+
+**Warum die Trigger-Funktionen nicht angefasst werden.** Sie geben `trigger`
+zurück, können deshalb nicht über PostgREST gerufen werden und sind über eine
+direkte SQL-Sitzung ohnehin nur mit `CREATE TRIGGER` nutzbar. Der Gewinn eines
+Revoke ist damit null. Der Preis wäre eine Unsicherheit: ob PostgreSQL beim
+**Auslösen** eines Triggers das `EXECUTE`-Recht erneut prüft oder nur bei
+`CREATE TRIGGER`, ist ohne Test an einer echten Datenbank nicht zu behaupten,
+und wenn die Antwort „beim Auslösen" wäre, stünden `score_total`,
+`user_city_scores` und alle Trophäen still. Eine Ersparnis von null gegen ein
+Risiko von allem ist keine Abwägung. Wer es sauber haben will, prüft es in einem
+Testprojekt und macht daraus eine eigene Migration.
+
+**Warum `_is_group_member` außen bleibt, obwohl `anon` sie nicht braucht.** Ein
+`anon`-Lesezugriff auf `group_sessions` liefert heute nichts, weil die Policy
+`host_id = auth.uid() or _is_group_member(id, auth.uid())` mit `auth.uid()`
+gleich `null` für jede Zeile falsch ist. Fehlt `anon` das Ausführrecht, wird aus
+dem leeren Ergebnis ein **Fehler**. Kein bekannter Ablauf liest die Tabelle als
+`anon`, aber die Fehlerklasse wäre eine andere als vorher, und dieser Nachtrag
+ändert keine Fehlerklasse, deren Aufrufer er nicht kennt. Der Zeilenschutz hängt
+an der Policy, nicht am Ausführrecht des Helfers.
+
+### 11.3 Reihenfolge, und wo die App dabei kaputtgeht
+
+Die drei Migrationen sind untereinander und von den Migrationen 1 bis 3
+unabhängig, mit **einer** Ausnahme.
+
+| Schritt | Sicherheitsgewinn für sich allein | Bricht die PWA? | Bricht diese App? |
+|---|---|---|---|
+| 4. E-52, `unlock_trophy` und Ausführrechte | fremde Konten und `anon` sind aus allen schreibenden RPCs draußen | **nein**, Nachweis in 11.4 | **nein**, `lib/` ruft keine der Funktionen; `check_username` bleibt frei |
+| 5. E-53, `facts` | ein selbst freigegebener Fakt ist nicht mehr möglich | **nein**, `api.jsx:176` schickt `false` | **nein**, `lib/` fügt keine Fakten ein |
+| 6. E-55, `user_trophies` und `user_city_scores` | Punktestände sind serverbestimmt, Trophäen nur noch über die RPC | **nein**, die PWA schreibt beide Tabellen nie direkt | **nein**, `progression` hat keine Datenschicht |
+
+**Die Ausnahme: Migration 4 gehört vor Migration 6.** Läuft 6 allein, ist der
+direkte Tabellenweg zu, `unlock_trophy` nimmt aber weiter eine fremde Kennung
+an. Der Angriff „schreib der Konkurrenz eine Trophäe" wäre dann nicht behoben,
+sondern nur verlegt. Andersherum entsteht kein halber Zustand: nach 4 allein
+schreibt der Client noch direkt in die Tabelle, also genau wie heute.
+
+**Keine der drei hängt am PWA-Release**, der Migration 3a blockiert. Sie können
+alle drei heute laufen, in der Reihenfolge 4, 5, 6.
+
+**Was nach jeder Migration einmal passieren muss.** Migration 4 und der
+optionale Block 4c ändern Funktionsrümpfe und Ausführrechte. PostgREST hält
+dafür einen Schemacache. Supabase erneuert ihn per Event-Trigger nach DDL, aber
+darauf muss sich niemand verlassen:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+Kostet nichts, ist beliebig oft wiederholbar, und ohne sie antwortet die API im
+Zweifel mit `PGRST202` („could not find function") auf eine Funktion, die es
+gibt. Dasselbe gilt für die Blöcke 2a, 2b und 3b oben.
+
+### 11.4 Migration 4: `unlock_trophy` und die Ausführrechte (E-52)
+
+Dateiname im Backend-Repo: `2026-09-02_e52_unlock_trophy_and_execute_grants.sql`
+
+**Vorher laufen lassen und die Ausgabe sichern: Abfrage K und L** (11.7). K sagt,
+welche Rolle heute welche Funktion rufen darf, L sagt, ob eine der doppelt
+definierten Funktionen (E-21) unter zwei Signaturen in der Datenbank steht.
+
+#### Die Entwurfsfrage: der Parameter bleibt in der Signatur
+
+`unlock_trophy` bekommt die Nutzerkennung vom Aufrufer. Zwei Wege führen weg
+davon, und sie schließen sich nicht aus:
+
+| Weg | Bricht Aufrufer? | Was er kostet |
+|---|---|---|
+| **A**: Signatur bleibt, der Wert wird nicht mehr geglaubt | nein | die Signatur lügt weiter über das, was sie braucht |
+| **B**: neue, parameterfreie Funktion, alte irgendwann weg | ja, ab dem Tag, an dem die alte fällt | ein Release je Client, bis dahin zwei Funktionen mit derselben Wirkung |
+
+**Entschieden: A jetzt, B als vorbereiteter Block 4c, der nicht mitläuft.**
+Begründung, in der Reihenfolge ihres Gewichts:
+
+1. **Es gibt genau einen Aufrufer, und er liegt im anderen Repository.**
+   `api.jsx:243` schickt `p_user_id` mit. Weg B ohne Übergangsfassung nimmt der
+   Produktion die Trophäen weg, und zwar lautlos: `Api.unlockTrophy` hat kein
+   `_apiCheck` und `app.jsx:551` fängt jeden Fehler mit `catch (e) { }` ab. Der
+   Nutzer sieht die Konfetti-Animation, der Server hat nichts gespeichert. Das
+   ist derselbe Fehlermodus, der Migration 3a blockiert.
+2. **Weg A schließt die Lücke vollständig, nicht teilweise.** Der Schaden von
+   E-52 ist der Schreibzugriff auf ein fremdes Konto. Der ist mit dem Vergleich
+   gegen `auth.uid()` weg, ganz unabhängig davon, ob der Parameter noch da
+   steht. Was bleibt, ist eine unschöne Signatur, kein Loch.
+3. **Es ist die Entscheidung, die für `increment_coins` schon getroffen ist.**
+   Block 2a hält den Parameter aus demselben Grund („damit alle bestehenden
+   Aufrufer ohne Änderung weiterlaufen"). Zwei verschiedene Muster für dieselbe
+   Klasse Fehler wären für den nächsten Leser teurer als die eine schiefe
+   Signatur.
+4. **Eine zweite Funktion ist eine zweite Rechtefläche.** Solange kein Client
+   sie ruft, hat 4c nur Kosten: ein weiterer Name, an dem jemand ein Grant
+   vergessen kann.
+
+**Nicht entschieden und ausdrücklich offen:** wann Weg B kommt. Er gehört an
+einen Client-Release, nicht an eine Migration. Der Reihenfolgeplan dafür steht
+unter Block 4c.
+
+#### Block 4a: `unlock_trophy`
+
+```sql
+-- ============================================================================
+-- FACT — E-52: unlock_trophy nimmt die Nutzerkennung vom Aufrufer
+-- ----------------------------------------------------------------------------
+-- Ist-Zustand: supabase-schema.sql:514-519. LANGUAGE sql, SECURITY DEFINER,
+-- kein Vergleich mit auth.uid(), keine Schlüsselprüfung, kein search_path,
+-- kein entzogenes Ausführrecht. Wirkung heute: wer eine fremde UUID kennt,
+-- schreibt dort jede Trophäe hin, und die UUIDs gibt get_leaderboard heraus
+-- (supabase-schema.sql:371), auch ohne Anmeldung.
+--
+-- Der Parameter p_user_id BLEIBT in der Signatur und wird nicht mehr geglaubt.
+-- Begründung in Abschnitt 11.4, Muster aus Block 2a.
+--
+-- Bricht heute nichts: einziger Aufrufer ist api.jsx:243, und er übergibt
+-- immer die eigene userId (app.jsx:551, rnkMaybeUnlock).
+-- ============================================================================
+
+begin;
+
+create or replace function public.unlock_trophy(p_user_id uuid, p_trophy_key text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'unlock_trophy: not authenticated' using errcode = '42501';
+  end if;
+
+  -- Der Nullfall ist erlaubt und landet beim eigenen Konto, wie in Block 2a.
+  -- Vorher schrieb `values (null, key)` in eine Spalte mit NOT NULL und
+  -- Fremdschlüssel, war also ein Fehler; jetzt ist er eine gültige Kurzform.
+  if p_user_id is not null and p_user_id <> v_uid then
+    raise exception 'unlock_trophy: foreign account' using errcode = '42501';
+  end if;
+
+  -- KEINE Zeichenklasse, nur eine Länge. `nachtschwärmer`
+  -- (wallet-colors.jsx:133, gerufen in app.jsx:726) und die Stadt-Trophäen des
+  -- Triggers (`münchen_first`, supabase-schema.sql:275-279) enthalten Umlaute.
+  -- Ein ^[a-z0-9_]+$ würde genau die Schlüssel abweisen, die es geben soll.
+  -- Die Länge verhindert nur, dass jemand die Tabelle mit Müll füllt; welche
+  -- Schlüssel es gibt, weiß heute nur der Client (window.WalletTrophies).
+  if p_trophy_key is null or length(p_trophy_key) not between 1 and 64 then
+    raise exception 'unlock_trophy: invalid trophy key' using errcode = '22023';
+  end if;
+
+  insert into public.user_trophies (user_id, trophy_key)
+    values (v_uid, p_trophy_key)
+    on conflict do nothing;
+end;
+$$;
+
+commit;
+```
+
+#### Block 4b: die Ausführrechte, in einer Schleife statt in einer Liste
+
+**Warum eine Schleife über `pg_proc` und keine Liste von Signaturen.** Drei
+Gründe, und jeder einzelne reicht:
+
+1. **Zwei Funktionen sind doppelt definiert** (`backend-inventory.md`, E-21:
+   `start_group_session`, `_team_generate_orders`). Welche Fassung in der
+   Datenbank steht und mit welcher Signatur, ist aus dem Repository nicht zu
+   sehen. Eine Schleife über den Namen trifft alle Fassungen, eine Liste trifft
+   die, die jemand erwartet hat.
+2. **Ein Tippfehler in einer Signatur schlägt nicht fehl, er trifft nur
+   nichts.** `revoke ... on function public.pick_team(uuid, text)` gegen eine
+   Funktion, die `(uuid, varchar)` heißt, ist ein Fehler; `revoke` gegen eine
+   nicht existierende Funktion ist ein Abbruch. Beides fällt in einem Block mit
+   30 Zeilen leicht durch. Die Schleife baut die Signatur aus dem Katalog und
+   kann sie nicht falsch schreiben.
+3. **Sie ist selbstprüfend.** Jede angefasste Funktion und jeder Name, den es
+   in dieser Datenbank nicht gibt, kommt als `NOTICE` zurück. Damit steht nach
+   dem Lauf im Editor-Protokoll, was wirklich passiert ist, und nicht, was
+   passieren sollte.
+
+```sql
+-- ============================================================================
+-- FACT — E-52: EXECUTE steht per PostgreSQL-Standard an PUBLIC, und PUBLIC
+--              schließt anon ein
+-- ----------------------------------------------------------------------------
+-- Im gesamten 03_Backend/ gibt es fünf GRANT/REVOKE-Zeilen, alle in
+-- 2026-06-20_ai_proxy.sql:51-54,61. Alle anderen Funktionen sind ohne Konto
+-- aufrufbar.
+--
+-- ABSICHTLICH NICHT IN DIESER MIGRATION:
+--   check_username   -> wird VOR der Anmeldung gerufen (screen-auth.jsx:600,
+--                       username_check_notifier.dart:144) und wird unten
+--                       ausdrücklich an anon vergeben.
+--   get_leaderboard  -> die Leseseite gehört zu E-16, das ist eine
+--                       Produktentscheidung, keine Migration.
+--   _is_group_member -> steckt in drei RLS-Policies
+--                       (group_sessions_rls_fix.sql:30-47). Policy-Ausdrücke
+--                       laufen mit den Rechten der ABFRAGENDEN Rolle. Ein
+--                       Revoke gegen authenticated legt den Gruppenmodus still.
+--   handle_new_user, handle_fact_collected, handle_user_fact_created
+--                    -> Trigger-Funktionen, über PostgREST nicht rufbar. Der
+--                       Gewinn ist null, das Risiko wäre die ganze Rangliste.
+-- ============================================================================
+
+begin;
+
+-- 1. Schreibende RPCs: nur mit Konto. Die zwölf Gruppen- und Team-RPCs prüfen
+--    auth.uid() schon selbst (group_sessions.sql:120-126 als Muster), das
+--    Ausführrecht ist die zweite, äußere Grenze. get_my_rank liest nur, nimmt
+--    aber eine fremde Kennung und hat keinen anon-Aufrufer (app.jsx:267).
+do $do$
+declare
+  r record;
+  c_names text[] := array[
+    'unlock_trophy',
+    'get_my_rank',
+    'create_group_session',
+    'join_group_session',
+    'start_group_session',
+    'end_group_session',
+    'leave_group_session',
+    'collect_group_fact',
+    'create_team_session',
+    'pick_team',
+    'auto_balance_teams',
+    'randomize_teams',
+    'collect_team_fact',
+    'tag_endpoint'
+  ];
+begin
+  for r in
+    select n.nspname as sch,
+           p.proname as fn,
+           pg_get_function_identity_arguments(p.oid) as args
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.prokind = 'f'
+       and p.proname = any (c_names)
+     order by 2, 3
+  loop
+    execute format('revoke all on function %I.%I(%s) from public, anon',
+                   r.sch, r.fn, r.args);
+    execute format('grant execute on function %I.%I(%s) to authenticated',
+                   r.sch, r.fn, r.args);
+    raise notice 'E-52 gesichert: %(%)', r.fn, r.args;
+  end loop;
+
+  -- Selbstprüfung: was in dieser Datenbank fehlt, muss man wissen, statt es zu
+  -- unterstellen. Ein fehlender Name heißt entweder "Migration nie gelaufen"
+  -- oder "anders benannt", und beides ist ein Befund.
+  for r in
+    select x.fn
+      from unnest(c_names) as x(fn)
+     where not exists (
+       select 1
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = x.fn)
+  loop
+    raise notice 'E-52: % existiert in dieser Datenbank NICHT', r.fn;
+  end loop;
+end
+$do$;
+
+-- 2. Interne Helfer: gar kein Client. Sie werden ausschließlich aus
+--    SECURITY-DEFINER-Funktionen gerufen (team_sessions.sql:130-250,300-325,
+--    570,666; city_backfill.sql:64-108), und die laufen als Eigentümer, den
+--    ein Revoke gegen anon oder authenticated nicht betrifft.
+--    _is_group_member steht bewusst NICHT in dieser Liste.
+do $do$
+declare
+  r record;
+  c_names text[] := array[
+    '_group_code_gen',
+    '_haversine_m',
+    '_city_default_meeting',
+    '_team_generate_orders',
+    '_slugify'
+  ];
+begin
+  for r in
+    select n.nspname as sch,
+           p.proname as fn,
+           pg_get_function_identity_arguments(p.oid) as args
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.prokind = 'f'
+       and p.proname = any (c_names)
+     order by 2, 3
+  loop
+    execute format('revoke all on function %I.%I(%s) from public, anon, authenticated',
+                   r.sch, r.fn, r.args);
+    raise notice 'E-52 intern: %(%)', r.fn, r.args;
+  end loop;
+end
+$do$;
+
+-- 3. Was ohne Konto erreichbar bleiben MUSS. Ausdrücklich vergeben und nicht
+--    dem Standard überlassen: wäre der Standard hier einmal angefasst worden,
+--    wäre die Namensprüfung in beiden Clients stumm kaputt.
+grant execute on function public.check_username(text) to anon, authenticated;
+
+commit;
+
+-- 4. PostgREST-Schemacache erneuern. Ohne das antwortet die API im Zweifel mit
+--    PGRST202 auf eine Funktion, die es gibt.
+notify pgrst, 'reload schema';
+```
+
+**Was `service_role` angeht: nichts.** Supabase vergibt die Rechte für `anon`,
+`authenticated` und `service_role` je Rolle einzeln, nicht über `PUBLIC`. Ein
+`revoke ... from public, anon` nimmt `service_role` also nichts weg. Die
+Datenpipeline und der Admin rufen ohnehin keine dieser Funktionen, geprüft über
+`rpc(` in `04_Datenpipeline/scripts/` und `02_Frontend/admin/index.html`: der
+einzige RPC-Aufruf außerhalb der PWA steht in
+`supabase/functions/llm/index.ts:62,84` und betrifft `ai_consume`/`ai_refund`.
+
+#### Block 4c: die parameterfreie Fassung. Läuft noch nicht
+
+> **Nicht ausführen, solange kein Client sie ruft.** Dieser Block ist fertig,
+> damit er bereitliegt, wie Migration 3.
+
+```sql
+-- Zweite Fassung ohne Nutzerkennung. PostgREST löst Überladungen über die
+-- Menge der Parameternamen im JSON-Rumpf auf: {p_trophy_key} trifft diese
+-- Fassung, {p_user_id, p_trophy_key} die alte.
+--
+-- ZWEI FALLEN, bevor jemand das für harmlos hält:
+--   1. Sobald eine der beiden Fassungen einen DEFAULT-Parameter bekommt, wird
+--      der Aufruf mehrdeutig und PostgreSQL antwortet mit 42725
+--      ("function is not unique"). Keine der beiden darf je einen bekommen.
+--   2. Ohne `notify pgrst, 'reload schema';` kennt die API die neue Fassung
+--      nicht und antwortet mit PGRST202.
+begin;
+
+create or replace function public.unlock_trophy(p_trophy_key text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'unlock_trophy: not authenticated' using errcode = '42501';
+  end if;
+  if p_trophy_key is null or length(p_trophy_key) not between 1 and 64 then
+    raise exception 'unlock_trophy: invalid trophy key' using errcode = '22023';
+  end if;
+
+  insert into public.user_trophies (user_id, trophy_key)
+    values (v_uid, p_trophy_key)
+    on conflict do nothing;
+end;
+$$;
+
+revoke all on function public.unlock_trophy(text) from public, anon;
+grant execute on function public.unlock_trophy(text) to authenticated;
+
+commit;
+
+notify pgrst, 'reload schema';
+```
+
+**Und der letzte Schritt, der erst danach kommt.** Wenn jeder Client die
+parameterfreie Fassung ruft, und nur dann:
+
+```sql
+drop function if exists public.unlock_trophy(uuid, text);
+notify pgrst, 'reload schema';
+```
+
+`if exists` ist hier nicht Kosmetik: ohne es ist der zweite Lauf ein Abbruch,
+und in einer Datenbank ohne Migrationsledger weiß niemand, ob es der zweite
+Lauf ist.
+
+Die Reihenfolge für Weg B, damit sie nicht in Vergessenheit gerät:
+
+| Schritt | Wo | Bedingung |
+|---|---|---|
+| 1 | Block 4c im Backend | jederzeit, aber ohne Nutzen |
+| 2 | PWA auf `{p_trophy_key}` umstellen | eigener Auftrag im PWA-Repository |
+| 3 | diese App: ruft `unlock_trophy` nicht, also nichts zu tun | entfällt |
+| 4 | `drop function ... (uuid, text)` | erst wenn Schritt 2 ausgeliefert **und** die alte Fassung nachweislich nicht mehr gerufen wird |
+
+Für Schritt 4 fehlt heute die Grundlage: es gibt kein Zugriffsprotokoll, aus dem
+hervorgeht, welche Fassung gerufen wird. Wer sichergehen will, baut vorher ein
+`raise notice` oder eine Zählspalte in die alte Fassung ein. Das ist derselbe
+Mangel wie das fehlende Buchungsjournal in Abschnitt 9.
+
+**Dasselbe Muster gilt später für `increment_coins` und
+`collect_fact_validated`.** Die beiden Blöcke oben bleiben unverändert; wenn
+jemand deren Signaturen aufräumt, ist 4c die Vorlage, samt der beiden Fallen.
+
+#### Rückabwicklung 4
+
+Dateiname: `2026-09-02_e52_unlock_trophy_and_execute_grants_down.sql`
+
+```sql
+-- Stellt supabase-schema.sql:514-519 wörtlich her und gibt die Ausführrechte
+-- an PUBLIC zurück, also den PostgreSQL-Standard.
+-- ACHTUNG: damit ist E-52 wieder offen, in vollem Umfang. Vorher Abfrage K
+-- laufen lassen und die Ausgabe sichern.
+begin;
+
+create or replace function public.unlock_trophy(p_user_id uuid, p_trophy_key text)
+returns void language sql security definer as $$
+  insert into public.user_trophies (user_id, trophy_key)
+    values (p_user_id, p_trophy_key)
+    on conflict do nothing;
+$$;
+
+do $do$
+declare
+  r record;
+  c_names text[] := array[
+    'unlock_trophy', 'get_my_rank',
+    'create_group_session', 'join_group_session', 'start_group_session',
+    'end_group_session', 'leave_group_session', 'collect_group_fact',
+    'create_team_session', 'pick_team', 'auto_balance_teams',
+    'randomize_teams', 'collect_team_fact', 'tag_endpoint',
+    '_group_code_gen', '_haversine_m', '_city_default_meeting',
+    '_team_generate_orders', '_slugify'
+  ];
+begin
+  for r in
+    select n.nspname as sch, p.proname as fn,
+           pg_get_function_identity_arguments(p.oid) as args
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.prokind = 'f'
+       and p.proname = any (c_names)
+  loop
+    execute format('grant execute on function %I.%I(%s) to public',
+                   r.sch, r.fn, r.args);
+  end loop;
+end
+$do$;
+
+commit;
+
+notify pgrst, 'reload schema';
+```
+
+Falls Block 4c gelaufen ist, zusätzlich
+`drop function if exists public.unlock_trophy(text);`, sonst bleibt eine
+Funktion stehen, die kein Dokument mehr erklärt.
+
+---
+
+### 11.5 Migration 5: die Freigabespalte gehört in die Policy (E-53)
+
+Dateiname im Backend-Repo: `2026-09-02_e53_facts_approval.sql`
+
+**Vorher laufen lassen: Abfrage M und O** (11.7). M zeigt die Policies auf
+`facts` im Ist-Zustand, O zeigt, ob der Befund schon benutzt wurde.
+
+```sql
+-- ============================================================================
+-- FACT — E-53: Nutzer-Fakten können sich selbst freigeben
+-- ----------------------------------------------------------------------------
+-- Ist-Zustand: supabase-schema.sql:149-150. Die Insert-Policy prüft created_by
+-- und is_user_created, aber nicht is_approved. Dass api.jsx:176 dort `false`
+-- schickt, ist eine Höflichkeit des Clients. Wer die Anfrage selbst
+-- formuliert, veröffentlicht unmoderierten Text für alle Nutzer, inklusive
+-- anon (Lese-Policy :145-146).
+--
+-- WARUM HIER KEINE SPALTENRECHTE, anders als in Migration 1: bei INSERT sieht
+-- WITH CHECK die neue Zeile und kann den Wert der Spalte prüfen. Der Umweg aus
+-- Abschnitt 3 ist für UPDATE nötig, wo es eine alte Zeile gibt. Er wäre hier
+-- sogar schädlich: die PWA nennt is_approved namentlich (api.jsx:176), ein
+-- `revoke insert (is_approved)` würde diesen richtigen Aufruf mit 42501
+-- abweisen.
+--
+-- `is not true` statt `= false`: is_approved ist nullable
+-- (supabase-schema.sql:33). Eine ausdrückliche NULL soll nicht abgewiesen
+-- werden, denn sie ist harmlos. Die Lese-Policy verlangt `= true`, und der
+-- Admin filtert in JavaScript mit `!f.is_approved` (admin/index.html:1164),
+-- behandelt NULL also als "offen". Eine NULL-Zeile ist damit unsichtbar und
+-- trotzdem moderierbar.
+--
+-- Bricht heute nichts: api.jsx:165-177 schickt created_by = eigene userId,
+-- is_user_created = true, is_approved = false. Alle drei Bedingungen erfüllt.
+-- ============================================================================
+
+begin;
+
+-- 1. Policy ersetzen. Gleicher Name, damit der Katalog danach eine Policy
+--    dieses Namens hat und nicht zwei.
+drop policy if exists "insert own fact" on public.facts;
+
+create policy "insert own fact" on public.facts
+  for insert with check (
+    auth.uid() = created_by
+    and is_user_created = true
+    and is_approved is not true
+  );
+
+-- 2. Schreibrechte auf das reduzieren, was ein Client braucht. Reihenfolge wie
+--    in Migration 1: erst tabellenweit entziehen, dann ausdrücklich
+--    zurückgeben. Nicht auf einen vorhandenen Grant vertrauen, sonst hängt das
+--    Ergebnis daran, ob authenticated sein INSERT einzeln oder über PUBLIC
+--    hält, und das weiß aus dem Repository niemand.
+revoke insert, update, delete on public.facts from authenticated, anon, public;
+grant insert on public.facts to authenticated;
+
+-- UPDATE und DELETE bleiben entzogen, und zwar für alle drei Empfänger. Sie
+-- sind heute ohnehin wirkungslos, weil es auf facts keine UPDATE- und keine
+-- DELETE-Policy gibt: ein Nutzer kann seinen Fakt nicht bearbeiten und nicht
+-- löschen. Der Entzug hält den Zustand fest, statt ihn von der Abwesenheit
+-- einer Policy abhängig zu machen. Wer später ein Bearbeiten baut, braucht
+-- beides, und dann steht die Entscheidung ausdrücklich an, statt sich aus
+-- einem alten Default zu ergeben.
+--
+-- SELECT bleibt unberührt: die PWA hängt an api.jsx:178 ein .select() an das
+-- Insert und braucht es. Die Lese-Policy :145-146 deckt den eigenen, noch
+-- nicht freigegebenen Fakt ab.
+
+commit;
+```
+
+**Optionaler Block 5b: die drei anderen Spalten, die niemand mitschickt.**
+
+Die Insert-Policy prüft die Freigabe, nicht den Rest der Zeile. Vier Spalten
+bleiben frei setzbar, und zwei davon haben Wirkung über die Anzeige hinaus:
+
+| Spalte | Was ein gesetzter Wert bewirkt | Schickt die PWA sie? |
+|---|---|---|
+| `rating`, `bewertungen` | der eigene Fakt sieht beliebt aus | nein (`api.jsx:165-177`) |
+| `nr` | Präfix wie `MUC_` steuert den Rückfall des Stadtschlüssels im Trigger (`supabase-schema.sql:242-249`) | nein |
+| `city` | steuert den Stadtschlüssel unmittelbar, also die Stadt-Rangliste | nein |
+
+Weil kein Client sie schickt, ist die strengere Fassung heute kostenlos:
+
+```sql
+begin;
+
+drop policy if exists "insert own fact" on public.facts;
+
+create policy "insert own fact" on public.facts
+  for insert with check (
+    auth.uid() = created_by
+    and is_user_created = true
+    and is_approved is not true
+    and coalesce(rating, 0) = 0
+    and coalesce(bewertungen, 0) = 0
+    and nr is null
+    and city is null
+  );
+
+commit;
+```
+
+**Der Preis steht in der Zukunft, nicht heute.** Sobald ein Client beim
+Erstellen eine Stadt mitgeben soll, und für den Neubau ist das plausibel, muss
+diese Policy mitgeändert werden, sonst scheitert das Erstellen mit `42501` und
+niemand sucht die Ursache in einer RLS-Policy von 2026. Deshalb ist 5b optional
+und nicht Teil von Migration 5: E-53 ist die Freigabespalte, der Rest ist
+Datenhygiene und gehört zu E-56 (Stadtschlüssel) beziehungsweise zur Frage, wer
+`rating` überhaupt setzen darf.
+
+**Was Migration 5 ausdrücklich nicht tut: das Bearbeiten öffnen.** Der Auftrag
+nannte „der Eigentümer darf seine Zeile anlegen und bearbeiten". Bearbeiten gibt
+es nicht, siehe Befund 2 in 11.0. Wenn es kommt, sieht es so aus, und dann ist
+der Umweg aus Abschnitt 3 tatsächlich nötig, weil `WITH CHECK` bei `UPDATE`
+nicht „`is_approved` darf sich nicht ändern" sagen kann:
+
+```sql
+-- NICHT AUSFÜHREN. Rezept für den Tag, an dem ein Fakt bearbeitbar wird.
+grant update (titel, text, text2, kategorie, quelle, hero, lat, lng, ort)
+  on public.facts to authenticated;
+
+create policy "update own pending fact" on public.facts
+  for update
+  using (auth.uid() = created_by and is_approved is not true)
+  with check (auth.uid() = created_by and is_approved is not true);
+```
+
+Zwei Dinge daran sind die eigentliche Arbeit und keine Migration: ob ein bereits
+freigegebener Fakt weiter bearbeitbar sein soll (das `using` oben sagt nein, und
+das ist eine Produktentscheidung), und ob eine Bearbeitung die Freigabe
+zurücksetzen muss. Letzteres ist mit RLS allein nicht zu machen, weil die
+`WITH CHECK`-Klausel den Wert nur prüfen, nicht setzen kann. Das wäre ein
+`BEFORE UPDATE`-Trigger, also Schema.
+
+#### Rückabwicklung 5
+
+Dateiname: `2026-09-02_e53_facts_approval_down.sql`
+
+```sql
+-- Stellt supabase-schema.sql:149-150 wörtlich her.
+-- ACHTUNG: danach kann sich jeder Nutzer seine Fakten wieder selbst freigeben.
+begin;
+
+drop policy if exists "insert own fact" on public.facts;
+
+create policy "insert own fact" on public.facts
+  for insert with check (auth.uid() = created_by and is_user_created = true);
+
+grant insert, update, delete on public.facts to authenticated, anon;
+
+-- Absichtlich KEIN "grant ... to public", gleiche Begründung wie in
+-- Rückabwicklung 1: ein an PUBLIC vergebenes Recht wäre ein neues Loch, kein
+-- wiederhergestellter Zustand. Ob im Ist-Zustand eines bestand, sagt Abfrage M
+-- beziehungsweise B aus Abschnitt 7.
+
+commit;
+```
+
+---
+
+### 11.6 Migration 6: Rangliste und Trophäen sind nicht mehr clientschreibbar (E-55)
+
+Dateiname im Backend-Repo: `2026-09-02_e55_ranking_tables.sql`
+
+**Vorher laufen lassen: Abfrage M, N, P und Q** (11.7). N ist die
+Voraussetzung, nicht die Nachkontrolle: sie bestätigt, dass Tabellen und
+Definer-Funktionen derselben Rolle gehören und `FORCE ROW LEVEL SECURITY` aus
+ist. P und Q zeigen, ob der Befund schon benutzt wurde.
+
+```sql
+-- ============================================================================
+-- FACT — E-55: user_city_scores und user_trophies sind vom Client schreibbar
+-- ----------------------------------------------------------------------------
+-- Ist-Zustand: supabase-schema.sql:213-214 und :223-224. FOR ALL ohne
+-- WITH CHECK, also gilt der USING-Ausdruck auch für neue und geänderte Zeilen.
+-- Ein Nutzer setzt seinen Punktestand je Stadt auf jeden Wert und trägt sich
+-- jede Trophäe ein. get_leaderboard liest im Modus "alltime, Stadt" direkt aus
+-- user_city_scores (supabase-schema.sql:434).
+--
+-- Anders als bei profiles braucht es KEINE Spaltenrechte: auf diesen beiden
+-- Tabellen schreibt kein Client legitim irgendetwas, die Grenze liegt an der
+-- Tabelle und nicht in der Zeile.
+--
+-- WER WEITER DURCHKOMMT, und warum:
+--   handle_fact_collected (:226-341) ist SECURITY DEFINER und gehört dem
+--   Tabelleneigentümer. Eine Definer-Funktion läuft mit den Rechten ihres
+--   Besitzers; für den Tabelleneigentümer greifen RLS-Policies nicht (solange
+--   FORCE ROW LEVEL SECURITY aus ist) und ein GRANT/REVOKE gegen authenticated
+--   betrifft ihn nicht. Der Trigger on_fact_collected (:343-345) hängt an
+--   collected_facts, nicht an der aufrufenden Rolle, und feuert bei jedem
+--   Insert, auch aus einer Definer-Funktion. Dasselbe gilt für
+--   handle_user_fact_created (:347-363) und unlock_trophy (:514).
+--   Bestätigt wird das mit Abfrage N, nicht geglaubt.
+--
+--   `alter table ... force row level security` darf auf keiner der beiden
+--   Tabellen gesetzt werden. Es steht in keiner geprüften Datei und in keiner
+--   Migration dieses Dokuments. Wer es setzt, legt den Trigger still, und
+--   damit die Trophäen und die Stadtwertung.
+--
+-- Bricht heute nichts: kein Client schreibt in eine der beiden Tabellen.
+-- Trophäen laufen über die RPC (api.jsx:243), Punktestände nur über den
+-- Trigger. Vollständige Erhebung in Abschnitt 11.1.
+--
+-- WAS ES NICHT BEHEBT: unlock_trophy bleibt der reguläre Weg, und der Client
+-- entscheidet weiter, welchen Schlüssel er sich holt (app.jsx:551,
+-- :725-727, :804, :975). Für user_city_scores ist die Behebung vollständig,
+-- für user_trophies ist sie eine Verkleinerung. Der Rest ist E-49.
+-- ============================================================================
+
+begin;
+
+-- 1. Schreibrechte entziehen, alle drei Empfänger. `public` ist die
+--    PUBLIC-Pseudorolle, nicht das Schema: ein an PUBLIC vergebenes Recht hält
+--    jede Rolle, und ein Revoke gegen authenticated entfernt es nicht.
+--    Gleiche Begründung wie in Migration 1, Schritt 1.
+revoke insert, update, delete on public.user_city_scores
+  from authenticated, anon, public;
+revoke insert, update, delete on public.user_trophies
+  from authenticated, anon, public;
+
+-- Kein Gegen-Grant. Anders als bei profiles und facts gibt es hier keine
+-- Spalte und keine Operation, die ein Client braucht.
+
+-- 2. Die FOR-ALL-Policies durch ausdrückliche SELECT-Policies ersetzen, damit
+--    im Katalog steht, was gilt. Ohne diesen Schritt bliebe eine Policy
+--    stehen, die INSERT, UPDATE und DELETE erlaubt, während das Recht dafür
+--    fehlt: zwei Aussagen, die sich widersprechen, und der nächste Leser muss
+--    raten, welche zählt.
+drop policy if exists "own city scores" on public.user_city_scores;
+drop policy if exists "own trophies"    on public.user_trophies;
+
+create policy "own city scores select" on public.user_city_scores
+  for select using (auth.uid() = user_id);
+
+create policy "own trophies select" on public.user_trophies
+  for select using (auth.uid() = user_id);
+
+-- Diese zwei Policies ändern HEUTE nichts. Die bestehenden Policies
+-- "public read city scores" und "public read trophies" (:213, :223) erlauben
+-- mit USING (true) ohnehin jedem das Lesen, und mehrere Policies für dieselbe
+-- Operation werden mit ODER verknüpft. Sie stehen hier, weil sie am Tag der
+-- E-16-Entscheidung gebraucht werden: wer dann die USING-(true)-Policies
+-- löscht, nimmt sonst in derselben Sekunde jedem Nutzer den Blick auf die
+-- eigenen Trophäen. Der eigene Zugriff soll nicht daran hängen, dass alle
+-- alles sehen dürfen.
+--
+-- Die Leseseite selbst bleibt unverändert. E-16 ist eine Produktentscheidung,
+-- Einordnung in Abschnitt 12.
+
+commit;
+```
+
+#### Rückabwicklung 6
+
+Dateiname: `2026-09-02_e55_ranking_tables_down.sql`
+
+```sql
+-- Stellt supabase-schema.sql:214 und :224 wörtlich her.
+-- ACHTUNG: danach kann jeder Nutzer seinen Punktestand und seine Trophäen
+-- wieder selbst setzen. Vorher Abfrage M laufen lassen und sichern.
+begin;
+
+drop policy if exists "own city scores select" on public.user_city_scores;
+drop policy if exists "own trophies select"    on public.user_trophies;
+
+create policy "own city scores" on public.user_city_scores
+  for all using (auth.uid() = user_id);
+create policy "own trophies" on public.user_trophies
+  for all using (auth.uid() = user_id);
+
+grant insert, update, delete on public.user_city_scores to authenticated, anon;
+grant insert, update, delete on public.user_trophies    to authenticated, anon;
+
+-- Absichtlich KEIN "grant ... to public", gleiche Begründung wie in
+-- Rückabwicklung 1.
+
+commit;
+```
+
+---
+
+### 11.7 Diagnoseabfragen K bis T
+
+Alle rein lesend, alle unausgeführt. **K bis Q vor den Migrationen laufen
+lassen und die Ausgabe sichern**, R bis T danach zur Kontrolle. Die
+Buchstaben laufen hinter Abschnitt 7 weiter, A bis J stehen dort.
+
+```sql
+-- K) Wer darf heute welche Funktion rufen? Die eine Abfrage, die E-52
+--    beantwortet.
+--    Bewusst mit has_function_privilege und NICHT mit
+--    information_schema.role_routine_grants (so steht es als Prüfung in
+--    backend-inventory.md, E-52): das information_schema zeigt Rechte, die an
+--    PUBLIC vergeben sind, gar nicht an, und genau die sind hier der Befund.
+--    has_function_privilege beantwortet die Frage über alle Wege: einzeln
+--    vergeben, über PUBLIC, über Rollenmitgliedschaft.
+select p.oid::regprocedure                                   as funktion,
+       has_function_privilege('anon',          p.oid, 'EXECUTE') as anon_darf,
+       has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_darf,
+       p.prosecdef                                           as security_definer,
+       pg_get_userbyid(p.proowner)                           as owner,
+       p.proconfig                                           as settings
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.prokind = 'f'
+ order by 2 desc, 1;
+
+-- L) Doppelt definierte Funktionen (E-21), zweistufig.
+--    L1 findet nur die Fälle mit UNTERSCHIEDLICHEN Signaturen. Bei gleicher
+--    Signatur ersetzt die zweite Ausführung die erste, es existiert also nur
+--    eine Zeile, und L1 bleibt leer. Genau so liegt der Fall bei
+--    start_group_session (beide Fassungen nehmen (p_session_id uuid)).
+select p.proname,
+       count(*)                                              as fassungen,
+       array_agg(p.oid::regprocedure::text order by p.oid)   as signaturen
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prokind = 'f'
+ group by 1
+having count(*) > 1;
+
+--    L2 ist deshalb die eigentliche Prüfung: den Rumpf ausgeben und mit den
+--    beiden Dateien vergleichen. 2026-06-04_group_sessions.sql:193 gegen
+--    2026-06-05_team_sessions.sql:473, und 2026-06-05:105 gegen
+--    2026-06-07_city_backfill_and_slug_match.sql:41. Welche Fassung läuft,
+--    entscheidet die Reihenfolge, in der jemand die Dateien in den Editor
+--    kopiert hat.
+select p.oid::regprocedure as funktion, pg_get_functiondef(p.oid) as rumpf
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.proname in ('start_group_session', '_team_generate_orders');
+
+-- M) Policies im Ist-Zustand für die Tabellen dieses Nachtrags.
+--    Gleiche Form wie Abfrage A, andere Tabellen.
+select tablename, policyname, cmd, qual, with_check
+  from pg_policies
+ where schemaname = 'public'
+   and tablename in ('facts', 'user_trophies', 'user_city_scores')
+ order by tablename, policyname;
+
+-- N) Voraussetzung für Migration 6, nicht Nachkontrolle: gehören Tabellen und
+--    Definer-Funktionen derselben Rolle, und ist FORCE RLS aus?
+--    Liefert rls_forced = true, dann NICHT ausführen: der Trigger wäre
+--    danach ausgesperrt.
+select c.relname,
+       pg_get_userbyid(c.relowner) as owner,
+       c.relrowsecurity            as rls_enabled,
+       c.relforcerowsecurity       as rls_forced
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public'
+   and c.relname in ('facts', 'user_trophies', 'user_city_scores');
+
+select p.proname,
+       pg_get_userbyid(p.proowner) as owner,
+       p.prosecdef                 as security_definer,
+       p.proconfig                 as settings
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.proname in ('handle_fact_collected', 'handle_user_fact_created',
+                     'unlock_trophy');
+
+-- O) Ist E-53 schon benutzt worden?
+select is_approved, count(*)
+  from public.facts
+ where is_user_created = true
+ group by 1
+ order by 1;
+
+select id, titel, created_by, created_at
+  from public.facts
+ where is_user_created = true and is_approved = true
+ order by created_at desc
+ limit 50;
+
+--    Zur Auslegung: eine Zeile hier bedeutet NICHT Missbrauch. Sie kann von
+--    einem Admin freigegeben worden sein (admin/index.html:1426) oder vom
+--    Client selbst. Die beiden Fälle sind in den Daten nicht unterscheidbar,
+--    weil es kein Protokoll darüber gibt, wer wann freigegeben hat. Das ist
+--    E-58, und es ist der Grund, warum diese Abfrage nur eine Liste zum
+--    Durchsehen liefert und keine Antwort.
+
+-- P) Ist E-55 schon benutzt worden? Trophäenschlüssel, die kein Serverpfad
+--    und kein Client-Aufruf erzeugt haben kann.
+--    Die Liste im Array sind die 19 Schlüssel der Trigger
+--    (supabase-schema.sql:268-334, :347-359) und die 8, die der Client über
+--    unlock_trophy holt (app.jsx:402,415,427,725-727,804,975).
+--    Das NOT LIKE nimmt die Stadt-Trophäen `<stadt>_first` heraus (:275-279),
+--    deren Namen von den Daten abhängen.
+select trophy_key, count(*) as nutzer, min(unlocked_at), max(unlocked_at)
+  from public.user_trophies
+ where trophy_key <> all (array[
+         'erster','entdecker','sammler','kenner','experte','legende',
+         'stadtkenner','weltenbummler','grand_tour',
+         'chronist','meister_hist','steinleser','meister_arch',
+         'mythenjaeger','lacher','flussfischer',
+         'tagesrekord','wochenend_held','geheimtipp',
+         'fruehaufsteher','nachtschwärmer','nachtfalter','kommentator',
+         'koop_first','koop_squad','team_first','team_victor'
+       ])
+   and trophy_key not like '%\_first'
+ group by 1
+ order by 2 desc;
+
+--    Vollbild zum Vergleich, weil ein leeres Ergebnis oben nichts beweist:
+select trophy_key, count(*) as nutzer
+  from public.user_trophies group by 1 order by 2 desc;
+
+-- Q) Stimmen die Punktestände mit dem Gesammelten überein?
+--    score_total wird ausschließlich vom Trigger hochgezählt, je Insert um 1
+--    (supabase-schema.sql:255-258), und collected_facts hat (user_id, fact_id)
+--    als Primärschlüssel. Beide Zahlen müssen gleich sein.
+select p.id, p.score_total, count(cf.fact_id) as gesammelt
+  from public.profiles p
+  left join public.collected_facts cf on cf.user_id = p.id
+ group by 1, 2
+having p.score_total <> count(cf.fact_id)
+ order by p.score_total - count(cf.fact_id) desc;
+
+--    Zur Auslegung, und das ist wichtig, sonst jagt jemand ein Phantom:
+--    eine Abweichung nach OBEN heißt entweder gesetzt (E-24) oder gelöscht.
+--    Die Policy "own collected" (:153) erlaubt heute FOR ALL, ein Nutzer darf
+--    seine collected_facts also löschen, und score_total geht dabei nicht
+--    zurück. Erst nach Migration 3a ist diese zweite Erklärung weg.
+
+--    Dieselbe Probe je Stadt hat eine zusätzliche legitime Fehlerquelle und
+--    ist deshalb schwächer: der Backfill vom 07.06.2026
+--    (2026-06-07_city_backfill_and_slug_match.sql) hat facts.city NACH dem
+--    Sammeln gesetzt. Alte Sammlungen liegen damit auf einem anderen
+--    Stadtschlüssel als die Neuberechnung ergibt, ganz ohne Zutun eines
+--    Nutzers. Das ist E-56. Eine Abweichung hier ist ein Hinweis, kein Befund.
+select ucs.user_id, ucs.city_key, ucs.score, coalesce(c.ist, 0) as neu_gerechnet
+  from public.user_city_scores ucs
+  left join (
+    select cf.user_id,
+           lower(coalesce(f.city,
+             case when f.nr like 'MUC%' then 'München'
+                  when f.nr like 'REG%' then 'Regensburg'
+                  when f.nr like 'ROM%' then 'Rom'
+                  when f.nr like 'PAU%' then 'Passau'
+                  else 'unknown' end)) as city_key,
+           count(*) as ist
+      from public.collected_facts cf
+      join public.facts f on f.id = cf.fact_id
+     group by 1, 2
+  ) c on c.user_id = ucs.user_id and c.city_key = ucs.city_key
+ where ucs.score <> coalesce(c.ist, 0)
+ order by ucs.score - coalesce(c.ist, 0) desc;
+```
+
+Nachkontrolle. Diese müssen **nach** den jeweiligen Migrationen gelten:
+
+```sql
+-- R) nach Migration 4.
+--    Erwartet: unlock_trophy anon = false, authenticated = true;
+--              check_username anon = true (SONST IST DIE REGISTRIERUNG STUMM
+--              KAPUTT); _is_group_member authenticated = true (sonst ist der
+--              Gruppenmodus tot).
+select has_function_privilege('anon',
+         'public.unlock_trophy(uuid, text)', 'EXECUTE')       as unlock_anon,
+       has_function_privilege('authenticated',
+         'public.unlock_trophy(uuid, text)', 'EXECUTE')       as unlock_auth,
+       has_function_privilege('anon',
+         'public.check_username(text)', 'EXECUTE')            as username_anon,
+       has_function_privilege('authenticated',
+         'public._is_group_member(uuid, uuid)', 'EXECUTE')    as member_auth,
+       has_function_privilege('anon',
+         'public.tag_endpoint(uuid, numeric, numeric)', 'EXECUTE') as tag_anon;
+
+--    Und die vollständige Gegenprobe: keine Funktion außer den drei bewusst
+--    offenen darf für anon noch ausführbar sein.
+--    Erwartet: genau check_username, get_leaderboard, fact_i18n_langs.
+select p.oid::regprocedure as noch_fuer_anon_offen
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prokind = 'f'
+   and has_function_privilege('anon', p.oid, 'EXECUTE')
+ order by 1;
+
+-- S) nach Migration 5.
+--    Erwartet: insert = true, update = false, delete = false, select = true.
+select has_table_privilege('authenticated', 'public.facts', 'INSERT') as ins,
+       has_table_privilege('authenticated', 'public.facts', 'UPDATE') as upd,
+       has_table_privilege('authenticated', 'public.facts', 'DELETE') as del,
+       has_table_privilege('authenticated', 'public.facts', 'SELECT') as sel,
+       has_table_privilege('anon',          'public.facts', 'INSERT') as ins_anon;
+
+--    Und die Policy selbst: with_check muss is_approved nennen.
+select policyname, cmd, with_check
+  from pg_policies
+ where schemaname = 'public' and tablename = 'facts';
+
+-- T) nach Migration 6.
+--    Erwartet: alle sechs Schreibrechte false, beide Leserechte true.
+select has_table_privilege('authenticated', 'public.user_trophies',    'INSERT') as tr_ins,
+       has_table_privilege('authenticated', 'public.user_trophies',    'UPDATE') as tr_upd,
+       has_table_privilege('authenticated', 'public.user_trophies',    'DELETE') as tr_del,
+       has_table_privilege('authenticated', 'public.user_city_scores', 'INSERT') as cs_ins,
+       has_table_privilege('authenticated', 'public.user_city_scores', 'UPDATE') as cs_upd,
+       has_table_privilege('authenticated', 'public.user_city_scores', 'DELETE') as cs_del,
+       has_table_privilege('authenticated', 'public.user_trophies',    'SELECT') as tr_sel,
+       has_table_privilege('authenticated', 'public.user_city_scores', 'SELECT') as cs_sel;
+```
+
+**R, S und T sind auch die Regressionsprobe.** Ein späteres, gut gemeintes
+`grant all on all tables in schema public to authenticated` oder ein
+`alter default privileges` macht in einer Zeile alles wieder auf. Wer das nicht
+merken will, legt die drei Abfragen neben Abfrage F.
+
+### 11.8 Negativtests 37 bis 63
+
+Gleiche Bedingungen wie Abschnitt 8: **formuliert, nicht ausgeführt**, weil aus
+diesem Repository keine Verbindung zu einem Supabase-Projekt aufgebaut wird. Sie
+gehören in eine Testdatenbank. Zwei Testkonten `A` und `B`, Aufrufe mit deren
+Session-Token, `anon`-Fälle mit dem öffentlichen Schlüssel und ohne Token. Die
+Nummerierung läuft hinter Abschnitt 8 weiter.
+
+Migration 4, E-52:
+
+| # | Handlung | Vor der Migration | Danach erwartet | Prüft |
+|---|---|---|---|---|
+| 37 | `A` ruft `unlock_trophy(B, 'legende')` | **erlaubt, `B` hat die Trophäe** | Fehler `42501`, `foreign account` | Kernfall E-52 |
+| 38 | `A` ruft `unlock_trophy(A, 'nachtschwärmer')` | erlaubt | **erlaubt** | Umlaut im Schlüssel bleibt zulässig |
+| 39 | `A` ruft `unlock_trophy(null, 'kommentator')` | Fehler, `user_id` ist `NOT NULL` | **erlaubt**, landet bei `A` | Nullfall, wie Test 18 |
+| 40 | `anon` ruft `unlock_trophy(A, 'legende')` | **erlaubt, `A` hat die Trophäe** | Fehler, kein `EXECUTE` | „ohne Konto darauf schreiben" |
+| 41 | `A` ruft `unlock_trophy(A, <65 Zeichen>)` | erlaubt, Zeile wird geschrieben | Fehler `22023` | Längengrenze |
+| 42 | `anon` ruft `check_username('irgendwas')` | erlaubt | **erlaubt** | **der wichtigste Nichtbruch-Test** |
+| 43 | `A` liest `group_sessions` einer eigenen Sitzung | erlaubt | **erlaubt** | `_is_group_member` ist noch ausführbar |
+| 44 | `A` fährt eine Gruppensitzung durch: anlegen, starten, sammeln | erlaubt | **erlaubt** | die Helfer sind aus Definer-Funktionen erreichbar |
+| 45 | `anon` ruft `create_group_session(...)` | Fehler `not_authenticated` aus dem Rumpf | Fehler `42501`, kein `EXECUTE` | äußere Grenze statt Rumpfprüfung |
+| 46 | `anon` ruft `get_my_rank(B, 'global', 'weekly')` | liefert eine Zahl | Fehler, kein `EXECUTE` | fremder Rang ohne Konto |
+| 47 | `A` ruft `_haversine_m(48.5, 13.4, 48.6, 13.5)` | erlaubt | Fehler, kein `EXECUTE` | interne Helfer sind keine API |
+| 48 | `anon` ruft `get_leaderboard('global','weekly')` | erlaubt | **erlaubt, unverändert** | E-16 bleibt bewusst offen |
+
+Migration 5, E-53:
+
+| # | Handlung | Vor der Migration | Danach erwartet | Prüft |
+|---|---|---|---|---|
+| 49 | `A` fügt einen Fakt genau wie `api.jsx:165-177` ein | erlaubt | **erlaubt** | Nichtbruch der PWA |
+| 50 | `A` fügt einen Fakt mit `is_approved: true` ein | **erlaubt, sofort für alle sichtbar** | Fehler `42501` | Kernfall E-53 |
+| 51 | `A` fügt einen Fakt ohne `is_approved` ein | erlaubt, Default `false` | **erlaubt** | Default greift weiter |
+| 52 | `A` fügt einen Fakt mit `is_approved: null` ein | erlaubt | **erlaubt**, unsichtbar und moderierbar | `is not true` statt `= false` |
+| 53 | `A` fügt einen Fakt mit `created_by: B` ein | abgelehnt | abgelehnt | unverändert |
+| 54 | `A` ändert `titel` seines eigenen Fakts | abgelehnt, keine `UPDATE`-Policy | abgelehnt, jetzt zusätzlich ohne Recht | Bearbeiten gibt es nicht |
+| 55 | `A` liest den eigenen, nicht freigegebenen Fakt (`.select()` am Insert) | erlaubt | **erlaubt** | `SELECT` unberührt |
+| 56 | Nur wenn 5b lief: `A` fügt einen Fakt mit `rating: 5` ein | erlaubt | Fehler `42501` | optionale Verschärfung |
+
+Migration 6, E-55:
+
+| # | Handlung | Vor der Migration | Danach erwartet | Prüft |
+|---|---|---|---|---|
+| 57 | `A` setzt `user_city_scores.score = 9999` in der eigenen Zeile | **erlaubt** | Fehler `42501` | Kernfall E-55 |
+| 58 | `A` fügt `user_city_scores(A, 'rom', 9999)` ein | **erlaubt** | Fehler `42501` | Insert statt Update |
+| 59 | `A` fügt `user_trophies(A, 'legende')` direkt ein | **erlaubt** | Fehler `42501` | Tabellenweg zu |
+| 60 | `A` löscht eine eigene `user_trophies`-Zeile | **erlaubt** | Fehler `42501` | `FOR ALL` schloss `DELETE` ein |
+| 61 | `A` ruft `unlock_trophy(A, 'kommentator')` | erlaubt | **erlaubt** | der Definer-Weg bleibt offen |
+| 62 | `A` sammelt einen Fakt in Reichweite; `score_total`, `user_city_scores` und `user_trophies` wachsen | ja | **ja** | **der Trigger ist nicht ausgesperrt** |
+| 63 | `A` liest die Trophäen von `B` | erlaubt | **erlaubt, unverändert** | E-16 bleibt bewusst offen |
+
+**Die vier Tests, an denen es hängt.** Test 42, weil ein Fehlschlag bedeutet,
+dass die Registrierung in beiden Clients stumm beschädigt ist. Test 43 und 44,
+weil ein Fehlschlag den Gruppenmodus tot bedeutet und weil er die einzige Probe
+auf den Rechte-Trap aus Befund 7 ist. Test 62, weil ein Fehlschlag bedeutet,
+dass die Eigentümer-Annahme aus Abfrage N falsch war und Migration 6
+zurückgerollt werden muss. Die drei eigentlichen Sicherheitstests (37, 50, 57)
+sind dagegen die einfachen: sie schlagen entweder fehl oder nicht.
+
+### 11.9 Auswirkung auf diese App
+
+**Keine.** Nach Migration 4, 5 und 6 scheitert in `lib/` keine Stelle. Das ist
+nachgesehen und nicht angenommen, und der Weg dorthin hat einen Haken, der
+weitergegeben gehört.
+
+Die vollständige Liste der Supabase-Berührungen dieses Repositories, ermittelt
+über
+
+```
+grep -rn --include=*.dart -E "\.(from|rpc)\s*(<[^>]*>)?\s*\(" lib/
+```
+
+| Stelle | Was | Betroffen von |
+|---|---|---|
+| `lib/features/facts/data/datasources/remote/supabase_fact_remote_data_source.dart:46-48` | `from('facts').select().eq('is_approved', true)` | Migration 5 berührt `SELECT` nicht |
+| `.../supabase_fact_remote_data_source.dart:57` | `from('facts').select().eq('id', id)` | dito |
+| `lib/features/identity/data/datasources/remote/supabase_auth_remote_data_source.dart:295-298` | `rpc('check_username')`, **ohne Anmeldung** | Migration 4 gibt die Funktion ausdrücklich an `anon` frei |
+| `.../supabase_auth_remote_data_source.dart:330-332` | `from('profiles').update({username})` | keine der drei Migrationen; `username` bleibt in Migration 1 freigegeben |
+
+**Der Haken: das Muster `.rpc(` findet den RPC-Aufruf dieses Repositories
+nicht.** Er heißt `_client.rpc<Object?>(`
+(`supabase_auth_remote_data_source.dart:295`), mit einem Typparameter zwischen
+Name und Klammer. Abschnitt 10 nennt `.rpc(` als eines der fünf Suchmuster für
+die dortige Erhebung. Deren **Ergebnis** ist trotzdem richtig, weil
+`check_username` dort ausdrücklich genannt ist, die **Methode** hätte den
+Aufruf aber verfehlt. Wer diese Erhebung später wiederholt, nimmt
+`\.rpc\s*(<[^>]*>)?\s*\(` oder sucht nach den Funktionsnamen. Das ist der
+Grund, warum in der Tabelle oben nach `from` **und** `rpc` gesucht wurde.
+
+**Was künftige Schritte beachten müssen**, jeweils mit der Stelle, an der es
+schiefgehen wird:
+
+- **Fakt erstellen (Phase 7).** Der Insert muss `created_by` auf die eigene
+  Kennung, `is_user_created` auf `true` und `is_approved` auf `false` setzen
+  oder weglassen. Nach Migration 5 ist ein `true` dort keine stille Freigabe
+  mehr, sondern ein `42501`, das in der Fehlerabbildung der Datenschicht
+  ankommt. Wenn 5b läuft, gilt dasselbe für `rating`, `bewertungen`, `nr` und
+  `city`.
+- **Trophäen (`progression`).** Der Block hat heute keine Datenschicht, das ist
+  ausdrücklich so entschieden
+  (`lib/features/progression/presentation/widgets/trophy_list.dart:39-45`,
+  `lib/features/progression/domain/entities/trophy.dart:17-19`). Wenn sie
+  kommt, ist die Leserichtung unproblematisch, und die Schreibrichtung ist
+  keine: `user_trophies` ist nach Migration 6 für den Client nicht schreibbar,
+  und `unlock_trophy` zu rufen würde den Fehler der PWA wiederholen, den E-49
+  beschreibt. Der Server entscheidet, welche Trophäe fällt.
+- **Punktestände.** `user_city_scores` ist nach Migration 6 nur lesbar. Wer
+  einen Stadtpunktestand anzeigen will, liest ihn oder ruft
+  `get_leaderboard`; er rechnet ihn nicht nach. Das ist derselbe Fehler, den
+  `wltDeriveTrophies` in der PWA macht (E-49).
+
+### 11.10 Was nach Migration 4 bis 6 immer noch offen ist
+
+Ergänzung zu Abschnitt 9, damit niemand die sechs Migrationen für eine
+abgeschlossene Absicherung hält.
+
+- **Der Client bestimmt weiter, welche Trophäe er bekommt.** `unlock_trophy`
+  ist nach Migration 4 an das eigene Konto gebunden und nimmt jeden Schlüssel
+  von höchstens 64 Zeichen. Ein Nutzer kann sich `legende` holen, ohne 250
+  Fakten gesammelt zu haben. Behebung: die Trophäenlogik gehört vollständig auf
+  den Server, `unlock_trophy` verschwindet als öffentliche Funktion. Das ist
+  E-49 und eine Architekturentscheidung, siehe `backend-inventory.md`,
+  Abschnitt 6.
+- **Es gibt keine Schlüsselliste in der Datenbank.** Welche Trophäen existieren,
+  weiß nur `wallet-colors.jsx:103`. Eine Tabelle `trophies(key, ...)` mit
+  Fremdschlüssel aus `user_trophies` wäre die Prüfung, die Migration 4 nicht
+  leisten kann. Neue Tabelle, also Entscheidung.
+- **`facts.rating` und `facts.bewertungen` bleiben clientsetzbar**, solange 5b
+  nicht läuft, und danach nur beim Einfügen. Wer sie später ändern darf, ist
+  offen, weil es heute keinen Bewertungsweg gibt.
+- **Ein Fakt kann weiterhin nicht bearbeitet werden**, auch nicht vom
+  Verfasser. Das ist der Zustand von vorher, kein Ergebnis dieser Migration,
+  aber es fällt jetzt auf, weil die Rechte ausdrücklich stehen.
+- **Die Leseseite bleibt vollständig offen.** `user_trophies` und
+  `user_city_scores` sind für jeden lesbar, `get_leaderboard` gibt die
+  Nutzerkennungen an `anon` heraus. Das ist E-16, und es ist die einzige der
+  vier Einordnungen unten, die eine Migration bräuchte, sobald die Entscheidung
+  da ist.
+- **Es gibt kein Protokoll darüber, wer freigegeben hat.** Abfrage O liefert
+  eine Liste zum Durchsehen, keine Antwort. Nach einem Missbrauch von E-53 ist
+  nicht rekonstruierbar, ob ein Admin oder der Verfasser den Fakt freigegeben
+  hat. Dasselbe Loch wie das fehlende Buchungsjournal in Abschnitt 9, und
+  derselbe Grund: E-58.
+- **Alles hier steht unter dem Vorbehalt aus `backend-inventory.md`,
+  Abschnitt 2.** Ohne Schema-Dump der laufenden Datenbank ist nicht bekannt, was
+  von den acht bestehenden Migrationen tatsächlich gelaufen ist. Die Abfragen K
+  bis Q sind die kleine Fassung dieses Dumps für den Ausschnitt, den dieser
+  Nachtrag anfasst.
+
+---
+
+## 12. Vier Befunde, für die eine Migration die falsche Antwort ist
+
+E-16, E-54, E-56 und E-57 aus `backend-inventory.md`, Abschnitt 3. Für jeden
+davon **könnte** man SQL schreiben. Es wäre in allen vier Fällen eine
+Entscheidung, die als Technik verkleidet daherkommt, und deshalb steht hier
+statt einer Migration die Frage, die vorher zu beantworten ist, und wem sie
+gehört.
+
+Die Zuordnung benutzt drei Zuständigkeiten: **Produkt** (was der Nutzer sehen
+und erleben soll), **Ökonomie** (was etwas kostet und was es wert ist),
+**Architektur** (wo eine Regel lebt und welchem Vertrag sie folgt).
+
+### E-16: Rangliste und Trophäen sind für jeden lesbar
+
+**Warum keine Migration reicht.** Die Migration wäre eine Zeile:
+`drop policy "public read trophies"`, dazu dieselbe für `user_city_scores`, und
+die beiden Policies aus Migration 6 tragen den eigenen Zugriff schon. Danach
+sieht niemand mehr die Trophäen eines anderen. **Das bricht die Rangliste
+nicht** (`get_leaderboard` ist `SECURITY DEFINER` und liest an RLS vorbei), aber
+es bricht möglicherweise ein Produktversprechen, das niemand aufgeschrieben hat.
+
+Die eigentliche Frage steht davor: **was darf ein fremder Nutzer sehen?** Es
+gibt eine Teilantwort im Bestand, und sie ist schmaler als der Ist-Zustand.
+`profiles` ist über die Policy `own profile` (`supabase-schema.sql:141`) nur für
+den Eigentümer lesbar, und der Schalter `show_real_name` entscheidet, ob in der
+Rangliste der echte Name oder das Pseudonym erscheint
+(`get_leaderboard`, `:382`, `:395`, `:420`, `:431`). Der Bestand sagt also:
+Identität ist geschützt, und über die Sichtbarkeit entscheidet der Nutzer.
+`user_trophies` und `user_city_scores` widersprechen dem mit `USING (true)`.
+
+Und sie widersprechen ihm auf eine Weise, die mehr freigibt als einen Namen:
+
+- **`user_trophies` ist eine Verhaltensakte.** `fruehaufsteher`,
+  `nachtschwärmer`, `wochenend_held`, `tagesrekord` sagen, zu welchen
+  Tageszeiten jemand unterwegs war, `unlocked_at` sagt, wann.
+- **`user_city_scores` ist Aufenthaltsdaten.** Die Tabelle sagt, in welchen
+  Städten ein Nutzer wie viele Fakten gesammelt hat, und Fakten haben
+  Koordinaten. Über `get_leaderboard` bekommt jeder ohne Konto die
+  Nutzerkennungen der Top 10 (`:371`), und mit einer Kennung liest er dann
+  beide Tabellen direkt aus.
+
+Das ist der Punkt, an dem der Befund die Nummer E-16 verlässt: es geht nicht um
+eine Policy, sondern um Standortdaten von identifizierbaren Personen.
+`docs/engineering/security.md` verlangt für neue sensible Daten eine
+Freigabe; hier sind sie nicht neu, sondern bereits offen, was die Freigabe nicht
+ersetzt, sondern dringlicher macht.
+
+**Wem sie gehört: Produkt**, mit einer Auflage. Die Entscheidung „was sieht ein
+Fremder" ist eine Produktfrage (Janek). Die Umsetzung ist danach klein und
+gehört zu Migration 6. Die Datenschutzseite ist keine Produktfrage und keine
+Geschmacksfrage: solange sie offen ist, ist der Zustand nicht „unentschieden",
+sondern „offen zugunsten der weitesten Auslegung". Wer die Entscheidung
+verschiebt, verschiebt sie in diese Richtung.
+
+### E-54: Coins sind über Gruppensitzungen unbegrenzt farmbar
+
+**Warum keine Migration reicht.** Der Geltungsbereich der Sperre ließe sich
+umschreiben, das ist ein Index:
+
+```sql
+-- NICHT AUSFÜHREN. Zwei mögliche Sperren, und keine ist ohne Entscheidung
+-- richtig.
+--   pro Nutzer und Fakt, einmalig:
+create unique index ... on public.group_collects (user_id, fact_id);
+--   pro Sitzung, wie heute (2026-06-05_team_sessions.sql:61-67):
+create unique index ... on public.group_collects (session_id, fact_id) where team is null;
+```
+
+Die erste Zeile ist nicht einmal so baubar, denn `group_collects` hat gar keine
+Spalte `user_id`: die Gutschrift geht an **alle** Teilnehmer der Sitzung
+(`2026-06-04_group_sessions.sql:329-333`), und wer wann dabei war, steht in
+`group_participants`. Die Sperre „einmal je Nutzer und Fakt" bräuchte also
+zuerst ein anderes Datenmodell, und schon das ist keine Migration, sondern eine
+Schemaänderung mit Backfill.
+
+Die eigentliche Frage ist die Spielregel: **wofür gibt es 50 Coins?** Für ein
+Fakt, das man noch nicht kannte? Dann ist die Sperre „einmal je Nutzer und
+Fakt", und Wiederholung mit Freunden bringt nichts. Für das Erlebnis, gemeinsam
+unterwegs zu sein? Dann ist die heutige Sperre richtig, und der Missbrauch ist
+der Preis. Dazwischen liegen die Varianten, die man in einer Datenbank auch
+bauen könnte, aber nur, wenn jemand sie will: ein Tageskontingent, ein
+Mindestabstand zwischen zwei Sitzungen, eine geringere Gutschrift beim zweiten
+Mal.
+
+Dieselbe Frage stellt `tag_endpoint` noch einmal deutlicher. Die 100 Coins gehen
+an das Team, das zuerst am **Endpunkt** ist
+(`2026-06-05_team_sessions.sql:679-687`), und der Endpunkt ist der Treffpunkt,
+den der Host beim Anlegen selbst setzt (`create_team_session`, `:277-278`). Wer
+seine eigene Position als Treffpunkt einträgt, ist bereits am Ziel. Eine
+serverseitige Prüfung dagegen ist nicht formulierbar, solange die Position vom
+Client kommt (E-07). **Der Deckel aus Migration 2b greift hier übrigens nicht**,
+weil `tag_endpoint` `profiles.coins` direkt schreibt und nicht über
+`increment_coins` geht, siehe Abschnitt 4.1.
+
+**Wem sie gehört: Ökonomie.** Und es ist die Frage, deren Antwort schon einmal
+formuliert wurde: `backend-inventory.md`, E-54, letzter Absatz, „solange Beträge
+und Anlass im Client bestimmbar sind, darf für Coins nichts zu haben sein, was
+Geld wert ist". Das ist keine technische Aussage, das ist eine Produktzusage.
+Solange sie gilt, ist E-54 ein Ärgernis und kein Schaden, und die Migration hat
+Zeit. Sobald jemand für Coins etwas anbietet, ist sie zuerst zu klären und dann
+zu bauen.
+
+### E-56: Drei Stadtschlüssel-Normalisierungen, und Rom fällt durch alle
+
+**Warum keine Migration reicht.** Eine kanonische Funktion ist schnell
+geschrieben, `_slugify` (`2026-06-07_city_backfill_and_slug_match.sql:19`) ist
+der Kandidat. Das Problem ist nicht die Funktion, sondern **was mit den Daten
+passiert, die unter den alten Schlüsseln liegen**. `user_city_scores` hat
+`city_key` im Primärschlüssel. Eine Umstellung von `münchen` auf `muenchen`
+bedeutet: Zeilen umschreiben, Kollisionen zusammenrechnen (was, wenn ein Nutzer
+Zeilen für `münchen` **und** `muenchen` hat?), und die Rangliste zeigt für die
+Dauer der Umstellung falsche Zahlen. Das ist eine Datenmigration mit
+Verhaltensänderung, kein `create or replace`.
+
+Und es gibt eine Frage davor, die niemand aus dem Code lesen kann: **wie heißt
+Rom?** `handle_fact_collected` bildet `nr LIKE 'ROM%'` auf `'Rom'` ab
+(`supabase-schema.sql:245`), der Backfill vom 07.06. auf `'Rome'`, der
+Ranglistenfilter schickt `rom` (`screen-profil.jsx:9,20`). Einer der drei Werte
+ist der richtige, und die Antwort ist Inhalt, nicht Technik: sie hängt daran, in
+welcher Sprache Städtenamen in `facts.city` stehen sollen und was der Nutzer
+sieht. Multi-City ist eine Invariante dieses Projekts (`CLAUDE.md`), also ist
+das keine Randnotiz zu einer Stadt, sondern der Datenvertrag für jede weitere.
+
+Dazu der Zusatzverdacht aus dem Befund: wenn
+`04_Datenpipeline/scripts/migrate_nr_codes.py:24-31` je über die ganze Tabelle
+gelaufen ist, trägt jede Stadt nördlich von Passau ein `PAU`-Präfix. Das wäre
+kein Anzeigefehler, sondern falsche Stammdaten, und dann ist die Reihenfolge
+umgekehrt: erst die Daten prüfen (Abfrage aus dem Befund, `count(*)` je `city`
+und je `split_part(nr,'_',1)`), dann entscheiden, dann eine Funktion.
+
+**Wem sie gehört: Architektur**, mit einer Inhaltsfrage darin. Der Datenvertrag
+für den Stadtschlüssel ist eine Architekturentscheidung (Dairen): eine Funktion,
+ein Ort, ein Format, und der Neubau des Backends ist der natürliche Zeitpunkt
+dafür, weil eine Datenmigration dann ohnehin ansteht
+(`backend-inventory.md`, Abschnitt 5a). Der Name jeder Stadt ist Inhalt und
+gehört zu Janek. Bis beides beantwortet ist, wäre eine kanonische Funktion nur
+die vierte Normalisierung neben den drei bestehenden.
+
+### E-57: Der Team-Ausgleich kann nicht wirken
+
+**Warum keine Migration reicht.** Der Rechenfehler ist klar und wäre klein zu
+beheben: `v_a` und `v_b` sind zwei Permutationen derselben Menge, `any()` ist
+Mengenmitgliedschaft, also ist `v_dist_a` immer gleich `v_dist_b` und die
+Schwelle immer erfüllt. Wer die Summe entlang der **Reihenfolge** rechnen will,
+braucht eine Wegstrecke von Station zu Station, also `unnest ... with ordinality`
+und `lag()`, nicht `sum(... where id = any(...))`.
+
+Nur behebt das nichts, was jemandem auffällt, denn dahinter steht ein zweiter
+Befund, und der ist der eigentliche: **beide Teams laufen denselben
+Stationssatz.** Das ist kein Versehen, der Partial-Index trägt es im Kommentar
+(`2026-06-05_team_sessions.sql:56-57`, „beide Teams dürfen denselben Fakt
+unabhängig sammeln"). Wenn beide Teams dieselben Stationen haben, ist die
+Wegstrecke beider Teams von der Reihenfolge abhängig und in der Summe gleich.
+Ein korrekt gerechneter Ausgleich würde dann feststellen, dass es nichts
+auszugleichen gibt, und das Resampling bliebe genauso unerreichbar wie heute,
+nur mit mehr Code.
+
+Die eigentliche Frage ist die Spielregel: **was unterscheidet die zwei Teams?**
+Vier Antworten sind denkbar, und sie führen zu vier verschiedenen Funktionen:
+verschiedene Stationen (dann ist der Ausgleich sinnvoll und nötig), dieselben
+Stationen in verschiedener Reihenfolge (dann ist der Ausgleich gegenstandslos
+und der Wettbewerb ist ein Rennen), dieselben Stationen in derselben Reihenfolge
+(dann zählt nur die Zeit), oder gar kein Wettbewerb, sondern eine gemeinsame
+Aufgabe. Die dritte Antwort ist die einzige, die heute im Code als Absicht
+erkennbar ist, und sie widerspricht dem Namen `auto_balance_teams`.
+
+Der Nebenbefund gehört mit derselben Begründung dazu: die Winkelnormalisierung
+`abs(((x - y) + pi()) - pi())` kürzt sich zu `abs(x - y)`, gemeint war
+offensichtlich ein Modulo. Sie repariert man mit, wenn man ohnehin an der
+Funktion ist. Vorher lohnt es nicht, weil sie eine Auswahl beeinflusst, deren
+Zweck offen ist.
+
+**Wem sie gehört: Produkt.** Der Spielablauf im Team-Modus ist eine
+Produktentscheidung (Janek), und Schritt 40 des Neubaus baut laut
+`backend-inventory.md`, Abschnitt 6, ohnehin gegen diesen Zustand, ob er behoben
+ist oder nicht. Solange die Regel offen ist, ist der wirkungslose Ausgleich
+**kein Sicherheitsbefund und keine Dringlichkeit**: er ist ein Stück Code, das
+verspricht, etwas zu tun, und nichts tut. Der Schaden daran ist, dass jemand ihn
+für eine Vorkehrung hält, und dagegen hilft dieser Absatz, keine Migration.
+
+---
+
+## 13. Wo dieser Nachtrag von seinem Auftrag abweicht
+
+Vollständig, weil eine stillschweigende Abweichung schlimmer ist als eine
+gemeldete. Die Abweichungen betreffen alle die Wahl des Mittels, keine den
+Zweck.
+
+| # | Auftrag | Was daraus geworden ist | Warum |
+|---|---|---|---|
+| 1 | E-53 braucht den Spaltenrechte-Umweg aus Abschnitt 3 | `WITH CHECK` auf `is_approved`, keine Spaltenrechte | Bei `INSERT` sieht `WITH CHECK` die Spalte. Ein `revoke insert (is_approved)` würde `api.jsx:176` abweisen, obwohl der Aufruf richtig ist. Der Umweg gilt für `UPDATE`, und `UPDATE` ist auf `facts` nicht offen. |
+| 2 | „der Eigentümer darf seine Zeile anlegen und **bearbeiten**" | Bearbeiten bleibt zu, das Rezept steht ungenutzt in 11.5 | Es gibt keine `UPDATE`-Policy auf `facts`. Bearbeiten wäre eine neue Fähigkeit, kein Sicherheitsfix. |
+| 3 | E-52: „die Funktion nimmt die Kennung nicht mehr entgegen" | Signatur bleibt, Wert wird nicht mehr geglaubt; die parameterfreie Fassung liegt als Block 4c bereit und läuft nicht | Vier Gründe in 11.4, der schwerste: `app.jsx:551` verschluckt den Fehler, ein Bruch wäre unsichtbar. |
+| 4 | E-52 betrifft drei Funktionen | Migration 4 behandelt nur `unlock_trophy`, plus die Ausführrechte des ganzen Bestands | `increment_coins` ist Block 2a, `collect_fact_validated` ist Block 3b. Beide existieren, beide dürfen nicht doppelt geschrieben werden. |
+| 5 | E-55: „Schreibrechte weg" | zusätzlich zwei neue `SELECT`-Policies, die heute nichts ändern | Ohne sie nimmt die E-16-Entscheidung später jedem Nutzer den Blick auf die eigenen Trophäen. |
+| 6 | Negativtest „vorher gelingt, nachher scheitert" | zusätzlich Tests, die **vorher und nachher gelingen müssen** (42, 43, 44, 48, 49, 61, 62, 63) | Ein Negativtest allein beweist nur, dass etwas zu ist, nicht dass die App noch läuft. Die Nichtbruch-Tests sind hier die riskanteren. |
+| 7 | Prüfen, was in `lib/` bricht | zusätzlich gemeldet, dass das Suchmuster `.rpc(` aus Abschnitt 10 den einzigen RPC-Aufruf dieses Repositories nicht findet | `_client.rpc<Object?>(`, `supabase_auth_remote_data_source.dart:295`. Das Ergebnis von Abschnitt 10 bleibt richtig, die Methode nicht. |
+| 8 | E-58 auslassen | ausgelassen, aber zweimal als Grund genannt (Abfrage O, 11.10) | Ohne Protokoll ist nach einem Missbrauch von E-53 nicht feststellbar, wer freigegeben hat. Das ist keine Behandlung von E-58, sondern die Wirkung seines Fehlens auf E-53. |

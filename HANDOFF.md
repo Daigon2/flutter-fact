@@ -80,7 +80,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2311 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2314 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -345,6 +345,69 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 02.09.2026, Drei Backend-Löcher haben Migrationen, und zwölf Meldungen zurück
+
+Janek hat den Auftrag gegeben, die Backend-Löcher zuzumachen, und zugleich
+gefragt, ob stopfen reicht oder das Backend neu gehört. **Antwort: das Schema
+stopfen, den Prozess neu.** Die elf Tabellen und die RLS-Struktur sind in
+Ordnung, die Löcher sind fehlende `WITH CHECK`, ein ungeprüfter Betrag, ein
+Index mit falschem Geltungsbereich. Was wirklich fehlt, ist ein
+Migrationssystem: aus dem Repository ist nicht zu sehen, was in der Datenbank
+steht, und solange das so bleibt, flickt jede Migration eine Vermutung. Weil
+noch nichts live ist, ist jetzt der billigste Moment dafür, den es geben wird.
+
+**Meine eigene frühere Aussage war zu optimistisch, und das ist jetzt
+nachgemessen.** Ich hatte gesagt, sechs von sieben Befunden seien wenige Zeilen
+SQL. Es sind drei Stufen: **drei** sind reine Migration (E-52, E-53, E-55, jetzt
+geschrieben), **vier** brauchen vorher eine Entscheidung (E-16, E-54, E-56,
+E-57), **einer** verlangt, etwas Neues zu bauen (E-58, der Admin).
+
+Angewendet ist nichts. Das Backend liegt im Monorepo, von hier wird dort nie
+geschrieben, und gegen eine Datenbank läuft von hier ohnehin nichts.
+
+### Zwölf Meldungen zurück, und vier davon waren Fehler in meinen Dokumenten
+
+Der Auftrag verlangte, jede Abweichung zu melden statt sie stillschweigend
+umzubauen. Das hat sich gelohnt, und zwar in beide Richtungen.
+
+**Zwei hätten die Produktion gebrochen.** Ein pauschaler Entzug der
+`anon`-Ausführrechte hätte die **Registrierung** in beiden Clients getötet:
+`check_username` läuft vor der Anmeldung, und beide Seiten verschlucken den
+Fehler, es wäre also stumm gescheitert. Und `_is_group_member` sieht wie ein
+interner Helfer aus, steckt aber in **drei RLS-Policies**; Policy-Ausdrücke
+laufen mit den Rechten der abfragenden Rolle, ein Revoke gegen `authenticated`
+hätte den ganzen Gruppenmodus abgeschaltet. Beides nachgeprüft, beides
+ausgenommen, beides mit eigenem Test.
+
+**Eine widerlegt meine eigene Vorgabe.** Ich hatte für E-53 den
+Spaltenrechte-Umweg aus Abschnitt 3 verlangt. Er ist hier nicht nur unnötig,
+sondern **schädlich**: bei `INSERT` gibt es keine alte Zeile, `is_approved is
+not true` ist exakt, und ein `revoke insert (is_approved)` würde einen
+inhaltlich richtigen Aufruf der PWA mit `42501` abweisen.
+
+**Vier waren Fehler in meinen Dokumenten**, alle richtiggestellt:
+
+* Die Sperre, die E-54 nennt, gibt es seit dem 05.06.2026 nicht mehr; sie ist
+  durch zwei partielle Indizes ersetzt. Wichtiger noch: **die naheliegende
+  Behebung ist keine Indexänderung**, weil `group_collects` keine Spalte
+  `user_id` hat.
+* Die Prüfanweisung zu E-52 **sieht den Befund nicht**:
+  `information_schema.role_routine_grants` zeigt an `PUBLIC` vergebene Rechte
+  gar nicht an, und genau die sind das Problem. Wer sie laufen lässt, hält den
+  Befund für behoben.
+* E-53 zeigte auf `api.jsx:167`, dort steht `text: factData.text`. Richtig ist
+  `:176`.
+* Abschnitt 10 der Fix-Datei prüft mit einem Griff nach `.rpc(` und findet
+  damit den **einzigen** RPC-Aufruf dieses Repositories nicht, weil er
+  `_client.rpc<Object?>(` heißt. Das Ergebnis stimmte, die Methode nicht.
+
+Dazu eine Entwurfsentscheidung, die mein Auftrag offen gelassen hatte:
+`p_user_id` **bleibt** in der Signatur und wird nur nicht mehr geglaubt. Ein
+Bruch wäre unsichtbar, weil die PWA jeden Fehler an dieser Stelle mit einem
+leeren `catch` abfängt, und die Lücke ist mit dem Vergleich gegen `auth.uid()`
+ohnehin zu. Der Weg zur parameterfreien Fassung liegt fertig daneben.
+
 
 ### 02.09.2026, Eine unabhängige Prüfung, und sie hat zwei echte Löcher gefunden
 

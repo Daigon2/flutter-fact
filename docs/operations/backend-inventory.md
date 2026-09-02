@@ -145,8 +145,15 @@ andere Funktion gilt der PostgreSQL-Standard: `EXECUTE` an `PUBLIC`, und
 aus und ist ebenfalls ungeschützt. Die Kette lautet also: ohne Konto Kennungen
 abholen, ohne Konto darauf schreiben.
 
-*Prüfung:* `select routine_name, grantee, privilege_type from
-information_schema.role_routine_grants where routine_schema='public';`
+*Prüfung:* **die hier zuerst genannte Abfrage taugt nicht**, am 02.09.2026
+gemessen. `information_schema.role_routine_grants` zeigt Rechte, die an die
+Pseudorolle `PUBLIC` vergeben sind, **gar nicht an**, und genau die sind der
+Befund. Wer sie laufen lässt, bekommt eine leere Liste und hält den Befund für
+behoben. Richtig ist `has_function_privilege`, ausgeschrieben als Abfrage K in
+`backend-security-fixes.md`.
+
+*Nachtrag vom 02.09.2026:* es sind **vier** Funktionen mit fremder Kennung, nicht
+drei. `get_my_rank(p_user_id, …)` liest nur, ist aber ohne Konto erreichbar.
 
 ### E-53: Nutzer-Fakten können sich selbst freigeben
 
@@ -155,9 +162,10 @@ create policy "insert own fact" on public.facts
   for insert with check (auth.uid() = created_by and is_user_created = true);
 ```
 
-`is_approved` kommt in der Bedingung nicht vor. Dass `api.jsx:167` beim
+`is_approved` kommt in der Bedingung nicht vor. Dass `api.jsx:176` beim
 Einfügen `is_approved: false` setzt, ist eine Höflichkeit des Clients, keine
-Regel des Servers. Der Kommentar darüber („bleibt false bis ein Admin den Fakt
+Regel des Servers. (Bis zum 02.09.2026 stand hier `:167`, dort steht
+`text: factData.text`. Nachgesehen und richtiggestellt.) Der Kommentar darüber („bleibt false bis ein Admin den Fakt
 freigibt") beschreibt eine Absicht, die im Schema nicht steht. Wer die Anfrage
 selbst formuliert, veröffentlicht unmoderierten Text für alle Nutzer, in einer
 App, deren Inhalt das Produkt ist. Der Trigger `on_user_fact_created` legt
@@ -169,9 +177,24 @@ obendrein die Trophäen `autor` und `viel_autor` mit an.
 
 `collect_group_fact` schreibt nach erfolgreichem Sammeln
 `update public.profiles set coins = coins + 50` für alle Teilnehmer,
-bedingungslos. Die Sperre gegen Doppelvergabe ist der `UNIQUE`-Index auf
-`(session_id, fact_id)`, also **pro Sitzung**. Eine neue Sitzung ist eine neue
-Zeile und damit erneut 50 Coins für denselben Fakt.
+bedingungslos.
+
+**Die Sperre ist nicht die, die hier bis zum 02.09.2026 stand.** Das
+`UNIQUE (session_id, fact_id)` ist am 05.06.2026 gedroppt und durch **zwei
+partielle Indizes** ersetzt worden (`2026-06-05_team_sessions.sql:54-67`): einer
+für den Koop-Modus über `(session_id, fact_id) where team is null`, einer für
+den Team-Modus über `(session_id, team, fact_id) where team is not null`. Am
+Befund ändert das nichts, der Geltungsbereich bleibt **pro Sitzung**; eine neue
+Sitzung ist eine neue Zeile und damit erneut 50 Coins für denselben Fakt. Im
+Team-Modus ist es sogar eine Sperre weniger, weil beide Teams denselben Fakt
+ausdrücklich unabhängig sammeln dürfen.
+
+**Und die naheliegende Behebung ist keine Änderung eines Indexbereichs.**
+„Einmal je Nutzer und Fakt" lässt sich so nicht schreiben: `group_collects` hat
+keine Spalte `user_id`, die Gutschrift geht an **alle** Teilnehmer der Sitzung.
+Wer die Sperre am Nutzer festmachen will, braucht ein anderes Datenmodell. Das
+ist der Grund, warum dieser Befund keine Migration ist, sondern eine
+Entscheidung.
 
 Sitzungen anzulegen kostet nichts, und der Client bestimmt dabei alles:
 `create_group_session` nimmt `p_fact_ids` entgegen, `create_team_session`
