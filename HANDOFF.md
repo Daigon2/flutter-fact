@@ -63,7 +63,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2292 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2308 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -328,6 +328,25 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Der i18n-Generator prüft jetzt auch die Aufrufstellen
+
+Die Lücke, die E-28 durchgelassen hat, ist zu. 2292 → 2308 Tests, sieben
+Mutationen, alle gefallen. Dazu hat das Werkzeug endlich eine Testdatei; es war
+das einzige der vier ohne, obwohl es die gesamte Zeichenketten-Tabelle erzeugt.
+
+**Überraschend war, wie sehr die Handmessung den Entwurf bestimmt hat.** Sieben
+Rohtreffer, und erst ihre Aufteilung ergab die drei Regeln: einer stand nur in
+einem Kommentar, vier waren Präfixe aus `t('cat.' + x, lang)`, zwei waren echt.
+Wer die Prüfung ohne diese Messung gebaut hätte, hätte fünf Fehlalarme
+eingebaut, und eine Prüfung mit Fehlalarmen wird abgeschaltet, nicht repariert.
+
+**Die Liste bekannter Lücken kann selbst verfallen, und das ist die Hälfte, die
+man vergisst.** Ein Eintrag, der nicht mehr fehlt, wird gemeldet. Ohne diese
+Hälfte verrottet so eine Liste still und bewacht irgendwann nichts mehr. Die
+schärfste Mutation war deshalb ein **erfundener dritter Eintrag**: er wird als
+veraltet gemeldet, die Liste kann also nicht unbemerkt wachsen.
+
 
 ### 31.08.2026, Zwei Löcher im Architektur-Tor, und ein Fund nebenbei
 

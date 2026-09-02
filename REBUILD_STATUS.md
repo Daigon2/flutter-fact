@@ -2622,14 +2622,44 @@ Nicht im REBUILD_PLAN, aber notwendig:
   Behebung gehört zu dem Schritt, der `facts` an die Karte hängt, nicht
   hierher. Die Regel dahinter ist mit E-32 seit dem 28.08.2026 geklärt, siehe
   unten; offen ist nur noch diese Fundstelle.
-- [ ] **Quellprüfung im i18n-Generator für unbekannte Schlüssel.** `t('...')`
-  im JSX ohne Eintrag im Wörterbuch ist für `tool/generate_i18n.dart` heute
-  unsichtbar; die Prüfung liest nur die beiden Wörterbuchdateien. Genau diese
-  Lücke hat `audio.dialog.volumeHint` (E-28) durchgelassen, gefunden wurde er
-  von Hand. Eine Prüfung wäre billig und deckt die ganze Fehlerklasse ab.
-  **Nicht mit E-39 erledigt:** die dort ergänzte Gegenprüfung läuft in die
-  andere Richtung, sie meldet Ergänzungs-Schlüssel, die es in der PWA
-  inzwischen gibt. Ein `t('...')` ohne Wörterbucheintrag sieht sie nicht.
+- [x] **Quellprüfung im i18n-Generator für unbekannte Schlüssel** (31.08.2026).
+  Ein `t('...')` im JSX ohne Wörterbucheintrag war für `tool/generate_i18n.dart`
+  unsichtbar; die Prüfung las nur die beiden Wörterbuchdateien. Genau diese
+  Lücke hat E-28 durchgelassen, gefunden wurde er von Hand. **Nicht mit E-39
+  erledigt**, dessen Gegenprüfung läuft in die andere Richtung.
+  Der Entwurf ist aus einer Handmessung abgeleitet und nicht geraten: 716
+  Wörterbuch-Schlüssel gegen 457 benutzte, **sieben** Rohtreffer, und ihre
+  Aufteilung war der ganze Entwurf. Zwei sind echt (E-28 und der dabei neu
+  gefundene E-63), einer stand nur in einem `//`-Kommentar, vier waren Präfixe
+  aus zusammengesetzten Aufrufen der Form `t('cat.' + x, lang)`. Daraus die
+  drei Regeln: **Kommentare zuerst entfernen**, **nur Literale, auf die `,`
+  oder `)` folgt** (nicht `+`), und **Sicherungsdateien ausschließen**
+  (`.original.`, `.bak`). Nach den drei Verfeinerungen bleiben genau die zwei
+  echten Treffer.
+  **Eine benannte Liste bekannter Lücken statt eines harten Abbruchs auf
+  alles.** Beide echten Funde liegen im anderen Repository und sind von hier
+  nicht behebbar; ohne die Liste wäre das Werkzeug ab dem ersten Lauf dauerhaft
+  rot. Jeder Eintrag trägt seine E-Nummer. **Und die Liste kann selbst
+  verfallen:** ein Eintrag, der im Wörterbuch auftaucht oder im JSX nicht mehr
+  vorkommt, wird gemeldet, sonst verrottet sie still und bewacht nichts mehr.
+  Dieselbe Bauform wie `_checkSupplement`.
+  Sieben Mutationen (vier vom Bauenden, drei von der prüfenden Seite), alle
+  gefallen. Die schärfste war die dritte der prüfenden Seite: ein **erfundener
+  dritter Eintrag** in der Liste wird als veraltet gemeldet, die Liste kann
+  also nicht still wachsen.
+- [x] **`tool/generate_i18n.dart` hatte als einziges der vier Werkzeuge keine
+  Testdatei** (31.08.2026 nachgeholt, `test/tool/generate_i18n_test.dart`, 16
+  Tests). Das Werkzeug erzeugt die gesamte Zeichenketten-Tabelle der App und
+  war ungeprüft, während `bake_map_style`, `generate_curated_data` und
+  `check_architecture` je eine eigene Datei haben. Aufbau nach demselben
+  Vorbild: eine winzige Ersatz-PWA im temporären Verzeichnis, das Werkzeug als
+  Prozess mit `--source` darauf. Der Grund steht schon bei
+  `generate_curated_data_test.dart` und gilt hier genauso: `flutter test` muss
+  **ohne** Zugang zum Lese-Repository durchlaufen.
+  Der Kopfkommentar sagt ausdrücklich, was die Datei **nicht** abdeckt
+  (`_checkParity`, die Veraltungsmeldung der Ergänzung, das Render-Format, die
+  Fehlerpfade von `_readConfig`). Eine Testdatei, die so tut, als decke sie ein
+  Werkzeug ab, ist schlimmer als keine.
 - [ ] **Gate für generierten Code fehlt.** `docs/engineering/quality-gates.md`
   nennt `tool/check_generated_code.dart`, das Skript existiert nicht. Ein
   veralteter `*.g.dart`-Stand fällt heute nur auf, wenn jemand zufällig
