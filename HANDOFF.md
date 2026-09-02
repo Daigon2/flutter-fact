@@ -329,6 +329,33 @@ Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zw
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
 
+### 31.08.2026, Das Tor stand offen, aber nicht an diesem Zweig
+
+Beim Suchen nach dem nächsten Posten stellte sich heraus, dass gleich zwei
+Einträge im Statusdokument die Wirklichkeit falsch beschrieben.
+
+**Der CI-Workflow existiert seit dem 30.08.2026**, das Dokument führte ihn als
+„gibt es nicht". `gh run list` zeigt Läufe, darunter eine bewusste Gegenprobe
+auf einem eigenen Zweig, die rot wurde. Das war das **vierte** veraltete
+Kästchen in diesem Dokument.
+
+**Und dann der Fund dahinter, der wirklich wehtut:** der Auslöser war `push`
+auf `main` und `pull_request`. Der Zweig, auf dem gebaut wird, ist keins von
+beidem. **Fünf Pushes an diesem Abend haben keinen einzigen Lauf ausgelöst.**
+Die vier Gates liefen die ganze Nacht nur, weil sie hier von Hand gestartet
+wurden. Ein Tor, das erst beim Zusammenführen zuschlägt, meldet den Fehler eine
+Tagesarbeit zu spät. Der Auslöser nimmt jetzt `claude/**` mit, und der Push
+dieses Eintrags ist zugleich seine eigene Gegenprobe.
+
+**Der Posten `check_generated_code.dart` ist kleiner als gedacht.**
+`quality-gates.md` sagt inzwischen selbst, dass es das Skript nicht gibt und
+die drei Drift-Werkzeuge dieselbe Fläche abdecken. Wirklich offen bleibt nur
+der `build_runner`-Teil, also `app_routes.g.dart`, einmal von Hand geprüft und
+seither nie wieder. Wer das schließt, entscheidet zuerst, ob so ein Lauf ein
+lokales Tor sein darf: er verdoppelt die Laufzeit ungefähr, und ein Tor, das
+niemand mehr abwartet, ist keins.
+
+
 ### 31.08.2026, Der i18n-Generator prüft jetzt auch die Aufrufstellen
 
 Die Lücke, die E-28 durchgelassen hat, ist zu. 2292 → 2308 Tests, sieben

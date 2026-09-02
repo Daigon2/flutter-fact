@@ -34,7 +34,15 @@ name: Gates
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      # Die Arbeitszweige laufen mit. Bis zum 31.08.2026 stand hier nur
+      # `main`, und das hieß: auf genau dem Zweig, auf dem gebaut wird, lief
+      # kein einziges Gate maschinell. Gemessen und nicht vermutet, `gh run
+      # list` zeigte an diesem Abend fünf Pushes ohne einen einzigen Lauf.
+      # Ein Tor, das erst beim Zusammenführen zuschlägt, meldet den Fehler
+      # eine Tagesarbeit zu spät.
+      - "claude/**"
   pull_request:
 
 # Ein laufender Durchgang wird abgebrochen, wenn derselbe Zweig neu geschoben

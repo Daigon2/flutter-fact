@@ -2758,9 +2758,31 @@ Nicht im REBUILD_PLAN, aber notwendig:
   wird nicht gemeldet, und Regel 10 (Cross-Feature nur über öffentlichen
   Vertrag) bleibt Review-Sache, weil am Text nicht unterscheidbar ist, ob ein
   Import den Vertrag nutzt oder umgeht.
-- [ ] **CI-Workflow.** `.github/workflows/` existiert nicht. Kein Gate läuft
-  automatisch. `quality-gates.md` ruft zusätzlich
-  `tool/check_generated_code.dart`, das es noch nicht gibt.
+- [x] **CI-Workflow** (`.github/workflows/gates.yml`, seit dem 30.08.2026).
+  **Der Eintrag hier war veraltet und behauptete das Gegenteil:** „`.github/
+  workflows/` existiert nicht. Kein Gate läuft automatisch." Beides stimmte
+  schon lange nicht mehr, `gh run list` zeigt Läufe seit dem 30.08.2026,
+  darunter eine bewusste Gegenprobe auf einem eigenen Zweig, die rot wurde.
+  Das ist das vierte veraltete Kästchen in diesem Dokument. Wer eins findet,
+  prüft es nach und setzt genau eine der beiden Stellen richtig.
+- [x] **Der Workflow lief auf dem falschen Zweig** (31.08.2026 behoben).
+  Der Auslöser war `push` auf `main` und `pull_request`. Der Zweig, auf dem
+  tatsächlich gebaut wird, ist keins von beidem: **fünf Pushes an diesem Abend
+  haben keinen einzigen Lauf ausgelöst**, gemessen mit `gh run list`. Die vier
+  Gates liefen nur, weil sie hier von Hand gestartet wurden. Der Auslöser nimmt
+  jetzt zusätzlich `claude/**`. Ein Tor, das erst beim Zusammenführen
+  zuschlägt, meldet den Fehler eine Tagesarbeit zu spät.
+- [ ] **`tool/check_generated_code.dart` gibt es weiterhin nicht**, und der
+  Posten ist kleiner, als er aussieht. `quality-gates.md` sagt inzwischen
+  selbst, dass es das Skript nicht gibt und die drei Drift-Werkzeuge dieselbe
+  Fläche Datei für Datei abdecken. Was **wirklich** offen bleibt, ist enger:
+  die drei Werkzeuge decken die Sprachtabellen, den Kartenstil und die
+  kuratierten Daten ab, aber **nicht** die von `build_runner` erzeugten Dateien
+  wie `app_routes.g.dart`. Deren Stand ist einmal von Hand geprüft worden
+  (27.08.2026, ein frischer Lauf war byteidentisch) und seither nie wieder.
+  Wer das schließt, entscheidet zuerst, ob ein `build_runner`-Lauf ein lokales
+  Tor sein darf: er verdoppelt die Laufzeit der vier Gates ungefähr, und ein
+  Tor, das niemand mehr abwartet, ist keins.
 - [x] **Standort-Permissions.** `ACCESS_FINE_LOCATION`,
   `ACCESS_COARSE_LOCATION` und `INTERNET` in `AndroidManifest.xml`,
   `NSLocationWhenInUseUsageDescription` in `Info.plist`, Texte aus dem alten
