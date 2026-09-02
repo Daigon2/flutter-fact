@@ -16,6 +16,20 @@
 /// [Puzzle]. Wer die Übersetzung an einen zweiten Ort kopiert, hat zwei
 /// Wahrheiten über die Rätselform.
 ///
+/// ## Zwei Umrechnungen sind mit ADR-008 verschwunden
+///
+/// Bis zum 31.08.2026 standen hier `_difficulty` und `_operand`, zwei
+/// Funktionen, die eine Aufzählung und ein Wertobjekt aus `facts` in die
+/// wortgleichen Gegenstücke in `puzzles/domain` übersetzten. Seit der geteilte
+/// Kern beide Typen hält, sind die Gegenstücke gelöscht, und die Umrechnung ist
+/// eine Zuweisung. **Das ist der ganze Gewinn von ADR-008 an dieser Stelle:**
+/// vorher konnten die beiden Aufzählungen auseinanderlaufen, und der `switch`
+/// dazwischen war die einzige Stelle, an der es aufgefallen wäre.
+///
+/// Was **nicht** verschwunden ist, ist diese Datei. `FactPuzzle` selbst bleibt
+/// in `facts/domain`, und `puzzles/domain` darf es weiterhin nicht sehen: der
+/// Kern hält Wertobjekte, keine Entitäten fremder Domänen.
+///
 /// ## Die Reihenfolge ist die Falle
 ///
 /// **Der Rätseltyp wird nicht am Feld `type` entschieden.**
@@ -40,10 +54,7 @@
 library;
 
 import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
 import 'package:fact_app/features/puzzles/domain/entities/puzzle.dart';
-import 'package:fact_app/features/puzzles/domain/value_objects/puzzle_difficulty.dart';
-import 'package:fact_app/features/puzzles/domain/value_objects/puzzle_operand.dart';
 
 /// Die Rätselform, die [source] laut Verhaltensquelle bekommt.
 ///
@@ -92,7 +103,7 @@ Puzzle puzzleFromFactPuzzle(FactPuzzle source) {
         question: source.question,
         type: source.type,
         gpsRadiusMeters: source.gpsRadiusMeters,
-        difficulty: _difficulty(source.difficulty),
+        difficulty: source.difficulty,
         expectedAnswer: source.expectedAnswer,
         hint: source.hint,
         hints: source.hints,
@@ -105,7 +116,7 @@ Puzzle puzzleFromFactPuzzle(FactPuzzle source) {
       return CompassPuzzle(
         question: source.question,
         type: source.type,
-        difficulty: _difficulty(source.difficulty),
+        difficulty: source.difficulty,
         expectedAnswer: source.expectedAnswer,
         hint: source.hint,
         hints: source.hints,
@@ -120,7 +131,7 @@ Puzzle puzzleFromFactPuzzle(FactPuzzle source) {
         type: source.type,
         expectedCount: source.expectedCount,
         countTolerance: source.countTolerance,
-        difficulty: _difficulty(source.difficulty),
+        difficulty: source.difficulty,
         expectedAnswer: source.expectedAnswer,
         hint: source.hint,
         hints: source.hints,
@@ -133,11 +144,11 @@ Puzzle puzzleFromFactPuzzle(FactPuzzle source) {
       return CombinationPuzzle(
         question: source.question,
         type: source.type,
-        operandA: _operand(source.operandA),
-        operandB: _operand(source.operandB),
+        operandA: source.operandA,
+        operandB: source.operandB,
         formula: source.formula,
         expectedResult: source.expectedResult,
-        difficulty: _difficulty(source.difficulty),
+        difficulty: source.difficulty,
         expectedAnswer: source.expectedAnswer,
         hint: source.hint,
         hints: source.hints,
@@ -161,7 +172,7 @@ ChoicePuzzle _choice(FactPuzzle source) => ChoicePuzzle(
   question: source.question,
   type: source.type,
   choices: source.choices,
-  difficulty: _difficulty(source.difficulty),
+  difficulty: source.difficulty,
   expectedAnswer: source.expectedAnswer,
   hint: source.hint,
   hints: source.hints,
@@ -173,34 +184,10 @@ ChoicePuzzle _choice(FactPuzzle source) => ChoicePuzzle(
 TextPuzzle _text(FactPuzzle source) => TextPuzzle(
   question: source.question,
   type: source.type,
-  difficulty: _difficulty(source.difficulty),
+  difficulty: source.difficulty,
   expectedAnswer: source.expectedAnswer,
   hint: source.hint,
   hints: source.hints,
   explanation: source.explanation,
   photoUrl: source.photoUrl,
 );
-
-/// Die Stufe von `facts` in die gleichnamige von `puzzles`.
-///
-/// Zwei wortgleiche Aufzählungen, ein `switch` dazwischen. Der Grund für die
-/// Doppelung steht im Kopf von
-/// `puzzles/domain/value_objects/puzzle_difficulty.dart` und ist dieselbe
-/// Sperre wie bei D-9. Ausdrücklich **ohne** `default`: kommt in `facts` eine
-/// vierte Stufe dazu, soll das hier beim Analysieren auffallen und nicht als
-/// `null` durchrutschen.
-PuzzleDifficulty? _difficulty(FactPuzzleDifficulty? source) => switch (source) {
-  null => null,
-  FactPuzzleDifficulty.leicht => PuzzleDifficulty.leicht,
-  FactPuzzleDifficulty.mittel => PuzzleDifficulty.mittel,
-  FactPuzzleDifficulty.schwer => PuzzleDifficulty.schwer,
-};
-
-/// Einen Eingabewert von `facts` in den gleichnamigen von `puzzles`.
-///
-/// `null` bleibt `null`. Ein leerer Operand bleibt ein leerer Operand: ob ein
-/// Kombi-Rätsel ohne Beschriftungen spielbar ist, entscheidet die
-/// Eingabemaske, nicht die Übersetzung.
-PuzzleOperand? _operand(FactPuzzleOperand? source) => source == null
-    ? null
-    : PuzzleOperand(label: source.label, description: source.description);

@@ -40,6 +40,8 @@ lib/
 │   ├── geo/
 │   └── widgets/
 │
+├── kernel/
+│
 ├── services/
 │   ├── supabase/
 │   ├── analytics/
@@ -48,6 +50,8 @@ lib/
 │   ├── notifications/
 │   ├── permissions/
 │   ├── location/
+│   ├── orientation/
+│   ├── preferences/
 │   ├── deep_links/
 │   └── background_tasks/
 │
@@ -66,6 +70,7 @@ lib/
     ├── progression/
     ├── challenges/
     ├── tours/
+    ├── puzzles/
     ├── profile/
     └── settings/
 ```
@@ -140,6 +145,25 @@ features/settings/
   a `lib/core/anchors/anchor_ids.dart` full of domain identifiers would pass the
   gate. Review enforces this rule, not the machine.
 
+- **`core/geo/` in the tree above is a plan that has since been decided
+  against, and it is kept here with that note rather than deleted.** D-9 was
+  answered on 2026-08-31 with *keep the local types*, and ADR-008 excludes a
+  shared coordinate type by admission rule 3. There are three coordinate types
+  today, in `facts/domain`, `map/domain` and `services/location`, and that is the
+  decided state, not a gap. `api-and-domain-design.md` still lists `GeoPoint`
+  among its examples of value objects worth creating; that list is about creating
+  domain types at all, not about a shared one, but a reader arriving from D-9
+  should know both places were written before the answer.
+
+- `kernel/` is the shared kernel (ADR-008), added on 2026-08-31. It holds value
+  objects that two or more feature domains both need, and it is the only place
+  outside its own feature that a domain layer may import (rule 23). It is
+  deliberately **not** part of `core/`: the root `CLAUDE.md` invariant keeps
+  business concepts out of `core`, and kernel contents are business concepts.
+  Admission is bound to four rules in ADR-008, and adding a type means amending
+  that ADR in the same change. Today it holds two types, `PuzzleDifficulty` and
+  `PuzzleOperand`, and it started by deleting more code than it added.
+
 - `map/` is the map host: app and UI infrastructure that belongs to no business
   domain. It owns the map surface and the camera. Features hand it intentions
   through `map/domain` and never import `map/presentation` or `map/data`
@@ -156,6 +180,27 @@ features/settings/
   the most obvious detour open. As with `map/`, the rule checks the import and
   never the content. A service that hands the user's whereabouts somewhere it
   does not belong passes it; that is E-07 and stays a review concern.
+
+- `services/orientation/` is the compass sensor, the fourth home directory of
+  this kind, added on 2026-08-31 with step 14. The whole package family may
+  appear nowhere else (rule 24), by prefix because
+  `native_device_orientation` is the transitive dependency and therefore the
+  obvious detour. The service hands out an absolute heading and **nothing else**:
+  the smoothing that the behavioural source applies lives in
+  `map/domain/bearing_smoothing.dart`, because a calculation inside a vendor
+  adapter would only ever run on a device, and one no test can reach does not
+  survive the next rewrite. That is the same split, and the same reason, as
+  `locationAccuracyLimitInMeters` sitting with the contract instead of in the
+  geolocator adapter.
+
+- `services/preferences/` is the device key-value store, the third home
+  directory of this kind, added on 2026-08-31 with `shared_preferences` itself.
+  The whole package family may appear nowhere else (rule 22), by prefix and for
+  the same reason as rule 21: `SharedPreferencesStorePlatform` lives in
+  `shared_preferences_platform_interface`, which is the obvious detour. The
+  contract the rest of the app sees is `KeyValueStore` in `core/preferences/`,
+  the same split as `core/diagnostics` and `services/diagnostics`. Five stores
+  ride on it: first launch, tour, audio mode, language and the running hunt.
 
 - `map/application/map_host_providers.dart` holds the two providers that give
   access to the map host, and the boundary between them is drawn by **type**,

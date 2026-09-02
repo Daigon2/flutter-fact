@@ -8,10 +8,16 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
+import 'package:fact_app/map/presentation/map_camera_driver.dart';
+import 'package:fact_app/map/presentation/map_camera_host.dart';
+import 'package:fact_app/map/presentation/map_overlay_driver.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 const MapPosition munich = MapPosition(latitude: 48.1351, longitude: 11.582);
 const MapPosition rome = MapPosition(latitude: 41.896, longitude: 12.4822);
@@ -80,7 +86,83 @@ class FakeMapHost implements MapHost {
     _controller.add(view);
   }
 
-  Future<void> close() => _controller.close();
+  MapViewport? _viewport;
+
+  @override
+  MapViewport? get viewport => _viewport;
+
+  /// Tut so, als hätte `MapSurface` eine Größe gemeldet.
+  void measure(MapViewport size) => _viewport = size;
+
+  final StreamController<MapOverlayGroupTap> _groupTaps =
+      StreamController<MapOverlayGroupTap>.broadcast();
+
+  @override
+  Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
+
+  /// Tut so, als hätte das SDK einen Tipp auf eine Gruppe gemeldet.
+  void tapGroup(MapOverlayGroupTap tap) => _groupTaps.add(tap);
+
+  Future<void> close() =>
+      Future.wait(<Future<void>>[_controller.close(), _groupTaps.close()]);
+}
+
+/// Ein `MapCameraDriver`, der nichts tut.
+///
+/// Für die Attach-Detach-Attach-Proben unten reicht ein echter
+/// `MapCameraHost` statt eines [FakeMapHost], weil genau dessen eigene
+/// Ströme die zu prüfende Begründung tragen (`map_camera_host.dart:193`,
+/// `map_overlay_host.dart:103`). `bindSurface` verlangt einen Treiber, auch
+/// wenn dieser Test keinen SDK-Aufruf sehen will.
+class _NoopCameraDriver implements MapCameraDriver {
+  @override
+  Future<bool?> animate(MapCameraView target, Duration duration) async => null;
+
+  @override
+  Future<bool?> jump(MapCameraView target) async => null;
+}
+
+/// Ein `MapOverlayDriver`, der nichts tut. Reicht, um eine Überlagerung
+/// wirklich zu installieren; **was** dabei ans SDK ginge, prüft
+/// `map_overlay_host_test.dart`.
+class _NoopOverlayDriver implements MapOverlayDriver {
+  @override
+  Future<void> addImage(String name, Uint8List bytes) async {}
+
+  @override
+  Future<void> addSource(String sourceId, SourceProperties properties) async {}
+
+  @override
+  Future<void> setGeoJsonSource(
+    String sourceId,
+    Map<String, dynamic> geoJson,
+  ) async {}
+
+  @override
+  Future<void> addCircleLayer(
+    String sourceId,
+    String layerId,
+    CircleLayerProperties properties, {
+    double? minzoom,
+    double? maxzoom,
+    Object? filter,
+  }) async {}
+
+  @override
+  Future<void> addSymbolLayer(
+    String sourceId,
+    String layerId,
+    SymbolLayerProperties properties, {
+    double? minzoom,
+    double? maxzoom,
+    Object? filter,
+  }) async {}
+
+  @override
+  Future<void> removeLayer(String layerId) async {}
+
+  @override
+  Future<void> removeSource(String sourceId) async {}
 }
 
 class RecordingSink implements DiagnosticSink {
@@ -142,6 +224,24 @@ void main() {
       expect(sink.events.single.attributes['access'], 'camera');
     });
 
+    test('gibt es keine Kartenfläche, und das wird gemeldet', () {
+      // Dieselbe Trennlinie wie bei `camera`: ohne Host ist `null` nicht von
+      // „Karte steht, aber ungemessen" zu unterscheiden, deshalb meldet die
+      // Registry genau diesen Fall.
+      expect(registry.viewport, isNull);
+      expect(sink.names, <String>[MapHostRegistry.missingHostEvent]);
+      expect(sink.events.single.attributes['access'], 'viewport');
+    });
+
+    test('bleibt der Gruppen-Tipp-Strom still, ohne zu melden', () {
+      final StreamSubscription<MapOverlayGroupTap> subscription = registry
+          .groupTaps
+          .listen((_) {});
+      addTearDown(subscription.cancel);
+
+      expect(sink.events, isEmpty);
+    });
+
     test('geht eine Absicht verloren, und das wird gemeldet', () {
       registry.submitIntent(skyFall());
 
@@ -187,7 +287,11 @@ void main() {
       // Durchreichung, die ihre Antwort verschluckt, sähe von außen aus wie
       // eine Karte ohne sichtbare Punkte.
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 12, yInScreenPixels: 34),
+        const MapScreenPoint(
+          xInScreenPixels: 12,
+          yInScreenPixels: 34,
+          isInFrontOfCamera: true,
+        ),
       ];
 
       final List<MapScreenPoint?> located = await registry.projectToScreen(
@@ -211,6 +315,17 @@ void main() {
       host.moveTo(viewAt(munich));
 
       expect(registry.camera, viewAt(munich));
+      expect(sink.events, isEmpty);
+    });
+
+    test('liefert sie die Kartenfläche des Hosts', () {
+      const MapViewport size = MapViewport(
+        widthInScreenPixels: 400,
+        heightInScreenPixels: 800,
+      );
+      host.measure(size);
+
+      expect(registry.viewport, size);
       expect(sink.events, isEmpty);
     });
   });
@@ -282,6 +397,129 @@ void main() {
       await pumpEventQueue();
 
       expect(seen, isEmpty);
+    });
+
+    test('überlebt attach, detach, attach mit demselben Host', () async {
+      // **Die eigentliche Begründung für `broadcast` bei
+      // `MapCameraHost._cameraChanges`** (siehe dort). `attach` kehrt nur
+      // bei einem bereits eingeklinkten, identischen Host früh zurück
+      // (`map_host_providers.dart:143`), `detach` löst dagegen nur die
+      // Kennung (`:181`), ohne den abgemeldeten Host selbst anzufassen. Ein
+      // späteres `attach` mit derselben Instanz hört also ein zweites Mal auf
+      // deren eigenen Strom, und ein Einzelabonnement-Strom wirft beim
+      // zweiten `listen`, auch nach einem `cancel` des ersten. Ein
+      // `FakeMapHost` trägt diese Probe nicht: sein eigener Strom ist selbst
+      // `broadcast` und verschleiert die Mutation, deshalb steht hier ein
+      // echter `MapCameraHost`.
+      final MapCameraHost realHost = MapCameraHost(diagnostics: sink);
+      addTearDown(realHost.dispose);
+
+      final List<MapCameraView> seen = <MapCameraView>[];
+      final StreamSubscription<MapCameraView> subscription = registry
+          .cameraChanges
+          .listen(seen.add);
+      addTearDown(subscription.cancel);
+
+      registry.attach(realHost);
+      registry.detach(realHost);
+      registry.attach(realHost);
+
+      realHost.handleCameraMove(viewAt(munich));
+      await pumpEventQueue();
+
+      expect(seen, <MapCameraView>[viewAt(munich)]);
+    });
+  });
+
+  group('Der Gruppen-Tipp-Strom', () {
+    test('überlebt einen Wechsel des Hosts', () async {
+      // Dieselbe Bauart wie beim Kamerastrom und aus demselben Grund: der
+      // Strom gehört der Registry und nicht dem Host.
+      final List<MapOverlayGroupTap> seen = <MapOverlayGroupTap>[];
+      final StreamSubscription<MapOverlayGroupTap> subscription = registry
+          .groupTaps
+          .listen(seen.add);
+      addTearDown(subscription.cancel);
+
+      const MapOverlayGroupTap first = MapOverlayGroupTap(
+        overlayId: 'discovery.facts',
+        position: munich,
+      );
+      const MapOverlayGroupTap second = MapOverlayGroupTap(
+        overlayId: 'discovery.facts',
+        position: rome,
+      );
+
+      registry.attach(host);
+      host.tapGroup(first);
+      await pumpEventQueue();
+
+      registry.detach(host);
+      final FakeMapHost secondHost = FakeMapHost();
+      addTearDown(secondHost.close);
+      registry.attach(secondHost);
+      secondHost.tapGroup(second);
+      await pumpEventQueue();
+
+      // `identical` und nicht `==`: [MapOverlayGroupTap] hat bewusst keine
+      // Wertgleichheit, siehe dessen Kopfkommentar.
+      expect(seen, hasLength(2));
+      expect(identical(seen[0], first), isTrue);
+      expect(identical(seen[1], second), isTrue);
+    });
+
+    test('meldet nach dem Ausklinken nichts mehr vom alten Host', () async {
+      final List<MapOverlayGroupTap> seen = <MapOverlayGroupTap>[];
+      final StreamSubscription<MapOverlayGroupTap> subscription = registry
+          .groupTaps
+          .listen(seen.add);
+      addTearDown(subscription.cancel);
+
+      registry.attach(host);
+      registry.detach(host);
+      host.tapGroup(
+        const MapOverlayGroupTap(overlayId: 'discovery.facts', position: rome),
+      );
+      await pumpEventQueue();
+
+      expect(seen, isEmpty);
+    });
+
+    test('überlebt attach, detach, attach mit demselben Host', () async {
+      // Dieselbe Begründung wie beim Kamerastrom, hier für den Strom, den
+      // `MapOverlayHost._groupTaps` führt (`map_overlay_host.dart:103`): zur
+      // Laufzeit hat er genau einen Hörer, `MapHostRegistry.attach`
+      // (`map_host_providers.dart:150`), und dieser Hörer meldet sich über
+      // einen Attach-Detach-Attach-Zyklus auf demselben Host ein zweites Mal
+      // an. Ein Einzelabonnement-Strom quittiert das mit einer Ausnahme.
+      final MapCameraHost realHost = MapCameraHost(diagnostics: sink);
+      addTearDown(realHost.dispose);
+      realHost.bindSurface(
+        driver: _NoopCameraDriver(),
+        camera: viewAt(munich),
+        overlays: _NoopOverlayDriver(),
+      );
+      realHost.setOverlay(overlayNamed('discovery.facts'));
+      await realHost.debugOverlays.debugSettled;
+
+      final List<MapOverlayGroupTap> seen = <MapOverlayGroupTap>[];
+      final StreamSubscription<MapOverlayGroupTap> subscription = registry
+          .groupTaps
+          .listen(seen.add);
+      addTearDown(subscription.cancel);
+
+      registry.attach(realHost);
+      registry.detach(realHost);
+      registry.attach(realHost);
+
+      realHost.handleFeatureTapped(
+        layerId: 'discovery.facts.groups',
+        at: const LatLng(48.1351, 11.582),
+      );
+      await pumpEventQueue();
+
+      expect(seen, hasLength(1));
+      expect(seen.single.overlayId, 'discovery.facts');
     });
   });
 

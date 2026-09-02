@@ -4,8 +4,8 @@ import 'package:fact_app/features/facts/domain/structural_equality.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_city.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_coordinates.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 
 /// Ein Fakt: der kanonische Inhalt, sein Ort und alles, was am Datensatz hängt.
 ///
@@ -163,7 +163,7 @@ class Fact {
   /// `puzzle_fit`, die Rätsel an diesem Fakt.
   ///
   /// Leer heißt: keine Rätsel. Der Name ist bewusst nicht `puzzleFit`, siehe
-  /// [FactPuzzleDifficulty].
+  /// [PuzzleDifficulty].
   final List<FactPuzzle> puzzles;
 
   /// Titel in der Standardsprache.
@@ -192,8 +192,8 @@ class Fact {
   ///
   /// Ersetzt den alten, doppelt belegten `puzzleFit`-String. Rein abgeleitet:
   /// hier wird nichts gespeichert, was nicht in [puzzles] steht.
-  FactPuzzleDifficulty? get easiestPuzzleDifficulty {
-    FactPuzzleDifficulty? easiest;
+  PuzzleDifficulty? get easiestPuzzleDifficulty {
+    PuzzleDifficulty? easiest;
     for (final puzzle in puzzles) {
       final difficulty = puzzle.difficulty;
       if (difficulty == null) {

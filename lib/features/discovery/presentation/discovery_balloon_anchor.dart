@@ -78,7 +78,7 @@
 /// **Ab Zoom 14,6, bei jedem üblichen Gehzoom, wählt dieser Bau also ferne,
 /// ruhende Ballons aus, wo die (so hergeleitete) Quelle immer auf das
 /// Ersatzrechteck zeigt.** Ob der Pfeil auf einen echten fernen Ballon zeigen
-/// darf oder ausschliesslich auf das Ersatzrechteck, ist eine sichtbare
+/// darf oder ausschließlich auf das Ersatzrechteck, ist eine sichtbare
 /// Verhaltensfrage. **Sie ist hier bewusst nicht entschieden** und liegt bei
 /// Janek, nicht in diesem Kommentar; bis zur Antwort bleibt das Verhalten wie
 /// gebaut.
@@ -87,7 +87,7 @@
 /// für jeden Ballon, der [FactProximityPoint] gerade als nah kennt, und null
 /// für jeden nur geografisch ausgewählten. Das ist keine Häufigkeitsangabe,
 /// sondern eine Übersetzung: die Quelle hat kein Konzept „nativ“, sie hat nur
-/// „innerhalb von 150 Metern“ und „ausserhalb“, und genau diese Grenze ist
+/// „innerhalb von 150 Metern“ und „außerhalb“, und genau diese Grenze ist
 /// [FactProximityPoint.emphasis]. Woran diese Übersetzung heute vorbeizielt,
 /// steht oben.
 ///
@@ -100,12 +100,12 @@
 /// Diese Datei kennt den Gruppierungszustand einzelner Fakten nicht: es gibt
 /// keinen Vertrag, über den `map/domain/` beantworten könnte, welches Feature
 /// der native Cluster-Algorithmus gerade zusammengefasst hat, und ihn hier
-/// nachzubauen hiesse, MapLibres Gruppierung ein zweites Mal zu schreiben, mit
+/// nachzubauen hieße, MapLibres Gruppierung ein zweites Mal zu schreiben, mit
 /// echtem Risiko, dass beide Seiten auseinanderlaufen. **Diese Auswahl kann
 /// deshalb unterhalb von Zoom 15 einen Fakt wählen, der gerade in einer Gruppe
 /// steckt**, während die Quelle dort korrekt nichts fände. Oberhalb von Zoom 15
 /// gruppiert MapLibre gar nicht mehr (dieselbe Grenze, die `factAnimationRunsAt`
-/// schon nutzt), und dort ist diese Auswahl exakt. Wer das schliessen will,
+/// schon nutzt), und dort ist diese Auswahl exakt. Wer das schließen will,
 /// braucht zuerst eine Antwort auf die Frage, ob `map/domain/` den
 /// Gruppierungszustand einzelner Punkte überhaupt melden soll; das ist eine
 /// Erweiterung des Kartenvertrags und keine, die diese Datei allein
@@ -113,17 +113,20 @@
 ///
 /// ## Ein Fakt hinter der Kamera
 ///
-/// `MapHost.projectToScreen` liefert für einen Punkt hinter der Kamera keine
-/// Ausnahme und kein `null`, sondern eine gespiegelte Zahl, die wie eine
-/// plausible Bildschirmlage aussieht (siehe `REBUILD_STATUS.md`, „Die vier
-/// Gerätemessungen“). Dieselbe Lücke hat `fact_balloon_overlay.dart` schon,
-/// ungelöst: `map/domain/` unterscheidet „vor der Kamera“ und „gespiegelt“
-/// nicht. Diese Auswahl erbt die Lücke, statt sie zu verdoppeln, aber die
-/// **Folge ist hier teurer**: in der Überlagerung zeichnet ein gespiegelter
-/// Punkt einen Ballon an falscher Stelle, ein optischer Aussetzer. Hier kann
-/// derselbe Punkt den Wettbewerb um die Rahmenmitte **gewinnen** und zum
-/// Tutorial-Ziel werden, denn eine Spiegelung an der Kameraachse zieht
-/// gespiegelte Punkte tendenziell in Richtung Bildmitte statt an den Rand.
+/// Ein solcher Punkt fällt aus dem Wettbewerb heraus, weil
+/// `MapScreenPoint.isInFrontOfCamera` es sagt; [selectBalloonAnchorRect] prüft
+/// das Feld und rechnet nichts nach.
+///
+/// **Bis zum 31.08.2026 stand hier eine halbe Seite darüber, dass der Vertrag
+/// diese Aussage nicht macht.** Er macht sie jetzt (D-17,
+/// `map_screen_point.dart` und `map_camera_horizon.dart`), und das war für
+/// diese Datei die teuerste der drei Folgen: in `fact_balloon_overlay.dart`
+/// zeichnete ein gespiegelter Punkt einen Ballon an falscher Stelle, ein
+/// optischer Aussetzer, hier konnte derselbe Punkt den Wettbewerb um die
+/// Rahmenmitte **gewinnen** und zum Tutorial-Ziel werden. Eine Spiegelung an
+/// der Kameraachse zieht gespiegelte Punkte nämlich in Richtung Bildmitte
+/// statt an den Rand, sie sind also nicht bloß falsch, sie sind bevorzugt
+/// falsch.
 library;
 
 import 'dart:async';
@@ -162,7 +165,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// beim Gehzoom auf die 25 zur Kartenmitte nächsten Features zu
 /// (`screen-map.jsx:2050-2056`). Der Grund dort ist ein anderer (Lag-Schutz
 /// bei 600 DOM-Knoten) als hier (Bildschirmabstand statt Kanalkosten), die
-/// Grössenordnung beantwortet aber dieselbe Frage: wie viele der nächsten
+/// Größenordnung beantwortet aber dieselbe Frage: wie viele der nächsten
 /// Punkte reichen, um die Umgebung eines Zentrums verlässlich zu vertreten.
 ///
 /// **Was diese Zahl in der Praxis trägt, hängt an der offenen Verhaltensfrage
@@ -183,8 +186,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// sichtbaren Fakt.** Und genau die bricht bei geneigter Kamera: der
 /// sichtbare Bereich ist bei 58 Grad ein unsymmetrisches Trapez und kein
 /// Kreis um die Kameramitte. Ein Fakt direkt hinter der Kamera ist
-/// geografisch nah und trotzdem nicht sichtbar (er liefert ohnehin eine
-/// gespiegelte Zahl statt `null`, siehe unten); ein Fakt weit voraus Richtung
+/// geografisch nah und trotzdem nicht sichtbar (dass er es nicht ist, sagt
+/// seit D-17 `MapScreenPoint.isInFrontOfCamera`, seine Zahlen sagen es nicht);
+/// ein Fakt weit voraus Richtung
 /// Horizont ist geografisch fern und sehr wohl sichtbar. Die geografische
 /// Vorauswahl ist eine reine Entfernungsprüfung und keine Sichtbarkeitsprüfung,
 /// sie kennt die Neigung nicht. Das macht 25 nicht zu einer schlechten Zahl,
@@ -214,7 +218,7 @@ const double discoveryBalloonAnchorFallbackSize = 38;
 /// Das feste Rechteck, wenn kein Ballon als Ziel taugt.
 ///
 /// `screen-tour.jsx:217-220`, der `else`-Zweig: kein Treffer unter den Markern
-/// heisst „Frame-Mitte unten“, nicht „kein Ziel“. [frameSize] ist dieselbe
+/// heißt „Frame-Mitte unten“, nicht „kein Ziel“. [frameSize] ist dieselbe
 /// Fläche, gegen die auch [selectBalloonAnchorRect] misst.
 Rect discoveryBalloonAnchorFallbackRect(Size frameSize) => Rect.fromLTWH(
   frameSize.width * discoveryBalloonAnchorFallbackXFraction,
@@ -278,7 +282,7 @@ List<MapOverlayPoint> nearestOverlayPointsTo(
 /// von [overlay] mit Betonung 0, ohne Dopplung.
 ///
 /// Ein Fakt, der in [nearby] steht, kommt nicht ein zweites Mal mit Betonung 0
-/// herein: [nearby] kennt die echte, grössere Rolle, die dieser Ballon gerade
+/// herein: [nearby] kennt die echte, größere Rolle, die dieser Ballon gerade
 /// spielt.
 List<BalloonAnchorCandidate> balloonAnchorCandidatesOf({
   required MapOverlay overlay,
@@ -312,8 +316,15 @@ List<BalloonAnchorCandidate> balloonAnchorCandidatesOf({
 ///
 /// `screen-tour.jsx:193-222`, in dieser Reihenfolge geprüft:
 ///
+/// 0. Ein Punkt ohne Bildschirmlage fällt weg, und seit D-17 auch einer, der
+///    laut `MapScreenPoint.isInFrontOfCamera` hinter der Kamera liegt. **In
+///    der Quelle steht diese Stufe nicht**, und warum sie dort fehlt, ist
+///    hier ausdrücklich **nicht** geprüft: ob MapLibre GL JS einen DOM-Marker
+///    hinter der Kamera von selbst versteckt, wäre am laufenden Browser in
+///    einer Minute zu sehen und ist es nicht. Die Stufe steht hier, weil der
+///    eigene Vertrag die Aussage macht, nicht weil die Quelle sie verlangt.
 /// 1. Ein zu kleiner Marker fällt weg, siehe [discoveryBalloonAnchorMinMarkerSize].
-///    Die Grösse folgt aus [BalloonAnchorCandidate.emphasis] und [zoom], genau
+///    Die Größe folgt aus [BalloonAnchorCandidate.emphasis] und [zoom], genau
 ///    wie beim gezeichneten Ballon in `fact_balloon_overlay.dart`.
 /// 2. Ein Marker, der den Rahmen gar nicht berührt, fällt weg.
 /// 3. Von den übrigen gewinnt der euklidisch nächste Mittelpunkt zur
@@ -350,8 +361,12 @@ Rect? selectBalloonAnchorRect({
   double bestDistanceSquared = double.infinity;
   for (int i = 0; i < candidates.length && i < screenPositions.length; i++) {
     final MapScreenPoint? at = screenPositions[i];
-    if (at == null) {
-      // Keine Bildschirmlage, ausserhalb der Karte oder hinter der Kamera.
+    if (at == null || !at.isInFrontOfCamera) {
+      // Keine Bildschirmlage, oder eine, die hinter der Kamera liegt und
+      // deshalb gespiegelt ist. **Die zweite Hälfte dieser Zeile ist die
+      // wichtigere**: ein `null` verliert den Wettbewerb von selbst, ein
+      // gespiegelter Punkt gewinnt ihn tendenziell, siehe den Kopfkommentar
+      // dieser Datei unter „Ein Fakt hinter der Kamera“.
       continue;
     }
     final Size markerSize =
@@ -396,7 +411,7 @@ Rect? selectBalloonAnchorRect({
 /// das Rechteck erst beim Abfragen aus einem echten Renderobjekt aus (siehe
 /// Kopfkommentar von `anchor_registry.dart`); ein schon berechnetes `Rect`
 /// lässt sich dort nicht direkt anmelden. Der Ausweg ist ein `AnchorTarget`,
-/// das an der berechneten Stelle, in der berechneten Grösse, nichts zeichnet:
+/// das an der berechneten Stelle, in der berechneten Größe, nichts zeichnet:
 /// sein Renderobjekt ist das Rechteck, das `AnchorRegistry.rectOf`
 /// zurückgibt, ohne dass `core/anchors/` einen zweiten Anmeldeweg braucht.
 /// Dasselbe `Positioned` trägt auch das Ersatzrechteck der Quelle, siehe
@@ -406,16 +421,16 @@ Rect? selectBalloonAnchorRect({
 ///
 /// Am 30.08.2026 am Gerät belegt (`REBUILD_STATUS.md`, „Ungefragter Fund A“):
 /// die projizierte Kameramitte trifft die Mitte der Kartenfläche, und die
-/// Kartenfläche deckt sich mit der Bildschirmgrösse. `MediaQuery.sizeOf`
+/// Kartenfläche deckt sich mit der Bildschirmgröße. `MediaQuery.sizeOf`
 /// genügt deshalb als Rahmenmass, ohne einen eigenen Messlauf über
-/// `LayoutBuilder`; dieselbe Grösse wird für die Rahmenmitte, den
+/// `LayoutBuilder`; dieselbe Größe wird für die Rahmenmitte, den
 /// Rahmenfilter und das Ersatzrechteck benutzt, damit alle drei
 /// übereinstimmen.
 ///
 /// ## Warum hier trotzdem dauerhaft ein Kamera-Zuhörer hängt
 ///
 /// Anders als beim Tutorial-Overlay selbst (das nur bei Schrittwechsel und
-/// Grössenänderung misst, siehe `tour_overlay.dart`) muss diese Klasse selbst
+/// Größenänderung misst, siehe `tour_overlay.dart`) muss diese Klasse selbst
 /// wissen, wo die Karte gerade steht, denn niemand sonst fragt sie danach. Der
 /// Kamerastrom projiziert trotzdem nicht 600 Fakten je Bild: eine geografische
 /// Vorauswahl (siehe [balloonAnchorCandidatesOf]) hält die Kandidatenzahl

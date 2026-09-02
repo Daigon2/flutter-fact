@@ -13,7 +13,7 @@
 ///
 /// Der Ausweg, den `puzzles` gegangen ist, wäre hier der falsche. Dort steht
 /// mit `PuzzleDifficulty` eine **wortgleiche Kopie** von
-/// `FactPuzzleDifficulty` in der eigenen Domäne, ausdrücklich als zweite
+/// `PuzzleDifficulty` in der eigenen Domäne, ausdrücklich als zweite
 /// Wiederholung von D-9 gemeldet. Eine Jagd-Station in `challenges/domain/`
 /// bräuchte dieselbe Behandlung für gleich vier Typen auf einmal: [FactId],
 /// [FactCoordinates], die Rätselstufe und das Rätsel selbst. Das wäre die
@@ -50,7 +50,7 @@ library;
 import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 
 /// Eine Station der Jagd: ein Ort und die eine Aufgabe, die dort gilt.
@@ -105,7 +105,7 @@ class HuntPlan {
   /// Sie steht hier, weil die Stufe während der Jagd sichtbar bleibt und
   /// nicht nur eine Eingabe der Erzeugung ist: `screen-challenge.jsx:2828`
   /// zeigt sie im Kopf des Pause-Bildschirms an.
-  final FactPuzzleDifficulty difficulty;
+  final PuzzleDifficulty difficulty;
 
   /// Die Dauer, die der Nutzer im Assistenten gewählt hat.
   ///

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fact_app/app/localization/language_preference_store.dart';
@@ -6,11 +7,16 @@ import 'package:fact_app/app/routing/app_router.dart';
 import 'package:fact_app/app/routing/app_routes.dart';
 import 'package:fact_app/app/shell/shell_tab.dart';
 import 'package:fact_app/app/theme/fact_theme.dart';
+import 'package:fact_app/features/challenges/presentation/widgets/hunt_pill.dart';
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/fact_overlay_providers.dart';
 import 'package:fact_app/features/discovery/presentation/pages/map_page.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/presentation/map_surface.dart';
+import 'package:fact_app/services/location/device_position.dart';
+import 'package:fact_app/services/location/location_providers.dart';
+import 'package:fact_app/services/location/location_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -143,6 +149,73 @@ void main() {
     expect(surface.initialCamera, MapPage.placeholderCamera);
   });
 
+  testWidgets(
+    'die Karten-Route versorgt die Jagd-Pille mit der Nutzerposition',
+    (tester) async {
+      // Schritt 37: derselbe Kompositions-Grund wie bei `mapSurface`, nur für
+      // Regel 8 (`challenges/presentation` ist für `discovery` unerreichbar)
+      // statt Regel 18.
+      rootBundle.clear();
+      final location = _FakeLocationService();
+      addTearDown(location.close);
+      final container = ProviderContainer(
+        overrides: [
+          languagePreferenceStoreProvider.overrideWithValue(
+            InMemoryLanguagePreferenceStore(),
+          ),
+          factOverlayProvider.overrideWith(
+            (ref) async => const MapOverlay(id: factOverlayId, points: []),
+          ),
+          locationServiceProvider.overrideWithValue(location),
+        ],
+      );
+      addTearDown(container.dispose);
+      final router = GoRouter(
+        initialLocation: const MapRoute().location,
+        routes: <RouteBase>[
+          GoRoute(path: '/map', builder: const MapRoute().build),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            theme: FactTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      HuntPill pillNow() => tester.widget<HuntPill>(find.byType(HuntPill));
+
+      expect(
+        pillNow().userPosition,
+        isNull,
+        reason: 'ohne Ortung gibt es keine Nutzerposition',
+      );
+
+      location.emit(
+        const DevicePosition(
+          latitude: 48.2,
+          longitude: 11.7,
+          accuracyInMeters: 8,
+        ),
+      );
+      // Zweimal gepumpt, wie bei jeder Ortung in diesem Projekt: der erste
+      // Umlauf stellt die Stromausgabe zu, der zweite baut die Oberfläche neu.
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        pillNow().userPosition,
+        const MapPosition(latitude: 48.2, longitude: 11.7),
+      );
+    },
+  );
+
   test('der Router startet auf der Karte, wie app.jsx:68-70', () {
     // Der Startort bleibt die Karte, auch wenn der Erstlauf offen ist: darüber
     // entscheidet die Weiche beim Auswerten der Route, nicht diese Zeile.
@@ -204,4 +277,21 @@ void main() {
       expect(callers, isEmpty);
     });
   });
+}
+
+/// Ein Ortungsdienst, der genau die Ortungen liefert, die [emit] übergibt.
+///
+/// Dasselbe kleine Muster wie `FakeLocationService` in `map_page_test.dart`
+/// und `user_location_providers_test.dart`, hier noch einmal lokal, weil
+/// keine der beiden Dateien eine testfremde Klasse exportiert.
+class _FakeLocationService implements LocationService {
+  final StreamController<DevicePosition> _controller =
+      StreamController<DevicePosition>.broadcast();
+
+  void emit(DevicePosition position) => _controller.add(position);
+
+  Future<void> close() => _controller.close();
+
+  @override
+  Stream<DevicePosition> positionUpdates() => _controller.stream;
 }

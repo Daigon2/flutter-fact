@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:fact_app/core/async/detached_work.dart';
+import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
+import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/discovery/presentation/discovery_balloon_anchor.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_images.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_overlay.dart';
+import 'package:fact_app/features/discovery/presentation/fact_group_expand.dart';
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/fact_proximity.dart';
 import 'package:fact_app/features/discovery/presentation/map_camera_intents.dart';
@@ -12,11 +16,18 @@ import 'package:fact_app/features/discovery/presentation/notifiers/map_mode_prov
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
 import 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome.dart';
 import 'package:fact_app/map/application/map_host_providers.dart';
+import 'package:fact_app/map/domain/bearing_smoothing.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_position_rect.dart';
+import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/services/location/device_position.dart';
+import 'package:fact_app/services/orientation/device_heading.dart';
+import 'package:fact_app/services/orientation/orientation_providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,10 +71,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// [_deliverOverlay]. Dass dabei nichts verloren geht, ist derselbe Gedanke wie
 /// beim Sky-Fall eine Zeile weiter unten.
 ///
-/// **Was beim Antippen eines Ballons passiert, steht bewusst nicht hier.** Der
-/// Punkt-Tipp hat bis Schritt 21 keinen Empfänger, und das Aufklappen einer
-/// Gruppe hängt an einer offenen technischen Entscheidung. Ein Strom auf
-/// Vorrat wäre Zustand, den niemand prüft.
+/// **Was beim Antippen eines einzelnen Ballons passiert, steht bewusst nicht
+/// hier.** Der Punkt-Tipp hat bis Schritt 21 keinen Empfänger, ein Strom auf
+/// Vorrat wäre Zustand, den niemand prüft. **Der Tipp auf eine Gruppe dagegen
+/// hat seit Schritt 15 Block 3 einen Empfänger**, [_onGroupTap]: er fährt die
+/// Kamera auf ein Rechteck, das die eigenen, genäherten Gruppenmitglieder
+/// umschließt.
 ///
 /// ## Seit Schritt 17 liegen die nahen Fakten nicht mehr nativ
 ///
@@ -131,7 +144,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Kartenmitte (`screen-map.jsx:310-322`, `:2992-3008`) gehört `features/city`.
 class MapPage extends ConsumerStatefulWidget {
   /// Erzeugt den Karten-Bildschirm mit der Kartenfläche [mapSurface].
-  const MapPage({required this.mapSurface, super.key});
+  const MapPage({
+    required this.mapSurface,
+    this.huntOverlay,
+    this.now,
+    super.key,
+  });
 
   /// Die Kartenfläche, die unter dem Top-Chrome liegt.
   ///
@@ -139,6 +157,30 @@ class MapPage extends ConsumerStatefulWidget {
   /// und eine Karte, die aus Versehen fehlt, sähe dann genauso aus wie eine,
   /// die noch lädt.
   final Widget mapSurface;
+
+  /// Die Jagd-Pille der laufenden Solo-Jagd, `HuntPill` in
+  /// `screen-map.jsx:1011-1135`, Schritt 37.
+  ///
+  /// **Nullbar, und das ist der Gegensatz zu [mapSurface] und aus demselben
+  /// Grund bewusst.** [mapSurface] ist verpflichtend, weil ein Standard dafür
+  /// eine leere Fläche wäre und eine fehlende Karte optisch nicht von einer
+  /// ladenden zu unterscheiden ist. Für das Jagd-Overlay gilt das Gegenteil:
+  /// **kein** Overlay ist der weit überwiegende Normalzustand dieses
+  /// Bildschirms, denn die allermeiste Zeit läuft gar keine Jagd. `HuntPill`
+  /// zeigt sich in diesem Fall selbst nicht (siehe seinen Kopfkommentar), ein
+  /// `null` hier ist also keine Notlösung, sondern deckt sich mit dem, was das
+  /// Widget ohnehin täte. Ein Pflichtparameter zwänge jeden Aufrufer ohne
+  /// laufende Jagd, trotzdem ein Widget zu bauen (und via `challenges`
+  /// aufzulösen), nur um es sofort nichts zeichnen zu lassen.
+  final Widget? huntOverlay;
+
+  /// Die Uhr des Kompass-Wachhunds, siehe `_MapPageState._now`.
+  ///
+  /// `null` im echten Betrieb: dann legt der Zustand selbst eine laufende
+  /// [Stopwatch] an. Ein Test setzt einen eigenen Rückgabewert, um die
+  /// verstrichene Zeit ohne echtes Warten vorzuspulen, dasselbe Muster wie
+  /// `now` bei `MapCameraHost`.
+  final Duration Function()? now;
 
   /// Münzstand ohne `features/progression`.
   static const int placeholderCoins = 0;
@@ -224,6 +266,20 @@ class _MapPageState extends ConsumerState<MapPage> {
   ///
   /// **Der Ortungsstrom läuft weiter**, nur die Kamera folgt nicht, siehe
   /// `notifiers/user_location_providers.dart`.
+  ///
+  /// **Der Kompass läuft aus derselben Erwägung weiter mit, seit Schritt 14
+  /// Teil 2.** [_headingSubscription] bleibt bestehen und [_compassWatchdog]
+  /// tickt unbedingt weiter, auch während dieser Zweig unsichtbar ist; nur
+  /// [compassBearingFollowIntent] geht nicht an den Host, solange [_canSteer]
+  /// `false` ist, siehe [_onHeading]. Die Nebenwirkung, die das in Kauf
+  /// nimmt: der Sensor bleibt an und [_smoothedBearing] läuft weiter, auch
+  /// während der Nutzer einen anderen Reiter ansieht. Der Gewinn ist derselbe
+  /// wie beim GPS: kommt der Nutzer zurück, folgt die Karte sofort einer
+  /// eingelebten Richtung statt eines kaltgestarteten Werts, der erst wieder
+  /// anlaufen müsste, und der Wachhund zeigt beim Zurückkommen den wahren
+  /// Stand, keine künstliche Pause, die nur am Tabwechsel lag. Der
+  /// Gegenkandidat, das Abonnement beim Verstecken abzubauen, spart den
+  /// Sensor, kostet aber genau diesen kalten Neustart der Glättung.
   bool _branchIsActive = true;
 
   /// Die Blickrichtung der Karte in Grad, wie die Kompassnadel sie braucht.
@@ -240,6 +296,97 @@ class _MapPageState extends ConsumerState<MapPage> {
   double _bearingDegrees = MapPage.placeholderCamera.bearing;
 
   StreamSubscription<MapCameraView>? _cameraSubscription;
+
+  /// Die geglättete Kompass-Blickrichtung, siehe [SmoothedBearing.towards].
+  ///
+  /// **Startwert 0, aus zwei Gründen und nicht nur, weil die Quelle so
+  /// beginnt.** `let smoothBearing = 0;` (`screen-map.jsx:2805`) ist der
+  /// Startwert dort, aber ein Nachbau, der nur deshalb 0 wählt, hätte hier
+  /// keine eigene Begründung, sondern nur die abgeschriebene. Die zweite,
+  /// eigene: [MapPage.placeholderCamera.bearing] ist ebenfalls 0, die
+  /// Startkamera zeigt also bereits genau dorthin, wo diese Glättung
+  /// beginnt. Ein anderer Startwert liefe der sichtbaren Kamera von der
+  /// ersten Sekunde an hinterher, ohne dass ein einziger Kopfwert das
+  /// verlangt hätte.
+  SmoothedBearing _smoothedBearing = SmoothedBearing(
+    MapPage.placeholderCamera.bearing,
+  );
+
+  /// Zuhörer auf rohe Kopfwerte des Kompasses, siehe [_onHeading].
+  StreamSubscription<DeviceHeading>? _headingSubscription;
+
+  /// Wann der letzte Kopfwert einging, gemessen mit [_now].
+  ///
+  /// Bekommt in [initState] schon vor dem ersten Kopfwert einen Startwert,
+  /// dieselbe „Baseline, damit der Wachhund nicht sofort anschlägt" wie
+  /// `compassLastEventRef.current = Date.now()` bei der Registrierung der
+  /// Quelle (`screen-map.jsx:2858`). Ohne sie wäre der Kompass in der Sekunde
+  /// zwischen Bildschirmstart und erstem Sensorwert fälschlich „tot".
+  Duration? _lastHeadingAt;
+
+  /// Der Wachhund-Takt, `screen-map.jsx:2846-2853`: alle 2 Sekunden geprüft,
+  /// ob seit [_lastHeadingAt] mehr als [compassStaleAfter] vergangen ist,
+  /// siehe [_checkCompassAlive].
+  Timer? _compassWatchdog;
+
+  /// Ob der Kompass gerade als tot gilt, siehe [_checkCompassAlive]. Geht an
+  /// [MapTopChrome.isCompassDead].
+  bool _isCompassDead = false;
+
+  /// Jetzt, als Abstand zu einem monotonen Nullpunkt. Nur der Wachhund
+  /// braucht das, um zu messen, wie lange der letzte Kopfwert her ist.
+  ///
+  /// ## Warum eine [Duration] und keine [DateTime]
+  ///
+  /// Dieselbe Erwägung wie in `map_camera_gate.dart` und
+  /// `map/presentation/map_camera_host.dart`: eine Uhr, die rückwärts
+  /// springen kann, ist für eine Karenzzeit die falsche Uhr. Anders als dort
+  /// hat `map_page.dart` selbst noch kein eigenes Muster dafür, aber
+  /// `MapCameraHost` hat exakt eines, für exakt dieselbe Aufgabenklasse
+  /// (`Duration Function()? now`, Standard eine laufende [Stopwatch]), und es
+  /// ist bereits geprüft: `map_camera_host_test.dart` steuert es über einen
+  /// `TestClock`, ohne echtes Warten. Diese Datei übernimmt das Muster
+  /// unverändert, statt ein zweites, eigenes zu erfinden.
+  ///
+  /// **Das ist die eine Stelle, an der diese Datei von der wörtlichen Vorgabe
+  /// abweicht, `DateTime.now` als Standard zu nehmen, und der Grund ist
+  /// mehr als Geschmack:** `DateTime.now()` springt bei `tester.pump(Duration)`
+  /// nicht mit vor, `fake_async` (das dahinterliegt) verspult nur `Timer`,
+  /// `Future.delayed` und `Stopwatch`, nicht die Wanduhr. Ein Wachhund-Test
+  /// gegen `DateTime.now()` bräuchte entweder `package:clock` (ein neues
+  /// Paket, freigabepflichtig) oder echtes Warten (von `.claude/rules/tests.md`
+  /// verboten). Der `Duration`-Weg braucht beides nicht.
+  late final Duration Function() _now;
+
+  /// Zuhörer auf Gruppen-Tipps, siehe [_onGroupTap].
+  ///
+  /// Ein eigenes Abonnement und kein zweiter Zweig in [_onCameraChange]:
+  /// `MapHost.groupTaps` ist ein eigener Strom, vier Features teilen sich
+  /// ihn, und dieser Bildschirm filtert selbst auf [factOverlayId].
+  StreamSubscription<MapOverlayGroupTap>? _groupTapSubscription;
+
+  /// Ob gerade eine Projektion für einen Gruppen-Tipp unterwegs ist.
+  ///
+  /// Die dritte Stelle mit demselben Zusammenfassungs-Muster wie
+  /// `discovery_balloon_anchor.dart` (`_selectionInFlight`) und
+  /// `fact_balloon_overlay.dart` (`_projectionInFlight`), hier aber mit einem
+  /// Unterschied in der Auswertung, siehe [_onGroupTap]: dort darf eine
+  /// veraltete Antwort noch gelten, weil sie nur einen Bildschirmzustand neu
+  /// zeichnet, den die nächste Antwort ohnehin gleich wieder überschreibt.
+  /// Hier gibt eine Antwort eine **einmalige** Kameraabsicht ab
+  /// (`MapCameraOneShot`, „es gibt keine Warteschlange"), und die nimmt
+  /// niemand zurück: kommt die Antwort auf einen älteren Tipp erst nach der
+  /// eines neueren zurück, überschriebe ihre Absicht die frische, und die
+  /// Kamera führe auf die falsche Gruppe zurück. Nicht die zweite Anfrage ist
+  /// dabei das Problem, sondern die veraltete Antwort auf die erste.
+  bool _groupTapInFlight = false;
+
+  /// Der jüngste Gruppen-Tipp, der während einer laufenden Anfrage eintraf.
+  ///
+  /// Es gibt keine Warteschlange: trifft während der laufenden Anfrage noch
+  /// ein zweiter und danach ein dritter Tipp ein, verwirft der dritte den
+  /// zweiten hier, nicht umgekehrt. Bei Einmal-Absichten gewinnt die letzte.
+  MapOverlayGroupTap? _pendingGroupTap;
 
   /// Für welches Bildverhältnis die Ballonbilder schon gezeichnet wurden.
   ///
@@ -310,6 +457,28 @@ class _MapPageState extends ConsumerState<MapPage> {
         .read(mapHostProvider)
         .cameraChanges
         .listen(_onCameraChange);
+
+    // Aus demselben Grund vor der Kartenfläche wie das Abonnement oben: ein
+    // Tipp, der vor diesem Aufruf einträfe, wäre für immer verpasst.
+    _groupTapSubscription = ref
+        .read(mapHostProvider)
+        .groupTaps
+        .listen(_onGroupTap);
+
+    // Der Kompass, seit Schritt 14 Teil 2. Keine Reihenfolge-Zwangslage wie
+    // bei den beiden Strömen oben: `OrientationService` hängt an keinem Kind
+    // dieses Bildschirms, ein später eintreffender erster Kopfwert geht nicht
+    // verloren, er wartet einfach auf sein Abonnement.
+    _now = widget.now ?? _stopwatchClock();
+    _lastHeadingAt = _now();
+    _headingSubscription = ref
+        .read(orientationServiceProvider)
+        .headingUpdates()
+        .listen(_onHeading);
+    _compassWatchdog = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _checkCompassAlive(),
+    );
 
     // **`listenManual` und nicht `ref.listen` im `build`, und der Grund ist
     // `fireImmediately`.** `ref.listen` kennt den Schalter in
@@ -441,6 +610,12 @@ class _MapPageState extends ConsumerState<MapPage> {
   void dispose() {
     unawaited(_cameraSubscription?.cancel());
     _cameraSubscription = null;
+    unawaited(_groupTapSubscription?.cancel());
+    _groupTapSubscription = null;
+    unawaited(_headingSubscription?.cancel());
+    _headingSubscription = null;
+    _compassWatchdog?.cancel();
+    _compassWatchdog = null;
     super.dispose();
   }
 
@@ -464,6 +639,203 @@ class _MapPageState extends ConsumerState<MapPage> {
     if (view.bearing != _bearingDegrees) {
       setState(() => _bearingDegrees = view.bearing);
     }
+  }
+
+  /// Ein roher Kopfwert des Kompasses ist da, `screen-map.jsx:2817-2843`.
+  ///
+  /// Drei Dinge passieren, und nur eines davon bedingt:
+  ///
+  /// 1. [_lastHeadingAt] wird **unbedingt** nachgeführt, der Wachhund-Puls.
+  /// 2. War der Kompass als tot markiert, wird das **hier** zurückgenommen,
+  ///    nicht erst beim nächsten Takt des Wachhunds: `if (compassDead)
+  ///    setCompassDead(false);` steht in der Quelle im Kopfwert-Zweig
+  ///    (`:2828`), nicht im Zwei-Sekunden-Takt.
+  /// 3. Die Glättung zieht in Richtung [heading], **immer**, siehe
+  ///    [_smoothedBearing].
+  ///
+  /// Erst danach die eine bedingte Wirkung: die Absicht geht nur an den Host,
+  /// wenn [_canSteer] gilt. Läuft der Bildschirm im unsichtbaren Zweig oder
+  /// ohne lebende Karte, bleiben Glättung und Zeitstempel trotzdem aktuell,
+  /// siehe die Begründung bei [_branchIsActive].
+  ///
+  /// **`setState` nur, wenn sich [_isCompassDead] wirklich ändert.** Ein
+  /// Strom, der bis zu 60 Mal je Sekunde einen neuen Kopfwert liefert, darf
+  /// nicht bei jedem einzelnen den ganzen Bildschirm neu bauen; dieselbe
+  /// Zusicherung wie bei [_onCameraChange] für `view.bearing`, nur auf der
+  /// Zeitachse statt auf der Winkelachse. Die Glättung selbst braucht kein
+  /// `setState`: [_smoothedBearing] wird nirgends direkt gezeichnet, sie geht
+  /// nur in die nächste Absicht ein.
+  void _onHeading(DeviceHeading heading) {
+    _lastHeadingAt = _now();
+    if (_isCompassDead) {
+      setState(() => _isCompassDead = false);
+    }
+    _smoothedBearing = _smoothedBearing.towards(heading.degrees);
+    if (!_canSteer) {
+      return;
+    }
+    ref
+        .read(mapHostProvider)
+        .submitIntent(
+          compassBearingFollowIntent(bearing: _smoothedBearing.degrees),
+        );
+  }
+
+  /// Der Wachhund-Takt, `screen-map.jsx:2846-2853`: prüft alle 2 Sekunden, ob
+  /// der Kompass seit mehr als [compassStaleAfter] keinen Kopfwert mehr
+  /// geliefert hat, und meldet das Ergebnis an [MapTopChrome.isCompassDead].
+  ///
+  /// **`setState` nur bei echter Änderung**, aus demselben Grund wie in
+  /// [_onHeading]: ein Takt, der bei jedem Aufruf neu baut, obwohl sich am
+  /// Ergebnis nichts geändert hat, ist derselbe Fehler wie ein 60-Hz-Strom
+  /// ohne Totzone, nur langsamer.
+  void _checkCompassAlive() {
+    final Duration? lastHeadingAt = _lastHeadingAt;
+    final bool dead =
+        lastHeadingAt != null &&
+        isCompassStale(sinceLastHeading: _now() - lastHeadingAt);
+    if (dead == _isCompassDead) {
+      return;
+    }
+    setState(() => _isCompassDead = dead);
+  }
+
+  /// Ein Tipp auf eine Gruppe, `screen-map.jsx:2439-2459`.
+  ///
+  /// ## Vier Features teilen sich `groupTaps`
+  ///
+  /// Verarbeitet wird nur ein Tipp auf die **eigene** Überlagerung, siehe
+  /// [factOverlayId]. Ein Tipp auf eine fremde Gruppe geht diesen Bildschirm
+  /// nichts an.
+  ///
+  /// ## Die Kandidaten sind die wirklich nativ liegenden Punkte
+  ///
+  /// Nicht `_latestOverlay` selbst, sondern
+  /// `factOverlayWithout(_latestOverlay!, _animatedIds).points`, dieselbe
+  /// Übersetzung, die [_deliverOverlay] auch an den Host schickt. Die
+  /// ausgeblendeten, lebenden Ballons sind Flutter-Widgets über der Karte und
+  /// stecken in **keiner** nativen Gruppe; die volle Liste zöge Punkte ins
+  /// Rechteck, die MapLibre gar nicht zusammengefasst hat.
+  ///
+  /// ## Die Näherung, mitprojiziert im selben Aufruf
+  ///
+  /// Die Kandidatenpositionen und die getippte Stelle gehen in **einem**
+  /// `projectToScreen`-Aufruf hinaus, damit beide Seiten im selben
+  /// Bildschirmraster landen; siehe `fact_group_expand.dart`,
+  /// `selectGroupMembers`, für die Auswahlregel selbst und ihre
+  /// Fehlerrichtung.
+  ///
+  /// ## Nie zwei Anfragen gleichzeitig, und die veraltete Antwort zählt nicht
+  ///
+  /// Läuft schon eine Anfrage, wird ein neuer Tipp nur in [_pendingGroupTap]
+  /// gemerkt und erst nach der laufenden verarbeitet, siehe
+  /// [_groupTapInFlight] für die Begründung. Trifft dabei ein dritter Tipp
+  /// ein, verwirft er den zweiten, denn bei Einmal-Absichten gewinnt die
+  /// letzte, nicht die erste.
+  ///
+  /// Kommt die Antwort auf einen Tipp zurück, während schon ein neuerer
+  /// gemerkt ist, entsteht aus dieser Antwort **keine** Absicht mehr: sie
+  /// gehört zu einem Tipp, den der Nutzer bereits hinter sich gelassen hat,
+  /// und eine `MapCameraOneShot`-Absicht kann niemand zurücknehmen. Ohne
+  /// diese Prüfung führe die Kamera kurz auf die richtige Gruppe und dann,
+  /// sobald die veraltete Antwort eintrifft, wieder auf die falsche zurück.
+  ///
+  /// ## Nach der Unterbrechung
+  ///
+  /// `projectToScreen` liefert ein `Future`; nach dem `await` wird geprüft, ob
+  /// dieser `State` noch lebt (`mounted`) und ob der Host noch eine Fläche
+  /// kennt (`host.viewport`, erneut gelesen und nicht der Stand von vor dem
+  /// Aufruf). Ohne beide Prüfungen könnte eine `setState`-freie, aber
+  /// trotzdem falsche Absicht bei einem längst entsorgten Bildschirm
+  /// abgegeben werden.
+  ///
+  /// Findet die Näherung keinen einzigen Punkt, entsteht keine Absicht,
+  /// siehe [groupTapFoundNoMembersEvent] für die Begründung, warum das
+  /// trotzdem gemeldet wird.
+  void _onGroupTap(MapOverlayGroupTap tap) {
+    if (tap.overlayId != factOverlayId) {
+      return;
+    }
+    if (_groupTapInFlight) {
+      _pendingGroupTap = tap;
+      return;
+    }
+    final MapOverlay? overlay = _latestOverlay;
+    if (overlay == null) {
+      return;
+    }
+    final MapHost host = ref.read(mapHostProvider);
+    if (host.viewport == null) {
+      // Vor dem ersten Layout der Kartenfläche entsteht keine Absicht: ohne
+      // Fläche kann `rectFitZoom` nicht rechnen, siehe dort.
+      return;
+    }
+    final List<MapOverlayPoint> candidates = factOverlayWithout(
+      overlay,
+      _animatedIds,
+    ).points;
+    if (candidates.isEmpty) {
+      return;
+    }
+
+    _groupTapInFlight = true;
+    reportDetached(
+      host
+          .projectToScreen(<MapPosition>[
+            for (final MapOverlayPoint point in candidates) point.position,
+            tap.position,
+          ])
+          .then((List<MapScreenPoint?> located) {
+            final MapViewport? viewport = host.viewport;
+            if (!mounted || viewport == null) {
+              return;
+            }
+            if (_pendingGroupTap != null) {
+              // Während diese Anfrage unterwegs war, ist schon ein neuerer
+              // Tipp eingetroffen. Diese Antwort gehört zum veralteten Tipp,
+              // siehe [_groupTapInFlight]; sie löst keine Absicht mehr aus,
+              // das übernimmt gleich die Anfrage zum gemerkten Tipp.
+              return;
+            }
+            final MapScreenPoint? tapAt = located.last;
+            if (tapAt == null) {
+              return;
+            }
+            final List<MapOverlayPoint> selected = selectGroupMembers(
+              candidates: candidates,
+              candidateScreenPositions: located.sublist(0, candidates.length),
+              tapScreenPosition: tapAt,
+              radiusInStylePixels: factOverlayGrouping.radiusInScreenPixels,
+              pixelRatio: MediaQuery.devicePixelRatioOf(context),
+            );
+            if (selected.isEmpty) {
+              ref
+                  .read(diagnosticSinkProvider)
+                  .report(DiagnosticEvent(groupTapFoundNoMembersEvent));
+              return;
+            }
+            final MapPositionRect rect = MapPositionRect.enclosingOrNull(
+              <MapPosition>[
+                for (final MapOverlayPoint point in selected) point.position,
+              ],
+            )!;
+            host.submitIntent(
+              groupExpandIntent(rect: rect, viewport: viewport),
+            );
+          })
+          .whenComplete(() {
+            _groupTapInFlight = false;
+            if (!mounted) {
+              return;
+            }
+            final MapOverlayGroupTap? pending = _pendingGroupTap;
+            if (pending != null) {
+              _pendingGroupTap = null;
+              _onGroupTap(pending);
+            }
+          }),
+      origin: 'discovery.group_tap',
+    );
   }
 
   /// Gleicht ab, welche Fakten aus der nativen Liste fallen.
@@ -626,6 +998,24 @@ class _MapPageState extends ConsumerState<MapPage> {
         // `FactBalloonOverlay`, damit beide dieselbe Kartenfläche als
         // Bezugspunkt für ihre Bildschirmlagen haben.
         const DiscoveryBalloonAnchor(),
+        // Die Jagd-Pille, `screen-map.jsx:1011-1135`: über der Tab-Leiste und
+        // unter dem Top-Chrome, wie die Quelle sie zeigt. **Vor**
+        // `MapTopChrome` im Baum, damit das Chrome bei einer zufälligen
+        // Überlappung sichtbar bleibt (Malreihenfolge = Reihenfolge im Baum,
+        // wie im Klassenkommentar von `MapTopChrome` begründet).
+        //
+        // `bottom: calc(max(24px, env(safe-area-inset-bottom, 0px)) + 70px)`,
+        // `left/right: 12`, `:1074`. Übernommen ist die Rechnung der Quelle
+        // wörtlich und nicht ein Bezug auf `FloatingTabBar`: die Pille kennt
+        // die Maße der schwebenden Tab-Leiste nicht, und beide sind
+        // unabhängig voneinander gegen die sichere Fläche bemessen.
+        if (widget.huntOverlay != null)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: math.max(24, MediaQuery.paddingOf(context).bottom) + 70,
+            child: widget.huntOverlay!,
+          ),
         MapTopChrome(
           cityName: MapPage.placeholderCityName,
           coins: MapPage.placeholderCoins,
@@ -644,16 +1034,31 @@ class _MapPageState extends ConsumerState<MapPage> {
           // zurück, auch ohne Position (`:3170`).
           onCompassTap: _onCompassTap,
           onCompassLongPress: _onCompassLongPress,
-          // Die Nadel dreht gegen die Kartenblickrichtung (`:1792`), und die
-          // kommt aus dem Kamerastrom, den dieser Bildschirm ohnehin
-          // abonniert. **Der Gerätekompass gehört nicht dazu**: die Karte
-          // seiner Ausrichtung folgen zu lassen (`:2805-2840`) ist Schritt 14
-          // und braucht ein Sensorpaket, das es hier nicht gibt.
+          // Die Nadel dreht weiterhin gegen die **Kartenblickrichtung**
+          // (`:1792`) und nicht gegen den Rohwert des Kompasses; das ist ein
+          // Unterschied und keine Doppelung mit dem Kompass-Folgen seit
+          // Schritt 14 Teil 2. Der Gerätekompass (`:2805-2840`, [_onHeading])
+          // lässt die Karte seiner Richtung folgen, aber nur, wenn die
+          // Winkel-Totzone und das Gate es zulassen; wie weit die Karte
+          // wirklich gedreht hat, kommt unverändert aus dem Kamerastrom, den
+          // dieser Bildschirm ohnehin abonniert, und genau den zeigt die
+          // Nadel.
           bearingDegrees: _bearingDegrees,
+          // Der Wachhund meldet einen toten Kompass, siehe
+          // [_checkCompassAlive].
+          isCompassDead: _isCompassDead,
           // `isDark` bleibt beim Standard `false`, weil `mapDark` in der
           // Quelle nie `true` wird, siehe `MapTopChrome.isDark`.
         ),
       ],
     );
+  }
+
+  /// Die Standarduhr des Kompass-Wachhunds: eine laufende [Stopwatch], die
+  /// dieser Zustand selbst anlegt. Wortgleiches Vorbild:
+  /// `MapCameraHost._stopwatchClock` in `map/presentation/map_camera_host.dart`.
+  static Duration Function() _stopwatchClock() {
+    final Stopwatch watch = Stopwatch()..start();
+    return () => watch.elapsed;
   }
 }

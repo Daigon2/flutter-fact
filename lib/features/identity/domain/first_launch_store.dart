@@ -28,8 +28,8 @@
 /// `LanguagePreferenceStore.readLanguage`: die Weiche im Router muss beim ersten
 /// Redirect antworten können. Ein `Future` hier würde jede Route in einen
 /// Ladezustand zwingen, obwohl der Wert beim ersten Frame längst feststeht.
-/// Wer später persistiert, lädt in `bootstrap()` vor und überschreibt
-/// `firstLaunchStoreProvider` mit einer gefüllten Implementierung.
+/// Seit dem 31.08.2026 ist die Persistenz gebaut: `bootstrap()` lädt vor und
+/// überschreibt `firstLaunchStoreProvider` mit `KeyValueFirstLaunchStore`.
 abstract interface class FirstLaunchStore {
   /// Ob der Startbildschirm schon durchlaufen wurde.
   bool hasLaunched();
@@ -40,15 +40,15 @@ abstract interface class FirstLaunchStore {
   Future<void> markLaunched();
 }
 
-/// Flüchtiger Standard, solange nichts persistiert, und Vorgabe für Tests.
+/// Flüchtiger Speicher, Vorgabe für Tests.
 ///
-/// Die Merkung überlebt den Neustart nicht. Das ist gewollt: eine halbe
-/// Persistenz wäre schwerer zu erkennen als gar keine. Praktische Folge im
-/// aktuellen Stand: die App zeigt bei jedem Start den Startbildschirm.
+/// Die Merkung überlebt den Neustart nicht. **Bis zum 31.08.2026 hieß das für
+/// die laufende App: sie zeigte bei jedem Start den Startbildschirm.** Seither
+/// überschreibt `bootstrap()` diesen Provider mit `KeyValueFirstLaunchStore`,
+/// und der flüchtige bleibt die Vorgabe für Tests.
 class InMemoryFirstLaunchStore implements FirstLaunchStore {
   /// [hasLaunched] setzt einen bereits erfolgten Start, etwa in einem Test.
-  InMemoryFirstLaunchStore({bool hasLaunched = false})
-    : _hasLaunched = hasLaunched;
+  InMemoryFirstLaunchStore({this._hasLaunched = false});
 
   bool _hasLaunched;
 

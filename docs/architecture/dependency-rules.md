@@ -19,7 +19,17 @@ load_when:
 |---|---|
 | Presentation | Application, Domain, narrowly scoped Core |
 | Application | Domain, narrowly scoped Core |
-| Domain | Dart SDK and approved pure-Dart primitives only |
+| Domain | Dart SDK, approved pure-Dart primitives, and the shared kernel |
+| Shared kernel (`lib/kernel/`) | Dart SDK and itself. Nothing else, and no entities |
+
+**Every row above may also import the shared kernel**, not only Domain. That is
+not a loophole, it is the only workable reading: `Fact.easiestPuzzleDifficulty`
+returns a kernel type, so a layer that may call a domain API must be able to name
+the types that API returns. The kernel sits below every layer, like `dart:core`,
+and the restriction that matters runs the other way: what the kernel itself may
+import. Stated here because listing it in the Domain row alone read as an
+exclusive permission, and an independent review measured that Application,
+Presentation and Data already import it.
 | Data | Domain, Core technical primitives, vendor SDKs |
 | App composition | All public feature entry points and services |
 | Services | Vendor SDKs, Core contracts; domain only through explicit adapters |
@@ -30,6 +40,20 @@ A feature's `presentation` and `data` directories are private to that feature.
 Only app composition under `lib/app/` may read them, which is the row above.
 This holds for every caller, not only for another feature: `lib/services/` and
 `lib/map/` are bound by it as well.
+
+The shared kernel under `lib/kernel/` is the one place a feature domain may
+reach outside itself. It exists because the strictness above was paid for three
+times and the third time could have diverged silently: an enumeration with
+meaning, copied, fails no test when the original grows. ADR-008 holds the four
+admission rules, the current contents and what is deliberately kept out,
+including the three coordinate types from D-9, which measurement showed should
+stay separate. Rule 23 has one enforceable half, and it is the one that matters over time: the
+kernel may import almost nothing, because everything in it is seen by everything
+else. The other half, that any layer may import the kernel, is a permission and
+therefore has no violation to detect. An earlier version of this paragraph and of
+ADR-008 claimed "both directions are machine-enforced", which an independent
+review measured as untrue and which is corrected here rather than above, so the
+correction stays visible.
 
 The map host under `lib/map/` is app and UI infrastructure, not a business
 domain. It owns the map surface and the camera; features hand it intentions
@@ -65,8 +89,16 @@ independent business domain.
 19. `webview_flutter` may only be imported below `lib/map/presentation/avatar/`.
 20. `maplibre_gl` may only be imported below `lib/map/`.
 21. `geolocator` and its platform packages may only be imported below `lib/services/location/`.
+22. `shared_preferences` and its platform packages may only be imported below `lib/services/preferences/`.
+23. Every layer may import `package:fact_app/kernel/`, the shared kernel, and
+    the kernel itself may import only `dart:`, itself, and vetted pure-Dart
+    packages. **Only the second half is a restriction**, and only it is
+    enforced; the first half is a permission and has nothing to check. See
+    ADR-008.
+24. `flutter_rotation_sensor` and `native_device_orientation` may only be
+    imported below `lib/services/orientation/`.
 
-Rules 19 to 21 give a vendor SDK one home directory. They are not a ban, they
+Rules 19 to 22 and rule 24 give a vendor SDK one home directory. They are not a ban, they
 are an assignment: the map SDK belongs to the map host, the geolocation SDK
 belongs to the location service, and the WebView belongs to the avatar. Rule 4
 already keeps the map and geolocation SDKs out of every `domain` directory, but
@@ -80,6 +112,27 @@ the supporting technical capabilities and not among the business domains, in the
 same list as map rendering. The rule enforces that placement, it does not decide
 it. Rule 20 was enforced in `tool/check_architecture.dart` from 2026-08-28 and
 is written down here only now.
+
+Rule 24 was added on 2026-08-31 with the compass sensor, and it is the third
+application of the same shape. The device store, the geolocation provider and now
+the orientation sensor are all supporting technical capabilities, so each gets one
+home under `services/` and appears nowhere else. It bans the family by prefix for
+the reason rule 21 gives: `native_device_orientation` is the transitive
+dependency of `flutter_rotation_sensor`, and reaching for the transitive package
+is the obvious way around the adapter.
+
+Rule 22 was added on 2026-08-31, together with the package itself.
+`tool/check_architecture.dart` had until then carried `shared_preferences` as a
+**deliberate** gap, with two stated conditions: the package was not in
+`pubspec.yaml`, and no accepted decision named a home directory for it. Both
+conditions fell away in the same change, so the rule enforces a placement
+instead of making one. The device store is a supporting technical capability
+like the geolocation provider, `lib/features/README.md` assigns vendor adapters
+without a surface to `services/`, and the rest of the app sees the
+`KeyValueStore` contract in `lib/core/preferences/` and never the package.
+Like rules 19 to 21 it names the package family by prefix: the likeliest way
+around the adapter is `shared_preferences_platform_interface`, because
+`SharedPreferencesStorePlatform` lives there.
 
 All three check the import, not the content. A service that hands the user's
 position to somewhere it does not belong passes them, and where the position may

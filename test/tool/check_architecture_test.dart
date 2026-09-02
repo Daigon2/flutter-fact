@@ -202,6 +202,8 @@ import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+import 'package:native_device_orientation/native_device_orientation.dart';
 
 class Tour {}
 ''',
@@ -536,6 +538,56 @@ import 'package:geolocator_platform_interface/geolocator_platform_interface.dart
 
 class OrtungFamilie {}
 ''',
+  // Ä13: der Gerätespeicher gehört dem Präferenz-Adapter. Wie bei Regel 21
+  // verbietet Regel 4 ihn nur in einer Domäne; jedes andere Verzeichnis
+  // unterhalb von lib/ durfte ihn vor Regel 22 holen, und die Lücke stand im
+  // Skript ausdrücklich als bewusst offen gelassen.
+  'lib/features/settings/data/praeferenz_versuch.dart': r'''
+import 'package:shared_preferences/shared_preferences.dart';
+
+class PraeferenzVersuch {}
+''',
+  // Ä13: auch die App-Komposition bekommt ihn nicht, obwohl sie den Speicher
+  // lädt. Sie holt ihn über `loadKeyValueStore` und sieht das Paket nie.
+  'lib/app/praeferenz_daneben.dart': r'''
+import 'package:shared_preferences/shared_preferences.dart';
+
+class PraeferenzDaneben {}
+''',
+  // Ä13: das Verbot trifft die ganze Paketfamilie. `shared_preferences_platform_interface`
+  // ist der naheliegendste Umweg, dort liegt `SharedPreferencesStorePlatform`.
+  'lib/features/settings/data/praeferenz_familie.dart': r'''
+import 'package:shared_preferences_android/shared_preferences_android.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
+
+class PraeferenzFamilie {}
+''',
+  // Ä14: der Kern darf keine Feature-Domäne importieren. Regel 23 dreht die
+  // Aufnahmerichtung um: eine Domäne darf den Kern sehen (D-18), der Kern darf
+  // niemals zurückblicken. Sonst wäre der Kern kein geteilter Ort mehr,
+  // sondern eine versteckte Abhängigkeit auf `facts`.
+  'lib/kernel/greift_auf_feature.dart': r'''
+import 'package:fact_app/features/facts/domain/entities/fact.dart';
+
+class GreiftAufFeature {}
+''',
+  // Ä14: auch `core` ist dem Kern verwehrt. `core` liegt selbst schon tiefer
+  // als jedes Feature, aber der Kern liegt laut ADR-008 noch darunter, und
+  // die Erlaubnisliste in [_isAllowedKernelImport] nennt `core` bewusst nicht.
+  'lib/kernel/greift_auf_core.dart': r'''
+import 'package:fact_app/core/types/result.dart';
+
+class GreiftAufCore {}
+''',
+  // Ä14: Flutter selbst ist verboten. Regel 2 aus ADR-008 verlangt reines
+  // Dart, damit jede Domäne den Kern ohne Widget-Abhängigkeit importieren
+  // kann; ein einziger Flutter-Import hier würde das für alle drei zugleich
+  // aufheben.
+  'lib/kernel/holt_flutter.dart': r'''
+import 'package:flutter/material.dart';
+
+class HoltFlutter {}
+''',
   // Ä10: webview_flutter ist auf lib/map/presentation/avatar/ beschränkt.
   'lib/features/discovery/presentation/avatar_versuch.dart': r'''
 import 'package:webview_flutter/webview_flutter.dart';
@@ -565,11 +617,102 @@ import 'package:fact_app/features/tours/presentation/pages/tour_page.dart';
 
 class GreiftAufFeature {}
 ''',
+  // Ä15: der Kompass-Sensor gehört dem Orientierungsdienst. Wie bei Regel 21
+  // und 22 verbietet Regel 4 ihn nur in einer Domäne; jedes andere Verzeichnis
+  // unterhalb von lib/ durfte ihn vor Regel 24 holen.
+  'lib/features/discovery/presentation/orientierung_versuch.dart': r'''
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+
+class OrientierungVersuch {}
+''',
+  // Ä15: auch die App-Komposition bekommt ihn nicht, obwohl sie den Dienst
+  // per Override einsetzt. Sie holt ihn über den Provider und sieht das Paket
+  // nie.
+  'lib/app/orientierung_daneben.dart': r'''
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+
+class OrientierungDaneben {}
+''',
+  // Ä15: das Verbot trifft beide Pakete der Familie. Anders als bei Regel 21
+  // und 22 teilen sie sich kein gemeinsames Namenspräfix, siehe die
+  // Begründung bei _orientationSdkBans im Skript: `native_device_orientation`
+  // ist die transitive Abhängigkeit, in der eine eigene Gerätestellungs-API
+  // liegt, und damit der naheliegendste Umweg.
+  'lib/features/discovery/presentation/orientierung_familie.dart': r'''
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+import 'package:native_device_orientation/native_device_orientation.dart';
+
+class OrientierungFamilie {}
+''',
+  // Lücke 1 geschlossen: die Cross-Feature-Prüfung griff nur die Schicht
+  // direkt unter dem fremden Feature. Ein fremdes presentation und ein
+  // fremdes data hinter einer Unterstruktur entkamen den Regeln 8 und 9,
+  // während dieselbe Verschachtelung für die eigenen Schichten längst
+  // geschlossen war (Ä1).
+  'lib/features/tours/presentation/pages/fremdes_feature_verschachtelt.dart':
+      r'''
+import 'package:fact_app/features/challenges/unterstruktur/presentation/challenge_page.dart';
+import 'package:fact_app/features/challenges/unterstruktur/data/challenge_dto.dart';
+
+class FremdSeiteVerschachtelt {}
+''',
+  // Lücke 2 geschlossen: Regel 17 hing an lib/features/ und _pointsIn-
+  // toOwnFeatureLayer. Ein Modul außerhalb davon, hier der Karten-Host,
+  // durfte sein eigenes data/ ungestraft lesen. Derselbe Fall, der bis eben
+  // unter "Offene Lücken" als gemessen und offen festgehalten war.
+  'lib/map/presentation/luecke_eigenes_data.dart': r'''
+import 'package:fact_app/map/data/tile_cache.dart';
+
+class LueckeEigenesData {}
+''',
+  // Lücke 2, Doppelmeldungs-Probe: derselbe Karten-Host, diesmal mit einem
+  // fremden Feature-data/ statt dem eigenen. Hier muss weiterhin nur Regel 9
+  // greifen, nicht zusätzlich die neue Regel-17-Prüfung, denn die
+  // Modulwurzel des Karten-Hosts (package:fact_app/map/) passt nicht auf
+  // einen Import unter package:fact_app/features/.
+  'lib/map/presentation/fremdes_feature_data_regel17.dart': r'''
+import 'package:fact_app/features/tours/data/tour_dto.dart';
+
+class FremdesFeatureDataRegel17 {}
+''',
 };
 
 /// Baum 2: alles, was still bleiben muss. Enthält die Gegenproben und die
 /// bekannten Lücken. Dieser Baum muss Exit-Code 0 ohne jeden Fund ergeben.
 Map<String, String> _stilleProben() => <String, String>{
+  // Ä13 Gegenprobe: im Präferenz-Adapter ist der Gerätespeicher erlaubt. Sonst
+  // hätte Regel 22 kein Ziel, sondern wäre ein Verbot ohne Ort.
+  'lib/services/preferences/praeferenz_adapter.dart': r'''
+import 'package:shared_preferences/shared_preferences.dart';
+
+class PraeferenzAdapter {}
+''',
+  // Ä15 Gegenprobe: im Orientierungsdienst ist der Kompass-Sensor erlaubt.
+  // Sonst hätte Regel 24 kein Ziel, sondern wäre ein Verbot ohne Ort.
+  'lib/services/orientation/orientierungs_adapter.dart': r'''
+import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
+
+class OrientierungsAdapter {}
+''',
+  // Ä14 Gegenprobe: eine Feature-Domäne darf den Kern importieren. Das ist die
+  // Gegenprobe, um die es Dairen mit D-18 ging: ohne sie ist Regel 23 nur eine
+  // Behauptung, dass eine Richtung erlaubt bleibt, ohne dass ein Test es prüft.
+  'lib/features/tours/domain/entities/nutzt_kern.dart': r'''
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
+
+class NutztKern {}
+''',
+  // Ä14 Gegenprobe: der Kern darf das Dart-SDK und sich selbst importieren.
+  // Ohne sie könnte [_isAllowedKernelImport] versehentlich auf eine leere
+  // Erlaubnisliste schrumpfen, und der Kern könnte sich nicht mehr selbst
+  // zusammensetzen.
+  'lib/kernel/nutzt_dart_und_sich_selbst.dart': r'''
+import 'dart:convert';
+
+import 'package:fact_app/kernel/puzzle_operand.dart';
+
+class NutztDartUndSichSelbst {}
+''',
   // Gegenprobe zu Regel 8 und 9: Import innerhalb des eigenen Features,
   // absolut und relativ.
   'lib/features/tours/presentation/pages/eigenes_feature.dart': r'''
@@ -733,12 +876,32 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 class AvatarView {}
 ''',
-  // Gemessene, noch nicht geschlossene Lücke: Regel 17 hängt weiter an
-  // lib/features/. Siehe die Gruppe unten.
-  'lib/map/presentation/luecke_eigenes_data.dart': r'''
+  // Lücke 1 Gegenprobe: ein Import in die eigene verschachtelte Schicht
+  // (features/tours/unterstruktur/data/ aus features/tours/) bleibt still,
+  // denn cross.group(1) == ownFeature. Bewusst außerhalb jeder Schicht
+  // (kein domain/, application/, presentation/ oder data/ im eigenen Pfad),
+  // damit keine andere Prüfung hineinspielt und nur die Cross-Feature-Prüfung
+  // selbst auf dem Prüfstand steht.
+  'lib/features/tours/orchestrierung/eigene_verschachtelung.dart': r'''
+import 'package:fact_app/features/tours/unterstruktur/data/tour_dto.dart';
+
+class EigeneVerschachtelung {}
+''',
+  // Lücke 2 Gegenprobe: im Karten-Host ist application erlaubt, nur data
+  // nicht. Sonst wäre die neue Prüfung ein Verbot der ganzen Modulwurzel und
+  // nicht nur der data-Schicht.
+  'lib/map/presentation/erlaubte_application.dart': r'''
+import 'package:fact_app/map/application/kamera_steuerung.dart';
+
+class ErlaubteApplication {}
+''',
+  // Lücke 2, zweite Falle: eine Schicht direkt unter lib/ liefert bei
+  // _modulwurzel bewusst null. Diese Datei prüft, dass der zweite Zweig der
+  // Regel-17-Prüfung dann ausbleibt, ohne Ausnahme und ohne Absturz.
+  'lib/presentation/schicht_direkt_unter_lib.dart': r'''
 import 'package:fact_app/map/data/tile_cache.dart';
 
-class LueckeEigenesData {}
+class SchichtDirektUnterLib {}
 ''',
 };
 
@@ -924,7 +1087,19 @@ void main() {
         'lib/features/discovery/presentation/ortung_versuch.dart',
         'lib/features/discovery/presentation/ortung_familie.dart',
         'lib/map/presentation/ortung_daneben.dart',
+        'lib/features/settings/data/praeferenz_versuch.dart',
+        'lib/features/settings/data/praeferenz_familie.dart',
+        'lib/app/praeferenz_daneben.dart',
         'lib/core/greift_auf_feature.dart',
+        'lib/kernel/greift_auf_feature.dart',
+        'lib/kernel/greift_auf_core.dart',
+        'lib/kernel/holt_flutter.dart',
+        'lib/features/discovery/presentation/orientierung_versuch.dart',
+        'lib/app/orientierung_daneben.dart',
+        'lib/features/discovery/presentation/orientierung_familie.dart',
+        'lib/features/tours/presentation/pages/fremdes_feature_verschachtelt.dart',
+        'lib/map/presentation/luecke_eigenes_data.dart',
+        'lib/map/presentation/fremdes_feature_data_regel17.dart',
       }, reason: verstoss.bericht);
     });
   });
@@ -946,6 +1121,11 @@ void main() {
           (6, 'Regel 4: Domain darf keine Geräte-SDK importieren'),
           (7, 'Regel 4: Domain darf keine Storage-SDK importieren'),
           (8, 'Regel 4: Domain darf keine Karten-SDK importieren'),
+          // flutter_rotation_sensor trifft das Flutter-Verbot, nicht das
+          // Geräte-SDK-Verbot: der Paketname beginnt selbst mit `flutter_`.
+          // Dieselbe Lage wie bei flutter_riverpod in Zeile 3.
+          (9, 'Regel 1: Domain darf Flutter nicht importieren'),
+          (10, 'Regel 4: Domain darf keine Geräte-SDK importieren'),
         ],
       );
     });
@@ -1329,13 +1509,13 @@ void main() {
     );
 
     test('Ä2: ein benanntes Verbot verdrängt die allgemeine Meldung', () {
-      // technik_importe.dart hat acht Importe, die alle ein benanntes Verbot
+      // technik_importe.dart hat zehn Importe, die alle ein benanntes Verbot
       // treffen. Gäbe es zusätzlich die allgemeine Meldung, stünden hier
-      // sechzehn Funde und der Leser bekäme zwei Sätze für denselben Import.
+      // zwanzig Funde und der Leser bekäme zwei Sätze für denselben Import.
       final funde = verstoss.fuer(
         'lib/features/tours/domain/entities/technik_importe.dart',
       );
-      expect(funde, hasLength(8), reason: verstoss.bericht);
+      expect(funde, hasLength(10), reason: verstoss.bericht);
       expect(
         funde.where((f) => f.regel.contains('Domain-Erlaubnisliste')),
         isEmpty,
@@ -1682,6 +1862,159 @@ void main() {
       );
     });
 
+    test('Ä13: der Gerätespeicher außerhalb des Präferenz-Adapters', () {
+      // Die Regel ist am 31.08.2026 entstanden, und sie ist genau das, was das
+      // Skript vorher ausdrücklich nicht sein wollte. Solange das Paket nicht
+      // in pubspec.yaml stand, wäre sie eine Entscheidung gewesen; seit es
+      // drinsteht und `lib/services/preferences/` sein Ort ist, ist sie eine
+      // Durchsetzung.
+      erwarteFunde(
+        verstoss,
+        'lib/features/settings/data/praeferenz_versuch.dart',
+        <(int, String)>[
+          (1, 'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter'),
+        ],
+      );
+      erwarteFunde(verstoss, 'lib/app/praeferenz_daneben.dart', <(int, String)>[
+        (1, 'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter'),
+      ]);
+    });
+
+    test('Ä13: das Verbot trifft die ganze shared_preferences-Familie', () {
+      // Wie bei Regel 21 breiter als der Paketname: in
+      // `shared_preferences_platform_interface` liegt
+      // `SharedPreferencesStorePlatform`, und das ist der Weg, auf dem jemand
+      // am Adapter vorbei eine eigene Plattform setzen würde.
+      erwarteFunde(
+        verstoss,
+        'lib/features/settings/data/praeferenz_familie.dart',
+        <(int, String)>[
+          (1, 'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter'),
+          (2, 'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter'),
+        ],
+      );
+    });
+
+    test('Ä13 Gegenprobe: im Präferenz-Adapter ist er erlaubt', () {
+      expect(
+        still.fuer('lib/services/preferences/praeferenz_adapter.dart'),
+        isEmpty,
+        reason:
+            'Sonst hat der Gerätespeicher keinen Ort mehr, an dem er '
+            'angesprochen werden darf. ${still.bericht}',
+      );
+    });
+
+    test('Ä14: der Kern importiert eine Feature-Domäne', () {
+      // Regel 23 dreht die Aufnahmerichtung von D-18 um: eine Domäne darf den
+      // Kern sehen, aber der Kern darf niemals zu einem Feature zurückgreifen.
+      erwarteFunde(
+        verstoss,
+        'lib/kernel/greift_auf_feature.dart',
+        <(int, String)>[
+          (1, '[kernel] Regel 23: der geteilte Kern darf nur das Dart-SDK'),
+        ],
+      );
+    });
+
+    test('Ä14: der Kern importiert core', () {
+      // `core` liegt selbst schon tiefer als jedes Feature, aber ADR-008
+      // zieht den Kern noch eine Ebene darunter, und [_isAllowedKernelImport]
+      // nennt `core` deshalb bewusst nicht in seiner Erlaubnisliste.
+      erwarteFunde(verstoss, 'lib/kernel/greift_auf_core.dart', <(int, String)>[
+        (1, '[kernel] Regel 23: der geteilte Kern darf nur das Dart-SDK'),
+      ]);
+    });
+
+    test('Ä14: der Kern importiert Flutter', () {
+      // Regel 2 aus ADR-008 verlangt reines Dart im Kern, damit jede der drei
+      // Domänen ihn ohne Widget-Abhängigkeit importieren kann.
+      erwarteFunde(verstoss, 'lib/kernel/holt_flutter.dart', <(int, String)>[
+        (1, '[kernel] Regel 23: der geteilte Kern darf nur das Dart-SDK'),
+      ]);
+    });
+
+    test('Ä14 Gegenprobe: eine Feature-Domäne darf den Kern importieren', () {
+      expect(
+        still.fuer('lib/features/tours/domain/entities/nutzt_kern.dart'),
+        isEmpty,
+        reason:
+            'Sonst hätte D-18 keinen Weg, die Schwierigkeitsstufe aus dem '
+            'Kern in einer Domäne zu nutzen.\n${still.bericht}',
+      );
+    });
+
+    test(
+      'Ä14 Gegenprobe: der Kern importiert das Dart-SDK und sich selbst',
+      () {
+        expect(
+          still.fuer('lib/kernel/nutzt_dart_und_sich_selbst.dart'),
+          isEmpty,
+          reason:
+              'Sonst könnte sich der Kern nicht mehr selbst zusammensetzen.\n'
+              '${still.bericht}',
+        );
+      },
+    );
+
+    test('Ä15: der Kompass-Sensor außerhalb des Orientierungsdienstes', () {
+      // Vor Regel 24 lief dieser Import überall unterhalb von lib/ durch,
+      // außer in einem domain/-Segment. Der Kompass-Sensor ist eine
+      // unterstützende Technik wie die Ortung, damit ist
+      // lib/services/orientation/ sein Ort und kein anderer.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/orientierung_versuch.dart',
+        <(int, String)>[
+          (1, 'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst'),
+        ],
+      );
+      erwarteFunde(
+        verstoss,
+        'lib/app/orientierung_daneben.dart',
+        <(int, String)>[
+          (1, 'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst'),
+        ],
+      );
+    });
+
+    test('Ä15: das Verbot trifft beide Pakete der Familie', () {
+      // Anders als bei Regel 21 und 22 teilen sich die beiden Pakete kein
+      // gemeinsames Namenspräfix: `native_device_orientation` ist die
+      // transitive Abhängigkeit mit einer eigenen Gerätestellungs-API und
+      // damit der naheliegendste Umweg am Orientierungsdienst vorbei.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/orientierung_familie.dart',
+        <(int, String)>[
+          (1, 'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst'),
+          (2, 'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst'),
+        ],
+      );
+    });
+
+    test('Ä15 Gegenprobe: im Orientierungsdienst ist der Sensor erlaubt', () {
+      expect(
+        still.fuer('lib/services/orientation/orientierungs_adapter.dart'),
+        isEmpty,
+        reason:
+            'Sonst hat der Kompass-Sensor keinen Ort mehr, an dem er '
+            'angesprochen werden darf.\n${still.bericht}',
+      );
+    });
+
+    test('Ä13 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
+      // Dieselbe Abgrenzung wie bei Regel 20 und 21. Regel 4 verbietet
+      // Storage-SDKs in jeder Domäne und ist dort die genauere Aussage.
+      final zeile7 = verstoss
+          .fuer('lib/features/tours/domain/entities/technik_importe.dart')
+          .where((fund) => fund.zeile == 7)
+          .toList();
+
+      expect(zeile7, hasLength(1), reason: verstoss.bericht);
+      expect(zeile7.single.regel, contains('Regel 4: Domain darf keine'));
+    });
+
     test('Ä12 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
       // Dieselbe Abgrenzung wie bei Regel 20 und aus demselben Grund: Regel 4
       // verbietet Geräte-SDKs in jeder Domäne und ist dort die genauere
@@ -1712,18 +2045,118 @@ void main() {
       expect(zeile8, hasLength(1), reason: verstoss.bericht);
       expect(zeile8.single.regel, contains('Regel 4: Domain darf keine'));
     });
+
+    test('Ä15 Gegenprobe: in einer Domäne meldet nur Regel 4', () {
+      // Für native_device_orientation, nicht für flutter_rotation_sensor:
+      // dessen Paketname beginnt selbst mit `flutter_` und trifft in einer
+      // Domäne bereits Regel 1, siehe Zeile 9 im Test „Domain darf keine
+      // Technik importieren" und die Begründung bei [_orientationSdkBans] im
+      // Skript. Für native_device_orientation gilt dieselbe Abgrenzung wie
+      // bei Regel 21 und 22: Regel 4 verbietet Geräte-SDKs in jeder Domäne
+      // und ist dort die genauere Aussage. Regel 24 lässt Domänen deshalb
+      // aus, sonst stünden für denselben Import zwei Meldungen da.
+      final zeile10 = verstoss
+          .fuer('lib/features/tours/domain/entities/technik_importe.dart')
+          .where((fund) => fund.zeile == 10)
+          .toList();
+
+      expect(zeile10, hasLength(1), reason: verstoss.bericht);
+      expect(zeile10.single.regel, contains('Regel 4: Domain darf keine'));
+    });
+  });
+
+  // Die beiden Lücken, die REBUILD_STATUS.md unter "Drei verbleibende
+  // Asymmetrien im Architektur-Check" als erste und dritte führte. Jede
+  // bekommt beide Richtungen: die Positivprobe im verstoss-Baum und die
+  // Gegenprobe(n) im stillen Baum, sonst prüft der Test nur die Hälfte der
+  // Behauptung.
+  group('Geschlossene Lücken: Cross-Feature-Tiefe und Regel 17 im Modul', () {
+    test('Lücke 1: fremdes presentation und data hinter einer '
+        'Unterstruktur', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/pages/'
+        'fremdes_feature_verschachtelt.dart',
+        <(int, String)>[
+          (1, 'Regel 8: presentation von "challenges" darf nur dieses Feature'),
+          (2, 'Regel 9: data von "challenges" darf nur dieses Feature'),
+        ],
+      );
+    });
+
+    test(
+      'Lücke 1 Gegenprobe: die eigene verschachtelte Schicht bleibt still',
+      () {
+        expect(
+          still.fuer(
+            'lib/features/tours/orchestrierung/eigene_verschachtelung.dart',
+          ),
+          isEmpty,
+          reason:
+              'cross.group(1) == ownFeature, also gilt hier weder Regel 8 '
+              'noch Regel 9. Wird hier etwas gemeldet, ist die '
+              'Eigen/Fremd-Unterscheidung nach der Tiefenerweiterung '
+              'kaputtgegangen.\n${still.bericht}',
+        );
+      },
+    );
+
+    test('Lücke 2: der Karten-Host darf sein eigenes data/ nicht lesen', () {
+      erwarteFunde(
+        verstoss,
+        'lib/map/presentation/luecke_eigenes_data.dart',
+        <(int, String)>[(1, 'Regel 17: presentation darf nicht auf data')],
+      );
+    });
+
+    test('Lücke 2 Gegenprobe: application bleibt im Karten-Host erlaubt', () {
+      expect(
+        still.fuer('lib/map/presentation/erlaubte_application.dart'),
+        isEmpty,
+        reason:
+            'Nur data ist verboten, nicht die ganze Modulwurzel. Wird hier '
+            'etwas gemeldet, prüft die neue Regel-17-Fassung die falsche '
+            'Schicht.\n${still.bericht}',
+      );
+    });
+
+    test('Lücke 2 Gegenprobe: fremdes Feature-data bleibt eine Meldung, '
+        'nicht zwei', () {
+      // Die Modulwurzel des Karten-Hosts (package:fact_app/map/) passt
+      // nicht auf einen Import unter package:fact_app/features/. Ohne
+      // diese Abgrenzung stünden hier Regel 9 und die neue Regel-17-Prüfung
+      // nebeneinander für denselben Import.
+      final funde = verstoss.fuer(
+        'lib/map/presentation/fremdes_feature_data_regel17.dart',
+      );
+      expect(funde, hasLength(1), reason: verstoss.bericht);
+      expect(
+        funde.single.regel,
+        contains('Regel 9: data von "tours" darf nur dieses Feature'),
+        reason: verstoss.bericht,
+      );
+    });
+
+    test('Lücke 2 Gegenprobe: eine Schicht direkt unter lib/ kennt keine '
+        'Modulwurzel', () {
+      // _modulwurzel liefert hier bewusst null (die Wurzel wäre sonst das
+      // ganze Paket). Dieser Test hält fest, dass der zweite Zweig der
+      // Regel-17-Prüfung diesen Fall ohne Ausnahme und ohne Absturz
+      // überspringt.
+      expect(
+        still.fuer('lib/presentation/schicht_direkt_unter_lib.dart'),
+        isEmpty,
+        reason: still.bericht,
+      );
+    });
   });
 
   // Diese Gruppe hält den heutigen Zustand fest. Jeder Test hier ist grün,
   // weil das Skript nichts meldet.
   //
-  // Bei den vier Lücken 1 bis 4 ist das gewollt, die Begründung steht im
-  // Kopfkommentar von tool/check_architecture.dart unter "Bewusst offene
-  // Lücken". Wer eine davon schließen will, muss zuerst die dortige
-  // Begründung widerlegen.
-  //
-  // Der fünfte Test ist anders gelagert: dort ist nichts entschieden, die
-  // Lücke ist gemessen und offen. Er steht hier, damit sie sichtbar bleibt.
+  // Die Begründung für jede der vier Lücken steht im Kopfkommentar von
+  // tool/check_architecture.dart unter "Bewusst offene Lücken". Wer eine
+  // davon schließen will, muss zuerst die dortige Begründung widerlegen.
   group('Offene Lücken', () {
     test('Lücke 1: benannte Konstruktoren umgehen Regel 7', () {
       expect(
@@ -1762,20 +2195,6 @@ void main() {
             'context.go(ziel) ist genau die Form, die eine typisierte Route '
             'erzeugt. Ein Verbot würde überwiegend korrekten Code melden.\n'
             '${still.bericht}',
-      );
-    });
-
-    test('Gemessene, noch offene Lücke: Regel 17 gilt nur unter '
-        'lib/features/', () {
-      expect(
-        still.fuer('lib/map/presentation/luecke_eigenes_data.dart'),
-        isEmpty,
-        reason:
-            'Anders als die vier Lücken darüber ist das keine Entscheidung, '
-            'sondern der Rest der Asymmetrie, die bei den Schichtmustern und '
-            'bei Regel 8 und 9 geschlossen wurde. Regel 17 hängt weiter an '
-            '_pointsIntoOwnFeatureLayer. Wer sie über _modulwurzel ableitet, '
-            'dreht diesen Test um.\n${still.bericht}',
       );
     });
 

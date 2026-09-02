@@ -1,9 +1,8 @@
 import 'package:fact_app/features/facts/domain/entities/fact_puzzle.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
 import 'package:fact_app/features/puzzles/application/puzzle_from_fact_puzzle.dart';
 import 'package:fact_app/features/puzzles/domain/entities/puzzle.dart';
-import 'package:fact_app/features/puzzles/domain/value_objects/puzzle_difficulty.dart';
-import 'package:fact_app/features/puzzles/domain/value_objects/puzzle_operand.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_operand.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Die Übersetzung der Rohdaten in die Rätselform,
@@ -37,7 +36,7 @@ void main() {
     String question = 'Wie viele Löwen sitzen am Portal?',
     String? type,
     List<String> choices = const <String>[],
-    FactPuzzleDifficulty? difficulty,
+    PuzzleDifficulty? difficulty,
     String? expectedAnswer,
     String? hint,
     List<String> hints = const <String>[],
@@ -46,8 +45,8 @@ void main() {
     int? gpsRadiusMeters,
     int? expectedCount,
     int? countTolerance,
-    FactPuzzleOperand? operandA,
-    FactPuzzleOperand? operandB,
+    PuzzleOperand? operandA,
+    PuzzleOperand? operandB,
     String? formula,
     num? expectedResult,
   }) => FactPuzzle(
@@ -211,11 +210,11 @@ void main() {
       final Puzzle puzzle = puzzleFromFactPuzzle(
         raw(
           type: 'kombi',
-          operandA: const FactPuzzleOperand(
+          operandA: const PuzzleOperand(
             label: 'Geburtsjahr',
             description: 'von der Sockelinschrift',
           ),
-          operandB: const FactPuzzleOperand(label: 'Todesjahr'),
+          operandB: const PuzzleOperand(label: 'Todesjahr'),
           formula: 'b - a',
           expectedResult: 61,
         ),
@@ -319,19 +318,19 @@ void main() {
       // getrennt, nicht einer stellvertretend.
       expect(
         puzzleFromFactPuzzle(
-          raw(difficulty: FactPuzzleDifficulty.leicht),
+          raw(difficulty: PuzzleDifficulty.leicht),
         ).difficulty,
         PuzzleDifficulty.leicht,
       );
       expect(
         puzzleFromFactPuzzle(
-          raw(difficulty: FactPuzzleDifficulty.mittel),
+          raw(difficulty: PuzzleDifficulty.mittel),
         ).difficulty,
         PuzzleDifficulty.mittel,
       );
       expect(
         puzzleFromFactPuzzle(
-          raw(difficulty: FactPuzzleDifficulty.schwer),
+          raw(difficulty: PuzzleDifficulty.schwer),
         ).difficulty,
         PuzzleDifficulty.schwer,
       );
@@ -350,7 +349,7 @@ void main() {
       // Auswertung.
       expect(
         PuzzleDifficulty.values.map((PuzzleDifficulty d) => d.code),
-        FactPuzzleDifficulty.values.map((FactPuzzleDifficulty d) => d.code),
+        PuzzleDifficulty.values.map((PuzzleDifficulty d) => d.code),
       );
     });
   });
@@ -359,7 +358,7 @@ void main() {
     // Dieselbe Aufgabe wie „beide Aufzählungen tragen dieselben Codes" eine
     // Gruppe höher, nur für das zweite kopierte Wertobjekt. Die erste Fassung
     // hatte diese Gruppe gar nicht, und `PuzzleOperand` war beim Abschreiben
-    // ohne `==` und `hashCode` geblieben, obwohl `FactPuzzleOperand` beide
+    // ohne `==` und `hashCode` geblieben, obwohl `PuzzleOperand` beide
     // hat (`fact_puzzle.dart:327-333`) und sie nur zwei Zeichenketten
     // vergleichen.
 
@@ -386,11 +385,11 @@ void main() {
 
       // Und dasselbe am Original, damit die Zusicherung wirklich ein
       // Abgleich ist und nicht nur eine Aussage über die Kopie.
-      final FactPuzzleOperand originalLeft = FactPuzzleOperand(
+      final PuzzleOperand originalLeft = PuzzleOperand(
         label: 'Geburtsjahr',
         description: 'Sockel',
       );
-      final FactPuzzleOperand originalRight = FactPuzzleOperand(
+      final PuzzleOperand originalRight = PuzzleOperand(
         label: jahr,
         description: String.fromCharCodes('Sockel'.codeUnits),
       );
@@ -428,11 +427,11 @@ void main() {
 
       // Gegenprobe am Original: dieselbe Wahrheitstafel, sonst ist die Kopie
       // weggelaufen.
-      expect(const FactPuzzleOperand().isEmpty, isTrue);
-      expect(const FactPuzzleOperand(label: 'a').isEmpty, isFalse);
-      expect(const FactPuzzleOperand(description: 'b').isEmpty, isFalse);
+      expect(const PuzzleOperand().isEmpty, isTrue);
+      expect(const PuzzleOperand(label: 'a').isEmpty, isFalse);
+      expect(const PuzzleOperand(description: 'b').isEmpty, isFalse);
       expect(
-        const FactPuzzleOperand(label: 'a', description: 'b').isEmpty,
+        const PuzzleOperand(label: 'a', description: 'b').isEmpty,
         isFalse,
       );
     });
@@ -444,7 +443,7 @@ void main() {
           puzzleFromFactPuzzle(
                 raw(
                   type: 'kombi',
-                  operandA: const FactPuzzleOperand(
+                  operandA: const PuzzleOperand(
                     label: 'Geburtsjahr',
                     description: 'Sockel',
                   ),

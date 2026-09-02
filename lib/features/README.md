@@ -24,13 +24,31 @@ Komplexität es verlangt.
 ## Über die Domain-Map hinaus
 
 Diese drei existieren, weil die Parity-Spec Verhalten fordert, für das die
-Domain-Map keinen Eigentümer nennt. Der Zuschnitt ist ein Vorschlag und wartet
-auf Bestätigung.
+Domain-Map keinen Eigentümer nennt.
+
+**`puzzles` ist seit dem 31.08.2026 bestätigt**, siehe ADR-006, und steht
+seitdem auch in `domain-map.md`, `architecture-overview.md` und
+`project-structure.md`. `tours` und `challenges` dürfen davon abhängen, aber nur
+von `puzzles/domain` und `puzzles/application`; umgekehrt nie.
+
+**`library` ist am 31.08.2026 gestrichen.** Die Produktfrage ist entschieden:
+alles kommt in den Wallet, also das Bücherregal mit den gesammelten Fakten, und
+`collection` besitzt diesen Bildschirm. Die Coins gehen ins **Profil**, sie
+gehören `progression`. Siehe ADR-006.
+
+**`creator` bleibt Vorschlag**, und zwar bewusst: sie haben heute
+keinen Inhalt und keinen Verbraucher, und für `library` ist zusätzlich ungeklärt,
+was ihm überhaupt gehört. Der Bildschirm, den es beansprucht, ist derselbe, für
+den `collection/presentation/pages/collection_page.dart` schon einen Platzhalter
+trägt und dem `shell_tab.dart` den `wallet`-Tab zuweist. Ob das PWA-„Wallet" ein
+Bildschirm ist (gesammelte Fakten, nach Städten als Reiseführer dargestellt) oder
+zwei, ist eine Produktfrage und keine Architekturfrage. Sie gehört beantwortet,
+bevor jemand in `library` baut, siehe ADR-006.
 
 | Ordner | Besitzt | Begründung |
 |---|---|---|
 | `puzzles` | Rätsel-Definition, sechs Rätseltypen, Auswertungs-Policy, Hinweisstufen | Die Engine wird von `tours` **und** `challenges` genutzt. Läge sie in einem der beiden, müsste das andere Feature dessen Presentation importieren, was Regel 8 der Dependency-Rules verbietet. Rätsel bewerten, nicht belohnen: die Belohnung entsteht als Ereignis für `progression`. |
-| `library` | Reiseführer-Regal, Cover, Kapitel, Reader | In der PWA heisst das „Wallet", enthält aber keine Währung. Coins gehören zu `progression`. Der Reader zeigt Fakten, besitzt sie nicht. |
+| `library` | Reiseführer-Regal, Cover, Kapitel, Reader | In der PWA heißt das „Wallet", enthält aber keine Währung. Coins gehören zu `progression`. Der Reader zeigt Fakten, besitzt sie nicht. |
 | `creator` | Fakt einreichen, Kategorie-Vorschlag, Foto-Upload, Wikipedia-Suche | `facts` besitzt veröffentlichten Inhalt, die Erzeugungs-Pipeline gilt laut Domain-Map als externes System. Nutzer-Einreichung ist ein eigener Arbeitsablauf mit eigenem Zustand. |
 
 ## Was bewusst kein Feature ist

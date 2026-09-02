@@ -1,7 +1,7 @@
 import 'package:fact_app/features/facts/data/mappers/fact_mapper.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_defect.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fact_row_fixtures.dart';
@@ -753,7 +753,7 @@ void main() {
 
       expect(
         result.facts.single.easiestPuzzleDifficulty,
-        FactPuzzleDifficulty.leicht,
+        PuzzleDifficulty.leicht,
       );
     });
 

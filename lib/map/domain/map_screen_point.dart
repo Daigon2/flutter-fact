@@ -37,6 +37,26 @@
 /// Typ trägt die rohe Einheit des SDK, damit jede Umrechnung sichtbar bleibt
 /// statt sich über den Vertrag zu verteilen.
 ///
+/// ## Das dritte Feld, seit dem 31.08.2026
+///
+/// Eine Bildschirmlage allein sagt nicht, ob der Punkt überhaupt vor der
+/// Kamera liegt. `maplibre_gl 0.26.2` meldet einen Punkt **hinter** der Kamera
+/// nicht, es liefert eine still gespiegelte Zahl, die von der Lage eines weit
+/// voraus liegenden Punktes nicht zu unterscheiden ist (am 30.08.2026 am Gerät
+/// gemessen, `REBUILD_STATUS.md`, „Die vier Gerätemessungen", Messung 3). Bei
+/// 58 Grad Neigung liegt alles jenseits des Horizonts hinter der Kamera, der
+/// Fall ist also der Normalfall und nicht exotisch.
+///
+/// Bis zu diesem Datum erbte jeder Verbraucher diese Lücke und beschrieb sie
+/// erneut, an drei Stellen mit drei verschiedenen Folgen. **D-17 hat das am
+/// 31.08.2026 entschieden:** die Antwort liegt dem Ergebnis bei, als
+/// [isInFrontOfCamera], und der Host rechnet sie aus, siehe
+/// `map_camera_horizon.dart`. Nicht gewählt wurde `null` für einen solchen
+/// Punkt, denn „keine Bildschirmlage" und „Lage bekannt, liegt aber hinter der
+/// Kamera" sind zwei verschiedene Aussagen: `discovery_balloon_anchor.dart`
+/// braucht die Unterscheidung, weil ein Punkt hinter der Kamera eine Lage hat,
+/// nur eben nicht mitspielen darf.
+///
 /// **Der Feldname sagt die Einheit nicht.** `xInScreenPixels` bliebe auch dann
 /// stehen, wenn jemand den Wert für logische Pixel hielte; ehrlicher wäre
 /// `xInDevicePixels`. Umbenannt ist er trotzdem nicht, weil
@@ -46,17 +66,34 @@
 /// Nebeneffekt einer Fehlerbehebung.
 library;
 
-/// Ein Punkt in der Fläche der Karte, in **Geräte-Pixeln**.
+/// Ein Punkt in der Fläche der Karte, in **Geräte-Pixeln**, mit der Aussage,
+/// ob er vor der Kamera liegt.
 ///
 /// `final class`, weil der Typ Wertgleichheit hat: eine Unterklasse mit einem
-/// dritten Feld wäre nach diesem `==` gleich einem [MapScreenPoint], umgekehrt
-/// aber nicht, und `a == b` hinge an der Reihenfolge der Operanden. Dieselbe
-/// Begründung wie bei `MapPosition`.
+/// **zusätzlichen** Feld wäre nach diesem `==` gleich einem [MapScreenPoint],
+/// umgekehrt aber nicht, und `a == b` hinge an der Reihenfolge der Operanden.
+/// Dieselbe Begründung wie bei `MapPosition`.
+///
+/// **Diese Begründung stand bis zum 31.08.2026 mit dem Wort „drittes Feld" da,
+/// und das dritte Feld ist inzwischen gekommen** ([isInFrontOfCamera], D-17).
+/// Sie trägt trotzdem weiter, denn es ging nie um die Anzahl: `final class`
+/// hält die Gleichheit dort, wo auch die Felder liegen. Der Zuwachs hat genau
+/// das gezeigt, was der Verschluss verspricht: `==`, [hashCode] und
+/// [toString] sind an **einer** Stelle mitgezogen, und es gibt keine
+/// Unterklasse, in der jemand das vergessen konnte.
 final class MapScreenPoint {
   /// Erzeugt einen Bildschirmpunkt.
+  ///
+  /// [isInFrontOfCamera] ist **Pflicht und hat keinen Standardwert**, obwohl
+  /// „liegt vor der Kamera" der häufigere Fall ist. Ein Standard wäre hier die
+  /// stille Variante: wer den Punkt baut, ohne über die Kamera nachgedacht zu
+  /// haben, bekäme lautlos „liegt davor", und genau diese Sorte Ersatzwert hat
+  /// in diesem Repository schon eine Probe blind gemacht
+  /// (`REBUILD_STATUS.md`, „Wie Tests hier blind werden", Muster 21).
   const MapScreenPoint({
     required this.xInScreenPixels,
     required this.yInScreenPixels,
+    required this.isInFrontOfCamera,
   });
 
   /// Abstand vom linken Rand der Karte, in Geräte-Pixeln.
@@ -65,14 +102,39 @@ final class MapScreenPoint {
   /// Abstand vom oberen Rand der Karte, in Geräte-Pixeln.
   final double yInScreenPixels;
 
+  /// Ob der Punkt vor der Kamera liegt und seine Bildschirmlage damit etwas
+  /// bedeutet.
+  ///
+  /// `false` heißt: die Karte ist geneigt, der Punkt liegt jenseits des
+  /// Horizonts, und [xInScreenPixels] und [yInScreenPixels] sind eine
+  /// **Spiegelung**. Sie sehen aus wie eine gültige Lage, sie sind endlich, sie
+  /// tragen kein `NaN`, und sie liegen in genau demselben Zahlenbereich wie ein
+  /// Punkt weit voraus. Wer sie benutzt, zeichnet ein Bauteil an eine Stelle,
+  /// an der es geometrisch nichts zu suchen hat.
+  ///
+  /// **Ein Verbraucher prüft dieses Feld, er rechnet es nicht nach.** Die Zahl
+  /// entsteht im Karten-Host aus Flächenhöhe und Neigung
+  /// (`map_camera_horizon.dart`); ein Feature, das sie selbst herleitete,
+  /// bräuchte die Kamerastellung und baute damit die Kamerahoheit nach, siehe
+  /// den Prüfstein im Kopfkommentar von `map_host.dart`.
+  ///
+  /// `false` heißt **nicht** „unsichtbar". Ein Punkt vor der Kamera kann
+  /// trotzdem weit außerhalb der Fläche liegen, und das ist der Normalfall
+  /// jeder Überlagerung, die mehr als den Bildausschnitt kennt. Wer
+  /// Sichtbarkeit meint, prüft die Lage gegen die Fläche, so wie
+  /// `selectBalloonAnchorRect` es tut.
+  final bool isInFrontOfCamera;
+
   @override
   bool operator ==(Object other) =>
       other is MapScreenPoint &&
       other.xInScreenPixels == xInScreenPixels &&
-      other.yInScreenPixels == yInScreenPixels;
+      other.yInScreenPixels == yInScreenPixels &&
+      other.isInFrontOfCamera == isInFrontOfCamera;
 
   @override
-  int get hashCode => Object.hash(xInScreenPixels, yInScreenPixels);
+  int get hashCode =>
+      Object.hash(xInScreenPixels, yInScreenPixels, isInFrontOfCamera);
 
   /// **Mit den Zahlen**, anders als `MapPosition.toString()`.
   ///
@@ -82,7 +144,13 @@ final class MapScreenPoint {
   /// zurückzurechnen. Und ohne die Zahlen wäre eine Ausgabe für die eine
   /// Diagnose, um die es hier geht, wertlos: „sitzt die Überlagerung um den
   /// Faktor drei daneben".
+  ///
+  /// **Mit der Lage zur Kamera im Klartext und nicht als `true`/`false`.** Die
+  /// eine Diagnose, für die dieses Feld gebaut ist, lautet „warum steht da ein
+  /// Ballon, wo keiner sein kann", und ein nackter Wahrheitswert am Ende der
+  /// Zeile ließe offen, wozu er gehört.
   @override
   String toString() =>
-      'MapScreenPoint($xInScreenPixels, $yInScreenPixels in Bildschirmpixeln)';
+      'MapScreenPoint($xInScreenPixels, $yInScreenPixels in Bildschirmpixeln, '
+      '${isInFrontOfCamera ? 'vor' : 'hinter'} der Kamera)';
 }

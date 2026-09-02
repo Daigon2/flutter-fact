@@ -1,5 +1,6 @@
 import 'package:fact_app/features/facts/domain/structural_equality.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_operand.dart';
 
 /// Ein Rätsel, das an einem Fakt hängt.
 ///
@@ -94,7 +95,7 @@ class FactPuzzle {
   final String? type;
 
   /// Schwierigkeitsstufe, `null` wenn sie fehlt oder unbekannt ist.
-  final FactPuzzleDifficulty? difficulty;
+  final PuzzleDifficulty? difficulty;
 
   /// Die Aufgabe, wie sie dem Spieler gezeigt wird.
   ///
@@ -167,10 +168,10 @@ class FactPuzzle {
   final int? countTolerance;
 
   /// Erster Eingabewert eines Kombi-Rätsels.
-  final FactPuzzleOperand? operandA;
+  final PuzzleOperand? operandA;
 
   /// Zweiter Eingabewert eines Kombi-Rätsels.
-  final FactPuzzleOperand? operandB;
+  final PuzzleOperand? operandB;
 
   /// Rechenvorschrift eines Kombi-Rätsels, etwa `b - a` oder `a * b`.
   ///
@@ -202,7 +203,7 @@ class FactPuzzle {
   FactPuzzle copyWith({
     String? question,
     String? type,
-    FactPuzzleDifficulty? difficulty,
+    PuzzleDifficulty? difficulty,
     String? expectedAnswer,
     String? hint,
     List<String>? hints,
@@ -216,8 +217,8 @@ class FactPuzzle {
     List<String>? choices,
     int? expectedCount,
     int? countTolerance,
-    FactPuzzleOperand? operandA,
-    FactPuzzleOperand? operandB,
+    PuzzleOperand? operandA,
+    PuzzleOperand? operandB,
     String? formula,
     num? expectedResult,
     String? photoUrl,
@@ -301,38 +302,4 @@ class FactPuzzle {
   String toString() =>
       'FactPuzzle(type: $type, difficulty: ${difficulty?.code}, '
       'choices: ${choices.length})';
-}
-
-/// Ein Eingabewert eines Kombi-Rätsels.
-///
-/// Steht in den Daten als `{"hint": "Geburtsjahr", "description": "Geburtsjahr
-/// von der Sockelinschrift"}`. Die PWA zeigt nur [label]
-/// (`puzzle-sheet.jsx:506`, Feld `hint`), [description] ist redaktionell.
-class FactPuzzleOperand {
-  /// Beide Felder optional, die Daten füllen nicht immer beide.
-  const FactPuzzleOperand({this.label, this.description});
-
-  /// Beschriftung des Eingabefelds (`hint`).
-  ///
-  /// Heißt hier nicht `hint`, weil das mit `FactPuzzle.hint`, dem Tipp zum
-  /// Rätsel, verwechselbar wäre. Es sind zwei verschiedene Dinge.
-  final String? label;
-
-  /// Ausführlichere Erklärung, woher der Wert kommt (`description`).
-  final String? description;
-
-  /// Ist nichts gesetzt?
-  bool get isEmpty => label == null && description == null;
-
-  @override
-  bool operator ==(Object other) =>
-      other is FactPuzzleOperand &&
-      other.label == label &&
-      other.description == description;
-
-  @override
-  int get hashCode => Object.hash(label, description);
-
-  @override
-  String toString() => 'FactPuzzleOperand($label)';
 }

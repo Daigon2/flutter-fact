@@ -375,17 +375,22 @@ void main() {
       }
     });
 
-    testWidgets('sie bleibt im englischen Modus deutsch', (tester) async {
-      // Der Text steht wörtlich im JSX und nicht in `translations.jsx`,
-      // die PWA zeigt ihn auch auf Englisch so. Exakte Parität.
+    testWidgets('im englischen Modus steht der englische Wortlaut da', (
+      tester,
+    ) async {
+      // Der Text steht wörtlich im JSX und nicht in `translations.jsx`; bis
+      // zum 02.09.2026 zeigte die PWA ihn auch auf Englisch deutsch, und das
+      // galt als Parität (E-61). Der Eigentümer hat das als gemessenen
+      // Defekt der Quelle aufgehoben: `fact.fileNumber` trägt seither einen
+      // eigenen englischen Wortlaut.
       await pumpFact(
         tester,
         fact: factFixture(number: 'MUC_004'),
         language: AppLanguage.en,
       );
 
-      expect(find.text('Akte #MUC_004'), findsOneWidget);
-      expect(find.textContaining('File'), findsNothing);
+      expect(find.text('File #MUC_004'), findsOneWidget);
+      expect(find.text('Akte #MUC_004'), findsNothing);
     });
   });
 

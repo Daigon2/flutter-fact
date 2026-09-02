@@ -15,6 +15,23 @@ Plans und der Parity-Spec stehen unten unter „Korrekturen an den
 Quelldokumenten". Es sind inzwischen zwölf, und **auch Kommentare in der PWA
 selbst** sind darunter.
 
+> **Zu den Datumsangaben, und das betrifft fast alles unterhalb.** Diese
+> Arbeitssitzung lief über **drei** Kalendertage, und das Protokoll kennt nur
+> einen. Fast jeder Eintrag seit dem Fragenblock an Dairen trägt „31.08.2026",
+> auch wenn er am 1. oder 2. September entstanden ist; die Wörter „am selben
+> Tag" sind entsprechend oft falsch. Gemessen an den Commit-Zeitstempeln:
+> `574c305` und alles davor liegt am **31.08.2026** (bis 22:58), `e1dd722` bis
+> `6f955a8` am **01.09.2026** (14:53 bis 23:29), `add0394` bis `d559abe` am
+> **02.09.2026** (00:17 bis 03:58).
+>
+> **Ein Rundumschlag wäre schlimmer als der Fehler.** Von den 65 falsch
+> datierten Zeilen verweisen einige zu Recht auf den 31.08., etwa auf Dairens
+> Antworten oder auf die Backend-Aufnahme. Wer eine einzelne Angabe braucht,
+> holt sie mit `git log --format="%h %ad %s" --date=format:"%Y-%m-%d"` und
+> setzt **diese eine** richtig. Die Überschriften der Protokolleinträge vom
+> 2. September sind bereits nachgezogen.
+
+
 ## Legende
 
 `[x]` fertig und verifiziert · `[~]` in Arbeit · `[ ]` offen · `[!]` blockiert
@@ -256,9 +273,9 @@ Sammelstelle: was hier fehlt, ist auch nicht anderswo dokumentiert.
 | **`animateCamera` liefert auf iOS immer sofort `null`**, auf Android echte Werte über einen Listener | `controller.dart:416`, eigene Doku; gilt genauso für `moveCamera` | Taugt nicht zum Abwarten. `if (await animateCamera(...) != true)` wäre auf Android richtig und auf iOS fatal: der Host löschte seinen Animationszustand nie mehr und unterdrückte danach jede Dauerabsicht. Regel: `true` und `false` löschen, `null` heißt „keine Auskunft" und lässt stehen. Ein Animationszustand mit Start und **ohne** geplantes Ende gilt sonst als „läuft ewig" und friert jede Dauerabsicht dauerhaft ein. |
 | **Keine Bewegungsursache im Rückruf** | `OnCameraMoveCallback = void Function(CameraPosition)`, ohne Ursache, ohne `isGesture`; `onCameraMoveStarted` gibt es als Widget-Rückruf nicht | „Der Nutzer hat angefasst" ist nur als **unerklärte Kamerabewegung** erkennbar. |
 | **Kein `setPaintProperty`, kein `setLayoutProperty`** | vorhanden ist nur `setLayerProperties`, das laut eigener Doku unbelegte Eigenschaften auf den Standard zurücksetzt | Der Stil wird **gebacken** statt zur Laufzeit umgefärbt, erzwungen und nicht gewählt. Die PWA ändert je Layer genau eine Eigenschaft und lässt den Rest stehen; nachbauen hieße, für jeden der **111 Layer** den vollständigen Eigenschaftssatz zurückzulesen und über den Plattformkanal zurückzuschieben. |
-| **Kein dauerhaftes Kamera-Padding** | `setPadding` fehlt; `padding` kommt nur an `CameraUpdate.newLatLngBounds` (`maplibre_gl_platform_interface-0.26.2/lib/src/camera.dart:106-119`) und an `setCameraBounds` (`controller.dart:1811-1826`) vor | `screen-map.jsx:1694` setzt `map.setPadding({ top: 320 })` und schiebt den wirksamen Kartenmittelpunkt um 320 Pixel nach unten, damit die Figur im unteren Drittel steht. `setCameraBounds` grenzt den **erlaubten Ausschnitt** ein; wer sie dafür hält, sperrt das Schieben ein, statt die Kamera zu versetzen. **Entscheidet in den Schritten 15 bis 18**, wo Nutzermarker und Avatar landen und wie ein Neuzentrieren aussieht. |
+| **Kein `setPadding`, aber `updateContentInsets` leistet dasselbe** | `updateContentInsets(EdgeInsets, [bool animated])`, `controller.dart:958-962`; Android macht daraus `CameraUpdateFactory.paddingTo` **mit** `density`-Skalierung (`MapLibreMapController.java:867-875`), iOS `mapView.setContentInset` (`MapLibreMapController.swift:311-323`) | `screen-map.jsx:1694` setzt `map.setPadding({ top: 320 })` und schiebt den wirksamen Kartenmittelpunkt um 320 Pixel nach unten, damit die Figur im unteren Drittel steht. Das ist nachbaubar, und die eigene Doku der Methode beschreibt genau diese Wirkung: „if the only the top edge is inset, the map center is effectively shifted downward" (`controller.dart:950-954`). `setCameraBounds` ist dagegen **nicht** das Gesuchte, sie grenzt den erlaubten Ausschnitt ein und sperrt damit das Schieben ein, statt die Kamera zu versetzen. Wo Nutzermarker und Avatar landen, bleibt Entscheidung der Schritte 15 bis 18, aber **nicht mehr wegen einer Paketlücke**. |
 | **`maxPitch` und `minPitch` haben kein Gegenstück** | `screen-map.jsx:1677-1678` | Das SDK klemmt die Neigung zoomabhängig und still. Folgenlos, solange die Auto-Neigung bei 58 endet. `dragRotate: false` (`:1681`) ist auf dem Gerät gegenstandslos, es betrifft nur die Maus. |
-| **Kein `getClusterExpansionZoom`** | null Treffer im ganzen Paket, ebenso `getClusterChildren` und `getClusterLeaves` | Die PWA rechnet damit die Zoomstufe, ab der genau dieser Cluster zerfällt (`screen-map.jsx:2447-2451`). Das ist die einzige Stelle, an der die Überlagerung in den **fertigen** Kameravertrag hineingreift, siehe D-b. |
+| **Kein `getClusterExpansionZoom`** | null Treffer im ganzen Paket, ebenso `getClusterChildren` und `getClusterLeaves` | Die PWA rechnet damit die Zoomstufe, ab der genau dieser Cluster zerfällt (`screen-map.jsx:2447-2451`). Das ist die einzige Stelle, an der die Überlagerung in den **fertigen** Kameravertrag hineingreift, siehe D-12. |
 | **`addGeoJsonSource` kann nicht clustern** | reicht auf Android nur `withSynchronousUpdate` durch, `MapLibreMapController.java:448` | Die Methode, deren Name genau das verspricht, hat keinen Cluster-Schalter; eine so angelegte Quelle clustert **nie**, ohne Fehlermeldung. Tragend ist `addSource` mit `GeojsonSourceProperties`, das `cluster`, `clusterRadius` und `clusterMaxZoom` führt, umgesetzt in `SourcePropertyConverter` auf beiden Plattformen. Dieselbe Sorte Falle wie `PLAIN_MAP_LOOK`: der naheliegende Name liefert das Falsche, und wer den Fehler beim Layer sucht, sucht Stunden. |
 | **Der Antipp-Rückruf liefert keine `properties`**, nur die Top-Level-`id` | Android schickt `layerId` und `feature.id()`, iOS `id`, `layerId` und die Positionen; Dart macht daraus blind `payload["id"].toString()` | Die Fakt-Kennung muss die **Top-Level-`id`** des GeoJSON-Merkmals sein. Die PWA legt sie nach `properties.id` (`screen-map.jsx:1896`); wer das GeoJSON eins zu eins übernimmt, bekommt beim Antippen die Zeichenkette `"null"`, ohne Ausnahme und ohne Warnung. `promoteId` rettet das nicht, es wirkt laut eigener Doku nur im Web und wird vom Android-Konverter gar nicht gelesen. **Kein Test in diesem Repository kann das finden**, weil ohne Plattformkanal kein Controller entsteht; es fällt am Gerät auf, und dort als „beim Tippen passiert nichts". |
 
@@ -268,6 +285,33 @@ schloss aus `:451`, das gehe mit diesem Paketstand nicht; `:451` ist eine
 Leerzeile, der Eintrag steht auf `:450` und ein zweiter auf `:477`, in genau der
 Methode, die bei jeder Aktualisierung läuft. Richtig ist nur „vor dem ersten
 `setGeoJsonSource` nicht".
+
+**Zweite Korrektur an dieser Tabelle, 31.08.2026: das Kamera-Padding gibt es
+doch.** Die Zeile hieß „Kein dauerhaftes Kamera-Padding, `setPadding` fehlt" und
+zog daraus, dass die 320 Pixel der Quelle nicht nachbaubar seien und die
+Schritte 15 bis 18 deshalb entscheiden müssten, wo Nutzermarker und Avatar
+landen. Beides stimmte nicht: `updateContentInsets` steht im Dart-Controller
+(`controller.dart:958-962`) und wird auf **beiden** Plattformen umgesetzt,
+Android über `CameraUpdateFactory.paddingTo` (`MapLibreMapController.java:867-875`),
+iOS über `mapView.setContentInset` (`MapLibreMapController.swift:311-323`).
+
+**Warum die Suche daran vorbeiging, und das ist das Lehrreiche:** gesucht wurde
+nach dem Namen der **Quelle**, `setPadding`. Das Paket nennt dieselbe Sache
+`updateContentInsets`, nach der iOS-Vokabel `contentInset`. „Null Treffer im
+ganzen Paket" ist damit eine Aussage über den gesuchten Namen und keine über
+die Fähigkeit. Dieselbe Falle wie bei `addGeoJsonSource`, nur umgekehrt: dort
+verspricht der naheliegende Name etwas, das er nicht kann, hier kann etwas mehr,
+als sein Name vermuten lässt.
+
+**Was daran noch nicht gemessen ist**, und das gehört dazu: alles oben ist am
+Quelltext des Plugins gelesen, nicht am Gerät. Ungeprüft bleibt, ob ein
+gesetztes Inset die Projektion (`toScreenLocation`) mitverschiebt, und die
+Einheit ist auf Android **nicht** dieselbe wie bei der Projektion:
+`updateContentInsets` skaliert mit `density` (`Convert.java:58-61`, `:205`,
+`:208-209`), `toScreenLocation` und `queryRenderedFeatures` tun das nicht
+(`MapLibreMapController.java:913-925`, `:1041-1054`). Wer das Padding einbaut,
+misst zuerst diese beiden Dinge, sonst wandert die Einheitenverwechslung von
+Schritt 17 in die Kameramitte.
 
 **Am 30.08.2026 gemessen: ja, `moveCamera` verwirft eine laufende
 `animateCamera`** auf maplibre-native unter Android. Zwei unabhängige Signale,
@@ -515,6 +559,133 @@ Empfänger.
   über rund 38 Sekunden, und nimmt dabei nur `Error` und `ProviderException`
   aus. `FactFailure` ist eine `Exception`, wird also wiederholt. Das trifft jeden
   künftigen Bildschirm mit einem `FutureProvider`.
+
+### Schritt 15, das Antippen der Gruppen, 31.08.2026
+
+1885 → 1979 Tests, in drei Blöcken mit je einer unabhängigen Review. **Damit ist
+Schritt 15 wirklich fertig**, nachdem er seit dem 29.08.2026 als `[x]` galt und
+das Antippen ausdrücklich nicht enthielt. Das ist der zweite Fall, in dem
+Kästchen und Wirklichkeit auseinanderlagen, diesmal in der anderen Richtung als
+bei Schritt 19: dort war das Kästchen zu vorsichtig, hier war es zu großzügig.
+An der Zahl 22 ändert das nichts, sie war schon vorher so gezählt.
+
+**Der Entwurf weicht von D-12s Vorhersage ab, und der Grund ist eine Messung.**
+D-12 sagte, Variante (b) koste ein neues Feld im Kameravertrag und einen zweiten
+Bewegungspfad im Host. Gebaut ist keines von beidem, siehe „Was in denselben
+Block gehört, aber keine Frage ist" unter „Fragen an Dairen". Kurz: das Rechteck
+ist eine **Rechnung vor der Absicht**, am Ende steht eine gewöhnliche
+`MapCameraOneShot` mit Mittelpunkt und Zoom, und Neigung und Blickrichtung
+bleiben deshalb von selbst stehen.
+
+**Die Zahlen und ihre Herkunft.** Zwei stehen in der Quelle, eine ist
+abgeleitet, und der Unterschied steht in den Kommentaren:
+
+| Zahl | Herkunft |
+|---|---|
+| 700 ms Fahrtdauer | `screen-map.jsx:2450`, `duration: 700` |
+| Obergrenze Zoom 18 | `screen-map.jsx:2449`, `Math.min(zoom + 0.4, 18)` |
+| Untergrenze Zoom 16 | **abgeleitet** aus `clusterMaxZoom: 15` (`:1911`), gerechnet als `maxZoom.floorToDouble() + 1` |
+
+Die Untergrenze ist der billigste Teil des Entwurfs: ab Zoom 16 gruppiert
+MapLibre überhaupt nicht mehr, ein Fahrziel von mindestens 16 lässt die
+angetippte Gruppe also **sicher** aufgehen, ohne dass irgendwer MapLibres
+Gruppierung nachrechnet. Gerechnet und nicht als 16 hingeschrieben, weil Android
+`clusterMaxZoom` ohnehin abschneidet und deshalb nur ganze Zoomstufen unten
+ankommen.
+
+**Größenordnung, damit die Zahlen nicht überraschen.** Bei Zoom 15 und 48 Grad
+Breite ist ein Stilpixel rund 1,6 m, 70 px also rund 112 m; ein Rechteck von
+etwa 224 m Kante passt bei 800 px Höhe auf Zoomstufe 17,5, die Obergrenze greift
+dort **nicht**. Bei Zoom 11 sind 70 px dagegen rund 25 km, ein gekettetes
+Stadt-Cluster kann 50 km spannen, und die Rechnung landet unter 16. Dann greift
+die Untergrenze, und **nicht alle Mitglieder sind danach im Bild**. Das ist die
+dokumentierte Abweichung: die Quelle garantiert dort ebenfalls nur das Aufgehen,
+sie fährt auf `expansionZoom + 0,4` ohne jedes Rechteck.
+
+**Die Auswahl der Punkte ist eine Näherung, und die Fehlerrichtung ist der
+Grund für sie.** `getClusterLeaves` und `getClusterChildren` fehlen im Paket,
+das SDK sagt nicht, welche Punkte in einer Gruppe stecken. Gewählt sind die
+eigenen Punkte innerhalb des Gruppierungsradius um die getippte Stelle, die im
+**selben** Projektionsaufruf mitprojiziert wird, damit beide Seiten im selben
+Raster liegen und die Einheitenfrage in diesem Vergleich gar nicht entsteht.
+Supercluster kettet, die Näherung wählt also im Zweifel zu wenige Punkte, das
+Rechteck wird zu klein, die Kamera fährt **zu weit** hinein. Zu weit hinein
+heißt: die Gruppe geht auf. Zu wenig weit hinein hieße: noch einmal tippen, und
+genau dafür hat D-12 die Variante (a) verworfen.
+
+**Vom Antipp-Payload ist nur die Hälfte brauchbar**, gemessen am Pub-Cache:
+
+- `x` und `y` sind plattformasymmetrisch, Android liefert rohe Gerätepixel
+  (`MapLibreMapController.java:2128-2131`), iOS UIKit-Punkte (`.swift:1425-1432`).
+  Benutzt werden deshalb nur `lng` und `lat`.
+- `id` ist für ein von MapLibre erzeugtes Gruppen-Merkmal im Pub-Cache **nicht
+  als vorhanden nachweisbar**, der Typ liegt in `maplibre-native`. Ist sie
+  `null`, macht `payload["id"].toString()` (`controller.dart:121`) daraus die
+  Zeichenkette `"null"`, und alle Gruppen trügen dieselbe Kennung, lautlos.
+  Verlässlich ist einzig `layerId`, denn die Kennungen vergibt der Host selbst.
+- Ein Tipp erzeugt **höchstens ein** Ereignis: Android prüft ein Rechteck von
+  20x20 Gerätepixeln gegen die interaktiven Layer, von oben nach unten, und
+  nimmt den ersten Treffer (`:2123-2135`, Auswahl `:816-822`), iOS ebenso
+  (`.swift:1386-1432`). Und die Layer sind **schon** interaktiv,
+  `enableInteraction` ist Standard (`controller.dart:810`, `:620`).
+
+**Die Reviews haben in allen drei Blöcken etwas gefunden, insgesamt zehn
+Punkte**, und das Verhältnis der Mutationsläufe hält sich: die eigenen des
+Bauenden fielen 11 von 11, 13 von 13 und 12 von 13, die fremden der Review
+überlebten 3 von 12, 3 von 13 und 4 von 15.
+
+Der teuerste Fund kam **ohne Mutation** zustande, durch Vergleich mit zwei
+Nachbarstellen: `_onGroupTap` hatte keine Sequenzsicherung. Zwei Tipps kurz
+hintereinander starten zwei Projektionsanfragen, und kommt die Antwort auf den
+älteren zuletzt zurück, überschreibt die **veraltete** Absicht die frische; die
+Karte zieht kurz auf die richtige Gruppe und fährt dann wieder weg.
+`discovery_balloon_anchor.dart:470-538` und `FactBalloonOverlay._requestProjection`
+lösen genau das schon, **beide älter als dieser Code**. Das ist Muster 10 in
+seiner unangenehmsten Form: nicht zwei Stellen, von denen eine ungeprüft ist,
+sondern eine dritte Stelle, die eine bereits bezahlte Lehre nicht mitgenommen
+hat. Die dritte Umsetzung weicht bewusst in einem Punkt ab: eine veraltete
+Antwort löst hier **gar keine** Absicht mehr aus, weil eine `MapCameraOneShot`
+nicht zurücknehmbar ist, während die beiden Vorbilder laufende Bildschirmzustände
+beschreiben.
+
+Die weiteren Funde, jeder mit einer Gegenprobe belegt:
+
+- **Eine zugesagte Eigenschaft ohne Zusicherung.** Der Konstruktorkommentar von
+  `MapPositionRect` sagte zu, `rectFitZoom` behandle vertauschte Ecken robust.
+  `.abs()` war ersatzlos löschbar, weil die vorhandene Probe nur die **Länge**
+  vertauscht und die Breitenspanne bei null lässt.
+- **Eine Klemmgrenze, die nur als „irgendwo" zugesichert war.** Die Konstante
+  85,051129 auf 84,051129 zu verschieben lief durch. Jetzt auf das Intervall
+  zwischen 85,0 und 85,051129 eingegrenzt, ohne die Zahl abzuschreiben.
+- **Kein Test installierte zwei Überlagerungen gleichzeitig.** Die Zuordnung
+  Layer zu Überlagerung konnte immer die erste installierte Kennung
+  zurückgeben, und alle 642 Tests blieben grün. Vier Features teilen sich diese
+  Karte.
+- **Eine abgeschriebene Begründung.** `broadcast` war mit „mehrere dürfen
+  gleichzeitig zusehen" begründet, tatsächlich abonniert genau ein Hörer. Der
+  echte Grund ist, dass `attach`, `detach`, `attach` zweimal auf denselben Strom
+  hört und ein Einzelabonnement-Strom dann wirft. **Die Reichweite dieser
+  Begründung ist dabei kleiner, als der erste Entwurf behauptete:** die einzige
+  heute belegte Aufrufer-Kette erzeugt die Folge nicht, weil
+  `MapSurface.initState` bei jedem Mount einen frischen Host baut. Das steht so
+  im Kommentar.
+- **Eine falsche Fundstelle**, `controller.dart:663` gehört zu `addLineLayer`.
+- **`dispose` war unbeprobt**, die zwei Zeilen zum Abmelden waren ersatzlos
+  löschbar.
+- **Zwei konstante `hashCode`** liefen durch.
+- Dazu die zwei neuen Blindheitsmuster 20 und 21, beide hier entstanden.
+
+**Was am Gerät zu prüfen bleibt:**
+
+1. Stimmt die Zoomstufe aus `rectFitZoom` bei 58 Grad Neigung? Die Formel
+   rechnet flach. Bei Neigung deckt die Karte oben mehr Boden ab, das Rechteck
+   erscheint also kleiner als gerechnet, die Fahrt ist tendenziell zu
+   vorsichtig. Die Untergrenze fängt den Fall auf, in dem das wirklich stört.
+2. Trägt ein Gruppen-Merkmal eine `id`? Betrifft diesen Pfad nicht mehr, aber es
+   entscheidet, ob der Punkt-Tipp später über `id` gehen kann.
+3. Die Referenzkachelgröße 512 in `rectFitZoom` ist hergeleitet und hat im
+   Repository **keinen** Beleg. Nachzumessen mit einem bekannten Rechteck über
+   `rectFitZoom`, Kamera setzen, `toScreenLocation` gegenprüfen.
 
 ### Schritt 17, was daran gemessen ist
 
@@ -898,9 +1069,10 @@ das nächste Mal an Phase 2 arbeitet, prüft, ob noch etwas fehlt, und setzt gen
 eine der beiden Stellen richtig.
 
 - [x] 12. MapLibre mit gebackenem Style · [x] 13. Kamera-Verhalten
-- [!] 14. Kompass-Rotation (Sensorpaket fehlt) · [x] 15. Cluster-Layer
+- [x] 14. Kompass-Rotation (am 31.08.2026 in zwei Teilen gebaut; am Gerät ungeprüft wie alles seit dem 29.08.2026) ·
+  [x] 15. Cluster-Layer **und Antippen** (das Antippen am 31.08.2026 nachgezogen)
   · [x] 16. Einzel-Marker
-- [x] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (WebView-Entscheidung)
+- [x] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (die 2D-Entscheidung vom 31.08.2026 ist am selben Tag aufgehoben, „bau doch gleich 3D"; die 3D-Laufzeit liegt bei Janek)
 - [x] 19. Top-Chrome (vorgezogen, D-5 am 29.08.2026 abgeschlossen) · [ ] 20. Sammel-Erlebnis
 
 ## Phase 3, Fakt-Akte und Audio
@@ -914,7 +1086,7 @@ plus 19 Mutationen, alle gefallen.
   Ballon-Tipp führt **nicht** in die Akte: innerhalb von 150 Metern löst er das
   Sammeln aus, außerhalb zeigt er nur eine Mini-Kachel. Der Grund steht als
   ausdrücklicher Fix in der Quelle (`screen-map.jsx:2137-2142`): „ohne GPS NIE
-  die Fakt-Detail-Seite direkt oeffnen. Sonst koennte man durch Antippen aus
+  die Fakt-Detail-Seite direkt öffnen. Sonst könnte man durch Antippen aus
   1000 km Entfernung einen Fakt ‚lesen'". Es gab dort ein Schlupfloch, und ein
   Nutzer in Italien bekam einen München-Fakt vollständig angezeigt.
 - **Die Akte ist deshalb ohne Einstieg gebaut**, und ein Test bewacht das: er
@@ -944,7 +1116,7 @@ plus 19 Mutationen, alle gefallen.
   diese Bedingung.
 
 - [x] 21. Fact-Detail-Sheet · [ ] 22. Collect-Reveal-Overlay
-- [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [!] 25. Audio-Service (TTS-Weg)
+- [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [ ] 25. Audio-Service (am 31.08.2026 entschieden: Gerät zuerst)
 - [ ] 26. Map-Audio-Kopplung
 
 ### Schritt 23 ist zur Hälfte schon fertig, und zwar seit Schritt 21
@@ -960,7 +1132,7 @@ Hochziffer ein `onTap: _jumpToSources` und springt mit
 **Und der zweite Weg der Quelle ist für diese App unerreichbar**, was
 `cited_text.dart` bereits nachgemessen hat: die Hochziffer wird dort zu einem
 Verweis, wenn der Quelleneintrag eine `url` trägt, aber `quellenListe` steht
-**nicht** im Supabase-Schema; in der PWA kommt das Feld ausschliesslich aus den
+**nicht** im Supabase-Schema; in der PWA kommt das Feld ausschließlich aus den
 eingebauten JS-Datendateien. Es gibt hier also genau ein Verhalten, und das ist
 gebaut. **Damit braucht dieser Teil auch kein `url_launcher`.**
 
@@ -1023,7 +1195,7 @@ Sheets, **ohne jeden Einstieg**, wie die Fakt-Akte in Schritt 21.
 
 - [x] 27. Puzzle-Sheet mit vollem Mapping · [!] 28. Alle Rätseltypen
   (sprachneutrale Auswertung) · [ ] 29. In-Puzzle-Hint · [ ] 30. Reveal-Screen
-- [!] 31. Hinweis-Ökonomie (Reward-Ledger) · [!] 32. Punkte gegen Coins
+- [ ] 31. Hinweis-Ökonomie · [ ] 32. Punkte gegen Coins (beide am 31.08.2026 frei, Restrisiko E-06 und E-24 im Backend, siehe Antwortblock)
 
 ## Phase 5, Challenge
 
@@ -1034,7 +1206,7 @@ Assistent hält seine Schritte selbst, Schritt 1 ist die Solo- und Gruppenwahl,
 Schritt 2 sind Schwierigkeit, Dauer und Genres, und der Generator hängt am
 Ausgang von Schritt 2. 1625 → 1725 Tests.
 
-- **Der grösste Fund kam vor dem Bau und betrifft den Plan, nicht den Code.**
+- **Der größte Fund kam vor dem Bau und betrifft den Plan, nicht den Code.**
   Die Solo-Jagd läuft in der Quelle auf der **Karte**, nicht im Challenge-Reiter.
   Damit beschreiben die Plan-Schritte 36 und 37 den Demo-Pfad. Steht als E-43,
   und deshalb endet dieser Block nach 34 statt nach 37.
@@ -1087,7 +1259,7 @@ Ausgang von Schritt 2. 1625 → 1725 Tests.
 
 ### Schritt 35, was daran gemessen ist
 
-1729 → 1813 Tests. Der Picker schliesst den Ausgang des Assistenten an: „Starten"
+1729 → 1813 Tests. Der Picker schließt den Ausgang des Assistenten an: „Starten"
 führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
 
 - **Er braucht keine Karte, und das ist gemessen.** `HotspotPickView` ist eine
@@ -1128,9 +1300,9 @@ führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
   Entfernung selbst.
 
 - [x] 33. Wizard · [x] 34. Solo-Setup · [x] 35. Hotspot-Picker
-- [!] 36. Phasen-Maschine (E-43 entschieden, wartet auf D-16) · [!] 37. Active-UI (dito)
-  · [!] 38. Rätsel und Ökonomie
-- [ ] 39. Pause und Results · [!] 40. Gruppen-Flow (Realtime-Entscheidung)
+- [x] 36. Phasen-Maschine · [x] 37. Active-UI (beide am 31.08.2026 im neuen Zuschnitt gebaut: Regeln, `HuntRun`, Zustandshalter, Jagd-Pille auf der Karte)
+  · [!] 38. Rätsel und Ökonomie (**der Grund stand bis zum 31.08.2026 nirgends**, als einziges Sperrzeichen im ganzen Dokument. Nachgetragen und nachgeprüft: die Sperre ist **E-08 über Schritt 28**, nicht die Ökonomie. Ohne Rätselkörper gibt es keine Antwort zu prüfen, und `puzzle_sheet.dart` sagt selbst, dass an dieser Stelle bewusst nichts steht. Die Ökonomie-Fragen E-06 und E-24 sind **nicht** der Blocker: dieselben Fragen sind bei den Schritten 31 und 32 am 31.08.2026 ausdrücklich als Restrisiko freigegeben worden)
+- [x] 39. Pause und Results (31.08.2026, dabei den seit Schritt 35 durchtrennten Jagdstart wieder angeschlossen) · [ ] 40. Gruppen-Flow (Realtime mit ADR-009 entschieden, seit dem 31.08.2026 frei; erbt E-21, E-54 und E-57 aus dem Backend)
 
 ## Phase 6, Tour
 
@@ -1173,7 +1345,7 @@ Gebaut ist die Liste, ohne Einstieg, wie die Fakt-Akte und das Rätsel-Sheet.
   weil kein Test je den Farbwert prüfte, nur die Zuordnung des Wortes. Beides
   ist jetzt gegen die **Quelle** festgenagelt, nicht gegen die eigene Konstante.
 - **Zwei Funde am Rand.** Das Feld `color` jeder Trophäe wird von der Quelle
-  **nie gelesen**, gefärbt wird ausschliesslich über die drei Stufenfarben; es
+  **nie gelesen**, gefärbt wird ausschließlich über die drei Stufenfarben; es
   fehlt deshalb bewusst im erzeugten Datensatz. Und „Silber" gibt es in
   derselben Datei zweimal mit verschiedenen Werten: `#B0BEC5` für die
   Trophäenstufe, `#A8A8A8` für das Rang-Abzeichen.
@@ -1223,11 +1395,11 @@ Ersatzrechteck zeigte. Gemessen: 29,17 Pixel bei Zoom 14,5, 30,00 bei 14,6,
 
 **Zwei Mutationsläufe, wieder mit gegensätzlichem Ergebnis.** Der Bauende fuhr
 fünf, alle fielen, eine erst nach Korrektur seines eigenen Tests, den er selbst
-als blind erkannt hatte: ein Punkt ausserhalb des Rahmens kann rechnerisch nie
+als blind erkannt hatte: ein Punkt außerhalb des Rahmens kann rechnerisch nie
 näher an der Rahmenmitte liegen als einer in der Mitte, der Ausschluss war also
 nicht prüfbar, wie er geschrieben war. Die Review fuhr zwölf, **sechs
 überlebten**, vier davon in genau diesem Filter: die ganze senkrechte Prüfung,
-der rechte Rand, die Grössenschwelle und die Betonung des Kandidaten. Nach der
+der rechte Rand, die Größenschwelle und die Betonung des Kandidaten. Nach der
 Nachbesserung fallen alle sechs.
 
 **Drei veraltete Zusagen im Bestand mitgezogen.** Die Umrechnung von Geräte- auf
@@ -1235,6 +1407,1186 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 `map_screen_point.dart` und die Liste „Was bewusst fehlt" sagten alle drei noch
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
+
+## Schritt 39, Pause und Ergebnis, und die Kette schließt sich, 02.09.2026
+
+2266 → 2287 Tests. Der Challenge-Reiter zeigt jetzt, was die Quelle dort zeigt,
+solange eine Jagd läuft: den Pausebildschirm mit Stationsliste, Kacheln und
+Abbruch-Rückfrage, und nach der letzten Station den Ergebnisbildschirm.
+
+**Neun Mutationen, neun Treffer.** Fünf aus dem Auftrag, vier danach von der
+prüfenden Seite gesetzt: die aktuelle Station nie markieren, im Ergebnis alle
+Stationen als gelöst zählen, „Doch weiterspielen" heimlich abbrechen lassen, und
+die Punktekachel des Pausebildschirms auf `0` festnageln. Keine hat überlebt.
+
+### Der eigentliche Fund: die Kette war seit Schritt 35 durchtrennt
+
+`_startHunt` hat den fertig erzeugten Jagdplan **weggeworfen**. Nicht vergessen,
+sondern begründet: D-16 war offen, und der Kommentar an dieser Stelle sagte das
+auch. Nur ist D-16 seit dem 31.08.2026 beantwortet, ADR-007 und ADR-009 stehen,
+`huntRunProvider` ist seit Schritt 36 gebaut, und **niemand hat den Draht wieder
+angeschlossen**. Der Schritt, zu dem die Stelle gehörte, war abgehakt; die Lücke
+saß in einem Kommentar, den kein Tor liest.
+
+Das ist die allgemeine Form: **eine dokumentierte Lücke in einem erledigten
+Schritt findet niemand wieder.** Sie steht nicht auf der Schrittliste, sie
+erzeugt keine Warnung, und der Kommentar, der sie erklärt, liest sich beim
+Überfliegen wie eine Absicht.
+
+### Was sie doch gefunden hat, war ein Test, der genau dafür gebaut war
+
+Der Test „mit genug Fakten erscheint keine Meldung" sicherte zu, dass nach dem
+Start **nichts** passiert, und sein Kommentar sagte wörtlich: „Diese Zusicherung
+ist die Stelle, die auffällt, sobald jemand den Empfänger einhängt." Genau das
+ist eingetreten. Er wurde rot, sein Kommentar erklärte warum, und die Änderung
+ist im Diff sichtbar begründet statt stillschweigend.
+
+**Eine Zusicherung auf eine bekannte Lücke ist billiger als jede Notiz**, weil
+sie sich meldet, statt gelesen werden zu müssen. Sie gehört an die Stelle, an
+der die Lücke sitzt, mit dem Satz dazu, wer sie wann auflösen darf.
+
+### Die Zeit steht als Platzhalter da, und das ist E-62
+
+Die Quelle rechnet `Date.now() - hunt.startedAt` und lässt dafür einen
+Sekundentakt laufen. `HuntRun` trägt bewusst keine Zeitstempel, E-19 ist mit
+„der Server rechnet“ entschieden, und Dairens Satz dazu deckt genau diesen Fall
+ab: „der baubare Teil ist alles, was den Ablauf anzeigt."
+
+**Kachel und Zeile bleiben stehen und zeigen `—`.** Das Layout ist damit das der
+Quelle, und der Tag, an dem ein Startzeitstempel vom Server kommt, kostet eine
+Zeile statt eines Umbaus. Der Sekundentakt ist ausdrücklich **nicht** gebaut: er
+hätte ohne laufende Zeit keinen Zweck, und ein Zeitgeber ohne Zweck ist im
+Widget-Test ein „A Timer is still pending". Das Zeichen `—` ist das
+Platzhalter-Idiom der Quelle selbst (`:2828`).
+
+### Die Wiederherstellungslücke wird zum ersten Mal sichtbar
+
+Verzweigt wird auf `huntRunProvider` und **nicht** auf `activeHuntProvider`.
+Letzterer liefert auch eine aus dem Speicher wiederhergestellte Jagd, und die
+trägt weder Stationszustände noch Punkte, also genau das, was diese beiden
+Bildschirme zeigen.
+
+Die Folge davon habe ich beim Schreiben **falsch behauptet**, und die
+unabhängige Prüfung derselben Nacht hat es widerlegt. Hier stand: „ist auf der
+Karte als Pille sichtbar, im Challenge-Reiter aber nicht". `HuntPill` liest
+aber ebenfalls `huntRunProvider` (`hunt_pill.dart:136`), und
+`activeHuntProvider` hat in `lib/` **keinen Verbraucher**. Nach einem Neustart
+ist die Jagd **nirgends** sichtbar. Der ganze Trost, dass der Nutzer sie
+wenigstens auf der Karte behält, war erfunden. Als **E-65** aufgenommen, samt
+der Feststellung, dass die Produktvorgabe aus ADR-007 damit an keiner Stelle
+eingelöst ist. Ein abgespeckter Pausebildschirm ist weiterhin nicht gebaut,
+jetzt aber, weil die Entscheidung offen ist.
+
+### Zwei Kleinigkeiten aus dem Bericht, beide richtig entschieden
+
+**Kein Rückfalltext für einen leeren Fakt-Titel.** `HuntPill` baut
+`stop.factTitle || stop.title || '—'` nach, `HuntStopRow` nicht: die Quelle hat
+den Rückfall dort schlicht nicht (`:2930`, roher Zugriff). Nicht nachgebaut, weil
+erfundene Robustheit eine Abweichung ist wie jede andere.
+
+**Keine harten Bildpunkte `paddingTop 44 / paddingBottom 80`.** Dieser Bildschirm
+sitzt innerhalb der bestehenden App-Chrome und nicht in einem eigenen
+`ScreenFrame`, genau wie `HuntStartPointView` es vormacht.
+
+### Die Stufe geht über `AppStrings`, mit den Rohwerten als Text
+
+Die Quelle zeigt `hunt.difficulty` roh an, also „leicht", „mittel", „schwer" in
+Kleinschreibung. Der Kopf von `kernel/puzzle_difficulty.dart` verlangt dagegen,
+dass Anzeigetext über `AppStrings` läuft und nicht über `code`. Beides zusammen:
+drei Schlüssel, deren Werte genau die Rohwerte sind. Sichtbar identisch zur
+Quelle, strukturell auf dem vorgeschriebenen Weg, und wer später englische
+Wörter will, ändert zwei Werte und keine Zeile Code.
+
+22 neue Schlüssel unter `challenge.huntPause.` und `challenge.huntResult.`, in
+beiden Sprachkarten mit demselben deutschen Wert. Der Grund ist E-61 und
+unverändert: die Quelle hält diese Beschriftungen hartcodiert deutsch.
+
+### E-44 war falsch zugeordnet, und das ist nachgemessen
+
+Der Faktor 1,5 am letzten Stopp (angezeigt, nicht gutgeschrieben) stand im
+Register unter „Schritt 37". Beide Zeilen liegen in `SnjdActiveView`
+(`screen-challenge.jsx:2158`), also im **alten** Jagd-Ablauf. Der neue, den die
+Schritte 36 bis 39 nachbauen, kennt den Faktor überhaupt nicht: `1.5` kommt in
+`screen-map.jsx` kein einziges Mal als Rechenfaktor vor, in `puzzle-sheet.jsx`
+nur als Zeilenhöhe und Rahmenstärke, im Jagd-Reduzierer gar nicht. **Der Neubau
+erbt diesen Widerspruch nicht.** Die Zeile im Register steht richtiggestellt da.
+
+
+## Schritt 37, die Jagd-Pille, 02.09.2026
+
+2240 → 2266 Tests. Damit ist die laufende Solo-Jagd auf der Karte sichtbar:
+Stationszähler, Titel, Navigationshilfen nach Schwierigkeit, gestufte Hinweise
+mit ihren Kosten, aufklappbar.
+
+**Der Weg ins Bild folgt der dokumentierten Bauform:** `challenges` liefert sein
+Overlay über die App-Komposition (`lib/features/README.md`). `MapPage` bekommt
+einen nullbaren Parameter dafür, `app_routes.dart` baut die Pille und versorgt
+sie mit der Nutzerposition. Das ist nötig und nicht bequem: `userLocationProvider`
+liegt in `discovery/presentation` und ist für `challenges` nach Regel 8 gesperrt,
+und ein eigenes Abonnement wäre der dritte Ortungsstrom im Projekt.
+
+**Fünf Pflichtmutationen, fünf Fälle**, ohne Nachschärfen.
+
+### Die Texte gibt es nur auf Deutsch, und das ist Parität
+
+Sechs Einträge in der Ergänzungs-Map aus E-39, Präfix `challenge.huntPill.`.
+Nicht `challenge.pill.`: die erzeugten Tabellen führen bereits `challenge.pills.*`
+für vier Marketing-Kacheln eines anderen Bildschirms, und zwei fast gleich
+geschriebene Präfixe wären eine Verwechslungsfalle.
+
+Warum nur Deutsch, steht als **E-61**: die Quelle hält diese Beschriftungen als
+hartcodiertes Deutsch ohne i18n-Schlüssel, englischsprachige Nutzer sehen dort
+also Deutsch. Erfundener englischer Text wäre die schlechtere Lösung, dieselbe
+Linie wie bei E-28.
+
+### Zwei Korrekturen nach dem Bericht, und die zweite war mein Fehler
+
+**1. `MapPosition` fehlte die Peilung, und der Pfeil stand deshalb still.** Der
+Bauende hat die Lücke gemeldet, statt die Formel im Widget nachzubauen, und das
+war richtig: eine Peilung ist domänenwertig und gehört neben
+`distanceInMetersTo`. Sie ist jetzt da, nach `screen-map.jsx:647-653`, mit sieben
+Tests gegen die **vier Himmelsrichtungen** statt gegen eine nachgerechnete Zahl.
+Der Fall „genau westlich" ist der, der ohne das abschließende `+ 360) % 360`
+falsch wäre: `atan2` liefert dort negativ.
+
+Damit fiel auch der Platzhalter-Parameter der Pille weg: sie rechnet die Peilung
+aus denselben zwei Punkten wie die Distanz, eine Zeile darunter. **Der Pfeil
+erscheint jetzt wirklich**, statt geprüft und unverdrahtet dazustehen.
+
+**2. „Die letzte Station bekommt keine Hinweise" war meine Vorgabe und falsch.**
+Der Bauende hat gemeldet, dass das von der Quelle abweicht, und die Quelle
+gewinnt: ihr Ausdruck fällt an der letzten Station in den `else`-Zweig, und der
+setzt den Rückfallsatz an Index 0. Ein Nutzer sieht dort also einen offenen
+ersten Hinweis mit „Schau dich in der Umgebung aufmerksam um.", keine leere
+Fläche. Behoben, und die Probe fällt.
+
+### Der Test, der grün war, während das Verhalten falsch war
+
+Der Test zur letzten Station prüfte nur, dass die Texte `Hinweis n.m` und
+`Tipp freischalten` **fehlen**. Beides fehlt auch bei der richtigen Fassung, er
+konnte den Unterschied also gar nicht sehen. Erst die zusätzliche Forderung, dass
+der Rückfallsatz **da** ist, macht ihn scharf. Als Muster **25** im Katalog.
+
+### Ein echter Bug, gefunden vom Widget-Test
+
+`GestureDetector` reagiert im Standardverhalten nicht auf Tipps in der leeren
+Fläche neben linksbündigem Text. In der Quelle ist die ganze Zeile klickbar
+(`cursor:pointer` am `div`, `:1080`). Ohne `HitTestBehavior.opaque` blieb die
+Pille unaufklappbar, und das war kein Testartefakt, sondern hätte auf dem Gerät
+genauso ausgesehen.
+
+### Zwei Kleinigkeiten, die dazugehören
+
+Der Platzhalter `—` hat in der Quelle **zwei** Fundstellen, nicht eine: auch ein
+freigeschalteter Hinweis ohne Text zeigt ihn (`:1115`). Mit unserer Domäne ist
+dieser Zweig unerreichbar, weil ein Freischalt-Knopf nur existiert, wo Text
+vorliegt; er ist trotzdem mit demselben Schlüssel abgesichert.
+
+Und der zweite Farbwert des Verlaufs (`#c02a05`) hat kein Token; nur der erste
+ist `FactColors.red`. Er steht als rohe Zahl mit Fundstelle daneben.
+
+
+## Schritt 36, der Zustandshalter, und damit ist Schritt 36 zu
+
+2232 → 2240 Tests. `HuntRunNotifier` besitzt die laufende Jagd, setzt sie und
+schreibt danach in den Speicher, genau wie es der Kopfkommentar von
+`active_hunt_providers.dart` seit Tagen vorschreibt. Die Naht ist geschlossen.
+
+`activeHuntProvider` behält seinen Typ und bekommt zwei Quellen mit klarer
+Rangfolge: **läuft eine Jagd, gilt der Halter; läuft keine, gilt der Speicher.**
+Die zweite Quelle ist kein Rest, sondern der Ertrag der Persistenz von heute
+Vormittag: eine Jagd, die einen Neustart überlebt hat, steht im Speicher und
+**soll** sichtbar bleiben, obwohl es keinen laufenden `HuntRun` gibt.
+
+**Nachtrag vom 02.09.2026, und er entwertet den Absatz darüber teilweise:**
+diese zweite Quelle wird nie abgefragt, weil `activeHuntProvider` in `lib/`
+keinen Verbraucher hat. `HuntPill` liest seit Schritt 37 direkt
+`huntRunProvider`. Die Rangfolge ist als Entwurf richtig und als Beschreibung
+des laufenden Programms falsch. E-65.
+
+**Keine Wiederherstellung eines spielbaren Laufs**, und das ist die von ADR-007
+gezogene Grenze: aus einem gespeicherten `ActiveHunt` lässt sich kein `HuntRun`
+bauen, weil der Plan mit Fakten und Rätseln nicht gespeichert wird. Das steht am
+`build()`, damit niemand es für eine Lücke hält.
+
+### Eine Mutation hat zuerst überlebt, und der Grund ist Muster 24
+
+„Lies immer aus dem Speicher" überlebte, weil der Test den Halter in genau den
+Speicher schreiben ließ, den er danach abfragte. Beide Quellen sagten dasselbe,
+die Rangfolge war also gar nicht geprüft. Der Test schreibt jetzt nach dem Start
+**am Halter vorbei** einen abweichenden Wert und erzwingt echte Divergenz.
+
+**Und eine Lehre über Mutationsproben selbst.** Ich habe die Gegenrichtung
+zuerst als `run != null || true` gefahren. Das wäre vermutlich schon am
+Übersetzer gescheitert, und ein Übersetzungsfehler macht `flutter test`
+ebenfalls rot: er ist damit ein **schwächerer** Beleg als ein fallender Test.
+Wiederholt in einer Fassung, die kompiliert und nur den Rückfallzweig auf `null`
+setzt.
+
+### Ein gemeldetes Risiko, sofort geschlossen
+
+Der Bauende hat selbst gemeldet, was sein Auftrag nicht abdeckte: die Wache
+`active_hunt_write_access_test.dart` bewachte `discovery` gegen den Namen
+`activeHuntStoreProvider`, und der neue `huntRunProvider` stand nicht darauf.
+Über `.notifier` ist der aber ein **vollwertiger Schreibzugang**, also genau
+das, was ADR-007 Regel 2 dem Kartenbildschirm verbietet.
+
+Die Wache führt jetzt eine Liste statt eines Namens. **Nachgewiesen, dass die
+neue Hälfte beißt:** eine Wegwerf-Datei unter `lib/features/discovery/`, die
+`huntRunProvider` nur erwähnt, macht sie rot, nach dem Löschen wieder grün.
+
+### Ein Framework-Befund, der beim nächsten Mal Zeit spart
+
+Riverpod 3 benachrichtigt Beobachter eines abgeleiteten Providers **nicht
+synchron**: der Scheduler sammelt sie bis zum Ende der Ereignisschleife, und
+zwar unabhängig von `await`. `container.read` liefert dabei immer den richtigen
+Wert, nur der Beobachter hinkt. Ein Benachrichtigungstest braucht deshalb
+`await container.pump()`. Steht jetzt im Testkommentar, weil es sonst wie ein
+Fehler des Notifiers aussieht.
+
+## Schritt 36, die Phasen-Maschine, 31.08.2026
+
+2212 → 2232 Tests. Eine Datei, `challenges/application/hunt_run.dart`, mit
+`HuntStopStatus`, `HuntRunStop` und `HuntRun`. Rein, unveränderlich, ohne
+Riverpod, ohne Widget, ohne Uhr.
+
+**In `application` und nicht in `domain`**, weil `HuntRun` einen `HuntPlan` hält
+und der `Fact` und `FactPuzzle` trägt. Das ist die bestehende, in
+`hunt_plan.dart` begründete Ausnahme, nicht eine neue.
+
+| Übergang | Was er tut |
+|---|---|
+| `start` | alle Stationen offen, Zeiger auf 0, Punkte 0 |
+| `unlockHint` | Kosten auf die **aktuelle** Station, Index in die Liste |
+| `solveStop` | Nettopunkte, Status gelöst, Weiterschaltung |
+| `skipStop` | Status übersprungen, dieselbe Weiterschaltung |
+| `collectStop` | Status eingesammelt, **keine** Weiterschaltung |
+| `toActiveHunt` | die dauerhafte Projektion, eins-basiert |
+
+### Uhrenfrei, und das ist eine Entscheidung mit Beleg
+
+Die Quelle schreibt `solvedAt` und `finishedAt` als Zeitstempel. Hier gibt es
+keine, und `isFinished` ist abgeleitet statt gespeichert. Der Grund steht in
+E-19: `finishedAt` wird in der Ergebnisansicht als **Dauer** gelesen
+(`screen-challenge.jsx:2954`), und der Client rechnet keine Zeit, an der eine
+Belohnung hängt. Die Zeitstempel gehören zu Schritt 39 und zum Backend-Auftrag.
+Das steht im Kopfkommentar, damit sie niemand später beiläufig einbaut.
+
+**`collected` zählt ausdrücklich nicht als erledigt**, das ist die Quelle:
+`allDone` prüft nur `solved` und `skipped`. Ein Fakt kann eingesammelt sein,
+ohne dass sein Rätsel gelöst ist.
+
+### Zwei Mutationen haben zuerst überlebt, und das ist der Ertrag dieser Runde
+
+Sechs Pflichtmutationen, vier fielen sofort. Die anderen zwei überlebten, und
+beide Gründe sind allgemein genug, dass sie jetzt als Muster **22** und **23**
+in „Wie Tests hier blind werden" stehen.
+
+**Die Untergrenze war unsichtbar, weil die Zahlen gleich waren.** Der Test
+prüfte 50 Punkte gegen 50 Münzen Hinweiskosten und erwartete 0. Genau diese
+Zahlen machen `max(0, 50 - 50)` und `50 - 50` ununterscheidbar. Scharf wird es
+erst, wenn die Kosten die Punkte übersteigen: 10 gegen 50 ergibt 0 statt −40.
+
+**Die Weiterschaltung war unsichtbar, weil vor der aktuellen Station nie etwas
+offen war.** Die Jagd sucht die nächste offene Station mit **größerem** Index.
+In jedem naheliegenden Testaufbau waren die früheren Stationen längst gelöst,
+und dann findet eine Suche ab Index 0 dieselbe Station wie eine ab `index + 1`.
+Scharf wird es erst, wenn eine Station **vor** der aktuellen noch offen ist.
+
+Nach dem Nachschärfen fallen alle sechs. **Ich habe drei davon selbst
+nachgefahren**, die zwei vorher überlebenden und die Projektion auf die Platte;
+alle drei fallen auch bei mir.
+
+### Vier Zugaben des Bauenden, alle gemeldet und alle richtig
+
+- `HuntRunStop` hat einen **privaten** Konstruktor. Damit kann von außen keine
+  Station mit widersprüchlichem Zustand entstehen, etwa `pending` mit
+  vergebenen Punkten. Dasselbe Muster wie bei `ActiveHunt`.
+- `solveStop`, `skipStop` und `collectStop` **werfen** bei einem Index außerhalb
+  des Bereichs, statt still nichts zu tun. Das ist ein Programmfehler des
+  Aufrufers und keine ungeprüfte Eingabe von außen, dieselbe Linie wie bei
+  `isHuntHintFree`.
+- Zwei zusätzliche Tests zum gratis Hinweis, der kostenlos bleibt und nicht in
+  die Liste wandert.
+- **Der Hinweiszustand wird nur zurückgesetzt, wenn sich der Zeiger wirklich
+  bewegt.** Das ist genauer als mein Auftrag und näher an der Quelle: dort hängt
+  der Rücksetz-Effekt an einer Änderung von `currentStopIdx`, und die bleibt an
+  der letzten Station aus. Praktische Folge: wer die letzte Station löst,
+  behält seine freigeschalteten Hinweise, statt sie im letzten Moment zu
+  verlieren.
+
+### Was `toActiveHunt` bei `null` bedeutet
+
+`ActiveHunt.tryFrom` kann an einer Jagd aus dieser Maschine nur an **einem**
+scheitern: an einer kaputten Koordinate des zugrunde liegenden Fakts.
+`currentStopIndex` liegt strukturell in `[0, stops.length - 1]`, und
+`unlockHint` lässt keinen ungültigen Index in die Liste. Ein `null` heißt
+deshalb „diese Jagd ist nicht speicherbar" und wird nicht repariert, dieselbe
+Doktrin wie bei `ActiveHunt` selbst.
+
+## Schritt 36, die reinen Regeln der laufenden Jagd, 31.08.2026
+
+2192 → 2212 Tests. Drei Dateien in `challenges/domain`, ohne Widget, ohne
+Zustand, ohne Riverpod. Das ist der erste Teil des neu zugeschnittenen Schritts
+36; die Phasen-Maschine und die Pille folgen.
+
+| Datei | Inhalt |
+|---|---|
+| `hunt_hints.dart` | `huntHintCosts = [0, 20, 30]`, `huntHintCount`, `isHuntHintFree` |
+| `hunt_navigation_aids.dart` | Pfeil und Distanz nach Schwierigkeitsstufe |
+| `hunt_arrow.dart` | Peilung in Grad auf einen von acht Pfeilindizes |
+
+**Fünf Pflichtmutationen, fünf Fälle.** `% 8` entfernt, Winkelnormalisierung
+entfernt, `null` wie `leicht` statt wie `mittel`, `schwer` wie `mittel`,
+`isHuntHintFree` auf `index <= 1`.
+
+### Der Ersatzwert für die fehlende Stufe hat jetzt einen Ort, und es ist der richtige
+
+ADR-008 verbietet einen Ersatzwert für `PuzzleDifficulty` **im geteilten Kern**,
+weil dort mehrere Domänen mit verschiedenen Antworten säßen: `puzzle-sheet.jsx`
+nimmt für die Münz-Berechnung `mittel`, der alte Flutter-Port nahm `leicht`.
+Derselbe Kommentar sagt, wohin die Entscheidung gehört, nämlich zu dem, der sie
+braucht.
+
+`HuntNavigationAids.forDifficulty(null)` verhält sich wie `mittel`, und das ist
+**nicht** dieselbe Entscheidung: die Quelle schreibt es an genau dieser Stelle so
+(`screen-map.jsx:1049`), und sie gilt nur für das Navigations-Gating. Über eine
+Belohnung sagt sie nichts. Das ist der erste Fall, in dem die Trennung aus
+ADR-008 praktisch trägt statt nur behauptet zu sein.
+
+### Die Pfeilformel ist nachgerechnet, und das war nötig
+
+`Math.round(((deg % 360) + 360) / 45) % 8` sieht nach einer reinen Übersetzung
+aus und ist keine. Zwei Unterschiede zwischen JavaScript und Dart stecken darin,
+beide gemessen und im Kopfkommentar festgehalten:
+
+1. **`%` bei negativen Zahlen.** JavaScript behält das Vorzeichen des
+   Dividenden, `-10 % 360` ist dort `-10`. Genau dafür steht in der Quelle das
+   `+ 360`. Dart rechnet euklidisch, `-10 % 360` ist `350`. Das `+ 360` ist in
+   Dart damit **beweisbar wirkungslos** und bleibt trotzdem stehen, damit der
+   Code Zeile für Zeile neben der Quelle lesbar ist. „Beweisbar wirkungslos" ist
+   ein anderer Zustand als „nicht geprüft".
+2. **`Math.round` gegen `.round()` bei `.5`.** JavaScript rundet aufwärts, Dart
+   von der Null weg. Der Unterschied ist hier **unerreichbar**, und zwar nicht
+   zufällig: weil `%` in Dart schon nach `[0, 360)` normalisiert, ist das
+   Argument von `.round()` immer mindestens `8` und nie negativ.
+
+**Und dazu ein Test, der die naive Übersetzung erschlägt.** Ohne die
+Normalisierung liefert `(-22.5 / 45).round() % 8` in Dart `7`, richtig wäre `0`.
+Dieser eine Eingabewert ist der einzige unter den erreichbaren, an dem der
+Unterschied sichtbar falsch wird statt nur zufällig richtig zu bleiben.
+
+### Eine Lehre über das Arbeiten mit Agenten, und sie hat fast etwas gekostet
+
+Der bauende Agent ist am Ende in eine **Warteschleife** geraten: er hat mehrfach
+eine „fertig"-Meldung ausgelöst, deren Inhalt jeweils „ich warte noch auf einen
+Testlauf" war. Ich habe die erste davon für das Ende gehalten, die Gates gefahren
+und angefangen, seine Dateien zu lesen.
+
+**Dabei habe ich eine Datei mitten in einer seiner Mutationsproben gelesen.**
+`isHuntHintFree` stand für einen Moment auf `index <= 1`, also auf genau der
+Mutation, die ich selbst beauftragt hatte. Für ein paar Minuten sah es aus wie
+ein ausgelieferter Fehler, den die Tests nicht fangen. Beides war falsch: der
+Agent hat die Probe kurz darauf zurückgenommen, und der Test fängt sie sehr wohl,
+nachgewiesen.
+
+Zwei Dinge folgen daraus, und beide gehören ins Protokoll:
+
+- **Eine „completed"-Meldung ist kein Beweis, dass der Arbeitsbaum still ist.**
+  Der Hinweistext sagt es sogar dazu: dieselbe Aufgabe kann mehrfach melden. Wer
+  danach misst, misst möglicherweise gegen einen halben Stand. Genau das ist die
+  Zwei-Schreiber-Falle aus dem Protokoll vom 31.08.2026, nur mit vertauschten
+  Rollen: diesmal war **ich** der zweite Schreiber.
+- **Ein Agent in einer Warteschleife wird beendet, nicht abgewartet.** Der
+  fachliche Teil seiner Arbeit war zu diesem Zeitpunkt fertig und gut; was fehlte,
+  waren die Mutationsproben, und die habe ich selbst gefahren. Danach `TaskStop`,
+  und erst dann war der Arbeitsbaum wirklich meiner.
+
+Der Wert der Sache liegt woanders: **die Mutationsproben waren der einzige Teil
+des Auftrags, den der Agent nicht mehr geschafft hat**, und ohne sie hätte ich
+drei Dateien mit grünen Tests eingecheckt, ohne zu wissen, ob die Tests etwas
+halten. Sie halten, alle fünf.
+
+## Ein Fund beim Zuschnitt von Schritt 36, 31.08.2026
+
+Beim Lesen der Quelle für die laufende Jagd sind zwei Dinge aufgefallen, die
+zusammen eine Produktfrage ergeben. Beide sind mit `grep` über das ganze
+PWA-Verzeichnis gemessen, nicht aus dem Code geschlossen.
+
+### 1. Der Vorrangzweig der Hinweise ist tot
+
+`screen-map.jsx:1035` liest die Hinweise so:
+
+```js
+const hints = stop.locationHints || (dbHints && (...) ? [...] : [...]);
+```
+
+**`stop.locationHints` wird in der gesamten PWA nirgends gesetzt.** Die einzigen
+zwei Treffer im ganzen `02_Frontend/app/` sind diese Lesestelle und dieselbe
+Zeile in `screen-map.original.jsx`, also der Sicherungskopie. Der Vorrangzweig
+läuft damit **nie**, und der Rückfall auf `stop.nextHints` ist in Wirklichkeit
+der einzige Pfad.
+
+Das allein wäre nur toter Code. Es wird erst durch den zweiten Fund wichtig.
+
+### 2. Das Hinweis-Trio gehört der **nächsten** Station
+
+`hunt-generator.jsx:319-338`, wörtlich:
+
+```js
+const nextStop  = stops[i + 1];
+const trio      = nextHintsFor(nextFact, lang);
+stop.nextHints  = trio;
+```
+
+An Stopp `i` liegt also das Trio des Fakts von Stopp `i + 1`. Und die letzte
+Station bekommt ausdrücklich `nextHints = null`, sie hat gar keine.
+
+**Zusammengesetzt ergibt das:** die Pille zeigt an der aktuellen Station die
+Hinweise zur **übernächsten**. Denn `currentStopIdx` springt beim Lösen sofort
+auf die nächste Station (`app.jsx:915-918`), und die Pille liest immer
+`stops[currentStopIdx].nextHints`. Wer Station 3 sucht, bekommt Hinweise zu
+Station 4. Auf den Ort, den er gerade sucht, sieht er nie einen.
+
+### Zwei Lesarten, und ich entscheide sie nicht
+
+**Absicht.** Der Kommentar der Quelle nennt den ersten, kostenlosen Hinweis
+einen „atmospheric teaser", der „sofort sichtbar" sein soll. Als Vorschau auf
+den nächsten Ort ergibt das Sinn: man löst hier, und der Text stimmt einen auf
+das ein, was als Nächstes kommt.
+
+**Defekt.** Dagegen steht die Beschriftung des gesperrten Hinweises:
+„🔒 Tipp freischalten (−20 🪙 vom Fakt-Lohn)". Zwanzig und dreißig Münzen für
+einen Hinweis auf einen Ort, den man noch nicht sucht, ist keine Hilfe, sondern
+eine Fehlausgabe. Und die Navigationshilfen daneben (Pfeil und Distanz) zeigen
+eindeutig auf die **aktuelle** Station, die Pille mischt also zwei Ziele in einer
+Zeile.
+
+Festgehalten als **E-60**. Der Neubau kann beide Lesarten, der Unterschied ist
+ein Index, und die Struktur wird so gebaut, dass die Entscheidung eine Zeile
+kostet und keine Umstellung.
+
+### Eine Verschärfung, gefunden beim Prüfen des Faktvertrags
+
+`Fact.stationHints` ist in unserem eigenen Vertrag als „`next_hints`, gestufte
+Hinweise auf den **Ort dieses Fakts**" dokumentiert. Die Spalte beschreibt also
+den Ort des Fakts, an dem sie hängt. Der Generator liest sie vom Fakt der
+**nächsten** Station und legt sie an der aktuellen ab. Damit ist die Kette
+lückenlos: die Hinweise an Station `i` beschreiben nachweislich den Ort von
+Station `i+1`, und das ist keine Auslegung mehr, sondern zwei zusammenpassende
+Belege.
+
+**Und die Stufe `schwer` macht daraus möglicherweise mehr als einen Schönheitsfehler.**
+Dort schaltet die Quelle Pfeil **und** Distanz ab, der Kommentar sagt „nichts;
+reines Rätsel, Hints geben nur Text". Wer auf `schwer` spielt, hat zum Finden der
+Station also nur den Stationstitel und die Hinweise, und die Hinweise
+beschreiben einen anderen Ort.
+
+Ob das die Jagd auf `schwer` unspielbar macht, hängt daran, ob der Titel allein
+genügt („Dom St. Stephan" findet man auch ohne Hinweis, ein „Brunnen im
+Hinterhof" nicht). Das ist eine Produktfrage und keine technische, und sie
+gehört mit E-60 zusammen entschieden.
+
+### Was daran nicht offen ist
+
+Dass die **letzte** Station keine Hinweise hat, ist keine der beiden Lesarten,
+sondern folgt aus beiden: in der einen gibt es keinen nächsten Ort, in der
+anderen ist das Feld schlicht leer. Der Neubau muss diesen Fall also so oder so
+tragen, und die Quelle fällt dort auf einen einzigen Satz zurück
+(„Schau dich in der Umgebung aufmerksam um.").
+
+## Schritt 14, die Wahl des Sensorpakets, 31.08.2026
+
+D-13 ist mit „ein neues Paket ist freigegeben" beantwortet worden, und die
+Auswahl war ausdrücklich zu recherchieren und zu begründen. Hier ist sie, mit
+Quellen, damit niemand sie nachschlagen muss.
+
+### Das entscheidende Kriterium steht in der Quelle, nicht im Paketvergleich
+
+`screen-map.jsx:2817-2823` liest die Richtung so:
+
+```js
+if (e.webkitCompassHeading != null) {
+  heading = e.webkitCompassHeading;           // iOS
+} else if (e.absolute && e.alpha != null) {
+  heading = (360 - e.alpha + 360) % 360;      // Android absolute
+} else {
+  return;                                      // relatives Event — ignorieren
+}
+```
+
+**Der `else`-Zweig ist das Kriterium.** Die Quelle braucht eine **absolute**
+Richtung und verwirft eine relative ausdrücklich. Ein Paket, das nur Rohwerte
+liefert, erfüllt das nicht, ohne dass wir die Sensorfusion selbst schreiben.
+
+### Die drei Kandidaten, am 31.08.2026 auf pub.dev nachgelesen
+
+| Paket | Absolute Richtung? | Letzte Veröffentlichung | Befund |
+|---|---|---|---|
+| `flutter_rotation_sensor` | ja, Azimut, Bezugsrahmen wählbar seit 0.3.0 | 0.4.0 am 27.08.2026 | **gewählt**, in `^0.3.1` |
+| `flutter_compass` | ja, 0 bis 360 | 0.8.1, seit 21 Monaten nichts | Präzedenzfall des eingefrorenen Ports, aber ohne Pflege |
+| `sensors_plus` | **nein** | 7.1.0, vor zwei Monaten | nur Rohwerte, keine Fusion |
+
+**`sensors_plus` fällt am Kriterium.** Es liefert `AccelerometerEvent`,
+`UserAccelerometerEvent`, `GyroscopeEvent`, `MagnetometerEvent` und
+`BarometerEvent`, also fünf Rohströme und **keine** fusionierte Orientierung.
+Wir müssten Azimut, Neigungskompensation und Tiefpass selbst rechnen. Das macht
+die Plattform besser, und es wäre Gerätelogik in unserem Baum, die kein Test
+erreicht. Dass es ein Flutter Favorite mit verifiziertem Herausgeber ist, ändert
+daran nichts: es ist das richtige Paket für eine andere Aufgabe.
+
+**`flutter_compass` fällt an der Pflege**, nicht an der Fähigkeit. Es liefert
+genau, was gebraucht wird, und der eingefrorene Port unter `08_Flutter/` benutzt
+es. Aber seine letzte Veröffentlichung liegt 21 Monate zurück, und dieses
+Repository weiß aus dem `maplibre_gl`-Eintrag weiter unten sehr genau, was ein
+Paket kostet, das der Werkzeugkette nicht mehr folgt. Zusatzbefund aus seiner
+eigenen Dokumentation: auf Android liefert es `null` als Richtung, wenn kein
+Sensor da ist, was den Wachhund der Quelle nicht ersetzt, aber immerhin nicht
+verschleiert.
+
+### Warum `^0.3.1` und ausdrücklich nicht `^0.4.0`
+
+**Das ist gemessen und nicht vorsichtshalber.** Mit `^0.4.0` bricht
+`flutter pub get` ab:
+
+> Because flutter_rotation_sensor >=0.4.0 depends on intl ^0.20.3 and every
+> version of flutter_localizations from sdk depends on intl 0.20.2,
+> flutter_rotation_sensor >=0.4.0 is incompatible with flutter_localizations
+> from sdk.
+
+Die Ursache steht im Änderungseintrag: **0.4.0 hat Web-Unterstützung bekommen**
+und dafür `flutter_web_plugins`, `web` und `intl` aufgenommen. Die Flutter-SDK
+nagelt `intl 0.20.2` fest, unser `flutter_localizations` hängt daran, und damit
+ist 0.4.0 für dieses Projekt unerreichbar, solange die SDK nicht nachzieht.
+
+**Web brauchen wir nicht.** 0.3.1 ist deshalb kein Verzicht, sondern die Fassung
+ohne das Web-Plugin. Sie hat den Bezugsrahmen (seit 0.3.0) und ausgerechnet
+„corrected iOS orientation values" (0.3.1, 13.08.2026).
+
+Und die Notation trägt es von selbst: bei einer 0.x-Fassung bedeutet `^0.3.1`
+`>=0.3.1 <0.4.0`, 0.4.0 ist also ausgeschlossen, ohne dass jemand daran denken
+muss. Wieder anheben, sobald die Flutter-SDK `intl 0.20.3` mitbringt.
+
+**Das ist dasselbe Muster wie bei `maplibre_gl 0.27.0`**, zum zweiten Mal: die
+neueste Fassung eines Pakets ist unerreichbar, weil eine festgenagelte
+Flutter-SDK eine transitive Abhängigkeit einfriert. Wer hier ein drittes Mal
+darauf trifft, weiß jetzt, wo er nachsieht.
+
+### Die Dart-Untergrenze steigt, und zwar ohne Spielraum
+
+`flutter_rotation_sensor 0.3.1` verlangt `sdk: ^3.12.1`, nachgelesen an der
+pub.dev-API und nicht vermutet. `pubspec.yaml` stand auf `^3.9.0` und steht jetzt
+auf `^3.12.1`.
+
+**Die installierte SDK ist Dart 3.12.1, also genau die Untergrenze.**
+`.github/workflows/gates.yml` nagelt Flutter 3.44.1 fest, das dieselbe
+Dart-Fassung mitbringt. Der Neubau baut damit ab jetzt nicht mehr auf einer
+älteren Flutter-Fassung. Wer eine ältere benutzt, bekommt einen
+Auflösungsfehler, und das ist die billigste Form dieser Nachricht.
+
+Zwei Pakete kommen dadurch in den Bau, nicht eines: `flutter_rotation_sensor
+0.3.1` und transitiv `native_device_orientation 2.1.1`. Das zweite ist der Grund,
+warum Regel 24 die **Paketfamilie** per Präfix verbietet und nicht nur den einen
+Namen, genau wie Regel 21 es bei `geolocator_platform_interface` tut.
+
+### Schritt 14 Teil 1: der Sensordienst und die Glättung
+
+2148 → 2180 Tests. Vier neue Dateien unter `lib/services/orientation/`, eine
+unter `lib/map/domain/`, dazu Regel 24 und vier Testdateien. **Die Verdrahtung in
+`map_page.dart` ist ausdrücklich nicht dabei**, das ist Teil 2.
+
+| Datei | Rolle |
+|---|---|
+| `services/orientation/device_heading.dart` | Wertobjekt, Zugang nur über `tryFrom` |
+| `services/orientation/orientation_service.dart` | Vertrag plus untätiger Standard |
+| `services/orientation/rotation_sensor_orientation_service.dart` | Vendor-Adapter, einziger Ort mit dem Paket |
+| `services/orientation/orientation_providers.dart` | Provider |
+| `map/domain/bearing_smoothing.dart` | Glättung und Wachhund-Schwelle, reine Rechnung |
+
+**Der Zuschnitt spiegelt den Ortungsdienst**, bis zur Begründung: der Dienst
+liefert die Richtung und glättet **nicht**. Eine Glättung im Vendor-Adapter liefe
+nur auf einem Gerät, und eine Rechnung, die kein Test erreicht, ist beim nächsten
+Umbau weg. Dieselbe Arbeitsteilung wie bei `locationAccuracyLimitInMeters`, das
+beim Vertrag steht und nicht im Geolocator-Adapter.
+
+**Sechs Pflichtmutationen, sechs Fälle.** Glättungsfaktor auf 1,0 (3 Tests rot),
+Winkelnormalisierung entfernt (2), abschließendes `% 360` entfernt (6),
+`NaN`-Abweisung entfernt (1), Normalisierung auf `[0, 360)` entfernt (5), das
+`>` des Wachhunds zu `>=` (1).
+
+#### Zwei Abweichungen von meiner Vorgabe, beide gemeldet und beide richtig
+
+**1. Die Glättung ruft `shortestBearingDeltaDegrees` auf, statt die Formel
+abzuschreiben.** Mein Auftrag sagte „wörtlich in derselben Form", was eine eigene
+Kopie zugelassen hätte. Die Konstruktion `((x + 540) % 360) - 180` steht aber
+schon geprüft in `map_camera_gate.dart`, und dieselbe Datei warnt im eigenen Kopf
+vor getrennten Kopien („Getrennt driften sie"). Der Aufruf ist die konsequentere
+Wahl, und beide liegen in derselben Domäne, Gate 6 erlaubt ihn also.
+
+**2. Regel 24 bekommt keinen Eintrag für `flutter_rotation_sensor` in
+`_domainBans`, und das war beim Schreiben des Auftrags nicht vorhersehbar.** Der
+Paketname beginnt selbst mit `flutter_`, und damit greift in einer Domäne bereits
+Regel 1 („Domain darf Flutter nicht importieren"). Ein zusätzlicher Regel-4-Eintrag
+hätte für denselben Import **zwei** Meldungen erzeugt, also genau das Muster, das
+das Skript an drei anderen Stellen ausdrücklich vermeidet (Test „Ä2"). Den
+Regel-4-Eintrag hat deshalb `native_device_orientation` bekommen, das kein
+`flutter_`-Präfix trägt.
+
+**Das ist ein neuer Fall in der Regelmechanik:** `flutter_rotation_sensor` ist das
+erste Vendor-Paket des Projekts, dessen Name mit `flutter_` beginnt. Wer das
+nächste Heimatverzeichnis baut, prüft zuerst, ob sein Paket schon unter Regel 1
+fällt.
+
+#### Was die Paket-API tatsächlich hergibt, nachgelesen im Pub-Cache
+
+- `RotationSensor` ist eine `@sealed class` mit **nur statischen** Mitgliedern,
+  ohne Konstruktor. Anders als bei `Geolocator` gibt es damit **keine
+  injizierbare Naht** für einen Testdoppelgänger. Das begrenzt, was am Adapter
+  prüfbar ist, und steht im Kopf der Testdatei.
+- Bezugsrahmen über `RotationSensor.referenceFrame`, Aufzählung `ReferenceFrame`,
+  Standard `magneticNorth`. Der Adapter setzt ihn **ausdrücklich**, damit eine
+  Änderung des Pakets nicht still die Richtung dreht.
+- Der Azimut steht als `OrientationEvent.eulerAngles.azimuth` in **Radiant**,
+  Bereich `[0, 2π)`, 0 bei Blick nach Norden, π/2 bei Osten. Derselbe Drehsinn
+  wie eine Kompass-Gradzahl, die Umrechnung ist reine Skalierung.
+- **Empirisch geprüft und nicht angenommen:** ein Quaternion mit einer
+  `NaN`-Komponente trägt die `NaN` ohne Ausnahme bis zum Azimut durch, und genau
+  deshalb hat `DeviceHeading.tryFrom` seine `NaN`-Wache. Ein **Null**-Quaternion
+  dagegen löst in `Quaternion.toRotationMatrix()` ein `assert` aus (`l != 0.0`);
+  unter `flutter test` sind Asserts aktiv, dieser Weg taugt also nicht als
+  Testfall und ist verworfen.
+
+#### Ein Befund am Rand, den ich nicht erklären kann
+
+`dart analyze` meldet **24 Hinweise**, alle `prefer_initializing_formals`,
+verteilt über 15 Dateien. Gate 2 bleibt auf Exit-Code 0, denn ein `info` kippt
+`dart analyze` nicht.
+
+**Ich habe vier Ursachen einzeln ausgeschlossen, alle gemessen:**
+
+1. Die Anhebung der Dart-Untergrenze. Mit `^3.9.0` sind es dieselben 24.
+2. Die Sprachfassung im `package_config.json`. Von Hand auf `3.9` gesetzt, wieder
+   dieselben 24.
+3. `analysis_options.yaml`. Unverändert, `git diff` leer.
+4. Die Fassungen von `flutter_lints` und `lints`. In `pubspec.lock` unverändert;
+   die 17 neuen Zeilen dort sind die zwei Sensorpakete und die SDK-Zeile.
+
+Dazu eine Gegenprobe, die die Sache nur schärfer macht: `anchor_registry.dart`
+wurde zuletzt am **28.08.2026** geändert, und einzeln analysiert meldet es den
+Hinweis heute. Der Auslöser liegt also nicht im Code von heute.
+
+**Und trotzdem passt es nicht zusammen.** Mehrfach an diesem Tag hat
+`dart analyze` in dieser Sitzung wörtlich „No issues found!" ausgegeben, zwei
+Zeilen Ausgabe insgesamt. Beide Beobachtungen können nicht gleichzeitig wahr
+sein, und **welche falsch ist, habe ich nicht aufgelöst.** Die bequeme
+Schlussfolgerung wäre „vorbestehend, also nicht mein Problem"; die ziehe ich
+nicht, weil sie nicht belegt ist.
+
+Zu entscheiden ist daran nichts Dringendes, aber zwei Dinge gehören gewusst: der
+Vertrag von Gate 2 ist der Exit-Code, und der hält. Ob das Projekt `--fatal-infos`
+will, ist eine eigene Frage, und die 24 Hinweise sind billig zu beheben, bis auf
+sechs in der **erzeugten** Datei `app_strings.dart`, die dem Generator gehören
+und nicht der Hand.
+
+### Der Bezugsrahmen ist eine offene Verhaltensfrage, siehe E-59
+
+Gewählt ist **magnetisch Nord**, der Standard des Pakets, und im Adapter
+ausdrücklich gesetzt statt stillschweigend übernommen. Begründung: der
+Android-Pfad der Quelle liest `deviceorientationabsolute`, und das ist
+magnetometerbasiert.
+
+**Offen ist, ob die Quelle auf iOS dasselbe tut.** `webkitCompassHeading` ist
+nach Apples Dokumentation aus `CLHeading` abgeleitet, und dort gibt es
+`trueHeading` **und** `magneticHeading`. Träfe die Quelle dort das wahre Nord,
+wären ihre beiden Zweige nicht deckungsgleich, und die Abweichung wäre die
+örtliche Missweisung, in Mitteleuropa je nach Ort ungefähr 2 bis 5 Grad, also
+**mehr** als die Totzone von 1,5 Grad und damit sichtbar. Als E-59
+festgehalten.
+
+### Schritt 14 Teil 2: die Verdrahtung, und damit ist Schritt 14 zu
+
+2180 → 2192 Tests. Vier Dateien geändert, keine neue. Die Karte folgt jetzt der
+Blickrichtung des Geräts.
+
+**Wie wenig dafür nötig war, ist der eigentliche Befund.** Alles Tragende stand
+schon: `MapCameraFollowKind.compassBearing` samt Fundstellen im Absichtstyp, die
+1,5-Grad-Totzone und die Unterdrückungsgründe im Gate, `isCompassDead` im
+Top-Chrome mit der Deckkraft 0,55 der Quelle. Gefehlt hat das Bindeglied, und das
+sind eine Absichtsfunktion und ein Abonnement.
+
+| Stelle | Was dazukam |
+|---|---|
+| `map_camera_intents.dart` | `compassBearingFollowIntent`, die sechste Absicht |
+| `map_page.dart` | Abonnement, Glättungszustand, Wachhund-Takt, `isCompassDead` |
+
+**Der Bewegungstyp ist `MapCameraImmediate`, und das ist nachgelesen und nicht
+gewählt:** `map_camera.dart` sagt wörtlich, dieser Typ entspreche `jumpTo`
+**und** `setBearing` der Quelle, und `screen-map.jsx:2838` ist genau der Aufruf
+dieser Absicht. Eine Animation wäre bei einem bis zu 60 Hz schnellen Strom
+ohnehin falsch: jede neue Ausgabe unterbräche die vorherige, bevor sie zu sehen
+wäre.
+
+#### Ein Paritätsdetail, das nicht im Auftrag stand
+
+Der Wachhund bekommt beim Start eine **Grundlinie**, bevor der erste Sensorwert
+da ist. Die Quelle tut dasselbe und sagt auch warum: `compassLastEventRef.current
+= Date.now()` beim Registrieren der Zuhörer (`screen-map.jsx:2858`, Kommentar
+„give watchdog a baseline so it doesn't fire instantly"). Ohne sie gälte der
+Kompass in der Sekunde zwischen Bildschirmstart und erstem Wert als tot, und die
+Nadel wäre beim Öffnen der Karte kurz abgeblendet.
+
+#### Die Entscheidung zum unsichtbaren Reiter, und ihr Preis
+
+Abonnement und Wachhund laufen weiter, nur die Absicht geht nicht an den Host,
+solange der Zweig unsichtbar ist. Dieselbe Abwägung wie beim Ortungsstrom, der
+aus demselben Grund weiterläuft.
+
+**Der Preis ist benannt:** der Sensor bleibt an, auch wenn niemand hinsieht. Der
+Gewinn ist, dass die Karte beim Zurückkommen sofort einer eingelebten Richtung
+folgt statt einer kaltgestarteten, und dass der Wachhund den wahren Stand zeigt
+statt einer Pause, die nur am Tabwechsel lag.
+
+#### Vier von fünf Mutationen gefangen, und die fünfte ist ehrlich offen
+
+Rohwert statt Glättung (2 Tests rot), fehlende Kündigung im `dispose` (ein
+`StateError` beim Entsorgen), Wachhund-Takt von 2 auf 60 Sekunden (der Kompass
+bleibt fälschlich lebendig), `isCompassDead` fest auf `false` (derselbe Test).
+
+**Die fünfte ist nicht fangbar, und es ist kein Test dafür erfunden worden.**
+`setState` bei jedem Kopfwert statt nur bei einer echten Änderung ändert allein
+die **Zahl der Neuaufbauten**, und die ist von außen nicht beobachtbar:
+`_smoothedBearing` wird nirgends gezeichnet. Ein Rebuild-Zähler wäre genau der
+Testhaken, den dieselbe Datei an anderer Stelle (`debugBuildBalloonImages`) schon
+einmal begründet wieder ausgebaut hat. Die bedingte Fassung ist trotzdem gebaut,
+sie ist richtig, nur unbewiesen.
+
+#### Eine Abweichung von meiner Vorgabe, und sie war nötig
+
+Ich hatte `DateTime.now()` als Rückfall für die Zeitquelle des Wachhunds
+vorgegeben. Das wäre falsch gewesen: `DateTime.now()` wird von `fake_async` und
+`tester.pump()` **nicht** mitverschoben, ein Test dagegen bräuchte also entweder
+`package:clock` (ein neues, zustimmungspflichtiges Paket) oder echtes Warten, und
+Warten verbietet `.claude/rules/tests.md`. Übernommen ist stattdessen das im
+Karten-Layer schon geprüfte Muster: eine `Duration Function()` mit einer
+laufenden `Stopwatch` als Vorgabe, wie in `map_camera_host.dart`.
+
+#### Zwei Testaufbau-Fallen, beide schon dokumentiert und trotzdem getreten
+
+Sie stehen hier, weil sie beim nächsten Mal wieder Zeit kosten:
+
+1. **Zwei frische `ProviderContainer` in einem Test** lassen den ersten mit einem
+   unversorgten Timer aus `factOverlayProvider` zurück, und das fällt erst in der
+   Invariantenprüfung auf. Die bestehende Suite verwendet an anderer Stelle
+   deshalb einen Container weiter.
+2. **Eine über einen Strom ausgelöste Zustandsänderung braucht zwei `pump()`**,
+   einen für die Zustellung und einen für den Neuaufbau. Dasselbe Muster wie bei
+   `emitFix`.
+
+#### Was jetzt gilt und was nicht
+
+Schritt 14 ist **im Code und in den Tests fertig**. Ungeprüft bleibt er **am
+Gerät**: dass sich die Karte beim Drehen des Telefons wirklich mitdreht, kann
+kein Widget-Test zeigen, und der Emulator braucht weiterhin den Neustart des
+Rechners. Die Aussage „die Karte folgt dem Kompass" ist damit strukturell belegt
+und optisch unbestätigt, wie alles seit dem 29.08.2026.
+
+## Die Architekturprüfung des Kerns, 31.08.2026
+
+Nachgeholt am Tag des Einbaus, weil `HANDOFF.md` verlangt, den
+`architecture-guardian` **vor** den großen Brocken zu fahren und nicht danach,
+und weil beim D-17-Block schon einmal die fehlende Prüfung als Risiko benannt
+stehen blieb. Sie hat drei echte Befunde gebracht, und der erste ist die Klasse,
+die hier historisch am teuersten war.
+
+### Befund 1: eine Rücknahmebedingung, die als erfüllt gelesen wird und nicht erfüllt ist
+
+**Der schwerste, und er stand in meinem eigenen ADR.** ADR-008 führte als
+Review-Auslöser: „`HuntPlan` and `HuntStop` move from `challenges/application` to
+`challenges/domain`. Their own takeback condition is tied to this decision; the
+move is behaviour-neutral and was deliberately left out of this change."
+
+Das liest ein Nachfolger als „Bedingung erfüllt, Umzug fällig". Nachgerechnet ist
+sie zu **einem Viertel** erfüllt: `hunt_plan.dart:14-21` nennt vier Fremdtypen,
+die der Umzug bräuchte, und ADR-008 löst genau einen davon.
+
+| Typ | Status nach ADR-008 |
+|---|---|
+| `PuzzleDifficulty` | gelöst, liegt im Kern |
+| `FactCoordinates` | gesperrt durch Aufnahmeregel 3, siehe D-9 |
+| `FactPuzzle` | **dauerhaft** gesperrt: eine Entität, und der Kern nimmt keine |
+| `FactId` | gesperrt durch Aufnahmeregel 1 |
+
+Der Fall `FactPuzzle` ist der entscheidende: das Verbot hängt **nicht** an D-9,
+sondern an einer eigenen Regel des Kerns, und keine künftige D-9-Antwort hebt es
+auf. Der Umzug „ohne Feldänderung", wie `hunt_plan.dart` es formuliert, ist damit
+nicht möglich, sondern setzt einen Umbau von `HuntStop` voraus, also genau eine
+Feldänderung. Behoben als Nachtrag in ADR-008.
+
+### Befund 2: die Vorhersage im ADR war die falsche Regel
+
+ADR-008 sagte, Aufnahmeregel 4 komme als erste unter Druck. Die Prüfung hat mit
+dem besseren Argument widersprochen: **Regel 3 bricht zuerst, und zwar an genau
+der Baustelle aus Befund 1.** `HuntStop.position` baut eine `MapPosition` aus
+`fact.coordinates`; wer den Umzug versucht, braucht `FactCoordinates` im Kern,
+und das ist der Typ, den Regel 3 mit der D-9-Messung ablehnt. Dann steht jemand
+vor der Wahl: Umzug bleibt liegen, oder Regel 3 wird für „nur die Lage, ohne
+Verhalten" aufgeweicht. Die Vorhersage steht jetzt im ADR, damit dieser Moment
+als der vorhergesagte erkennbar ist und nicht als neue Idee.
+
+### Befund 3: zwei der vier Aufnahmeregeln waren Ritual und keine Kontrolle
+
+Nur Regel 2 (reines Dart) ist maschinell, als Regel 23. Regel 4 („jeder Eintrag
+steht im ADR") war eine Absichtserklärung: nichts hinderte einen Commit daran,
+einen Typ nach `lib/kernel/` zu legen, ohne ADR-008 anzufassen.
+
+**Für Regel 4 gibt es eine billige maschinelle Näherung**, und sie ist gebaut:
+`test/kernel/kernel_admission_test.dart` liest jede Deklaration auf oberster
+Ebene unter `lib/kernel/` und vergleicht sie mit der Inhaltstabelle von ADR-008,
+**in beide Richtungen**. Ein Typ ohne Eintrag ist rot, ein Eintrag ohne Typ
+ebenso, denn eine veraltete Tabelle ist die einzige Buchführung dieses
+Kopplungskanals. Dazu eine dritte Zusicherung auf genau die zwei heute
+entschiedenen Typen: sie schlägt bei gewolltem Wachstum absichtlich an und macht
+ADR-008s eigenen Auslöser „the kernel grows past a handful of types" sichtbar.
+
+**Regel 1 und Regel 3 bleiben Review-Sache, und das ist kein Versäumnis.** Beide
+sind Aussagen über Bedeutung. Eine Prüfung, die „zwei Importe existieren" mit
+„zwei Domänen brauchen es" verwechselt, wäre schlechter als eine offene
+Review-Pflicht, weil sie wie eine Kontrolle aussähe. Das steht so im Kopf des
+Tests.
+
+### Zwei Präzisierungen, die keine Fehler waren
+
+**Die Ablehnung von `FactId` stand auf schwächerem Grund als der Rest**, und das
+war im ADR nicht kenntlich. `FactCoordinates` ist strukturell ausgeschlossen
+(rollengebundenes Verhalten, gemessen), `FactId` nur deshalb, weil
+`challenges/application` heute ganze `Fact`-Objekte hält. Das ist eine
+Momentaufnahme des Datenmodells und kippt, sobald `HuntStop` demselben Muster
+folgt wie `ActiveHunt`, das schon heute Koordinaten statt einer Entität trägt.
+Jetzt als Nachtrag benannt.
+
+**Die Abwägung gegen Option (c) war unvollständig.** Das ADR verwarf sie mit dem
+Wortlaut von ADR-007. Technisch war sie die billigste: Gate 6 sperrt nur die
+`domain`-Schicht, `hunt_plan.dart` importiert `facts/domain` aus `application`
+heute schon. Der tragende Grund gegen (c) ist ein anderer und stand nicht da: sie
+hätte D-18 gelöst und die zwei Kopien in `puzzles/domain` stehen gelassen, also
+ADR-006s benannten Preis nicht bezahlt und das Risiko der stillen Abweichung
+offen gelassen. Ergänzt.
+
+### Ein Widerspruch in zwei akzeptierten Dokumenten
+
+`project-structure.md` führt in seinem `core`-Baum ein `geo/`, und
+`api-and-domain-design.md` nennt `GeoPoint` unter den Beispielen für lohnende
+Wertobjekte. Beides ist vor der Antwort auf D-9 geschrieben und widerspricht ihr:
+es bleibt bei drei lokalen Koordinatentypen, und ADR-008 schließt einen geteilten
+über Regel 3 aus. Der `core`-Baum trägt jetzt eine Notiz dazu, statt gelöscht zu
+werden, denn ein stillschweigend entfernter Plan sieht aus wie ein Versehen.
+
+### Die zweite Prüfung, an der Umsetzung statt an der Entscheidung
+
+Parallel zur Architekturprüfung lief eine Code-Review über alle drei Blöcke des
+Tages, mit eigenen Wegwerf-Proben und selbst gefahrenen Gates. Sie hat zwei
+Befunde gebracht, und **beide betrafen meine Dokumente und nicht den Code**.
+
+**Befund A, der wichtigere: „Regel 23 setzt beide Richtungen durch" war falsch,
+und die Regel ist weiter als ich sie geschrieben hatte.** Gemessen mit Proben:
+die Innenseite des Kerns ist dicht, auch gegen einen relativen Import hinaus,
+gegen `export` statt `import` und in Unterordnern. Die andere Seite ist **keine
+Beschränkung**, sondern eine Erlaubnis, und die hat nichts zu prüfen.
+
+Dazu der Teil, der die Regel selbst ändert: `dependency-rules.md` führte den Kern
+nur in der Domänen-Zeile, und ADR-008 nannte ihn „the one place a **feature
+domain** may reach outside itself". Gemessen importieren ihn auch Application,
+Presentation und Data, in fünf Dateien. **Das ist kein Wildwuchs, sondern
+notwendig:** `Fact.easiestPuzzleDifficulty` gibt einen Kern-Typ zurück, eine
+Schicht, die ihn nicht nennen darf, könnte die Domänen-API nicht benutzen. Der
+Kern liegt unter allen Schichten, wie `dart:core`. Beides ist korrigiert, in der
+Tabelle, in Regel 23 und als Nachtrag in ADR-008.
+
+Der Preis davon ist benannt statt weggeredet: ein Kern-Typ kann in einer
+Widget-Signatur auftauchen, ohne dass ein Gate widerspricht. Heute harmlos, weil
+beide Einträge Wertobjekte ohne Verhalten sind. Harmlos bleibt es genau so lange,
+wie Aufnahmeregel 3 hält.
+
+**Befund B: ein Satz in diesem Dokument war gemessen falsch.** Er lautete „eine
+fehlende oder ausdrücklich leere Stufe bleibt gültig". Für den leeren String ist
+das falsch, er verwirft die Nutzlast wie jede andere unauflösbare Zeichenkette.
+Der Kommentar im Code war richtig, die Prosa nicht, und der Fall hatte keinen
+Test. Beides behoben, siehe den Abschnitt zur Nutzlast.
+
+**Ein dritter Punkt ist kein Fehler, sondern eine unbenannte Annahme.** Die Länge
+von `unlockedHintIndices` ist nicht begrenzt; eine Nutzlast mit 500.000 Einträgen
+lief anstandslos durch, gemessen. Tragbar, weil die einzige Schreibquelle der
+Gerätespeicher dieser App ist. Eine Obergrenze wäre eine erfundene
+Geschäftsregel. Die Annahme steht jetzt im Feldkommentar, mit dem Satz, der sie
+fällig macht: sobald eine zweite Quelle diese Nutzlast schreibt, ist sie weg.
+
+**Was die Code-Review nachgerechnet und bestätigt hat**, weil eine Zahl, die
+niemand nachrechnet, eine Behauptung ist: die 67 Zeilen netto, die 156 Zeilen
+Kern, die drei Domänendateien zum Stand des Kern-Commits, die Testzahl 2144, die
+vier Gates und die drei Drift-Werkzeuge. Dazu die Formangriffe auf die Nutzlast
+(Map, String, `null`-Element, ganzzahliger `double`, Rand-Leerzeichen), die
+Unveränderlichkeit der Indexliste und die reihenfolgeunabhängige Gleichheit. Und
+dass nach dem Löschen der drei Dateien **kein** Verweis auf die alten Namen
+zurückgeblieben ist, auch nicht in `docs/`.
+
+### Was die Prüfung ausdrücklich nicht beanstandet hat
+
+Der Kern ist nicht `core` mit anderem Namen: seine Zäunung ist strenger, in beide
+Richtungen maschinell, und mit ADR-Pflicht je Eintrag, während `core` nur Regel 11
+hat, eine Namensliste, die bei `core/anchors/` schon einmal nicht ausreichte. Und
+keine Cross-Feature-Kante verschwindet oder wird versteckt: `puzzles → facts`
+bleibt, weil der Übersetzer weiterhin eine **Entität** übersetzt und nicht nur
+die jetzt geteilten Werte.
+
+## Die Jagd-Nutzlast auf Fassung 2, 31.08.2026
+
+Zwei Inhalte, **eine** Formänderung. 2131 → 2144 Tests, alle vier Gates auf
+Exit-Code 0. Das Hinweis-Feld trägt jetzt die Indizes der freigeschalteten
+Hinweise (`unlockedHintIndices`), und die Jagd trägt ihre Schwierigkeitsstufe
+(`difficulty`, nullbar). `payloadVersion` steht auf 2, die Schlüssel heißen
+`hintIndices` und `difficulty`.
+
+**Warum zusammen und nicht nacheinander.** Jede Erhöhung von `payloadVersion`
+verwirft einen gespeicherten Spielstand. Seit der Persistenz von heute Vormittag
+liegen echte Nutzlasten auf echten Geräten, das ist also kein theoretischer Preis
+mehr: nacheinander hätte zwei Spielstände gekostet, zusammen kostet es einen.
+
+### Zwei Entscheidungen, die nach Regelbruch aussehen und keiner sind
+
+**1. `tryFrom` normalisiert die Indexliste, statt eine unsortierte abzuweisen.**
+Sortieren und Duplikate entfernen sieht wie das „Reparieren" aus, das ADR-007
+verbietet. Es ist keins: die freigeschalteten Hinweise sind eine **Menge**,
+Reihenfolge und Mehrfachnennung tragen keine Bedeutung, also wählt das
+Normalisieren nur eine kanonische Darstellung desselben Werts. Ohne die Regel
+wären `[0, 1]` und `[1, 0]` zwei verschiedene Jagden, und ein Aufrufer, der die
+Liste aus der Iterationsreihenfolge eines `Set` baut, würde zufällig scheitern.
+
+**2. Ein unbekannter Stufen-Code verwirft die ganze Nutzlast.** Nicht
+„wiederherstellen ohne Stufe". Der Präzedenzfall steht in derselben Datei:
+`_durationOfMinutes` verwirft bei einer unbekannten Dauer. Eine Jagd, deren Stufe
+still von der abweicht, die der Spieler gesehen hat, ist schlimmer als ein
+Neustart.
+
+**Hier stand zuerst ein falscher Satz, und die Code-Review hat ihn gemessen.** Er
+lautete „eine fehlende oder ausdrücklich leere Stufe bleibt gültig". Richtig ist
+nur die erste Hälfte: ein fehlender Schlüssel und ein ausdrückliches `null` sind
+gültig und ergeben keine Stufe. Ein **leerer String** ist dagegen eine
+unauflösbare Zeichenkette und verwirft die Nutzlast, genau wie `'episch'`. Der
+Kommentar im Code hat das nie anders behauptet, die falsche Aussage stand
+ausschließlich hier. Der Fall hat jetzt einen eigenen Test, denn er hatte keinen:
+geprüft war nur `'episch'`.
+
+Keine Obergrenze für einen Index, aus dem Grund, der schon am alten Feld stand:
+die Zwei aus `HINT_COSTS` hängt an Schritt 37, und eine Prüfung darauf würde nach
+einer Preisänderung eine **gültige** Nutzlast verwerfen.
+
+### Sieben Pflichtmutationen, sieben Fälle
+
+Alle sieben sind gefallen, keine hat überlebt. Sortierung entfernen (3 Tests
+rot), Duplikat-Entfernung entfernen (1), `List.unmodifiable` durch eine normale
+Liste ersetzen (1), Abweisung negativer Indizes entfernen (2), Elementprüfung der
+Liste entfernen (1), unbekannten Stufen-Code still durchlassen (1),
+`payloadVersion` auf 1 zurücksetzen (8).
+
+**Ein Ergebnis ist genauer als „gefallen" und gehört dazu.** Bei der fünften
+Probe fällt der Test nicht über den `null`-Rückgabewert, sondern über einen
+`CastError`: weil die geparste Liste auf `List<int>` typisiert ist, erzwingt das
+Entfernen der Wache eine implizite Umwandlung, und die wirft. Der Test wird rot,
+die Wache ist also nachgewiesen, aber die Fehlerform ist eine andere als bei den
+übrigen sechs. Wer das nicht weiß, hält den Zweig für stärker geprüft, als er
+ist.
+
+### Ein Fund am Rand, und er lag in meinem eigenen Test
+
+`key_value_active_hunt_store_test.dart` baute die kaputte Nutzlast über
+`toPayload().map((k, v) => MapEntry(k, v!))`. Mit einer nullbaren Stufe stirbt
+dieser `!` an `null`. Der erste Reflex war, die Testvorgabe an das Konstrukt
+anzupassen, also der Jagd eine Stufe zu geben, damit der `!` nicht mehr trifft.
+**Der Reflex war falsch, und die Richtung ist die Lehre:** der `!` war von Anfang
+an überflüssig, ich hatte nur das innere Literal auf `<String, Object>` statt
+`<String, Object?>` getippt, und `jsonEncode` nimmt `Object?`. Behoben ist jetzt
+das Konstrukt. Die Stufe bleibt trotzdem gesetzt, aber aus dem richtigen Grund:
+so trägt der Rundlauf durch `jsonEncode` eine echte Stufe, und der Weg über
+`fromCode` wäre sonst in dieser Datei nirgends geprüft.
+
+## Der geteilte Kern, 31.08.2026
+
+ADR-008, Antwort auf D-18. Nicht einer der 50 Schritte, sondern die Änderung des
+Grenzverlaufs, an dem drei Schritte hingen. 2112 → 2131 Tests, alle vier Gates
+auf Exit-Code 0, die drei Drift-Werkzeuge mit `--check` auf 0.
+
+**Der Kern nimmt weniger Platz ein, als er freimacht.** `lib/` schrumpft netto um
+**67 Zeilen**: 156 Zeilen neuer Kern gegen 289 gelöschte, davon 178 aus drei
+gelöschten Dateien.
+
+| Was | Vorher | Nachher |
+|---|---|---|
+| Schwierigkeitsstufe | `FactPuzzleDifficulty` in `facts/domain` **plus** wortgleiche Kopie `PuzzleDifficulty` in `puzzles/domain` | `PuzzleDifficulty` in `lib/kernel/` |
+| Operand | `FactPuzzleOperand` in `fact_puzzle.dart` **plus** Kopie `PuzzleOperand` in `puzzles/domain` | `PuzzleOperand` in `lib/kernel/` |
+| Übersetzer | `_difficulty` als `switch`, `_operand` als Feldkopie | beide gelöscht, die Umrechnung ist eine Zuweisung |
+
+### Was daran die Auflockerung ist, und wie klein sie gehalten wurde
+
+**Genau ein zusätzlich erlaubter Importpfad** für Domänen:
+`package:fact_app/kernel/`. Kein Loch in Regel 11, keine Ausnahme je Fall, keine
+Erlaubnisliste, die jemand pflegen muss. Das ist Regel 23 in
+`dependency-rules.md`.
+
+Die Gegenrichtung ist die wichtigere und deshalb ebenfalls maschinell: der Kern
+selbst darf **nur** `dart:`, sich selbst und die leere Liste
+`_domainAllowedPackages`. Als **Erlaubnisliste** und nicht als Verbotsliste, aus
+demselben Grund wie bei der Domäne: ein Vendor-Paket, an das niemand gedacht hat,
+muss abgelehnt werden und nicht durchrutschen. Alles im Kern sieht jede Domäne.
+
+**Beide Richtungen sind an der echten Ablage nachgewiesen, nicht nur im Test.**
+Drei Domänendateien in zwei Features importieren den Kern heute
+(`facts/domain/entities/fact.dart`, `fact_puzzle.dart`,
+`puzzles/domain/entities/puzzle.dart`), und Gate 3 steht dabei auf 0. Eine
+Wegwerf-Probe `lib/kernel/_probe.dart` mit einem Supabase-Import hat Gate 3 auf
+**Exit-Code 1** gebracht, mit genau der Regel-23-Meldung; nach dem Löschen wieder
+0. Dazu fünf feste Testfälle unter „Ä14" in `check_architecture_test.dart`, drei
+Verstoßproben und zwei stille.
+
+### Was der Kern ausdrücklich nicht bekommt
+
+- **Die drei Geo-Typen aus D-9.** Aufnahmeregel 3 in ADR-008 lehnt sie ab, und
+  das ist die Messung von D-9 als Regel geschrieben: `FactCoordinates` prüft
+  Rohwerte, `MapPosition` rechnet Haversine, ein geteilter Typ müsste beide
+  Rollen tragen. D-9 bleibt bei Variante (b).
+- **`FactId`.** `challenges/application` hält heute ganze `Fact`-Objekte und
+  braucht die Kennung nicht einzeln. Aufnahmeregel 1 nicht erfüllt.
+- **Einen Ersatzwert für die Stufe.** Der Kern wäre der bequemste Ort und
+  deshalb der schlechteste: welcher Ersatzwert gilt, ist eine Belohnungsfrage von
+  `puzzles` und `progression`. Im Kern wäre sie vor allen drei Domänen versteckt.
+- **Entitäten.** `FactPuzzle` bleibt in `facts/domain`, und `puzzles/domain` darf
+  es weiterhin nicht sehen. Der Übersetzer in `puzzles/application` bleibt genau
+  deshalb bestehen.
+
+### D-18 ist freigemacht und noch nicht gebaut, und das ist Absicht
+
+Die laufende Jagd **kann** ihre Stufe jetzt tragen. Sie bekommt sie trotzdem in
+dieser Änderung nicht, denn beides zusammen wäre teurer als nacheinander, und
+zwar in der falschen Richtung: die Umstellung des Hinweis-Felds von einer Anzahl
+auf Indizes erhöht `ActiveHunt.payloadVersion`, die Schwierigkeitsstufe ebenso.
+**Zwei Erhöhungen hintereinander verwerfen einen gespeicherten Spielstand
+zweimal, eine verwirft ihn einmal.** Seit dem 31.08.2026 liegen echte Nutzlasten
+auf echten Geräten, das ist also kein theoretischer Preis mehr. Beides gehört in
+einen Zug.
+
+### Zwei Nachwirkungen in akzeptierten Dokumenten
+
+**ADR-006 hat seinen eigenen Auslöser vorhergesagt und damit recht gehabt.** Es
+führte die Doppelung als „known, measured cost of the domain boundary" und nannte
+als Review-Auslöser wörtlich den Fall, der jetzt eingetreten ist. Beides steht
+dort nun als bezahlt. Der nützliche Teil daran ist die Vorhersage: eine als Preis
+benannte Konsequenz mit passendem Auslöser hat die nächste Entscheidung finden
+lassen, ohne dass jemand suchen musste.
+
+**`HuntPlan` und `HuntStop` bleiben in `challenges/application`.** Ihre
+Rücknahmebedingung hängt an genau dieser Entscheidung („zieht ohne Feldänderung
+nach `domain/` um"), und sie ist damit fällig. Der Umzug ändert kein Verhalten
+und ist deshalb nicht mitgemacht; er steht als Review-Auslöser in ADR-008 und
+gehört als **Mitteilung** in den nächsten Dairen-Block, nicht als Frage.
+
+## Die erste Persistenz, 31.08.2026
+
+Nicht einer der 50 Schritte, aber Voraussetzung für die Schritte 36 und 37 und
+für ADR-007. 2048 → 2112 Tests, alle vier Gates auf Exit-Code 0, die drei
+Drift-Werkzeuge mit `--check` auf 0.
+
+**Was entstanden ist.** Fünf neue Dateien in `lib/`, sieben neue Testdateien.
+
+| Datei | Rolle |
+|---|---|
+| `core/preferences/key_value_store.dart` | Vertrag, plus flüchtige Umsetzung |
+| `services/preferences/shared_preferences_key_value_store.dart` | Vendor-Adapter, `loadKeyValueStore` |
+| `features/identity/data/key_value_first_launch_store.dart` | `fact_has_launched` |
+| `app/onboarding/key_value_tour_store.dart` | `fact_tour_shown` |
+| `features/settings/data/key_value_audio_mode_store.dart` | `fact_audio_mode` |
+| `features/settings/data/key_value_language_preference_store.dart` | `fact_lang` |
+| `features/challenges/data/key_value_active_hunt_store.dart` | `fact_active_challenge` |
+
+### Warum ein Vertrag in `core` und nicht fünfmal das Paket
+
+Selbst entschieden, Stufe 2, und hier begründet, damit widersprochen werden kann.
+
+ADR-007 nennt für den Jagd-Speicher `challenges/data` als Ort, und die vier
+anderen Verträge sagen wortgleich, wer sie füllt. Fünf Umsetzungen an fünf Orten,
+die alle `shared_preferences` holen, wären fünf Stellen mit Speichertechnik
+gewesen. Ein Vertrag in `core/preferences/` ist ein Ort weniger, und das Vorbild
+stand schon im Projekt: `core/diagnostics/diagnostic_sink.dart` hält den Vertrag,
+`services/diagnostics/` die Umsetzung.
+
+Drei Dinge trägt die Variante, die fünf direkte Paketnutzungen nicht getragen
+hätten:
+
+1. **Ein Heimatverzeichnis**, also Regel 22, in derselben Bauart wie 19 bis 21.
+   Mit fünf Aufrufern gäbe es fünf Heimaten und damit keine.
+2. **Tests ohne Plattformkanal.** Die fünf Speicher-Tests brauchen weder
+   `setMockInitialValues` noch eine initialisierte Bindung.
+3. **Regel 11 bleibt gewahrt.** Der Vertrag kennt Schlüssel und Werte, keine
+   Jagd, keine Sprache, kein Audio.
+
+ADR-007 ist damit nicht verletzt: die persistente Jagd-Umsetzung liegt in
+`challenges/data`, sie hängt nur am Core-Vertrag statt am Paket.
+
+### Regel 22 war schon geschrieben, als sie noch nicht galt
+
+Der Doku-Block von `_geoSdkBans` in `tool/check_architecture.dart` führte
+`shared_preferences` unter „Was die Regel nicht kann", und zwar mit **zwei
+ausdrücklich benannten Bedingungen**: das Paket stehe nicht in `pubspec.yaml`,
+und es gebe „keine getroffene Entscheidung, die ein Heimatverzeichnis benennt.
+Eine Regel wäre hier eine Entscheidung, keine Durchsetzung."
+
+Diese Änderung hebt beide Bedingungen auf. Regel 22 ist deshalb keine neue
+Entscheidung, sondern die Durchsetzung, auf die derselbe Kommentar gewartet hat.
+Die Lehre ist allgemein: ein Kommentar, der seine eigene Ablaufbedingung nennt,
+ist mehr wert als einer, der nur begründet. Er wird nämlich von selbst fällig.
+
+### `getBool` wirft, und gelesen wird vor dem ersten Bild
+
+Der teuerste Fund, gemessen und nicht vermutet. `SharedPreferences.getBool`
+castet den Wert aus dem Zwischenspeicher hart (`_preferenceCache[key] as bool?`)
+und **wirft** eine Ausnahme, wenn dort ein Wert anderen Typs liegt. Genau das
+entsteht bei einem Formatwechsel, also bei einer Änderung wie der, die als
+Nächstes ansteht.
+
+Gelesen wird in `bootstrap()`, vor dem ersten Bild. Ohne das `try` im Adapter
+wäre ein Formatwechsel also nicht eine verworfene Präferenz, sondern ein Absturz
+beim Start, und zwar auf jedem Gerät, das den alten Wert noch liegen hat. Der
+Test dazu ist grün
+(`shared_preferences_key_value_store_test.dart`, „ein falsch typisierter Wert
+liefert null statt einer Ausnahme").
+
+### Was ungeprüft bleibt, und warum es benannt statt versteckt ist
+
+Der Zweig in `_write`, der auf ein `false` als Rückgabewert von `setBool`
+reagiert statt auf eine Ausnahme. Die Test-Plattform
+(`InMemorySharedPreferencesStore`) antwortet immer mit `true`. Erreichbar wäre
+der Zweig nur über ein eigenes `SharedPreferencesStorePlatform`, und das liegt in
+`shared_preferences_platform_interface`, einem Paket, das heute nur transitiv im
+Baum steht. Ein weiteres Paket in `dev_dependencies` ist zustimmungspflichtig und
+für einen Zweig dieser Größe nicht beantragt.
+
+**Der Zweig bleibt damit eine Behauptung.** Er steht im Kopf der Testdatei und in
+ADR-007, statt unbemerkt mitzulaufen.
+
+### Zwei Nebenwirkungen, die nicht bestellt waren
+
+**`productionProviderScope` hat einen Pflichtparameter mehr.** Ein Standardwert
+wäre bequem gewesen und hätte genau den stillen Ausfall gebaut, gegen den diese
+Funktion samt `bootstrap_test.dart` überhaupt existiert: eine App, die startet,
+heil aussieht und sich nichts merkt. Der Preis sind zehn angepasste Aufrufe im
+Test, gelöst über einen Helfer `_scope()`.
+
+**Sieben Vertrags-Dokumente waren nach dieser Änderung falsch.** Alle fünf
+Speicher-Verträge sagten „Flüchtiger Standard, solange nichts persistiert" und
+nannten die praktische Folge („das Tutorial erscheint bei jedem Start erneut"),
+`language_preference_store.dart` behauptete zusätzlich, `shared_preferences` sei
+„im Projekt bewusst nicht installiert", und `active_hunt_store.dart` führte alle
+vier anderen als flüchtig. Das ist mit derselben Änderung nachgezogen, weil ein
+stehen gelassener Satz dieser Art die nächste Sitzung in die falsche Richtung
+schickt.
 
 ## Arbeit außerhalb der 50 Schritte
 
@@ -1297,34 +2649,94 @@ Nicht im REBUILD_PLAN, aber notwendig:
   Behebung gehört zu dem Schritt, der `facts` an die Karte hängt, nicht
   hierher. Die Regel dahinter ist mit E-32 seit dem 28.08.2026 geklärt, siehe
   unten; offen ist nur noch diese Fundstelle.
-- [ ] **Quellprüfung im i18n-Generator für unbekannte Schlüssel.** `t('...')`
-  im JSX ohne Eintrag im Wörterbuch ist für `tool/generate_i18n.dart` heute
-  unsichtbar; die Prüfung liest nur die beiden Wörterbuchdateien. Genau diese
-  Lücke hat `audio.dialog.volumeHint` (E-28) durchgelassen, gefunden wurde er
-  von Hand. Eine Prüfung wäre billig und deckt die ganze Fehlerklasse ab.
-  **Nicht mit E-39 erledigt:** die dort ergänzte Gegenprüfung läuft in die
-  andere Richtung, sie meldet Ergänzungs-Schlüssel, die es in der PWA
-  inzwischen gibt. Ein `t('...')` ohne Wörterbucheintrag sieht sie nicht.
+- [x] **Quellprüfung im i18n-Generator für unbekannte Schlüssel** (31.08.2026).
+  Ein `t('...')` im JSX ohne Wörterbucheintrag war für `tool/generate_i18n.dart`
+  unsichtbar; die Prüfung las nur die beiden Wörterbuchdateien. Genau diese
+  Lücke hat E-28 durchgelassen, gefunden wurde er von Hand. **Nicht mit E-39
+  erledigt**, dessen Gegenprüfung läuft in die andere Richtung.
+  Der Entwurf ist aus einer Handmessung abgeleitet und nicht geraten: 716
+  Wörterbuch-Schlüssel gegen 457 benutzte, **sieben** Rohtreffer, und ihre
+  Aufteilung war der ganze Entwurf. Zwei sind echt (E-28 und der dabei neu
+  gefundene E-63), einer stand nur in einem `//`-Kommentar, vier waren Präfixe
+  aus zusammengesetzten Aufrufen der Form `t('cat.' + x, lang)`. Daraus die
+  drei Regeln: **Kommentare zuerst entfernen**, **nur Literale, auf die `,`
+  oder `)` folgt** (nicht `+`), und **Sicherungsdateien ausschließen**
+  (`.original.`, `.bak`). Nach den drei Verfeinerungen bleiben genau die zwei
+  echten Treffer.
+  **Eine benannte Liste bekannter Lücken statt eines harten Abbruchs auf
+  alles.** Beide echten Funde liegen im anderen Repository und sind von hier
+  nicht behebbar; ohne die Liste wäre das Werkzeug ab dem ersten Lauf dauerhaft
+  rot. Jeder Eintrag trägt seine E-Nummer. **Und die Liste kann selbst
+  verfallen:** ein Eintrag, der im Wörterbuch auftaucht oder im JSX nicht mehr
+  vorkommt, wird gemeldet, sonst verrottet sie still und bewacht nichts mehr.
+  Dieselbe Bauform wie `_checkSupplement`.
+  Sieben Mutationen (vier vom Bauenden, drei von der prüfenden Seite), alle
+  gefallen. Die schärfste war die dritte der prüfenden Seite: ein **erfundener
+  dritter Eintrag** in der Liste wird als veraltet gemeldet, die Liste kann
+  also nicht still wachsen.
+- [x] **`tool/generate_i18n.dart` hatte als einziges der vier Werkzeuge keine
+  Testdatei** (31.08.2026 nachgeholt, `test/tool/generate_i18n_test.dart`, 16
+  Tests). Das Werkzeug erzeugt die gesamte Zeichenketten-Tabelle der App und
+  war ungeprüft, während `bake_map_style`, `generate_curated_data` und
+  `check_architecture` je eine eigene Datei haben. Aufbau nach demselben
+  Vorbild: eine winzige Ersatz-PWA im temporären Verzeichnis, das Werkzeug als
+  Prozess mit `--source` darauf. Der Grund steht schon bei
+  `generate_curated_data_test.dart` und gilt hier genauso: `flutter test` muss
+  **ohne** Zugang zum Lese-Repository durchlaufen.
+  Der Kopfkommentar sagt ausdrücklich, was die Datei **nicht** abdeckt
+  (`_checkParity`, die Veraltungsmeldung der Ergänzung, das Render-Format, die
+  Fehlerpfade von `_readConfig`). Eine Testdatei, die so tut, als decke sie ein
+  Werkzeug ab, ist schlimmer als keine.
 - [ ] **Gate für generierten Code fehlt.** `docs/engineering/quality-gates.md`
   nennt `tool/check_generated_code.dart`, das Skript existiert nicht. Ein
   veralteter `*.g.dart`-Stand fällt heute nur auf, wenn jemand zufällig
   `build_runner` startet. Am 27.08.2026 einmal von Hand geprüft: ein frischer
   Lauf erzeugt `app_routes.g.dart` byteidentisch.
-- [ ] **Drei verbleibende Asymmetrien im Architektur-Check.** Erstens ist die
-  Cross-Feature-Prüfung flach: ein fremdes `features/x/unterstruktur/data/`
-  entkommt den Regeln 8 und 9, während dieselbe Verschachtelung für die
-  eigenen Schichten geschlossen ist. Zweitens hat `application` weiter nur
-  eine Verbotsliste. Letzteres setzt eine Aussage voraus, was „narrowly
-  scoped Core" konkret bedeutet, und die fehlt in `dependency-rules.md`.
-  Drittens hängt **Regel 17** (`presentation` zeigt nicht auf `data`, auch
-  nicht auf das eigene) weiter an `_pointsIntoOwnFeatureLayer` und damit an
-  `lib/features/`: ein `lib/map/presentation/` auf `lib/map/data/` wird nicht
-  gemeldet, am 28.08.2026 mit einer Wegwerf-Probe gemessen. Heute nicht
-  auslösbar, weil es außerhalb von `lib/features/` kein `data/` gibt, und
-  spätestens fällig, wenn der Karten-Host eines bekommt. Die Behebung ist
-  dieselbe Ableitung über `_modulwurzel`, die für die Domäne schon dasteht;
-  bewusst nicht mitgemacht, weil der Auftrag vom 28.08.2026 vier benannte
-  Regeln umfasste und diese nicht.
+- [x] **Zwei der drei Asymmetrien im Architektur-Check geschlossen**
+  (31.08.2026), beide gemessen und beide mit Gegenprobe. Erstens war die
+  Cross-Feature-Prüfung flach: `_crossFeaturePattern` verlangte die Schicht
+  **direkt** unter dem Feature, ein fremdes `features/x/unterstruktur/data/`
+  entkam damit den Regeln 8 und 9, während dieselbe Verschachtelung für die
+  eigenen Schichten über `_hasSegment` längst geschlossen war. Das Muster
+  erlaubt jetzt dieselbe Tiefe, **nicht-gierig**, damit
+  `features/x/presentation/widgets/foo.dart` weiterhin `presentation` als
+  Schicht liefert und nicht `widgets`. Zweitens hing **Regel 17** an
+  `_pointsIntoOwnFeatureLayer` und damit an `lib/features/`: ein
+  `lib/map/presentation/` auf `lib/map/data/` wurde nicht gemeldet. Sie nutzt
+  jetzt zusätzlich `_modulwurzel`, dieselbe Ableitung, die für die Domäne
+  schon dastand.
+  **Ergänzt und nicht ersetzt, und das war eine Entscheidung des Bauenden, die
+  der Auftrag offen gelassen hatte:** ein reiner Ersatz hätte den Schutz für
+  eine Presentation-Datei in einer Feature-Unterstruktur verengt, weil die
+  Modulwurzel dort nur bis zum unmittelbaren Modul reicht und nicht bis zum
+  ganzen Feature. Beide Bedingungen stehen deshalb als Oder in **einem** `if`
+  mit **einem** `found.add`, damit aus zwei Prüfungen nie zwei Meldungen für
+  denselben Import werden. Dass fremdes `data/` weiter allein bei Regel 9
+  bleibt, ergibt sich von selbst und braucht keine Ausnahmeliste:
+  `_modulwurzel` kommt aus dem Pfad der geprüften Datei, ein fremder Import
+  beginnt nie mit diesem Präfix. Eine Zusicherung prüft ausdrücklich die
+  **Anzahl** der Meldungen und nicht nur ihr Vorhandensein.
+  85 → 90 Tests am Skript, sechs Mutationen (drei vom Bauenden, drei von der
+  prüfenden Seite), alle gefallen. Die verschärfte Prüfung findet im Bestand
+  **keinen** Verstoß, es gab also nichts nachzuziehen.
+- [ ] **Zwei Testlücken an den Bildschirmen von Schritt 39**, am 02.09.2026 von
+  der unabhängigen Prüfung benannt. Erstens fehlt der **zusammengesetzte Weg**:
+  die drei neuen Tests seeden den Lauf, statt durch Assistent, Picker, Start und
+  Abbruch zu gehen. Genau dort sitzt aber die Stelle, die ein Leser falsch
+  erinnert, nämlich dass `_choice` die Jagd überlebt und nach „Fertig" wieder
+  der Picker dasteht (das ist Parität, `screen-challenge.jsx:4331-4358` verlässt
+  `handleHotspotPick` im Erfolgsfall ohne `setView`). Zweitens fehlen **Maß- und
+  Schriftproben**: `challenges_page_test.dart` fährt 390/360/320 mal Schrift 1
+  und 2, die beiden neuen Bildschirme kennen weder `textScale` noch 320. Die
+  Rückfrage im Pausebildschirm ist eine nicht scrollbare `Column` in einem
+  `Center`, also die Bauform, die dieses Dokument zweimal als „schneidet lautlos
+  ab" protokolliert hat. Kein Überlauf ausgelöst, nur die Zusicherung fehlt.
+- [ ] **Die dritte Asymmetrie bleibt offen, und sie ist keine Erkennungslücke.**
+  `application` hat weiter nur eine Verbotsliste, keine Erlaubnisliste wie
+  Domäne und Kern. Das setzt eine Aussage voraus, was „narrowly scoped Core"
+  in `dependency-rules.md` konkret bedeutet, und die fehlt dort. Wer das
+  schließen will, entscheidet zuerst die Architekturfrage; das Skript kann
+  nichts prüfen, was niemand geschrieben hat.
 - [x] **Zwei gemessene blinde Flecken im Architektur-Check geschlossen**
   (28.08.2026). `_domainPath`, `_applicationPath` und `_dataPath` verlangten
   das Literal `lib/features/`, nur `_presentationPath` war allgemein: eine
@@ -1385,9 +2797,40 @@ Nicht im REBUILD_PLAN, aber notwendig:
   wird nicht gemeldet, und Regel 10 (Cross-Feature nur über öffentlichen
   Vertrag) bleibt Review-Sache, weil am Text nicht unterscheidbar ist, ob ein
   Import den Vertrag nutzt oder umgeht.
-- [ ] **CI-Workflow.** `.github/workflows/` existiert nicht. Kein Gate läuft
-  automatisch. `quality-gates.md` ruft zusätzlich
-  `tool/check_generated_code.dart`, das es noch nicht gibt.
+- [x] **CI-Workflow** (`.github/workflows/gates.yml`, seit dem 30.08.2026).
+  **Der Eintrag hier war veraltet und behauptete das Gegenteil:** „`.github/
+  workflows/` existiert nicht. Kein Gate läuft automatisch." Beides stimmte
+  schon lange nicht mehr, `gh run list` zeigt Läufe seit dem 30.08.2026,
+  darunter eine bewusste Gegenprobe auf einem eigenen Zweig, die rot wurde.
+  Das ist das vierte veraltete Kästchen in diesem Dokument. Wer eins findet,
+  prüft es nach und setzt genau eine der beiden Stellen richtig.
+- [x] **Der Workflow lief auf dem falschen Zweig** (31.08.2026 behoben).
+  Der Auslöser war `push` auf `main` und `pull_request`. Der Zweig, auf dem
+  tatsächlich gebaut wird, ist keins von beidem: **fünf Pushes an diesem Abend
+  haben keinen einzigen Lauf ausgelöst**, gemessen mit `gh run list`. Die vier
+  Gates liefen nur, weil sie hier von Hand gestartet wurden. Der Auslöser nimmt
+  jetzt zusätzlich `claude/**`. Ein Tor, das erst beim Zusammenführen
+  zuschlägt, meldet den Fehler eine Tagesarbeit zu spät.
+- [x] **Der erzeugte Code wird geprüft, und der Posten war viel kleiner als
+  sein Eintrag** (02.09.2026). Er stand hier als „Gate für generierten Code
+  fehlt, `quality-gates.md` nennt `tool/check_generated_code.dart`, das Skript
+  existiert nicht". Nachgezählt: von den sechs `*.g.dart` im Baum stammt genau
+  **eine** von `build_runner`, nämlich `lib/app/routing/app_routes.g.dart` aus
+  `go_router_builder`. Die anderen fünf erzeugen die drei eigenen Werkzeuge,
+  und die haben ihre Drift-Prüfung mit `--check` längst. `quality-gates.md`
+  sagt inzwischen selbst, dass es das Skript nicht gibt und die drei Werkzeuge
+  dieselbe Fläche Datei für Datei abdecken; nur diese eine Datei fiel durch.
+  Sie wird jetzt im CI-Lauf geprüft: `build_runner` läuft, danach muss
+  `git diff --exit-code` auf dieser Datei still bleiben. **Nicht lokal**, und
+  das ist gemessen und keine Bequemlichkeit: der Lauf dauert 40 Sekunden für
+  eine Datei, die vier lokalen Tore zusammen liegen darunter, und ein Tor, das
+  niemand mehr abwartet, ist keins. Dazu schlägt `git diff` auf Windows an
+  dieser Datei allein durch die Zeilenenden-Umschreibung an, obwohl der Inhalt
+  gleich ist; auf dem Linux-Läufer gibt es das nicht.
+  **Der Stand war beim Einbau aktuell**, nachgeprüft: ein frischer Lauf ergab
+  denselben Inhalt. Ein `tool/check_generated_code.dart` bleibt damit
+  gegenstandslos, und der Eintrag in `quality-gates.md`, der es als „not
+  written yet" führt, sagt jetzt dasselbe.
 - [x] **Standort-Permissions.** `ACCESS_FINE_LOCATION`,
   `ACCESS_COARSE_LOCATION` und `INTERNET` in `AndroidManifest.xml`,
   `NSLocationWhenInUseUsageDescription` in `Info.plist`, Texte aus dem alten
@@ -1442,13 +2885,14 @@ nachsehen. Der Ausweg wird sein, dass `maplibre_gl` eine Fassung mit
 Built-in-Kotlin bekommt; dann ist zu prüfen, ob der `app_links`-Konflikt
 dabei mit verschwindet.
 
-## Fragen an Dairen, gestellt und unbeantwortet
+## Fragen an Dairen
 
-Am 29.08.2026 als Block verschickt, seither ohne Antwort. **Der Wortlaut steht
+Am 29.08.2026 als Block verschickt. **Der Wortlaut steht
 hier, weil er sonst nirgends stand.** Im Repository gab es die D-Nummerierung
 bis dahin in genau drei Vorkommen: `D-5` (entschieden), ein beiläufiges `D-9` in
 `lib/services/location/device_position.dart:24` und ein `D-b` in der
-maplibre-Tabelle, das nirgends aufgelöst wird. Die sechs Fragen selbst lebten
+maplibre-Tabelle, das nirgends aufgelöst wurde; dieses letzte ist am 31.08.2026
+auf `D-12` berichtigt worden, denn genau diese Frage war gemeint. Die sechs Fragen selbst lebten
 allein im Chatverlauf, und `CLAUDE.md` sagt, dass Chatverlauf keine Quelle ist.
 Eine eintreffende Antwort wäre ihrer Frage nicht mehr sicher zuzuordnen gewesen.
 
@@ -1463,6 +2907,48 @@ stehen unter der jeweiligen Frage, jeweils als eigener Abschnitt „Antwort".
 entstanden, D-16 als technische Folge von Janeks Entscheidung zu E-43. Wer den
 nächsten Block schickt, nimmt beide mit.
 
+### Was in denselben Block gehört, aber keine Frage ist
+
+Zwei Punkte aus dem Bau von Schritt 15 am 31.08.2026. Beide betreffen
+Vorhersagen aus dem letzten Block, beide sind selbst entschieden, und beide
+gehören mitgeteilt statt gefragt, weil `CLAUDE.md` verlangt, einen Widerspruch
+zu melden statt ihn still aufzulösen.
+
+**1. Der von D-12 vorhergesagte Preis fällt nicht an.** D-12 sagte, Variante (b)
+koste „ein neues Feld im gerade fertiggestellten Kameravertrag und einen zweiten
+Bewegungspfad im Host". Gebaut wird keines von beidem. Drei Gründe, alle am
+Paket gelesen:
+
+- `CameraUpdate.newLatLngBounds` übergibt der nativen Seite **keinen** Neigungs-
+  und keinen Blickrichtungswert (Android `Convert.java:56-61`, iOS
+  `Convert.swift:135-145`). Die Dart-Doku behauptet, beide fielen dabei auf 0
+  (`maplibre_gl_platform_interface-0.26.2/lib/src/camera.dart:104`); ob das
+  stimmt, entscheidet `maplibre-native` und ist im Pub-Cache **nicht**
+  nachprüfbar. Eine Kamerafahrt, die die 58 Grad Neigung möglicherweise still
+  flachlegt, ist kein Fundament.
+- `MapCameraDriver` schickt bewusst **immer** eine vollständige Kamera, weil das
+  SDK zwei Teiländerungen nicht in einem Aufruf verbinden kann. Ein
+  Rechteck-Pfad wäre eine zweite Buchführung für Animationsende, Lenkfenster und
+  Folge-Anker.
+- `getVisibleRegion` taugt nicht als Gegenprobe: bei Neigung liefert es nur die
+  achsparallele Box des trapezförmigen Sichtfelds (Android
+  `MapLibreMapController.java:897-912`, iOS `:556-561`).
+
+Stattdessen ist das Rechteck eine **Rechnung vor der Absicht**: `map/domain/`
+bekommt Geometrie ohne Kamerabezug (`MapPositionRect`, `MapViewport`,
+`rectFitZoom`), und das Feature gibt am Ende eine gewöhnliche `MapCameraOneShot`
+mit Mittelpunkt und Zoom ab. Neigung und Blickrichtung bleiben stehen, weil
+`MapCameraChange` sie mit `null` unverändert lässt. Erweitert wird allein die
+Fassade `MapHost`, um die Größe der Kartenfläche und den Gruppen-Tipp, also um
+zwei Dinge, die ein Feature ohne die Karte nicht wissen kann.
+
+**2. Eine Prämisse der Paketlücken-Tabelle war falsch.** Es gibt dauerhaftes
+Kamera-Padding. `updateContentInsets` steht im Dart-Controller und wird auf
+beiden Plattformen umgesetzt; die Einzelheiten und die Lehre daraus stehen oben
+unter „Was `maplibre_gl 0.26.2` nicht kann". Die 320 Pixel der Quelle sind damit
+nachbaubar, und die Schritte 15 bis 18 entscheiden über die Lage von
+Nutzermarker und Avatar frei statt um eine Lücke herum.
+
 | Nr | Antwort in einem Satz |
 |---|---|
 | D-9 | Variante (b), lokale Typen bleiben, **falls** die Umrechnung nicht teuer ist; vorher prüfen, ob es doch einen sauberen architektonischen Weg gibt |
@@ -1471,6 +2957,9 @@ nächsten Block schickt, nimmt beide mit.
 | D-12 | Variante (b), die Kamera fährt auf ein Rechteck |
 | D-13 | **Ein neues Paket ist freigegeben**, welches, ist zu recherchieren |
 | D-14 | Sauber machen, **wenn D-9 auch sauber gemacht wird**, und dann das Prüfskript anpassen |
+| D-15 | **An mich delegiert**, „bitte selbst entscheiden mit einer cleanen Architektur im Kopf" → ADR-006 |
+| D-16 | **An mich delegiert**, mit einer Vorgabe von Janek: die Jagd überlebt den Neustart → ADR-007 |
+| D-17 | **Variante (a)**, `projectToScreen` liefert es mit: „Aso, ja dann soll ProjektToScreen das mitliefern“ |
 
 | Nr | Frage in einem Satz | Blockiert | Nachtrag seit dem Absenden |
 |---|---|---|---|
@@ -1481,7 +2970,9 @@ nächsten Block schickt, nimmt beide mit.
 | D-13 | Welches Sensorpaket für die Kompass-Drehung, und ist es frei | Schritt 14 | Der eingefrorene Port nennt `flutter_compass ^0.8.1` |
 | D-14 | Darf `presentation` direkt aus `lib/services/` lesen | nichts | Aus einer Lesestelle sind vier geworden |
 | D-15 | Ist `puzzles` als Feature bestätigt, damit `tours` und `challenges` später davon abhängen dürfen | nichts, blockiert aber Phase 5 | Am 30.08.2026 mit Schritt 27 entstanden |
-| D-16 | Wie liest `discovery` den Zustand der laufenden Jagd, wenn sie auf der Karte läuft | die Umsetzung von E-43, also Schritt 36 und 37 | Am 30.08.2026 aus E-43 entstanden |
+| D-16 | Wie liest `discovery` den Zustand der laufenden Jagd, wenn sie auf der Karte läuft | **nichts mehr**, seit ADR-007 | Am 30.08.2026 aus E-43 entstanden, am 31.08.2026 in ADR-007 entschieden; Schritt 36 und 37 sind damit frei |
+| D-17 | Soll `projectToScreen` melden, dass ein Punkt hinter der Kamera liegt | nichts mehr, **gebaut** | Am 31.08.2026 mit Schritt 15 zum dritten Mal aufgetreten, am selben Tag mit Variante (a) entschieden und umgesetzt |
+| D-18 | Wie kommt die Schwierigkeitsstufe einer Jagd über die Domänengrenze, damit `challenges` sie speichern kann | die **vollständige** Wiederherstellung, also einen Teil von Schritt 36 und 37 | Am 31.08.2026 beim Bau des Jagd-Vertrags entstanden |
 
 ### D-9, gemeinsamer Geo-Typ
 
@@ -1654,6 +3145,8 @@ betrifft, kann sie so bleiben. Keine eigene Prüfregel. Der Befund aus dem
 Nachtrag bleibt damit stehen: eine pauschale Pfadregel träfe zwei Testdateien,
 die den teuersten Fund der Woche abdecken.
 
+**Antwort vom 31.08.2026: Variante (b), so lassen.** Damit ist D-11 geschlossen und kostet keine Arbeit. Die zwei Testdateien, die `map/presentation` importieren, bleiben stehen; sie schließen die Lücke, die am 29.08.2026 teuer gefunden wurde, und eine pauschale Regel hätte ausgerechnet sie verboten. Die Regel bleibt Review-Sache, und genau so steht sie schon im Prüfskript.
+
 ### D-12, Aufklappen einer Gruppe
 
 **Blockiert das Antippen in Schritt 15.**
@@ -1776,6 +3269,33 @@ ging nach `lib/app/onboarding/`, ausdrücklich damit `domain-map.md` und
 Mit zu entscheiden: ob dieselben drei Dokumente auch `library` und `creator`
 nachtragen sollen, die unter demselben Vorbehalt stehen.
 
+**Antwort vom 31.08.2026: an mich delegiert, „bitte selbst entscheiden mit einer
+cleanen Architektur im Kopf". Entschieden in ADR-006.**
+
+`puzzles` ist die elfte Domäne. `tours` und `challenges` dürfen davon abhängen,
+aber nur von `puzzles/domain` und `puzzles/application`; `puzzles` referenziert
+die beiden nie, damit der Graph kreisfrei bleibt. Die drei akzeptierten
+Dokumente nennen `puzzles` seit heute.
+
+**`library` und `creator` bleiben Vorschläge**, und das ist die eigentliche
+Entscheidung an dieser Stelle: beide haben keinen Inhalt und keinen Verbraucher,
+und bei `library` ist zusätzlich ungeklärt, was ihm gehört. Der Bildschirm, den
+es beansprucht, ist derselbe, für den `collection_page.dart:5-9` schon einen
+Platzhalter trägt und dem `shell_tab.dart:34` den `wallet`-Tab zuweist. Ob das
+PWA-„Wallet" ein Bildschirm ist oder zwei, war eine **Produktfrage**.
+
+**Am 31.08.2026 von Janek entschieden: ein Bildschirm.** „Alles kommt in den
+Wallet, also das Bücherregal mit den Fakten.“ Damit besitzt `collection` diesen
+Bildschirm, und **`library` entfällt als Ordnervorschlag**. Die Coins gehen ins
+**Profil** und nicht ins Regal: sie gehören fachlich `progression`, und Janeks
+Begründung trägt auch ohne Architektur („die Coins sind ja einfach nur eine Zahl
+und machen nichts“). Der Münzzähler oben auf der Karte bleibt, der ist ein
+laufender Stand während des Spiels und keine zweite Heimat.
+
+Die gemessene Doppelung in `puzzles/domain` (zweite Schwierigkeitsstufe, zweites
+Operanden-Wertobjekt) bleibt, weil Gate 6 den Import weiter verbietet. Sie steht
+in ADR-006 als benannter Preis der Grenze und nicht als Versehen.
+
 ### D-16, wie `discovery` an den Jagdzustand kommt
 
 **Am 30.08.2026 aus E-43 entstanden, noch nicht verschickt. Blockiert die
@@ -1813,7 +3333,208 @@ Quelle sagt ja und legt sie im lokalen Speicher ab; im Neubau gibt es dafür
 Präzedenzfälle (`FirstLaunchStore`, `TourStore`, `AudioModeStore`), aber keinen
 Vertrag.
 
-### Zwei Punkte aus demselben Block, die keine Fragen sind
+**Antwort vom 31.08.2026: an mich delegiert, mit einer Vorgabe von Janek, „Jagd
+sollte aber den Neustart der App überleben". Entschieden in ADR-007.**
+
+`challenges` besitzt die Jagd samt Sitzungszustand. `discovery` liest sie über
+einen öffentlichen, nur lesenden Vertrag: Lesemodell und Store-Vertrag in
+`challenges/domain`, Provider in `challenges/application`, beobachtet von
+`discovery/presentation`. Kein Adapter in der App-Komposition, denn der wäre eine
+dritte Stelle, die die Form der Jagd kennt, für einen Zustand mit einem
+Eigentümer.
+
+**Die Vorgabe zur Dauerhaftigkeit hat die Frage vergrößert, und das ist der
+wichtigste Teil dieser Antwort.** Es gibt in diesem Projekt **überhaupt keine**
+dauerhafte Speicherung: alle vier vorhandenen Stores sind reine
+`InMemory`-Fassungen, und `pubspec.yaml` führt kein Speicherpaket. Die Vorgabe
+erzeugt also kein Jagd-Problem, sondern erzwingt die **erste**
+Persistenz-Entscheidung, und auf dieselbe warten schon vier Stores und die
+zwischengespeicherte letzte GPS-Position (`map_camera_intents.dart`).
+
+Empfohlen ist `shared_preferences`, und der Grund ist billiger als erwartet: es
+steht **schon als transitive Abhängigkeit in `pubspec.lock`**, gezogen von
+`supabase_flutter`. Es zur direkten Abhängigkeit zu machen bringt damit **keine
+einzige neue Zeile** in den Bau. Trotzdem ist ein Paket laut `CLAUDE.md`
+zustimmungspflichtig, deshalb steht in ADR-007 die Empfehlung und nicht der
+Einbau. **Das ist das eine, was hier noch bei Janek liegt.**
+
+Zwei Folgen, die in ADR-007 als Regel stehen und leicht zu übersehen sind: eine
+wiederhergestellte Jagd kann eine Station nennen, deren Fakt es nicht mehr gibt,
+das Wiederherstellen muss also gegen aktuelle Daten prüfen statt der gespeicherten
+Nutzlast zu glauben. Und die Gruppenjagd aus Phase 6 ist damit **nicht** gelöst:
+geteilter Zustand über Geräte hinweg ist Serverzustand und kein lokaler Store.
+
+### D-17, soll die Projektion einen Punkt hinter der Kamera melden
+
+**Am 31.08.2026 beim Bau von Schritt 15 entstanden, blockiert nichts.**
+
+`MapHost.projectToScreen` liefert für einen Punkt **hinter** der Kamera keine
+Ausnahme und kein `null`, sondern eine still **gespiegelte** Zahl, die von der
+Lage eines weit voraus liegenden Punktes nicht zu unterscheiden ist. Das ist am
+30.08.2026 am Gerät gemessen, siehe „Die vier Gerätemessungen"; es war einer der
+zwei teuersten Funde und stand auf keiner Liste. Bei 58 Grad Neigung liegt alles
+jenseits des Horizonts hinter der Kamera, der Fall ist also normal und nicht
+exotisch.
+
+Der Vertrag kann die beiden Lagen heute nicht unterscheiden, und das steht auch
+so in `map/domain/map_host.dart`. **Jeder Verbraucher erbt die Lücke und
+beschreibt sie erneut**, mit jedes Mal anderer Folge:
+
+- `features/discovery/presentation/fact_balloon_overlay.dart`: ein gespiegelter
+  Punkt zeichnet einen Ballon an falscher Stelle, ein optischer Aussetzer.
+- `features/discovery/presentation/discovery_balloon_anchor.dart:115-125`: dort
+  ist die Folge **teurer**, ein gespiegelter Punkt kann den Wettbewerb um die
+  Rahmenmitte gewinnen und zum Tutorial-Ziel werden, weil die Spiegelung
+  gespiegelte Punkte in Richtung Bildmitte zieht.
+- Seit Schritt 15 der dritte: die Auswahl der Punkte einer angetippten Gruppe
+  kann einen gespiegelten Punkt in den Gruppierungsradius fallen lassen und
+  damit das Rechteck verfälschen.
+
+Damit ist es das Muster, an dem dieses Repository sonst zu suchen anfängt: drei
+Stellen, dieselbe Lücke, dreimal einzeln umschrieben. Ein vierter Verbraucher
+kommt in Schritt 18 mit dem Avatar.
+
+**Zur Wahl stehen mindestens:** `MapScreenPoint` bekommt ein Feld „liegt vor der
+Kamera", und der Host füllt es; oder `projectToScreen` gibt für einen solchen
+Punkt `null` zurück, so wie es für „keine Bildschirmlage" schon vorgesehen ist;
+oder es bleibt, wie es ist, und die Lücke wird an genau einer Stelle
+dokumentiert, auf die die Verbraucher verweisen.
+
+**Was die Antwort teuer oder billig macht:** das Paket hilft nicht. `maplibre_gl
+0.26.2` gibt Sichtfeld und Kamerahöhe nicht heraus, `getVisibleRegion` liefert
+bei Neigung nur die achsparallele Box des trapezförmigen Sichtfelds, und die
+eigene Doku von `toScreenLocation` behauptet eine Sichtbarkeitsprüfung, die im
+Code beider Plattformen **nicht existiert** (`controller.dart:1782` gegen
+`MapLibreMapController.java:913-925` und `MapLibreMapController.swift:562-571`,
+gemessen am 31.08.2026). Wer das Feld füllen will, rechnet es also selbst, aus
+Kamerastellung und Neigung, und das ist eine Rechnung im Host und keine Abfrage.
+
+**Antwort vom 31.08.2026, über Janek weitergegeben: Variante (a).** Im Wortlaut:
+„Aso, ja dann soll ProjektToScreen das mitliefern“. Gelesen als das Feld auf dem
+Ergebnis und nicht als `null`, denn „mitliefern“ heißt beiliegen und nicht
+fehlen. `MapScreenPoint` bekommt also ein Feld, und der Host füllt es.
+
+**Damit ist die teure Hälfte der Frage gewählt, und das ist bewusst so:** die
+Alternative `null` wäre billiger gewesen, hätte aber „keine Bildschirmlage“ und
+„Lage bekannt, liegt aber hinter der Kamera“ in denselben Wert gelegt. Der
+`discovery_balloon_anchor` braucht die Unterscheidung: er sucht den Ballon
+nächst der Rahmenmitte, und ein Punkt hinter der Kamera hat eine Lage, sie darf
+nur nicht mitspielen.
+
+**Was die Umsetzung mitbringt, und was sie nicht darf:** die Zahl kommt nicht
+vom Paket, sie wird gerechnet. Sie gehört damit in den Host und in keinen
+Verbraucher, und die drei bestehenden Umschreibungen der Lücke werden durch
+einen Verweis auf das Feld ersetzt, sonst bleibt genau das Muster stehen, dessen
+Beseitigung der Zweck war.
+
+#### Gebaut am 31.08.2026, und welcher Weg gewonnen hat
+
+`MapScreenPoint.isInFrontOfCamera` ist ein Pflichtfeld, der Host füllt es, die
+drei Verbraucher prüfen es. Die Rechnung liegt in
+`map/domain/map_camera_horizon.dart`.
+
+**Zwei Wege standen zur Wahl, und der Wettbewerb war nicht knapp.**
+
+**Verloren hat die Hin- und Rückrechnung** (projizieren, mit `toLatLng`
+zurückrechnen, mit dem Ausgangspunkt vergleichen). Sie kostet **einen
+Kanalaufruf je Punkt**, denn `toLatLng` hat kein Stapel-Gegenstück: die
+Plattform-Schnittstelle kennt `toScreenLocation`, `toScreenLocationBatch` und
+`toLatLng`, aber kein `toLatLngBatch`
+(`maplibre_gl_platform_interface-0.26.2/lib/src/maplibre_gl_platform_interface.dart:253-257`).
+Der `balloon`-Anker projiziert 25 Kandidaten je Kamerameldung; das wären 25
+zusätzliche Umläufe je Meldung, also genau das, was der Kopfkommentar von
+`map_projection_driver.dart` ausdrücklich verwirft. **Und sie hätte eine
+zweite, größere Unbekannte:** wenn `toLatLng` die Spiegelung genauso rückwärts
+rechnet, wie `toScreenLocation` sie vorwärts rechnet, kommt der Ausgangspunkt
+**exakt** wieder heraus, und die Probe erkennt gar nichts. Ob das so ist, sagt
+kein Dokument; es wäre eine Gerätemessung, und zwar eine, ohne die man nicht
+anfangen kann. Dazu käme eine Toleranz, die nahe am Horizont in Kilometern je
+Pixel zu bemessen wäre.
+
+**Gewonnen hat die Geometrie**, und der Einwand aus der Auftragsbeschreibung
+(„braucht das Sichtfeld, und das gibt das Paket nicht heraus") fällt, weil das
+Sichtfeld **schon gemessen ist**, nur hat es niemand als solches gelesen. Es
+steckt in der Leiter der Messung 3: die Werte laufen gegen einen Fluchtwert von
+rund −1050,9 Geräte-Pixeln, und aus `Horizont = H/2 − f·cot θ` folgt bei
+`H/2 = 1200` und `θ = 58°` sofort `f = 3602,2`, also `f/H = 1,5009`. Das ist
+das Sichtfeld `2·arctan(1/3) = 36,87°`, die feste Konstante von MapLibre. Keine
+geratene Zahl, eine abgelesene.
+
+**Die entscheidende Vereinfachung:** der Abstand der Kamera zum Ziel fällt aus
+der Rechnung heraus. Übrig bleibt `y > H/2 − f·cot θ`, und das braucht weder
+Kamerahöhe noch Zoom noch eine Umrechnung von Metern in Pixel. Die Herleitung
+steht vollständig im Kopfkommentar der neuen Datei.
+
+**Was daran geprüft ist, und zwar gegen die Messung und nicht gegen die
+Formel.** Die vierzehn Ablesungen der Leiter sind Zeile für Zeile Testdaten
+(`test/map/domain/map_camera_horizon_test.dart`). Der schärfste Fall sind die
+beiden Enden: 2000 km nach vorn (−1047,95) liegt rund zwei Pixel **vor** dem
+gerechneten Horizont, 2000 km nach hinten (−1053,83) rund vier Pixel
+**dahinter**. Die Formel trennt sie. Und die zwei verwirrenden Ablesungen
+(1774,76 und 3825,91, nach hinten gemessen und trotzdem vor der Kamera) liegen
+mit im Test, damit niemand „großes y heißt gespiegelt" einbaut.
+
+**Die Annahme, die übrig bleibt, und die eine Messung, die sie fällt.**
+`f/H = 1,5` ist bei **einer** Neigung (58°) und **einer** Fläche
+(1080 × 2400 Geräte-Pixel) belegt. Angenommen ist, dass das Sichtfeld des SDK
+eine feste Konstante ist. Zu messen: die Karte auf eine andere Neigung stellen,
+etwa 30 Grad, die Kamera stehen lassen, einen einzigen Punkt rund 2000 km in
+Blickrichtung projizieren und sein `y` ablesen. Vorhergesagt bei 2400
+Geräte-Pixeln Höhe: −5035,4 bei 30 Grad, −2400,0 bei 45, −1049,5 bei 58,
+−878,5 bei 60. Trifft es nicht, folgt das richtige Verhältnis aus derselben
+Ablesung. Ein sichtbarer Punkt ist dafür nicht nötig, die Projektion antwortet
+auch weit außerhalb des Bildes.
+
+**Was der Bau nebenbei gekostet hat:** der Host braucht jetzt den
+Skalierungsfaktor der Kartenfläche, weil `MapViewport` in Stilpixeln misst und
+die Projektion in Geräte-Pixeln antwortet. `MapSurface` meldet ihn zusammen mit
+der Größe, und ein Wechsel des Faktors ohne Größenänderung meldet ebenfalls.
+Der Vertrag in `map/domain/` rechnet weiter nicht um, die Umrechnung liegt an
+einer benannten Stelle im Host.
+
+**Was ausdrücklich nicht geprüft ist:** dass `_devicePixelRatio` beim
+`unbindSurface` mit gelöscht wird. Der Faktor kommt zusammen mit der Fläche
+herein und wird zusammen mit ihr gelesen; ein vergessenes Löschen ist über die
+Fassade nicht beobachtbar. Ein Test dafür wäre eine Zusicherung ohne Aussage.
+
+#### Ungefragter Fund C: das Modell rechnet die ganze Leiter der Messung 3 nach
+
+Nachgerechnet am 31.08.2026 aus der Tabelle oben, nicht neu am Gerät gemessen.
+Mit dem Fluchtwert und **zwei** der vierzehn Ablesungen (100 km und 20 km nach
+vorn) liegen die zwei Größen fest, die die Messnacht selbst als unsicher
+gekennzeichnet hatte: die Lage des Kameraziels auf der Leiter und der Abstand
+des Pols dahinter. Die **restlichen elf** Ablesungen trifft das Modell danach
+auf 0,42 % im schlechtesten Fall, über einen Wertebereich von −3241 bis +3826
+Pixeln.
+
+**Drei Dinge folgen daraus, und das dritte ist eine Korrektur an diesem
+Dokument.**
+
+1. Der Abstand des Pols hinter dem Kameraziel lässt sich unabhängig
+   vorhersagen: `D/sin θ`, mit `D = f` (MapLibre setzt den Abstand zum
+   Kameraziel gleich der Brennweite) und dem Web-Mercator-Maßstab bei Zoom
+   14,94, Breite 48,15° und Faktor 2,625. Das ergibt 2,688 km gegen 2,687 km
+   aus der Anpassung, **0,06 % Abweichung**.
+2. **Das ist ein Indiz für die 512 aus `map_camera_fit.dart`**, die dort bis
+   heute nur hergeleitet und nicht gemessen ist. Mit einer Referenz-Kachelgröße
+   von 256 wäre der Maßstab doppelt so grob und die Vorhersage um den Faktor
+   zwei daneben. **Ein Beweis ist es nicht:** bestätigt wird das Produkt aus
+   `D = f` und dem Maßstab, und eine Welt mit doppeltem `D` und halb so feinem
+   Maßstab passte genauso. Nebenbei: `camera.dart:40-42` des Pakets behauptet
+   selbst „A zoom of 0.0, the default, means the screen width of the world is
+   256", und dieselbe Sorte Satz hat bei `toScreenLocation` schon einmal nicht
+   gestimmt.
+3. **Die Korrektur vom 30.08.2026 zur Spalte „Entfernung" ist selbst falsch.**
+   Sie sagt, die Kamera sei vor der Messung 2,2 km nach Süden gesprungen und
+   jeder Leiterwert deshalb um diese Strecke verschoben. Aus den Zahlen folgt
+   das Gegenteil: das Kameraziel lag rund **0,44 km nördlich** des Startpunkts
+   der Probe. Läge es 2,2 km südlich, müsste der Punkt 2,3 km nach vorn
+   **oberhalb** der Bildmitte landen; abgelesen ist 1533,23, also deutlich
+   darunter. Der Umschlag liegt damit rund 2,7 km hinter dem Kameraziel und
+   nicht „zwischen 1,2 und 2,8 km", wobei die 1,2 km ohnehin **vor** der Kamera
+   lagen. Das qualitative Ergebnis der Messung 3 bleibt unangetastet, es hängt
+   nur an der Reihenfolge der Werte. Muster 9 in Reinform: eine Korrektur, die
+   nach Messung aussieht und eine Rechnung war.
 
 Im selben Block mitgeschickt, ausdrücklich als selbst entschieden gekennzeichnet
 und beide mit einer Zeile umkehrbar:
@@ -1825,6 +3546,623 @@ und beide mit einer Zeile umkehrbar:
 - **Die Cluster-Parameter gehören dem Feature**, nicht dem Karten-Host, weil sie
   technisch ohnehin an der Datenquelle hängen und zwei Überlagerungen
   unterschiedlich clustern dürfen.
+
+### D-18, die Schwierigkeitsstufe über die Domänengrenze
+
+**Am 31.08.2026 beim Bau des Jagd-Vertrags entstanden, noch nicht verschickt.
+Blockiert die vollständige Wiederherstellung einer Jagd, damit einen Teil von
+Schritt 36 und 37.**
+
+Der neue Jagd-Vertrag trägt die Schwierigkeitsstufe **nicht**, und das ist kein
+Versehen, sondern eine Sperre. Sie hat zwei echte Verbraucher in der Quelle:
+`screen-map.jsx:1049-1051` staffelt danach die Navigationshilfen, und
+`screen-challenge.jsx:2828` zeigt sie im Pause-Bildschirm. Der Typ dafür,
+`FactPuzzleDifficulty`, gehört aber `facts`, und Gate 6 in
+`tool/check_architecture.dart` sperrt ihn aus `challenges/domain` aus. Solange
+das offen ist, kann eine wiederhergestellte Jagd ihre Stufe nicht kennen.
+
+**Zur Wahl stehen drei Wege, und keiner ist billig:**
+
+1. **Die Aufzählung kopieren.** Es wäre die **dritte** Wiederholung dieser Art,
+   und der Präzedenzfall steht schon im Haus: `PuzzleDifficulty` in
+   `puzzles/domain` ist genau so entstanden, und ADR-006 führt die Doppelung
+   ausdrücklich als benannten Preis der Grenze. Billig zu bauen, teuer im
+   Bestand.
+2. **Als Zeichenkette in der Nutzlast führen.** Umgeht den Typ statt ihn zu
+   lösen: die Stufe wäre gespeichert, aber niemand im Vertrag könnte sie
+   auswerten, ohne sie wieder in eine Aufzählung zu übersetzen, und diese
+   Übersetzung läge dann in `presentation`.
+3. **Das Lesemodell nach `application` legen.** Dort dürfte es `facts/domain`
+   sehen. Widerspricht ADR-007 aber **wörtlich**, das den Vertrag in
+   `challenges/domain` verlangt.
+
+**Warum das dieselbe Frage wie D-9 ist, nur teurer:** D-9 ist mit „lokale Typen
+bleiben, die Umrechnung ist gemessen billig" beantwortet worden, und das trug
+dort, weil es um zwei Doubles ging. Hier geht es um eine Aufzählung mit
+Bedeutung, und eine Kopie kann auseinanderlaufen, ohne dass ein Test es merkt.
+Der eine Weg, der beide Fragen zusammen lösen würde, ist bei D-9 beschrieben
+und dort nicht empfohlen: ein geteilter Kern als Paket in der heute leeren
+Erlaubnisliste von Gate 6.
+
+**Antwort vom 31.08.2026: keine der drei Optionen, sondern der vierte Weg. Shared Kernel.** Die Architektur wird an dieser Stelle ausdrücklich als zu streng bewertet und minimal aufgelockert, die Kopien in `puzzles/domain` werden über denselben Weg aufgelöst, und beides gehört als Architekturentscheidung festgehalten. Wortlaut, die drei Aufträge darin und die Abgrenzung gegen D-9 stehen im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“.
+
+## Der dritte Fragenblock, 02.09.2026, verschickt
+
+**Der Wortlaut steht hier, bevor er rausgeht.** Das ist die Regel, die sich der
+zweite Block selbst gegeben hat, nachdem zwei seiner Antworten ohne den
+Fragetext nicht mehr auflösbar waren.
+
+Zuschnitt diesmal anders als bei den ersten beiden Blöcken, und zwar auf
+Janeks Hinweis: er liest meist nur die Fragen, und Dairen sieht ohnehin nur
+die Fragen. **Jede Frage trägt ihren Zusammenhang deshalb selbst**, damit sie
+ohne dieses Dokument beantwortbar ist.
+
+### An Janek
+
+**J-1: Dieses Repository ist öffentlich. Umstellen, und wann gehen die
+Backend-Löcher zu?** Gehört zu E-64. Nachgesehen und nicht angenommen,
+`gh repo view` meldet für `Daigon2/flutter-fact` die Sichtbarkeit `PUBLIC`.
+Darin liegt `REBUILD_STATUS.md` mit dem geprüften Verzeichnis von sieben
+Löchern im laufenden Supabase-Backend, mit Tabellen-, Policy- und
+Funktionsnamen, und `docs/operations/backend-inventory.md` nennt die
+Projekt-URL der laufenden Instanz. Der Schlüssel liegt nicht im Repository,
+aber der öffentliche Schlüssel der PWA ist aus jedem Browser zu holen.
+Zwei getrennte Entscheidungen, und die zweite ist die wichtigere: umstellen
+behebt nichts rückwirkend, die Löcher zu machen behebt es.
+
+**J-2: Zwei fehlende Texte, je Deutsch und Englisch.** Gehört zu E-28 und
+E-63. Beide Schlüssel werden in der PWA aufgerufen und stehen in keinem
+Wörterbuch, und weil `window.t` bei fehlendem Schlüssel den Schlüssel selbst
+zurückgibt, steht der Name auf dem Bildschirm. Vorschläge liegen bei, die
+Frage ist nur, ob sie so bleiben.
+
+### An Dairen
+
+**D-19: Die Rätsel-Antworten sind deutsche Datenwerte, und auf Englisch ist das
+Kompass-Rätsel unlösbar. Was baut der Neubau, bevor die Daten sprachfrei
+sind?** Gehört zu E-08 und blockiert die Schritte 28, 29, 30 und 38, also die
+ganze spielbare Jagd. Die Behebung an der Wurzel ist eine Datenstruktur im
+Monorepo.
+
+**D-20: Eine laufende Jagd soll einen Neustart vollständig überleben. Wie kommt
+der Plan in die Nutzlast, ohne ADR-007 zu sprengen?** Gehört zu E-65. Janek hat
+am 02.09.2026 entschieden: „als hätte man nie aufgehört“. ADR-007 speichert heute
+bewusst nur ein kleines Lesemodell und ausdrücklich **nicht** den `HuntPlan`
+mit Fakt und Rätsel je Station. Braucht einen Folge-ADR.
+
+**D-21: Was heißt „narrowly scoped Core“ konkret?** Letzte der drei Asymmetrien
+im Architektur-Prüfskript. `application` hat als einzige Schicht nur eine
+Verbotsliste, weil in `dependency-rules.md` niemand geschrieben hat, welche
+Teile von `lib/core/` gemeint sind. Das Skript kann nichts prüfen, was nicht
+dasteht.
+
+
+## Janeks Antworten auf den dritten Block, 02.09.2026
+
+Vier Fragen, vier Antworten, und drei davon ziehen Arbeit nach sich, die vorher
+nicht auf der Liste stand. Der Wortlaut der Fragen steht im Abschnitt darüber.
+
+### J-A: die Überschrift, und eine Entscheidung über mich
+
+> „Ja das passt, mach die Überschriften so. Sowas kannst du ehrlicherweise auch
+> einfach selbst entscheiden, das klingt immer plausibel, was du bei sowas sagst
+> und wenn es nicht passt mache ich es später rückgängig.“
+
+Der Wortlaut ist damit **„Session-Code eingeben"** und **„Enter session code"**.
+
+**Der zweite Satz wiegt mehr als der erste.** Kurze Oberflächentexte, wo die
+Quelle keinen Wortlaut hat, entscheide ich ab jetzt selbst, schreibe die
+Entscheidung hin und melde sie in einem Satz. Nicht mehr fragen. Zu Janek gehen
+weiter: was ein Nutzer sehen **darf**, wie sich das Spiel **verhält**, und alles,
+was mehrere Bildschirme oder die Datenstruktur berührt.
+
+**Der Schlüssel kommt trotzdem noch nicht in die Ergänzung**, und das ist keine
+Trägheit. `group.join.title` ist eine Lücke der **PWA**, und genau die verfolgt
+`_knownMissingSourceKeys` in `tool/generate_i18n.dart`. Trüge unsere Ergänzung
+den Schlüssel, würde die Quellprüfung über diese PWA-Lücke schweigen, ohne dass
+unsere App den Text irgendwo zeigt: der Beitritts-Dialog ist Schritt 40. Der
+Wortlaut steht deshalb hier, und der Schlüssel entsteht mit dem Bildschirm.
+Dasselbe Muster wie bei E-28, nur zeitlich getrennt.
+
+### J-B: Sichtbarkeit, und der echte Name fällt ganz weg
+
+> „jemand der nicht angemeldet ist natürlich nichts, sonst nur Rang und
+> Punktestand und Anzahl an Städten, vielleiht noch ein Toggle im Proifil mit
+> Städtenamen teilen? oder ist das zu viel gedacht? aber stalking ist schon ein
+> punkt... [...] ich würde fast sagen es gibt immer nur ein Username und sonst
+> nichts. Keinen echten namen etc. in Games ist das ja auch immer so.“
+
+**Entschieden war zuerst:** ohne Anmeldung **nichts**. Mit Anmeldung **Rang,
+Punktestand und Anzahl der Städte**, keine Städtenamen. Und es gibt **nur einen
+Username**, keinen echten Namen.
+
+**Die erste Hälfte hat der Eigentümer am selben Tag zurückgenommen**, und der
+Auslöser war ein gemessener Nebenbefund aus dem Migrationsauftrag: nach der
+Migration hätten nicht angemeldete Besucher die Rangliste verloren, obwohl die
+PWA gar keine Anmeldeschranke davor hat. Es hätte also wie ein Fehler
+ausgesehen. Sein Wortlaut:
+
+> „achso, ja mei, dann sieht man halt doch die Rangfolge und die Coins etc.
+> passt schon auch wenn man nicht angemeldet ist. bevor das aussieht wie ein
+> Fehler. Kannst du schon machen und schafft ja vielleicht auch den reiz sich
+> anzumelden.“
+
+**Es gilt also:** die Rangliste ist **auch ohne Anmeldung** sichtbar, mit Rang
+und Punktestand. Alles andere der Antwort bleibt: keine Städtenamen, nur ein
+Username, kein echter Name.
+
+**Eine Lesart musste ich dabei festlegen.** Er schreibt „die Coins“, die
+Rangliste führt aber `score` und nicht `coins`; die Coins sind das persönliche
+Guthaben und stehen dort heute nicht. Gelesen als „das, was in der Rangliste
+steht“, also Rang und Punktestand. Coins kommen nicht in die Rückgabe.
+
+**Und die Rücknahme macht einen Teil der Behebung wichtiger, nicht
+unwichtiger.** Die Rückgabe enthält heute `user_id`, also Konto-Kennungen. Mit
+einem angemeldeten Aufrufer war das Nachklapp, weil Kennungen ohnehin über die
+für alle lesbaren Kommentare zu holen sind. Ohne Anmeldung ist eine Liste von
+Konto-UUIDs **ohne jede Hürde maschinell einsammelbar**. `user_id` durch ein
+`is_me` zu ersetzen ist damit die eigentliche Behebung von E-16 und nicht mehr
+Hygiene. Für einen nicht angemeldeten Aufrufer ist `is_me` immer `false`, das
+braucht keinen Sonderfall.
+
+**Zum Toggle, weil ausdrücklich gefragt: nicht bauen.** Rang, Punktestand und
+Städte**zahl** sind eine Rangliste. Städte**namen** sind ein Bewegungsprofil,
+und genau darin liegt das Stalking-Risiko, das die Frage selbst benennt. Ein
+Schalter macht das Riskante zur Entscheidung des Nutzers, und zwar mit einem
+Standardwert, der für die Mehrheit falsch sein wird, egal wie er gesetzt ist.
+Wenn es später einen Grund gibt, Städte zu teilen, hat der einen Empfänger
+(etwa Freunde) und ist dann ein eigener Schnitt mit eigener Sichtbarkeit. Ein
+Schalter ohne Empfänger ist eine Veröffentlichung mit Zusatzschritt.
+
+**Der Neubau macht die Username-Regel bereits, nachgeprüft am 02.09.2026.**
+`signup_page.dart` sammelt Username, E-Mail, Passwort und Heimatstadt, kein
+Namensfeld. `signup_notifier.dart:174` füllt das Feld `name` mit dem
+**Username**, mit dem Kommentar, dass der Rückfalltext der Quelle dort toter
+Code ist. Die Entscheidung bestätigt also den Bestand, statt Arbeit zu
+erzeugen. Sie steht hier trotzdem, damit niemand später ein Namensfeld
+*ergänzt*, weil `profiles.name` existiert.
+
+**Was sie im Backend ändert, ist mehr:**
+
+* `get_leaderboard` gibt heute Nutzerkennungen **ohne Konto** heraus. Nach
+  dieser Antwort verlangt sie eine Sitzung und liefert Rang, Punktestand und
+  Städtezahl, sonst nichts.
+* Die beiden `USING (true)`-Leserechte auf `user_city_scores` und
+  `user_trophies` fallen. **E-16 ist damit beantwortbar**, es fehlte genau diese
+  Aussage.
+* **Der Schalter „Echten Namen zeigen" verschwindet als Begriff.** Damit
+  entfällt auch der Grund, `profiles.name` von `profiles.username` zu
+  unterscheiden, und der Befund um das clientbeschreibbare
+  `raw_user_meta_data` verliert seine Spitze: wer dort schreibt, faelscht seinen
+  eigenen Anzeigenamen, und der ist ohnehin der Username.
+* **Die Anmeldeseite gehört nochmal angesehen**, sagt Janek selbst. Das ist ein
+  eigener Punkt und keine Folge dieser Antwort.
+
+### J-C: Ein Fakt gibt zweimal Coins, aus zwei verschiedenen Gründen
+
+> „Jeder Fakt gibt nur einmal Coins. Aber: wenn man den Fakt in einer
+> Schnitzeljagd findet bekommt man trotzdem nochmal die Coins, weil damit ja die
+> Suche belohnt wird. nur in diesem Fall darf man zwei mal belohnt werden. [...]
+> Startet man etwas neues und findet den Fakt erneut bekommt man dafür nicht
+> nochmal punkte. belohnt wird das finden, man hat es schon einmal gefunden in
+> einer Jagd, dann wird man dafür natürlich nicht nochmal belohnt.“
+
+**Die Regel, ausformuliert:** je Nutzer und Fakt gibt es **zwei** mögliche
+Belohnungsanlässe, und **jeder genau einmal, für immer**:
+
+1. **Entdecken.** Den Fakt normal einsammeln.
+2. **Finden.** Denselben Fakt in einer Schnitzeljagd oder Gruppensitzung finden.
+
+Zweimal belohnt werden ist also erlaubt, aber nur einmal je Anlass. Eine neue
+Jagd mit demselben Fakt gibt **nichts** mehr. In Gruppen bekommt **jeder**
+Teilnehmer den Finde-Anlass, unabhängig davon, ob er den Fakt vorher schon
+entdeckt hatte, und auch dort nur einmal je Nutzer und Fakt.
+
+**Das ist mit dem heutigen Backend nicht ausdrückbar, und zwar prinzipiell.**
+Die Sperre wirkt über einen Index auf `group_collects`, also **pro Sitzung**,
+und `group_collects` hat keine Spalte für den Nutzer. Ein Index kann
+„einmal für immer je Nutzer, Fakt und Anlass" nicht ausdrücken, wenn zwei der
+drei Dimensionen in der Tabelle fehlen.
+
+**Damit ist entschieden, was Abschnitt 9 der Fix-Datei als „nächster Schritt"
+vorgeschlagen hatte:** es braucht ein Buchungsjournal,
+`coin_ledger(user_id, fact_id, reason, delta, created_at)` mit einem
+`UNIQUE (user_id, fact_id, reason)`. Dann ist die Regel **die Tabelle selbst**
+und keine Prüfung, die jemand vergessen kann. Nebenwirkung, die ohnehin
+gefordert war: Coins bekommen eine Historie, und nach einem Missbrauch ist
+zurückrechenbar, was passiert ist.
+
+**Eine neue Tabelle ist eine Stufe-3-Entscheidung** und geht an Dairen, siehe
+den vierten Fragenblock. Was hier entschieden ist, ist die **Regel**; der Ort,
+an dem sie erzwungen wird, ist die Architekturfrage.
+
+### J-D: Die Teams laufen dieselben Stationen gegeneinander, mit gleichem Ziel
+
+> „Es trennen sie der Wettlauf gegen einander. Entsprechend der Wettlauf gegen
+> die Zeit. man hat die selben Stationen aber man zeiht nicht gemeinsam los
+> sondern in unterschiedliche Richtungen. Der letzte Fakt ist aber gleich bei
+> beiden. Wer dort zuerst ankommt hat gewonnen. Aber NUR wenn man dabei auch
+> mehr oder gleich viele Coins gesammelt hat. jemand der nur skippt bis zum
+> finalen hinweis und durch rennt, soll nicht belohnt werden.“
+
+**Zwei Befunde daraus, und der zweite ist neu.**
+
+**Erstens: der Ausgleich ist nicht nur tot, er ist überflüssig.** E-57 hat
+gemessen, dass `_team_generate_orders` die Wegstrecken über `any(v_a)` und
+`any(v_b)` summiert, also über zwei Permutationen **derselben Menge**; das
+Ergebnis ist immer gleich, `v_balance` ist immer 0, und die Schleife bricht in
+der ersten Runde ab. Bisher stand das als Fehler da. Mit dieser Antwort ist es
+**kein Fehler mehr, sondern gegenstandslos**: gleiche Stationen für beide Teams
+sind ausdrücklich gewollt, gleich lange Wege folgen daraus, und entschieden wird
+über Zeit und Coins. Der Ausgleich prüft eine Eigenschaft, die der Entwurf
+garantiert. Er kann weg.
+
+**Zweitens, und das ist der neue Befund: „der letzte Fakt ist bei beiden gleich"
+gibt es im Code nicht.** Nachgesehen am 02.09.2026: `v_a` ist nach Entfernung
+zum Treffpunkt sortiert, und `v_b` ist im ersten Zweig
+`array_agg(id order by ord desc)`, also die **Umkehrung** von `v_a`. Damit ist
+die letzte Station von B die **erste** von A. Der zweite Zweig sortiert noch
+anders. Beide Fassungen verletzen die Regel.
+
+Die Regel braucht also: eine Station wird als **Finale** festgelegt und ist für
+beide Teams die letzte; nur die Stationen davor laufen in umgekehrter
+Reihenfolge. Das ist eine kleine Änderung an der Funktion und eine echte
+Anforderung, die vorher nirgends stand.
+
+**Und eine Frage bleibt offen, klein aber entscheidend für die Auswertung.**
+„Mehr oder gleich viele Coins" ist ein Vergleich, aber es steht nicht dabei,
+**gegen wen und wann**. Die naheliegende Lesart: im Moment, in dem das erste
+Team das Finale erreicht, wird sein Coin-Stand mit dem des anderen Teams
+verglichen; liegt er darunter, zählt der Sieg nicht. Offen bleibt, was **dann**
+gilt, denn das andere Team ist noch nicht angekommen. Gewinnt es, sobald es das
+Finale erreicht? Gewinnt es sofort über die Coins? Oder gibt es keinen Sieger?
+Das gehört in den vierten Fragenblock.
+
+
+## Der zweite Fragenblock an Dairen, 31.08.2026, mit Antworten
+
+**Der Wortlaut steht hier, und zwar aus demselben Grund wie beim ersten Block.**
+Der erste lebte allein im Chatverlauf, bis am 29.08.2026 auffiel, dass eine
+eintreffende Antwort ihrer Frage nicht mehr zuzuordnen wäre. Dieser hier hat
+denselben Fehler wiederholt: die Antworten kamen am Abend des 31.08.2026 als
+Liste „1., 2., 3., 4., 5.", und ohne den Fragetext waren zwei davon nicht
+auflösbar. Genau das ist der Grund für diesen Abschnitt. **Wer den dritten Block
+schickt, legt ihn vorher hier ab.**
+
+Fünf Fragen, sortiert nach Blockadewirkung, je Frage die Neigung des Absenders.
+
+### Frage 1: D-18, wie kommt die Schwierigkeitsstufe über die Domänengrenze?
+
+*Blockiert die vollständige Wiederherstellung einer Jagd, also einen Teil der
+Schritte 36 und 37.* Wortlaut siehe den Abschnitt „D-18" oben, die drei
+vorgelegten Wege waren (a) Aufzählung kopieren, (b) als Zeichenkette in der
+Nutzlast, (c) Lesemodell nach `application`. Der Fragetext nannte zusätzlich
+einen vierten Weg, ohne ihn als Option zu führen: „Der Weg, der D-9 und D-18
+zusammen löste, wäre ein geteilter Kern als Paket in der heute leeren
+Erlaubnisliste von Gate 6."
+
+> **Antwort:** „Entscheidung: Shared Kernel einführen, die vorgegebene
+> Architektur scheint hier zu streng zu sein und nicht zu passen, wenn wir jetzt
+> schon die zweite Ausnahme brauchen. Bitte das dementsprechend auflockern, aber
+> nur so viel wie nötig. Dann aber auch die andere Ausnahme genauso darüber
+> auflösen und in den Architekturentscheidungen festhalten und verbessern."
+
+**Gewählt ist keine der drei Optionen, sondern der vierte Weg.** Das ist die
+teuerste und die richtige Antwort: sie behebt die Ursache statt den Fall.
+
+Drei Aufträge stecken darin, und der dritte ist der, den man überliest:
+
+1. **Den geteilten Kern einführen**, so schmal wie möglich.
+2. **Die andere Ausnahme über denselben Weg auflösen.** Gemeint sind die
+   wortgleichen Kopien `PuzzleDifficulty` und `PuzzleOperand` in
+   `puzzles/domain`. Sie sind der Präzedenzfall, den der Fragetext selbst nennt,
+   sie tragen die Rücknahmebedingung „löscht diese Datei ersatzlos" in ihrem
+   Kopfkommentar, und ADR-006 führt die Doppelung als benannten Preis der
+   Grenze. **Nicht gemeint sind die drei Geo-Typen aus D-9:** die sind mit
+   Variante (b) entschieden, und die Messung dort hat gezeigt, dass sie keine
+   Kopien sind, sondern drei Rollen mit überschneidungsfreiem Verhalten.
+3. **Die Architektur verbessern, nicht nur ein Loch bohren.** „in den
+   Architekturentscheidungen festhalten und verbessern" heißt: die Regel wird
+   ausdrücklich geändert und maschinell durchgesetzt, nicht durch eine Ausnahme
+   umgangen. Eine Auflockerung ohne Grenze wäre die schlechtere Variante von
+   dem, was heute zu streng ist.
+
+**Offene Folge, benannt und nicht mitgemacht:** `HuntPlan` und `HuntStop` liegen
+in `challenges/application` statt in `domain`, und ihre Rücknahmebedingung hängt
+an derselben Entscheidung („zieht ohne Feldänderung nach `domain/` um"). Der
+Umzug ändert kein Verhalten und ist deshalb nicht Teil dieses Auftrags; er
+gehört in den nächsten Block als Mitteilung, nicht als Frage.
+
+### Frage 2: E-19, Trusted Time, wer rechnet die Zeit?
+
+*Blockiert das Sitzungsende in Phase 5.* Der 45-Minuten-Timer und die
+Finale-Punkte mal 1,5 rechnen heute im Client, `security.md` §1 verbietet
+vertrauenswürdige Zeitstempel aus dem Client, und hier hängen Punkte daran.
+Vorgelegt: (a) Server rechnet, (b) Client behalten und die Regel für diesen Fall
+ausnehmen, mit Begründung und Ablaufdatum.
+
+> **Antwort:** „2a. Keine Ausnahme von security.md."
+
+**Gewählt: (a).** Der Satz ist knapper als die Frage und beantwortet mehr als
+sie: er lehnt nicht nur (b) ab, sondern die Bauform „Regel plus Ausnahme"
+überhaupt. Damit steht die Regel für den Neubau ohne Rest:
+
+**Der Client rechnet keine Zeit, an der eine Belohnung hängt.** Weder das
+Sitzungsende noch einen Bonusfaktor. Das ist die Zwillingsregel zu der aus
+Janeks Ökonomie-Antwort („der Client bestimmt nie einen gutgeschriebenen
+Betrag"), und beide zeigen auf dieselbe Stelle: eine Gutschrift entsteht
+serverseitig, aus serverseitigen Größen.
+
+**Folge für die Reihenfolge, und sie ist unbequem.** Die Umsetzung ist eine
+Backend-Änderung, und das Backend kommt nach dem Frontend. Bis dahin ist das
+Sitzungsende in Phase 5 **nicht** parität-treu baubar: ein clientseitiger Timer
+wäre genau das, was hier abgelehnt ist. Der baubare Teil ist alles, was den
+Ablauf **anzeigt**; der Moment, in dem daraus Punkte werden, braucht den
+Serveraufruf. Das gehört in den Backend-Auftrag und nicht in einen Client-Trick.
+
+### Frage 3: E-49, zwei Wahrheiten für den Trophäenstand
+
+*Zu klären vor Schritt 45.* Der Profil-Bildschirm liest `user_trophies`, das
+Reiseregal rechnet clientseitig neu, und die Client-Rechnung ist nachweislich
+kaputt: nur Kategorie-Trophäen tragen eine Schwelle, und `>= undefined` ist in
+JavaScript immer falsch. Vorgelegt: (a) Server ist die Wahrheit, (b) Client
+rechnet, Server speichert nur.
+
+> **Antwort:** „3a + defekte Client-Ableitung entfernen + E-16 schließen."
+
+**Gewählt: (a), plus zwei Aufträge, die nicht auf der Liste standen.**
+
+1. **Der Server ist die einzige Wahrheit.** Für den Neubau ist das billig, und
+   das ist am 31.08.2026 nachgeprüft und nicht behauptet:
+   `trophiesInDisplayOrder({required Set<String> unlockedKeys})`
+   (`progression/application/trophy_catalog.dart:39-45`) nimmt den
+   Freischaltstand als Parameter und **sortiert nur**. Das einzige `>=` in der
+   ganzen Domäne sitzt in `trophyTierOf`
+   (`domain/value_objects/trophy_tier.dart:67`) und bestimmt die Stufe Bronze,
+   Silber oder Gold aus der Katalogdefinition, also eine Anzeigeeigenschaft und
+   nicht den verdienten Zustand. Der Neubau hat die defekte Ableitung der Quelle
+   also nie gehabt, und sie bekommt er auch nicht.
+2. **Die defekte Client-Ableitung wird entfernt, nicht nachgebaut.**
+   `wltDeriveTrophies` steht in der PWA (`screen-wallet.jsx:114-128`), also im
+   anderen Repository. Hier heißt „entfernen" deshalb: sie wird **nicht
+   portiert**, und der Auftrag zum Entfernen in der PWA gehört in den
+   Backend-und-PWA-Stapel. Das ist ausdrücklich **kein** Paritätsbruch: die
+   Quelle zeigt an dieser Stelle einen Defekt, und die Regel vom 28.08.2026
+   sagt, gefundene Fehler werden behoben und nicht mitportiert.
+3. **E-16 wird geschlossen.** `user_trophies` und `user_city_scores` sind heute
+   für jeden lesbar (`USING (true)`). Wenn der Server die einzige Wahrheit ist,
+   ist die Sichtbarkeit seiner Daten keine Nebenfrage mehr. Zu entscheiden ist
+   das Zusammenspiel mit dem Schalter „Echten Namen zeigen". **Und es hängt an
+   E-55**, dem Fund vom 31.08.2026: dieselben zwei Tabellen sind nicht nur
+   lesbar, sondern vom Client **schreibbar** (`FOR ALL USING` ohne
+   `WITH CHECK`). Eine Antwort, die nur die Leseseite regelt, lässt die teurere
+   Hälfte stehen. Beides gehört in denselben Backend-Auftrag.
+
+### Frage 4: Gruppen-Jagd, geteilter Zustand über Geräte
+
+*Blockiert Schritt 40.* ADR-007 hat die Solo-Jagd geklärt und trägt für die
+Gruppen-Jagd ausdrücklich einen Auslöser zur Neubewertung. Vorgelegt:
+(a) Supabase Realtime, (b) Abfragen im Takt. Die Frage war nicht die Kosten,
+sondern ob (a) den Vertrag von ADR-007 aufbricht oder daneben passt.
+
+> **Antwort:** „4a passt neben ADR-007. ADR-007 bekommt einen
+> Zusatz/Follow-up-ADR für Group Hunt Synchronization. Wenn Realtime später zu
+> teuer wird, können wir den Transport wechseln."
+
+**Gewählt: (a), und die eigentliche Antwort ist der Nebensatz.** „Passt daneben"
+heißt: ADR-007 bleibt gültig und unverändert, es gilt für die Solo-Jagd und
+lokalen Zustand. Der geteilte Zustand ist eine **zweite** Sache mit eigener
+Entscheidung, kein Widerspruch zur ersten. Der Auslöser in ADR-007 ist damit
+ausgelöst und beantwortet statt offen.
+
+**Und der Transport ist austauschbar zu halten.** Das ist eine Auflage an den
+Bau, nicht nur eine Beruhigung: der Vertrag der Gruppen-Jagd darf nicht auf
+`postgres_changes` zeigen. Wer die Realtime-Kanäle in den Vertrag schreibt, kann
+später nicht auf Abfragen im Takt wechseln, ohne den Vertrag zu brechen, und
+genau diese Möglichkeit ist ausdrücklich offen gehalten worden.
+
+### Frage 5: D-11, braucht die Karten-Host-Regel ein Gegenstück für `test/`?
+
+*Blockiert nichts.* Vorgelegt: (a) pauschale Regel für `test/`, (b) so lassen,
+Review-Sache, (c) enge Regel mit Ausnahmeliste. Neigung des Absenders: (b).
+
+> **Antwort:** „Ja b passt"
+
+**Gewählt: (b).** Damit ist D-11 geschlossen und kostet keine Arbeit. Die zwei
+Testdateien, die `map/presentation` importieren, bleiben stehen; sie schließen
+die Lücke, die am 29.08.2026 teuer gefunden wurde, und eine pauschale Regel
+hätte ausgerechnet sie verboten. Die Regel bleibt Review-Sache, und das steht
+schon so im Prüfskript.
+
+### Nachtrag: OD-002 bleibt offen, und die Begründung ist jetzt belegt
+
+Der Fragetext hatte OD-002 als „noch nicht blockierend, aber die nächste in
+dieser Reihe" mitgeschickt.
+
+> **Antwort:** „würde vermeiden, jetzt eine Datenbank auszuwählen, nur weil wir
+> für ADR-007 ein paar Werte persistieren müssen. Sobald das erste echte
+> Offline-Collection/Sync-Ticket konkret wird, entscheiden wir OD-002 anhand der
+> benötigten Queries/Datenmenge."
+
+Deckt sich mit der Abgrenzung, die ADR-007 selbst zieht, und mit dem Kopf von
+`core/preferences/key_value_store.dart`. **Wichtig für den nächsten Leser:** der
+`KeyValueStore` vom 31.08.2026 ist ausdrücklich **keine** Vorentscheidung für
+OD-002. Wer dort Abfragen, Migrationen oder Konfliktauflösung braucht, ist bei
+OD-002 und darf den Präferenzspeicher nicht dafür ausbauen.
+
+## Antworten von Janek, 31.08.2026
+
+Der ganze Stapel Produkt-, UX- und Kostenfragen ist an einem Stück beantwortet.
+Was hier steht, ist die Antwort **plus** die Folge für den Bau; wo ich
+widersprochen habe, steht es dabei.
+
+**Wallet, ein Bildschirm.** Siehe oben bei ADR-006. `library` entfällt, Coins
+ins Profil. **Phase 7 ist damit frei.**
+
+**Belohnungs-ökonomie: die Frage war falsch gestellt, und der Widerspruch war
+berechtigt.** Janek: „mach es halt so dass es logisch aufgeht und nicht irgendwo
+ein logik fehler ist oder dass man irgendwo zu wenig bekommt … das ist doch keine
+wichtige entscheidung von mir?“ Richtig: die Zahlen sind Herleitung aus der
+Quelle und keine Entscheidung. **Was bleibt, ist auch keine Entscheidung für
+ihn**, sondern eine Aufgabe im anderen Repository: E-06 (`increment_coins` ist
+`security definer` und prüft den Betrag nicht) und E-24 (Policy auf `profiles`
+ohne `WITH CHECK`) sitzen im Backend des Monorepos, und `CLAUDE.md` verbietet,
+es von hier zu ändern.
+
+Folge für den Neubau, als Regel formuliert: **der Client bestimmt nie einen
+gutgeschriebenen Betrag.** Jede Gutschrift geht über einen Serveraufruf, der den
+Betrag selbst herleitet. Damit sind Schritt 31 und 32 baubar, und das Restrisiko
+bleibt benannt statt vergessen: solange E-06 und E-24 offen sind, ist das
+Backend manipulierbar, unabhängig davon, wie sauber der Client rechnet.
+
+**Sprachausgabe: Gerät zuerst, Cloud als Einklick-Umschaltung.** Janek: „mach
+erstmal einfach Gerät und später kann man dann über chatgpt das nice abspielen
+lassen … bau auch alles schon so, dass ein nurnoch ein klick wäre das andere zu
+aktivieren. soll aber nirgends rumliegen, ist ja schließlich ein api key.“
+
+Drei Anforderungen, die daraus folgen und die keine Erfindung von mir sind:
+
+1. Der Vertrag ist **anbieterneutral**. `flutter_tts` ist eine Umsetzung davon
+   und nicht die Schnittstelle.
+2. **Kein Schlüssel im Client, nie.** Die Cloud-Variante läuft über Proxy und
+   Edge Function, wie E-13 es für den KI-Zugang ohnehin verlangt.
+3. **Vorladen, dann abspielen.** Janek nennt die Latenz ausdrücklich als
+   erträglich, *weil* geladen werden kann, bevor man sich nähert. Das ist eine
+   Verhaltensanforderung an die Kopplung aus Schritt 26 und keine Optimierung.
+
+Die Stimmqualität auf dem Gerät nennt er selbst „grausam“. Das ist der bewusst
+in Kauf genommene Preis des Starts.
+
+**Avatar: 2D in Flutter, kein WebView. Mit einem Widerspruch von mir, der
+stehenbleibt.** Janek: „ist mir egal, ich hänge nicht so am design … wenn es
+sinnvoller und langfristiger ist das in flutter nachzubauen, dann go for it“,
+und als Ziel „wie bei pokemon go“.
+
+Die Bedingung „wenn es langfristig sinnvoller ist“ trägt für den heutigen
+Avatar, aber **nicht für das genannte Ziel**: Flutter hat keine eingebaute
+3D-Szene, und die Wege dorthin sind experimentell. Für eine schöne 3D-Person
+lautet die Frage später nicht „Flutter oder WebView“, sondern „welche
+3D-Laufzeit“. Entschieden ist deshalb nur: **jetzt 2D, kein `webview_flutter`**,
+und die Frage kommt neu, sobald ein Charakterentwurf existiert. Nebenwirkung:
+270 KB Assets und die JS-Brücke fallen weg, und Regel 19 hat vorläufig keinen
+Gegenstand mehr.
+
+**Nachtrag am selben Tag, drei Korrekturen von Janek.**
+
+**Der Avatar wird gleich 3D.** „ja dann bau doch gleich 3D der carakter wird
+sicher etwas brauchen. das ist es wert.“ Damit ist die Entscheidung von wenigen
+Minuten vorher („jetzt 2D, kein WebView“) **aufgehoben**, und mein Widerspruch
+ist der Grund dafür: wenn das Ziel eine schöne 3D-Person ist, dann ist 2D ein
+Umweg, der zweimal bezahlt wird.
+
+Damit ist eine **neue technische Frage offen: welche 3D-Laufzeit.** Drei Wege:
+
+1. **WebView mit Three.js**, wie die Quelle. Der einzige Weg, bei dem der
+   schwierige Teil schon gelöst ist, nämlich die geografische Verankerung auf
+   einer sich bewegenden Karte. 270 KB Assets und eine JS-Brücke.
+2. **Flutter 3D** (`flutter_scene` auf `flutter_gpu`). Kein WebView, aber
+   experimentell, und die Verankerung wäre neu zu bauen.
+3. **Spiel-Engine einbetten.** Größte Freiheit, größter Preis, und sie bringt
+   ihren eigenen Renderer neben Flutter mit.
+
+Meine Neigung ist (1) für den ersten Bau, weil die Verankerung der teure Teil
+ist, mit Regel 19 als Grenze: `webview_flutter` darf nur unter
+`map/presentation/avatar/` auftauchen. Damit kehrt `webview_flutter` in die
+Paketliste zurück; Janeks Freigabe von heute umfasste es, es war nur durch die
+inzwischen aufgehobene 2D-Entscheidung entfallen.
+
+**E-17, Creator-Foto: gespeichert wird auf Supabase, aber es ist der Ausnahmeweg.**
+„nein, das foto wird nicht gespeichert, fotos nehmen wir immer professionelle
+(außer es gibt keins im Internet … ja dann auf supabase)“. Der Normalfall ist
+also **kuratiertes, professionelles Bildmaterial**, und der Nutzer-Upload ist die
+Ausnahme für Fakten, zu denen es kein Bild gibt. Das ändert die Gewichtung von
+Schritt 50: der Upload ist kein Hauptweg, sondern eine Lücken-Füllung. Bucket
+privat und Freigabe vor Sichtbarkeit bleiben mein Vorschlag und sind nicht
+bestätigt.
+
+**Neu und größer als es klingt: das Backend des Monorepos gehört perspektivisch
+mit zum Neubau.** „was liegt denn sonst im backend des monorepos? das brauchen
+wir perspektivisch ja schon auch. Das ist ja auch etwas was du neu bauen musst!“
+
+Das widerspricht der heutigen Arbeitsgrundlage: `CLAUDE.md` führt das Monorepo
+als **schreibgeschützte** Verhaltensquelle, und Schema, RLS und RPCs gelten dort
+als geteilt mit der laufenden PWA, jede Änderung als Stufe-3-Entscheidung im
+anderen Repository. Wenn das Backend mitgebaut wird, ist das **eine Erweiterung
+des Auftrags über die 50 Schritte hinaus** und keine Umsortierung.
+
+Zu klären, bevor daran jemand anfängt, und ausdrücklich nicht von mir entschieden:
+
+- **Neubau oder Reparatur? Am 31.08.2026 abends wieder offen, und die Neigung
+  hat gedreht.** Vormittags „das neu zu machen mit den guardlines klingt aber
+  eigentlich auf jeden fall vernünftig“, abends „vielleicht braucht es auch
+  keinen echten neubau, sondern nur eine fehleranalyse“. Nach der Aufnahme ist
+  Letzteres besser begründet: E-06, E-23, E-24, E-52, E-53 und E-55 sind
+  Policy- und Funktionsänderungen von wenigen Zeilen, für die ersten drei liegt
+  die Migrations-SQL fertig in `backend-security-fixes.md`. E-54 und E-56
+  brauchen je eine Regelentscheidung, E-57 eine Produktantwort. **Neu zu bauen
+  wäre genau ein Teil, und es existiert heute gar nicht:** ein Admin-Zugang mit
+  Rollenprüfung statt des `service_role`-Schlüssels im Browser (E-58). Dazu ein
+  Migrationssystem, das unter den Bestand gelegt wird. Das ist zusammen deutlich
+  weniger als ein zweites Supabase-Projekt mit Datenmigration, und es hält die
+  laufende PWA am Netz.
+- **Reihenfolge entschieden:** erst das Frontend fertig, dann das Backend.
+  „Aber das Frontend sollten wir erstmal abschließen, dann kommt später das
+  backend.“ Zwei Einschränkungen, die dazugehören: die Löcher, die **heute**
+  gegen echte Konten wirken, warten nicht auf die Reihenfolge, und „später“
+  trägt nur bis etwa Schritt 48. Fünf der 28 restlichen Schritte fassen das
+  Backend an (38, 40, 47, 48, 50), Schritt 50 braucht einen Storage-Bucket, den
+  es überhaupt nicht gibt.
+- **Was genau gehört dazu? Beantwortet am 31.08.2026.** Die vollständige
+  lesende Aufnahme steht in `docs/operations/backend-inventory.md`: 11 Tabellen,
+  30 Funktionen, 3 Trigger, 15 Policies, 1 Edge Function, kein Bucket, kein
+  Cron, kein Webhook. Dazu der Admin und 11 Pipeline-Skripte, die beide am
+  `service_role`-Schlüssel hängen. **Der wichtigste Fund ist kein Inhalt,
+  sondern eine Abwesenheit:** es gibt kein Migrationssystem, die acht Dateien
+  sind eine Absichtserklärung und kein Zustand. Erster Arbeitsschritt jeder
+  Variante ist deshalb ein Schema-Dump der laufenden Datenbank. Sieben neue
+  Befunde daraus als E-52 bis E-58.
+- **Was daran ist die Priorität?** E-06 und E-24 sind offene Löcher, die
+  **jetzt** wirken. Ob der Neubau bei ihnen anfängt oder woanders, ist eine
+  Reihenfolgefrage mit Sicherheitsgewicht.
+
+**Pakete freigegeben.** „ja pakete können frei gemacht werden“. Ich lese das als
+Freigabe für die **benannte Liste** und nicht als Blankoscheck:
+`shared_preferences`, `flutter_rotation_sensor`, `flutter_tts`, `audioplayers`,
+`image_picker`, `share_plus`. **`webview_flutter` fällt weg** (Avatar).
+
+Zwei Folgen, die dazugehören: `flutter_rotation_sensor` verlangt Dart ≥ 3.12.1,
+die `pubspec.yaml` deklariert `^3.9.0` und muss mit angehoben werden. Und
+`shared_preferences` macht `readActiveHunt` zur Startbedingung: `bootstrap()`
+braucht ein `await` vor dem ersten Bild.
+
+**Dienste.** Janek: „was brauchst du? wenn etwas nicht geht, gehts halt nicht.
+KI Zugang kann ich dir ganz am ende geben.“ Daraus folgt kein Konto, also:
+
+- **OpenRouteService (E-14, Schritt 42):** der Routen-Anbieter kommt hinter
+  einen Vertrag, mit Luftlinie als Rückfall. Kein Konto nötig, um zu bauen.
+- **KI-Zugang (E-13, Schritt 47):** bleibt blockiert, aber nur der Aufruf. Alles
+  darum herum ist baubar. Schlüssel kommen am Ende.
+- **Creator-Foto (E-17, Schritt 50):** erklärt und mit Vorschlag versehen, Bucket
+  privat und `is_approved` bleibt falsch bis zur menschlichen Freigabe. Wartet
+  auf ein Wort, betrifft aber erst Phase 8.
+
+**An mich delegiert, vier Stück.** Kamera-Zweckwortlaut (E-20, „soll halt beides
+abdecken“, also Damals/Heute **und** Foto-Rätsel in einem Satz), der
+Tutorial-Pfeil ohne Ballon (E-48), der Lautstärke-Wortlaut (E-28), und die
+Konsistenz der Ökonomie.
+
+**E-50 und E-51: der Defekt wird behoben, nicht nachgebaut.** Janek: „ja na klar
+sollen die gespeichert bleiben!! wenn etwas abstürzt hat man trotzdem seine
+Rätsel.“
+
+**Das ändert eine Entscheidung von heute Vormittag, und zwar zum Besseren.** Der
+Nachtrag zu ADR-007 hatte für das Hinweis-Feld die **Münzsumme** gewählt, weil
+die Quelle sie speichert. Wenn aber die *freigeschalteten* Hinweise überleben
+sollen, dann sind die **Indizes** die richtige Nutzlast: aus ihnen folgt die
+Summe (`HINT_COSTS[i]` addieren), umgekehrt nicht. Die Indizes tragen also
+strikt mehr Information bei gleicher Größe. Das Feld heißt damit weder
+`purchasedHintCount` noch eine Summe, sondern führt die Indizes.
+
 
 ## Offene Entscheidungen
 
@@ -2153,11 +4491,11 @@ nicht.** Nachgeschlagen: `screen-auth.jsx:348` zeichnet unbedingt
 `<Flag size={30}/>`, eine Breitenschwelle für die Flagge gibt es in der ganzen
 PWA nicht; der einzige Umbruchpunkt ist `@media (max-width: 500px)` in
 `styles.css:269` und schaltet den Telefonrahmen auf Vollbild. Die 30 war die
-Grösse, nicht eine Regel. **Die Verkleinerung ist damit eine bewusste
+Größe, nicht eine Regel. **Die Verkleinerung ist damit eine bewusste
 Abweichung von der Quelle und kein Nachbau**, und sie wurde Janek mit der
 falschen Begründung vorgelegt.
 
-Schwelle und Grösse sind hergeleitet und gemessen, mit echten Schriften: der
+Schwelle und Größe sind hergeleitet und gemessen, mit echten Schriften: der
 Fehlbetrag von 14,657 Pixeln verteilt sich auf zwei Karten, jede muss 7,33
 schmaler werden, die Flagge darf also höchstens 22,67 breit sein. **22 wäre das
 Maximum und geht mit 0,039 Pixeln Rest auf**, also ein Zufallstreffer; gewählt
@@ -2208,7 +4546,7 @@ Zeile ab, die in der Quelle tote Fläche ist.
 nicht wieder entstehen kann:** `generateHuntRoute` nimmt jetzt die gewählte
 Dauer und leitet die Stationszahl daraus ab, statt beides einzeln zu bekommen.
 Eine Eingabe, keine Hintertür für Tests. Der Preis waren 37 Testaufrufe, von
-denen 28 mit Stationszahlen ausserhalb von 5, 7 und 9 arbeiteten; 25 davon
+denen 28 mit Stationszahlen außerhalb von 5, 7 und 9 arbeiteten; 25 davon
 kosteten nur eine längere Erwartungsliste, weil die Schleife bei kleinem
 Bestand ohnehin von selbst abbricht. Die drei Tests, die eine Regel an ihrer
 **Position im Lauf** prüfen, sind neu gelegt und ihre Läufe vorher mit einem
@@ -2219,6 +4557,15 @@ sie als nicht freigegeben vor**, so wie bei E-28. Sie gehen in die
 Ergänzungs-Map nach E-39 und tragen den Vermerk, dass sie auf Bestätigung
 warten. Der Bildschirm ist damit in beiden Sprachen vollständig, und der
 erfundene Anteil ist als solcher markiert statt sich als Quelle auszugeben.
+
+**Am 02.09.2026 geschlossen, und zwar von mir selbst.** Janek hat für kurze
+Oberflächentexte ausdrücklich delegiert: „Sowas kannst du ehrlicherweise auch
+einfach selbst entscheiden, das klingt immer plausibel, was du bei sowas sagst
+und wenn es nicht passt mache ich es später rückgängig.“ Vierzehn hergeleitete
+Beschriftungen eines Bildschirms sind genau das. Der Vermerk „wartet auf
+Bestätigung“ fällt damit weg; die Werte stehen als entschieden da. Wer sie
+ändern will, ändert Werte und keine Schlüsselnamen, das war beim Herleiten schon
+der Punkt.
 
 **E-35 ist am 30.08.2026 entschieden**, beim Bau von Schritt 33, und die Wahl
 war beim Nachmessen gar keine mehr. Der Startknopf der Schnitzeljagd ist
@@ -2232,7 +4579,7 @@ importieren". Angelegt, ausgeführt, gelöscht.
 Der Knopf liegt jetzt als `PrimaryButton` in `lib/core/widgets/primary_button.dart`.
 **Umbenannt werden musste er auch**, und zwar von der Maschine erzwungen: Regel
 11 zerlegt Pfade in Wortbestandteile, `fact_button.dart` fiel über den Begriff
-„fact", obwohl der Knopf nach der App heisst und nicht nach der Entität.
+„fact", obwohl der Knopf nach der App heißt und nicht nach der Entität.
 Ebenfalls mit einer Probe gemessen. Die Wache wurde dafür **nicht** aufgeweicht.
 
 **Die Fälligkeitsangabe des alten Eintrags war falsch gesetzt** und das ist der
@@ -2268,15 +4615,15 @@ eine Fundstelle.
 | E-06 | **Reward-Ledger.** `increment_coins(uid, amount)` im geteilten Backend ist `security definer` und prüft den Betrag nicht. Der Client bestimmt, wie viele Coins er bekommt. Die gesamte Rätsel-Ökonomie hängt daran. Zusätzlich widersprechen sich die Zahlen der Quelle: Server bucht 10 beim Sammeln, die Map-Animation zeigt „+12", das Fact-Detail „+10 und ⭐+50", das Puzzle Basis 50. | **4** | Phase 4 |
 | E-07 | **Location-Spoofing.** `collect_fact_validated` prüft die 150-Meter-Distanz gegen die vom Client geschickte Position. | **4** | Phase 2 |
 | E-08 | **Sprachneutrale Rätsel-Auswertung.** Belegt, nicht vermutet: `puzzle-sheet.jsx:425` baut die acht Kompass-Knöpfe aus `puzzle.compass.N` bis `.NW` und vergleicht in Zeile 450 mit `String(pick) === String(puzzle.expected)`. `expected` kommt deutsch aus den Faktdaten, EN liefert `North` bis `Northwest`. **Auf Englisch ist das Kompass-Rätsel in der PWA unlösbar.** Verwandt: `puzzle-sheet.jsx:320-323` (Freitext), `screen-challenge.jsx:2326` mit hartcodierten deutschen Antworten in `:808` und `:954`, `bearingName: 'Westen'` in `:427`, `:805`, `:948`. Behebung heißt sprachfreier Antwortwert in den Faktdaten, also Datenstruktur im anderen Repo. | 3, bei Formatänderung 4 | Phase 4 |
-| E-09 | **Multiplayer echt oder Mock.** Backend ist fertig (`group_sessions`, `team_sessions`, Realtime-Kanäle). Realtime kommt in keinem Architekturdokument vor. | 3 | Phase 5 |
+| E-09 | **Multiplayer echt oder Mock.** Backend ist fertig (`group_sessions`, `team_sessions`, Realtime-Kanäle). Realtime kommt in keinem Architekturdokument vor. **Am 31.08.2026 entschieden: Supabase Realtime, und es passt neben ADR-007 statt es aufzubrechen.** Der Transport ist austauschbar zu halten, der Vertrag der Gruppen-Jagd darf nicht auf `postgres_changes` zeigen. Ein Folge-ADR für Group Hunt Synchronization gehört dazu. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“. | 3 | Phase 5 |
 | E-10 | **3D-Avatar.** WebView mit Three.js behalten (270 KB Assets, JS-Bridge, geografisch verankert auf bewegter Karte) oder in Flutter nachbauen (sichtbare Abweichung). | 3 | Phase 2 |
 | E-11 | **City-Identität.** Die Datenbank speichert `facts.city` als Anzeigename, das Frontend nutzt Slugs, die Brücke ist eine SQL-Funktion `_slugify`, welche die JS-Normalisierung nachbaut. Dieser Mismatch hat schon einmal `create_team_session` scheitern lassen. Domain-Map fordert `CityId` als Wertobjekt. | 3 | Phase 0 Schritt 5 |
 | E-13 | **AI-Zugang.** Anthropic-Schlüssel niemals im Client, `ai_proxy` und Edge Function nutzen, Quota serverseitig. | **4** | Phase 7 |
 | E-14 | **OpenRouteService** für Fußweg-Routen: Konto, Kosten, Rate Limits, Fallback. | **4** | Phase 6 |
 | E-15 | **TTS-Weg.** Gerät (`flutter_tts`) oder Cloud. Cloud heißt laufende Kosten. | 4 bei Cloud, sonst 3 | Phase 3 |
-| E-16 | **Leaderboard-Sichtbarkeit.** `user_city_scores` und `user_trophies` haben `USING (true)` für SELECT. Alle Punktestände und Trophäen sind für jeden lesbar. Zusammenspiel mit dem Schalter „Echten Namen zeigen". | **4** | Phase 7 |
+| E-16 | **Leaderboard-Sichtbarkeit.** `user_city_scores` und `user_trophies` haben `USING (true)` für SELECT. Alle Punktestände und Trophäen sind für jeden lesbar. Zusammenspiel mit dem Schalter „Echten Namen zeigen". **Am 31.08.2026 zur Schliessung beauftragt**, gemeinsam mit E-49. Haengt an E-55: dieselben zwei Tabellen sind nicht nur lesbar, sondern vom Client schreibbar, und eine Antwort nur zur Leseseite lässt die teurere Hälfte stehen. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“.  **Am 02.09.2026 beantwortet, damit ist die Leseseite entschieden.** Janek: ohne Anmeldung sieht niemand etwas; mit Anmeldung Rang, Punktestand und **Anzahl** der Städte, keine Städtenamen. Ein Schalter zum Teilen von Städtenamen ist erwogen und **nicht** gebaut: Städtenamen sind ein Bewegungsprofil, und ein Schalter macht das Riskante zur Entscheidung des Nutzers mit einem Standardwert, der für die Mehrheit falsch ist. Dazu die weiter reichende Entscheidung: **es gibt nur einen Username, keinen echten Namen.** Damit verschwindet der Schalter „Echten Namen zeigen“ als Begriff und mit ihm der Grund, `profiles.name` von `profiles.username` zu unterscheiden. Der Neubau macht die Username-Regel schon, nachgeprüft: kein Namensfeld in der Registrierung, `signup_notifier.dart:174` füllt `name` mit dem Username. Umzusetzen bleibt im Backend: `get_leaderboard` verlangt eine Sitzung, die zwei `USING (true)`-Leserechte fallen. Wortlaut im Abschnitt „Janeks Antworten auf den dritten Block“.  **Am 02.09.2026 in einem Punkt zurückgenommen:** die Rangliste bleibt **auch ohne Anmeldung** sichtbar, mit Rang und Punktestand. Auslöser war ein gemessener Nebenbefund des Migrationsauftrags, dass die PWA keine Anmeldeschranke davor hat und der Verlust wie ein Fehler aussähe. Alles andere bleibt: keine Städtenamen, nur ein Username. **Dadurch wird 7b wichtiger, nicht unwichtiger:** eine Liste von Konto-UUIDs ohne jede Hürde ist schlechter als eine hinter einer Anmeldung, `user_id` durch `is_me` zu ersetzen ist damit die eigentliche Behebung. | **4** | Phase 7 |
 | E-17 | **Creator-Foto.** Storage-Bucket, Policy, Moderation vor `is_approved`. | 3, Bucket-Anlage 4 | Phase 8 |
-| E-19 | **Trusted Time.** Der 45-Minuten-Timer für das Session-Ende und die Finale-Punkte ×1.5 rechnen clientseitig. `security.md` §1 verbietet vertrauenswürdige Zeitstempel aus dem Client. | 3 | Phase 5 |
+| E-19 | **Trusted Time.** Der 45-Minuten-Timer für das Session-Ende und die Finale-Punkte ×1.5 rechnen clientseitig. `security.md` §1 verbietet vertrauenswürdige Zeitstempel aus dem Client. **Am 31.08.2026 entschieden: der Server rechnet, keine Ausnahme von `security.md`.** Regel für den Neubau: der Client rechnet keine Zeit, an der eine Belohnung hängt. Die Umsetzung ist eine Backend-Änderung, damit ist das Sitzungsende in Phase 5 bis dahin nicht parität-treu baubar. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“. | 3 | Phase 5 |
 | E-20 | **Kamera-Permission** für Damals/Heute und Foto-Rätsel, mit Zweckbindung. | 3 | Phase 3 |
 | E-23 | **Die Distanzprüfung beim Sammeln ist nicht nur umgehbar, sie ist optional.** Die Policy `create policy "own collected" on public.collected_facts for all using (auth.uid() = user_id)` erlaubt dem Client, direkt in `collected_facts` einzufügen. Damit entfällt `collect_fact_validated` samt der 150-Meter-Prüfung vollständig, und der Trigger `handle_fact_collected` bucht danach Punkte, Stadtwertung und Trophäen. E-07 beschreibt nur, dass die Positionsangabe fälschbar ist; hier braucht man gar keine. | **4** | Phase 2 |
 | E-24 | **Coins und Punktestand sind direkt setzbar.** Die Policy `create policy "own profile" on public.profiles for all using (auth.uid() = id)` hat kein `WITH CHECK`. Der Client kann seine eigene Profilzeile aktualisieren, einschließlich `coins` und `score_total`. **Wichtig für die Reihenfolge der Behebung:** wer E-06 behebt, also `increment_coins` absichert, hat damit nichts gewonnen, solange E-24 offen ist. Die Funktion ist dann nur der bequemere von zwei Wegen. | **4** | Phase 2 |
@@ -2288,10 +4635,27 @@ eine Fundstelle.
 | E-37 | **Das Launcher-Symbol ist noch das Flutter-Logo.** Android 12 und neuer zeichnet `@mipmap/ic_launcher` über die SplashScreen-API mitten in den nativen Startbildschirm. Der Hintergrund ist seit dem 27.08.2026 richtig (`#FF0F0D0A`), das Symbol nicht. Braucht das FACT-Symbol in allen Dichten, plus eine Entscheidung, ob der native Startbildschirm es überhaupt zeigen soll. | 2 | vor Auslieferung |
 | E-41 | **Drei Rätseltypen rendern eine leere Auswahl mit totem Antwortknopf.** `puzzle-sheet.jsx:255-257` und `:268-269` schicken `klang-sinnes-check`, `verstecktes-detail` und `zeitreise` auf `PszMcq`. Diese Zweige sind aber **nur mit leerer Optionenliste erreichbar**, weil `:247` alles mit Optionen vorher abfängt. `PszMcq` erzeugt dann null Antwortknöpfe (`:353-358`), `pick` bleibt `null`, `canSubmit` (`:344`) ist dauerhaft falsch, und das Rätsel ist nur über „Überspringen (0 Punkte)" (`:230-236`) verlassbar. Wie viele Datensätze das trifft, ist **nicht gezählt**: die Markdown-Quellen in `05_Content/facts/` tragen eine andere Typkodierung (`T2`, `T3`, `T9`) als die Datenbank, es braucht die Live-Daten. Zu entscheiden ist, welche Form ein solches Rätsel im Neubau bekommt. Der Zustand ist an `ChoicePuzzle.choices` ablesbar. | 3, verwandt mit E-08 | Phase 4, Schritt 28 |
 | E-42 | **Der 150-Meter-Radius der Foto-Rätsel wirkt in der PWA nie.** `screen-map.jsx:3915` übergibt die Nutzerposition als `userPos`, `puzzle-sheet.jsx:50` erwartet sie als `userPosition`. Folge in `PszPhoto`: `:373` liefert immer `null`, `:374` setzt `inRange = true`, und die Näherungsprüfung `:378` läuft nie. `foto-beweis` und `perspektiven` sind damit von überall mit einem beliebigen Foto lösbar, obwohl `gpsRadius` (`:372`) in den Daten durchgehend auf 150 steht. Dieselbe Klasse wie E-08: ein Defekt der Quelle, der wie Parität aussieht, und wie E-07 einer, der eine Ortsprüfung aushebelt. **Ändert sichtbares Verhalten, geht deshalb an Janek.** | 3, verwandt mit E-07 | Phase 4, Schritt 28 |
-| E-44 | **Der Faktor 1,5 am letzten Stopp wird angezeigt, aber nicht gutgeschrieben.** `screen-challenge.jsx:2479` übergibt dem Nächster-Fakt-Abzeichen `isLast ? Math.round(diff.points * 1.5) : diff.points`. Die tatsächlich vergebenen Punkte rechnet `handleChallengeComplete` (`:2295-2299`), und dort kommt der Faktor nicht vor. Das Abzeichen verspricht am letzten Stopp das Anderthalbfache, gutgeschrieben wird der einfache Satz. Widerspruch in der Quelle, nicht in E-19. Sichtbares Verhalten. | 3 | Schritt 37 |
+| E-44 | **Der Faktor 1,5 am letzten Stopp wird angezeigt, aber nicht gutgeschrieben, und er steht in einem Bildschirm, den der Neubau nicht nachbaut.** `screen-challenge.jsx:2479` übergibt dem Nächster-Fakt-Abzeichen `isLast ? Math.round(diff.points * 1.5) : diff.points`. Die tatsächlich vergebenen Punkte rechnet `handleChallengeComplete` (`:2295-2299`), und dort kommt der Faktor nicht vor. **Am 31.08.2026 nachgemessen, und die Zuordnung war falsch:** beide Zeilen liegen in `SnjdActiveView` (`:2158`), also im **alten** Jagd-Ablauf. Der neue Ablauf, den die Schritte 36 und 37 nachgebaut haben, kennt den Faktor überhaupt nicht: `1.5` kommt in `screen-map.jsx` kein einziges Mal als Rechenfaktor vor, in `puzzle-sheet.jsx` nur als Zeilenhöhe und Rahmenstärke, und im Jagd-Reduzierer in `app.jsx` gar nicht. **Der Neubau erbt diesen Widerspruch also nicht.** Er wird erst wieder wichtig, wenn jemand die Altansicht nachbaut, und dafür gibt es keinen Schritt. Sichtbares Verhalten in der laufenden PWA, kein offener Punkt des Neubaus. | 3 | PWA, im Neubau nicht geerbt |
 | E-47 | **Drei Bedienelemente im Challenge-Reiter tun bis Schritt 35 nichts.** Seit Schritt 33 zeigt der Reiter den Assistenten. Wer ihn zu Ende bedient, drückt einen vollflächigen roten Knopf „Starten", sieht die Drück-Animation und danach passiert nichts, weil der Startpunkt-Picker fehlt. Dasselbe gilt für die Kachel „Gruppe" und für „Mit Code beitreten", deren Formulare Sitzungen über Supabase anlegen müssten, die es im Neubau nicht gibt. **Eine Sackgasse ist es nicht**, der Zurück-Knopf und die Tab-Leiste bleiben erreichbar, gemessen im Widget-Test. Aber es ist derselbe Zustand, den E-33 beim Kästchen „Angemeldet bleiben" beanstandet, und der Bau begründet an anderer Stelle ausdrücklich, warum die Zufallskarte **nicht** antippbar ist („ein Tipp, der nichts ändert, ist ein Bedienelement, das nichts tut"). Die Ungleichbehandlung ist bewusst, weil eine erfundene Navigation schlechter wäre als keine, aber sie gehört gewusst. Löst sich mit den Schritten 35 und 40 von selbst auf. | 2 | Schritt 35 |
-| E-48 | **Wohin zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist?** Die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, und ein ruhender Ballon ist selbst nur 26 breit; sie zeigt also nur dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ein festes Rechteck in der unteren Bildmitte. Der Neubau misst statt des Kopfes die Zeichenfläche samt Schattenrand und wählt deshalb ab Zoom 14,6 auch ferne Ballons. **Parität** hiesse, den Kopf zu messen; **Abweichung** hiesse, es so zu lassen, und der Pfeil fände fast immer einen echten Ballon, was möglicherweise besser aussieht. Zu entscheiden ist auch, ob die Zoomsperre des Ankers auf `factAnimationRunsAt` verschärft wird: das schnitte den Löwenanteil der Plattformkanal-Aufrufe weg und schlösse nebenbei die Gruppierungslücke unter Zoom 15, um den Preis, dass unter Zoom 16 das Ersatzrechteck steht. **Die tragende Kette ist hergeleitet und nicht am Browser gemessen**, siehe „Der `balloon`-Anker". | 2 | vor Auslieferung |
-| E-49 | **Zwei verschiedene Wahrheiten darüber, ob eine Trophäe verdient ist.** Der Profil-Bildschirm liest den Freischaltstand vom Server (`user_trophies`) und färbt danach. Das Reiseregal rechnet ihn **clientseitig neu**: `wltDeriveTrophies` (`screen-wallet.jsx:114-128`) zählt die gesammelten Fakten je Kategorie und setzt `earned` auf `counts[t.cat] >= t.threshold`. Beide können auseinanderlaufen, und beide zeigen dieselben 36 Definitionen. **Zusätzlich ist die Client-Rechnung unvollständig:** nur die Kategorie-Trophäen tragen ein `threshold`; die Stadt-, Rang- und Geheim-Trophäen haben keins, und `>= undefined` ist in JavaScript immer falsch. Im Reiseregal sind sie damit **dauerhaft** unverdient, egal was der Server sagt. Zu entscheiden ist, welche Quelle im Neubau gilt, bevor Schritt 45 gebaut wird; die Trophäenliste aus Schritt 49 nimmt heute den Stand als Parameter entgegen und legt sich nicht fest. Berührt E-16, weil `user_trophies` für jeden lesbar ist. | 3 | vor Schritt 45 |
+| E-48 | **Wohin zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist?** Die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, und ein ruhender Ballon ist selbst nur 26 breit; sie zeigt also nur dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ein festes Rechteck in der unteren Bildmitte. Der Neubau misst statt des Kopfes die Zeichenfläche samt Schattenrand und wählt deshalb ab Zoom 14,6 auch ferne Ballons. **Parität** hieße, den Kopf zu messen; **Abweichung** hieße, es so zu lassen, und der Pfeil fände fast immer einen echten Ballon, was möglicherweise besser aussieht. Zu entscheiden ist auch, ob die Zoomsperre des Ankers auf `factAnimationRunsAt` verschärft wird: das schnitte den Löwenanteil der Plattformkanal-Aufrufe weg und schlösse nebenbei die Gruppierungslücke unter Zoom 15, um den Preis, dass unter Zoom 16 das Ersatzrechteck steht. **Die tragende Kette ist hergeleitet und nicht am Browser gemessen**, siehe „Der `balloon`-Anker". | 2 | vor Auslieferung |
+| E-49 | **Zwei verschiedene Wahrheiten darüber, ob eine Trophäe verdient ist.** Der Profil-Bildschirm liest den Freischaltstand vom Server (`user_trophies`) und färbt danach. Das Reiseregal rechnet ihn **clientseitig neu**: `wltDeriveTrophies` (`screen-wallet.jsx:114-128`) zählt die gesammelten Fakten je Kategorie und setzt `earned` auf `counts[t.cat] >= t.threshold`. Beide können auseinanderlaufen, und beide zeigen dieselben 36 Definitionen. **Zusätzlich ist die Client-Rechnung unvollständig:** nur die Kategorie-Trophäen tragen ein `threshold`; die Stadt-, Rang- und Geheim-Trophäen haben keins, und `>= undefined` ist in JavaScript immer falsch. Im Reiseregal sind sie damit **dauerhaft** unverdient, egal was der Server sagt. Zu entscheiden ist, welche Quelle im Neubau gilt, bevor Schritt 45 gebaut wird; die Trophäenliste aus Schritt 49 nimmt heute den Stand als Parameter entgegen und legt sich nicht fest. Berührt E-16, weil `user_trophies` für jeden lesbar ist. **Am 31.08.2026 entschieden: der Server ist die einzige Wahrheit.** Dazu zwei Aufträge, die nicht auf der Liste standen: die defekte Client-Ableitung wird nicht portiert, und E-16 wird mitgeschlossen. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“. | 3 | vor Schritt 45 |
+| E-50 | **Gekaufte Hinweise gehen beim Neustart verloren, die Schuld dafür nicht.** `unlockedHints` ist Komponentenzustand (`screen-map.jsx:1014`) und wird nie gespeichert; `stop.hintCostSpent` überlebt dagegen (`app.jsx:927-935`), und `:908-909` zieht genau diesen Betrag vom Stopp-Lohn ab (`netPoints = max(0, pointsAwarded - hintCost)`). Nach einem Neustart sieht der Nutzer die Hinweise wieder verschlossen, **zahlt erneut**, und der erste Kauf wird weiterhin abgezogen. Derselbe Commit, der die Wiederherstellung eingeführt hat, hat diese Hälfte vergessen. Das ist ein Defekt der Quelle und **keine Paritätsvorlage**: im Neubau gehört entweder beides gespeichert oder keins. **Im Neubau am 31.08.2026 gelöst, und zwar in die Richtung, die der Eigentümer entschieden hat:** `ActiveHunt` speichert die **Indizes** der freigeschalteten Hinweise, `payloadVersion` steht auf 2. Damit überleben die Hinweise selbst den Neustart, nicht nur die Schuld dafür. Der Defekt der Quelle bleibt im anderen Repository und ist **keine** Paritätsvorlage. | 3 | vor Schritt 37 |
+| E-51 | **Die gespeicherte Münzsumme kann nicht sagen, welche Hinweise gekauft waren.** `hintCostSpent` ist eine Summe, und `HINT_COSTS = [0, 20, 30]` (`screen-map.jsx:1031`) ist nicht eindeutig umkehrbar: die Summen 20 und 30 bedeuten beide „ein Hinweis“. Die *Anzahl* ist heute zufällig noch ableitbar, die *Identität* nicht, und ab einem vierten Kostenwert wäre auch die Anzahl mehrdeutig. Wer nach einem Neustart dieselben Hinweise offen zeigen will, braucht die Indizes und nicht die Summe. Hängt an E-50, ist aber der allgemeinere Fund. **Im Neubau am 31.08.2026 gegenstandslos:** gespeichert werden die Indizes und nicht die Summe. Anzahl und ausgegebene Münzen folgen daraus, umgekehrt nicht, und ein vierter Kostenwert ändert daran nichts mehr. | 2 | vor Schritt 37 |
+| E-52 | **Nicht nur `increment_coins`: drei Funktionen nehmen die Nutzerkennung als Parameter, und alle sind ohne Anmeldung erreichbar.** `unlock_trophy(p_user_id, p_trophy_key)` und `collect_fact_validated(p_user_id, …)` prüfen `auth.uid()` genauso wenig wie `increment_coins`. Dazu stehen im gesamten Backend **fünf** `GRANT`/`REVOKE`-Zeilen, alle fünf für `ai_consume` und `ai_refund`; für jede andere Funktion gilt der PostgreSQL-Standard `EXECUTE` an `PUBLIC`, und `PUBLIC` schließt `anon` ein. `get_leaderboard` gibt die Kennungen mit aus und ist ebenfalls offen. Die Kette lautet: ohne Konto Kennungen abholen, ohne Konto darauf schreiben. Schärft E-06 und ändert nicht die Migration, sondern die Aufgabenstellung. Beleg: `docs/operations/backend-inventory.md`. | **4** | mit E-06 |
+| E-53 | **Nutzer-Fakten können sich selbst freigeben.** Die INSERT-Policy auf `facts` prüft `created_by` und `is_user_created`, aber **nicht** `is_approved`. Dass `api.jsx:167` `false` setzt, ist Höflichkeit des Clients und keine Regel des Servers. Wer die Anfrage selbst formuliert, veröffentlicht unmoderierten Text für alle Nutzer, in einer App, deren Inhalt das Produkt ist; der Trigger `on_user_fact_created` legt die Autoren-Trophäen gleich mit an. | **4** | vor Schritt 44 |
+| E-54 | **Coins sind über Gruppensitzungen unbegrenzt farmbar.** `collect_group_fact` bucht 50 Coins, die Sperre wirkt **pro Sitzung**. **Am 02.09.2026 richtiggestellt:** das `UNIQUE (session_id, fact_id)` ist am 05.06.2026 gedroppt und durch zwei partielle Indizes ersetzt worden (`2026-06-05_team_sessions.sql:54-67`); am Befund ändert das nichts, im Team-Modus ist es eine Sperre weniger. **Und die naheliegende Behebung ist keine Änderung eines Indexbereichs:** `group_collects` hat keine Spalte `user_id`, die Gutschrift geht an alle Teilnehmer, „einmal je Nutzer und Fakt“ verlangt also ein anderes Datenmodell. Sitzungen legt der Client an und bestimmt dabei `p_fact_ids`, im Team-Modus zusätzlich den Treffpunkt, an dem `tag_endpoint` weitere 100 gibt. An einem Fakt stehen und die Schleife wiederholen ergibt rund 150 Coins je Durchlauf, ohne einen Schritt zu gehen. `collected_facts` bleibt sauber (`on conflict do nothing`), betroffen ist nur die Währung. Folge für die Ökonomie: solange Betrag und Anlass im Client bestimmbar sind, darf für Coins nichts zu haben sein, was Geld wert ist.  **Am 02.09.2026 zur Regel entschieden, und die Regel verlangt eine neue Tabelle.** Janek: je Nutzer und Fakt gibt es **zwei** Belohnungsanlässe, Entdecken und Finden, und **jeder genau einmal für immer**. Eine neue Jagd mit demselben Fakt gibt nichts mehr; in Gruppen bekommt jeder Teilnehmer den Finde-Anlass, unabhängig von früherem Entdecken, und auch dort nur einmal. **Mit dem heutigen Backend ist das prinzipiell nicht ausdrückbar**, weil die Sperre ein Index auf `group_collects` ist und dieser Tabelle sowohl der Nutzer als auch der Anlass fehlt. Damit ist entschieden, was Abschnitt 9 der Fix-Datei als nächsten Schritt vorgeschlagen hatte: ein `coin_ledger(user_id, fact_id, reason, delta, created_at)` mit `UNIQUE (user_id, fact_id, reason)`. Dann ist die Regel die Tabelle und keine Prüfung, die jemand vergessen kann, und die Coins bekommen die Historie, die `security.md` ohnehin verlangt. Eine neue Tabelle ist Stufe 3 und geht an Dairen. | **4** | Phase 5 |
+| E-55 | **Rangliste und Trophäen sind vom Client direkt schreibbar.** `user_city_scores` und `user_trophies` tragen `FOR ALL USING (auth.uid() = user_id)` ohne `WITH CHECK`; ohne `WITH CHECK` gilt der `USING`-Ausdruck auch für neue Zeilen. Dieselbe Lücke wie E-24 auf `profiles`, nur auf den beiden Tabellen, die ausdrücklich für den Wettbewerb da sind, und `get_leaderboard` liest im Modus „alltime, Stadt“ direkt aus `user_city_scores`. E-16 beschreibt an denselben Tabellen die Leseseite; das hier ist die teurere Hälfte. | **4** | mit E-24 |
+| E-56 | **Drei Stadtschlüssel-Normalisierungen nebeneinander, und Rom fällt durch alle.** `lower(city)` im Trigger und in beiden Ranglisten-Funktionen, `_slugify(city)` in `_team_generate_orders`, eine feste Liste in `_city_default_meeting`. Für München geht es gut, weil jede Funktion von genau einer Stelle gerufen wird: Glück, keine Konstruktion. Für Rom bildet der Trigger-Rückfall `nr LIKE 'ROM%'` auf `Rom` ab, der Backfill vom 07.06. dasselbe Präfix auf `Rome`, und das Frontend schickt `rom`. **Zusatzverdacht, unbestätigt:** `migrate_nr_codes.py:24-31` vergibt Präfixe nach Breitengrad mit `lat > 48.5 → PAU`; Regensburg, Nürnberg und Weimar liegen darüber. Wenn das je über die ganze Tabelle lief, sind es falsche Stammdaten und kein Anzeigefehler. Konkretisiert E-11. | 3 | vor Schritt 45 |
+| E-57 | **Der Team-Ausgleich kann nicht wirken.** `_team_generate_orders` vergleicht die Wegstrecken über `sum(...) where id = any(v_a)` gegen `any(v_b)`; `v_a` und `v_b` sind Permutationen **derselben Menge**, also ist die Differenz immer 0, die Schwelle `<= 0.20` immer erfüllt und der dreifache Resampling-Apparat unerreichbar. Beide Teams laufen denselben Stationssatz in anderer Reihenfolge, und das ist laut Index-Kommentar gewollt; dann ist offen, was die Teams überhaupt unterscheiden soll. Dazu eine wirkungslose Winkelnormalisierung, `abs(((x-y)+pi())-pi())` kürzt sich zu `abs(x-y)`. Dieselbe Bauart wie die dreistufige Auswahl aus Schritt 33: eine Vorkehrung, die ihr Ergebnis nicht ändern kann.  **Am 02.09.2026 beantwortet, und die Antwort dreht den Befund.** Janek: dieselben Stationen für beide Teams, in **unterschiedlicher Richtung**, mit **demselben letzten Fakt**; wer dort zuerst ankommt gewinnt, aber nur bei mehr oder gleich vielen Coins. **Der Ausgleich ist damit nicht kaputt, sondern gegenstandslos**: gleich lange Wege sind gewollt und folgen aus gleichen Stationen, entschieden wird über Zeit und Coins. Er kann weg. **Neuer Befund an derselben Stelle:** die Regel „gleicher letzter Fakt“ gibt es im Code nicht. Nachgesehen: `v_b` ist im ersten Zweig `array_agg(id order by ord desc)`, also die Umkehrung von `v_a`, damit ist die letzte Station von B die **erste** von A; der zweite Zweig sortiert noch anders. Nötig ist eine als Finale festgelegte Station, die für beide die letzte ist, und nur die Stationen davor umgekehrt. **Offen bleibt eine kleine Frage mit großer Wirkung:** gegen wen und wann werden die Coins verglichen, und was gilt, wenn das schnellere Team weniger hat. Im vierten Fragenblock. | 2 | Phase 5 |
+| E-58 | **Der Admin ist eine statische Seite mit dem `service_role`-Schlüssel im Browser.** `02_Frontend/admin/index.html` nimmt den Generalschlüssel entgegen, legt ihn in `localStorage` (`fact_admin_service_key`) und spricht damit direkt gegen Supabase; er umgeht **jede** RLS-Policy. Kein Admin-Server, keine Rollenprüfung, kein Protokoll darüber, wer wann was freigegeben hat. Dieselbe Bauart in der Pipeline: 11 Skripte lesen `service_role_key` aus `import_config.json`, gitignoriert, aber im Klartext in einem OneDrive-Ordner. Das ist kein Fehler in einer Zeile, sondern der Teil, der bei einem Backend-Neubau nicht mitgenommen werden kann: ohne Antwort hierauf ist der Neubau nach einem Tag wieder am Ausgangspunkt, weil jemand Fakten freigeben können muss. | **4** | vor dem Backend-Neubau |
+| E-59 | **Welchen Bezugsrahmen hat die Kompass-Richtung, magnetisch Nord oder wahres Nord?** Der Neubau setzt seit Schritt 14 ausdrücklich **magnetisch** Nord, weil der Android-Pfad der Quelle `deviceorientationabsolute` liest und das magnetometerbasiert ist. **Offen ist der iOS-Pfad:** `webkitCompassHeading` leitet sich aus `CLHeading` ab, und dort gibt es `trueHeading` **und** `magneticHeading`. Nimmt die Quelle dort das wahre Nord, sind ihre beiden Zweige nicht deckungsgleich, und der Unterschied ist die örtliche Missweisung, in Mitteleuropa ungefähr 2 bis 5 Grad. Das ist **mehr** als die Totzone von 1,5 Grad, also sichtbar, und es hiesse, dass die Karte auf iOS und Android unterschiedlich zeigt. Zu klären an einem iOS-Gerät oder an Apples Dokumentation; der Neubau kann beide Rahmen, die Umstellung ist eine Zeile im Adapter. Belege unter „Schritt 14, die Wahl des Sensorpakets". | 2 | vor Auslieferung |
+| E-60 | **Die gestuften Hinweise der Jagd beschreiben die Station nach der aktuellen, nicht die aktuelle.** Gemessen und nicht vermutet, siehe „Ein Fund beim Zuschnitt von Schritt 36". Der Generator legt an Stopp `i` das Hinweis-Trio des Fakts von Stopp `i+1` ab (`hunt-generator.jsx:319-338`), und die Pille liest an der aktuellen Station genau dieses Feld (`screen-map.jsx:1035-1043`). Weil `currentStopIdx` beim Lösen sofort weiterspringt, sieht der Spieler nie einen Hinweis auf den Ort, den er gerade sucht. Zwei Lesarten: **Absicht** (der erste Hinweis heißt im Kommentar „atmospheric teaser", also eine Vorschau auf den nächsten Ort) oder **Defekt** (dann zahlt man 20 und 30 Münzen für Hinweise auf einen Ort, den man noch nicht sucht). Zu entscheiden ist, welche gilt; der Neubau kann beide, der Unterschied ist ein Index. **Und die letzte Station hat gar keine Hinweise**, denn dort setzt der Generator `nextHints = null`. | 2 | vor Schritt 37 |
+| E-61 | **Die Beschriftungen der Jagd-Pille gibt es nur auf Deutsch, und das ist Parität.** Geprüft: die Quelle hält „Station {n} / {total}", „Tipps", „Tipp freischalten (−20 🪙 vom Fakt-Lohn)", „Schließen" und den Rückfallsatz „Schau dich in der Umgebung aufmerksam um." als **hartcodiertes Deutsch** in `screen-map.jsx`, ohne einen einzigen i18n-Schlüssel. Englischsprachige Nutzer sehen dort also Deutsch. Der Neubau trägt sie über die Ergänzungs-Map aus E-39 ein, **nur auf Deutsch**, und der Rückfall auf die Fallback-Sprache erzeugt genau dasselbe Verhalten. **Erfundener englischer Nutzertext wäre die schlechtere Lösung**, dieselbe Linie wie bei E-28. Zu entscheiden ist, ob die Pille englische Texte bekommen soll; dann sind es fünf bis sechs Sätze, und die bessere Behebung wäre ein Schlüssel in der PWA, weil die Gegenprüfung des Generators den lokalen Eintrag dann von selbst wieder abräumt. Verwandt mit E-08, wo dieselbe Sorglosigkeit ein Rätsel auf Englisch unlösbar macht.  **Am 02.09.2026 aufgehoben, und zwar grundsätzlich.** Janek: „englischsprachige Nutzer sollen natürlich nur englisch sehen“ und „klar besser als die Quelle machen“. Hartcodiertes Deutsch ohne i18n-Schlüssel ist damit ein **Defekt der Quelle** und keine Paritätsvorlage. Folge, und sie ist Arbeit: alle Ergänzungs-Schlüssel, die heute in der englischen Karte einen deutschen Wert tragen, brauchen echtes Englisch. Betroffen sind die Blöcke `challenge.huntPill.*`, `challenge.huntPause.*` und `challenge.huntResult.*`, dazu jeder frühere Eintrag mit derselben Begründung. Der Grundsatz steht jetzt in `CLAUDE.md` unter „The PWA is a reference, not a gold standard“. | 2 | vor Auslieferung |
+| E-62 | **Der Pause- und der Ergebnisbildschirm der Jagd zeigen keine Zeit, sondern den Platzhalter `—`.** Die Quelle rechnet dort `Date.now() - hunt.startedAt` (`screen-challenge.jsx:2807-2808` und `:2954`) und lässt dafür einen Sekundentakt laufen. `HuntRun` trägt bewusst keine Zeitstempel, und der gespeicherte Vertrag `ActiveHunt` auch nicht: E-19 ist mit „der Server rechnet“ entschieden, und Dairens Satz dazu lautet „der baubare Teil ist alles, was den Ablauf anzeigt“. Angezeigt wird hier nichts, was der Client kennt, also steht der Platzhalter da, den die Quelle selbst für fehlende Werte benutzt (`:2828`). **Die Kachel und die Zeile bleiben stehen**, damit das Layout stimmt und der Tag, an dem ein Startzeitstempel vom Server kommt, eine Zeile kostet und keinen Umbau. Kein Sicherheitsbefund, sondern eine sichtbare Lücke mit bekannter Ursache und bekannter Behebung. | 2 | Schritt 39, Behebung mit dem Backend-Auftrag |
+| E-63 | **Der Beitritts-Dialog der Gruppe zeigt seinen eigenen Schlüsselnamen als Überschrift, und der dafür geschriebene Rückfall kann nie greifen.** Am 31.08.2026 gemessen, nicht vermutet. `screen-challenge.jsx:2025` schreibt `t('group.join.title', lang) \|\| 'Session-Code eingeben'`. Den Schlüssel `group.join.title` gibt es in `translations.jsx` nicht, weder deutsch noch englisch; seine Geschwister `group.join.cta`, `.invalidCode` und `.submit` gibt es alle drei. **Der Rückfall ist toter Code:** `window.t` (`translations.jsx:1600-1605`) gibt bei fehlendem Schlüssel den **Schlüssel selbst** zurück, und der ist wahrheitswertig, also feuert `\|\|` nie. Auf dem Bildschirm steht damit in beiden Sprachen die Zeichenkette `group.join.title`. Dieselbe Fehlerklasse wie E-28, gefunden mit derselben Messung, die auch die Prüfung im i18n-Generator begründet. Für den Neubau heißt das: Schritt 40 erfindet hier eine Überschrift oder übernimmt den hartcodierten deutschen Satz, den der Autor gemeint hat, und beides gehört entschieden statt stillschweigend gewählt.  **Am 02.09.2026 entschieden:** „Session-Code eingeben“ und „Enter session code“. Der Schlüssel kommt bewusst **noch nicht** in die Ergänzung: er ist eine Lücke der PWA, und genau die verfolgt `_knownMissingSourceKeys`. Trüge unsere Ergänzung ihn, schwiege die Quellprüfung über eine offene PWA-Lücke, ohne dass unsere App den Text zeigt; der Beitritts-Dialog ist Schritt 40. Der Schlüssel entsteht mit dem Bildschirm. | 2 | Schritt 40 |
+| E-64 | **Dieses Repository ist öffentlich, und es enthält das geprüfte Verzeichnis der Backend-Lücken zusammen mit der Projekt-URL der laufenden Instanz.** Am 31.08.2026 festgestellt, nicht vermutet: `gh repo view` meldet für `Daigon2/flutter-fact` die Sichtbarkeit `PUBLIC`, und `docs/operations/backend-inventory.md` nennt die Projekt-URL. Das Register in dieser Datei führt E-06, E-07, E-23, E-24, E-54 und E-58 mit Tabellen-, Policy- und Funktionsnamen. Der Schlüssel selbst liegt **nicht** im Repository, `SupabaseConfig` liest ihn über `String.fromEnvironment`; der öffentliche Schlüssel der PWA ist aber ohnehin aus jedem Browser zu holen, er ist dafür gedacht. **Damit steht öffentlich, welche Tür offen ist und wo sie sitzt.** **Zwei Dinge sind zu trennen.** Erstens: die Sichtbarkeit umzustellen behebt nichts rückwirkend, was einmal öffentlich war, kann kopiert und indiziert sein. Zweitens: die eigentliche Behebung ist ohnehin, die Lücken zu schließen, und die sind laut Backend-Bestandsaufnahme überwiegend wenige Zeilen SQL. Die Sichtbarkeit zu ändern verringert nur, was ab jetzt dazukommt. **Beides ist eine Entscheidung des Eigentümers und wurde von hier aus nicht getroffen.** | **4** | sofort |
+| E-65 | **Die Persistenz der laufenden Jagd wird nirgends gelesen, und die Produktvorgabe aus ADR-007 ist damit an keiner Stelle eingelöst.** Am 02.09.2026 von einer unabhängigen Prüfung gefunden und nachgezählt: `activeHuntProvider` hat in `lib/` **keinen einzigen Verbraucher**. `HuntPill` liest seit Schritt 37 direkt `huntRunProvider` (`hunt_pill.dart:136`), weil sie Stationen, Hinweise und Punkte braucht, die ein `ActiveHunt` nicht trägt. Der Schreibweg funktioniert, der Leseweg hat keinen Abnehmer. **Folge:** eine Jagd, die einen App-Neustart überlebt, ist weder auf der Karte noch im Challenge-Reiter sichtbar, und `bootstrap.dart:180-183` zitiert genau diesen Fall als das, was ADR-007 ausschließt. **Zweite Folge, kleiner aber unsauber:** der Eintrag `fact_active_challenge` lässt sich dann auch nicht mehr löschen, weil `HuntRunNotifier.end()` bei `state == null` sofort zurückkehrt; er wird erst von der nächsten Jagd überschrieben. **Zur Wahl stehen zwei Wege.** (a) Die Pille bekommt eine abgespeckte Lesart aus `ActiveHunt`: Stationszähler, Titel und Entfernung stehen dort alle, Hinweise und Punkte nicht. Das löst die Vorgabe ein, ohne den Plan zu speichern. (b) Der Start räumt einen nicht fortsetzbaren Eintrag auf und die Vorgabe wird als unerfüllbar zurückgegeben, dann gehört ADR-007 geändert. **Die Wahl ist nicht von hier aus getroffen worden.** Der Fund ist kein Codefehler dieser Nacht, sondern eine Lücke aus Schritt 37, die eine falsche Behauptung in vier Dokumentstellen als erledigt aussehen ließ; die Behauptung ist berichtigt.  **Am 02.09.2026 entschieden, und die Entscheidung geht weiter als beide vorgelegten Wege.** Janek: „man sollte sowohl sehen was da ist und auch weitermachen können. also sollte es so sein, als hätte man nie aufgehört.“ Damit fällt (b) weg, und (a) reicht nicht: eine sichtbare, aber nicht fortsetzbare Jagd ist ausdrücklich nicht die Antwort. Verlangt ist die **vollständige Wiederherstellung**, also auch der `HuntPlan` mit Fakt und Rätsel je Station. Genau den schließt ADR-007 heute bewusst von der Nutzlast aus. **Das ist jetzt eine Architekturfrage an Dairen**, samt Folge-ADR, siehe den Fragenblock. | 3 | vor Schritt 40 |
+| E-66 | **Ein Fakt ohne zuordenbare Stadt zählt als eigene Stadt, und damit sind zwei Trophäen zu früh zu haben.** Am 02.09.2026 gemessen. `handle_fact_collected` (`supabase-schema.sql:240-250`) bildet einen Fakt, dessen Stadt sich weder aus `facts.city` noch aus dem `nr`-Präfix ergibt, auf den Schlüssel `'unknown'` ab. Zwei Zeilen später zählt `select count(distinct city_key) ... where score > 0` (`:287-288`) genau diesen Schlüssel mit. **Folge:** `weltenbummler` (drei Städte) ist mit zwei echten Städten plus einem nicht zuordenbaren Fakt erreichbar, `grand_tour` (vier) mit drei. Dazu kommt eine Trophäe `unknown_first`, die in `wallet-colors.jsx` keinen Namen hat. **Dritte Folge derselben Wurzel** wie E-11 und E-56: die Stadt wird aus einem Präfix geraten, statt gepflegt zu sein. Die Behebung berührt eine Spielregel und bereits vergebene Trophäen, ist also keine reine Migration. Aufgefallen beim Zählen der Städte für E-16; die Anzahl dort schließt `'unknown'` bewusst aus und wird der Trophäenschwelle deshalb absichtlich widersprechen. | 3 | vor Schritt 45 |
 
 ## Wie Tests hier blind werden
 
@@ -2392,7 +4756,7 @@ halben Tag.
     Registrierung" die ganze Suite. Was einen guten Prüfauftrag ausmacht, steht
     in `HANDOFF.md` unter „Arbeitsweise mit Claude".
 16. **Ein Test, der `lib/` nach einer Zeichenkette durchsucht, findet zuerst
-    sich selbst, und wer das behebt, reisst ein Loch auf.** Beide Hälften sind
+    sich selbst, und wer das behebt, reißt ein Loch auf.** Beide Hälften sind
     in Schritt 27 passiert. Die Einstiegs-Wache des Rätsel-Sheets schlug im
     ersten Lauf an, weil in **ihrem eigenen Kopfkommentar** das Wort steht, nach
     dem sie sucht. Die naheliegende Behebung, vor dem Vergleich alles ab dem
@@ -2425,6 +4789,64 @@ halben Tag.
     Helfer neben `pumpEventQueue()` und `loadAppFonts()`, und der Ausweg ist
     hier ein anderer: nicht `setUpAll`, sondern `tester.runAsync`. Der
     Unterschied zu Muster 13 ist die **Zone**, nicht die Zeit.
+20. **Zwei Ereignisse reichen nicht, um „die letzte gewinnt" von „die erste
+    gewinnt" zu unterscheiden.** Wo ein Aufbau genau **einen** Vorgang merkt,
+    während ein anderer läuft, sind beide Regeln bei zwei Ereignissen identisch:
+    das erste läuft, das zweite wird gemerkt, es gibt nichts zu verdrängen. Erst
+    das **dritte** trennt sie. Beleg: die Sequenzsicherung des Gruppen-Tipps in
+    Schritt 15. Die Mutation `_pendingGroupTap ??= tap`, also „der ältere
+    bleibt", überlebte den Zwei-Tipp-Test und fällt erst gegen drei Tipps.
+    Verwandt mit Muster 18, aber die Ursache liegt nicht in der Zusicherung,
+    sondern in der **Anzahl der Eingaben**.
+21. **Zwei Verhalten, die bei den gewählten Eingaben zufällig dasselbe
+    Ergebnis liefern, sind nicht unterscheidbar.** Beleg: die Auswahl der Punkte
+    einer angetippten Gruppe lässt einen Punkt ohne Bildschirmlage herausfallen.
+    Behandelt man ihn stattdessen als (0, 0), bleibt die Suite grün, weil die
+    Testkoordinaten so lagen, dass (0, 0) **ebenfalls** außerhalb des Radius
+    fiel. Beide Wege endeten bei „ausgeschlossen". Der Produktivcode war
+    richtig, nur die Probe war blind. Gegenmittel: die Eingaben so wählen, dass
+    der Ersatzwert ein **anderes** Ergebnis erzwingt, und den Grund für die
+    Wahl in den Test schreiben, sonst macht der Nächste sie beim Aufräumen
+    wieder harmlos.
+
+22. **Gleiche Zahlen verstecken den Unterschied zwischen zwei Formeln.** Ein
+    Test prüfte 50 Punkte gegen 50 Münzen Hinweiskosten und erwartete 0. Genau
+    diese Zahlen machen `max(0, 50 - 50)` und `50 - 50` ununterscheidbar, und
+    die Mutation, die die Untergrenze entfernt, **überlebt**. Belegt am
+    31.08.2026 an der Phasen-Maschine der Jagd. Der Testfall ist erst scharf,
+    wenn die Kosten die Punkte **übersteigen**: 10 Punkte gegen 50 Kosten
+    ergeben 0 statt −40. Allgemein: wer eine Untergrenze prüft, wählt Eingaben,
+    die sie **auslösen**, nicht solche, die sie gerade eben nicht brauchen.
+23. **Ein Suchlauf, dessen Startpunkt nie zählt, weil davor schon alles
+    erledigt ist.** Die Jagd sucht die nächste offene Station mit **größerem**
+    Index. In jedem naheliegenden Test waren die Stationen davor längst gelöst
+    oder übersprungen, und dann findet eine Suche ab Index 0 dieselbe Station
+    wie eine Suche ab `index + 1`. Die Mutation, die die Bedingung entfernt,
+    **überlebte** deshalb. Belegt am 31.08.2026, gefunden von der Mutationsprobe
+    und nicht vom Testentwurf. Scharf wird es erst, wenn eine Station **vor**
+    der aktuellen noch offen ist. Allgemein: eine Bedingung, die eine Richtung
+    einschränkt, braucht einen Testfall, in dem die andere Richtung überhaupt
+    einen Kandidaten hätte.
+24. **Zwei Wege, die zufällig dasselbe liefern, prüfen keine Rangfolge.**
+    Der Leseprovider der Jagd soll bei laufender Jagd den Zustandshalter
+    bevorzugen und nur sonst den Speicher lesen. Der Test ließ den Halter in
+    genau den Speicher schreiben, den er danach abfragte, und damit stand dort
+    **derselbe Wert**. Die Mutation „lies immer aus dem Speicher" überlebte,
+    weil beide Quellen ununterscheidbar waren. Belegt am 31.08.2026. Scharf
+    wird es erst, wenn die zweite Quelle **abweicht**: der Test schreibt jetzt
+    nach dem Start am Halter vorbei einen anderen Wert in den Speicher.
+    Allgemein: wer eine Rangfolge prüft, sorgt dafür, dass die verlierende
+    Quelle etwas anderes sagt, sonst prüft er nur, dass irgendeine von beiden
+    gelesen wird.
+25. **Ein Test, der nur Abwesenheit prüft, unterscheidet „nichts" nicht von
+    „etwas anderes".** Der Test „an der letzten Station gibt es keine
+    Hinweistexte" prüfte, dass die Texte `Hinweis n.m` und
+    `Tipp freischalten` **nicht** vorkommen. Beides fehlt sowohl bei einer
+    leeren Fläche als auch bei dem Rückfallsatz, den die Quelle dort in
+    Wahrheit zeigt. Der Test blieb deshalb grün, während das Verhalten falsch
+    war, und wurde erst rot, als er zusätzlich die **Anwesenheit** des
+    richtigen Satzes forderte. Belegt am 31.08.2026. Allgemein: wer prüft, dass
+    etwas weg ist, prüft im selben Test, was stattdessen da ist.
 
 ## Datenvertrag: die bekannten Fallen
 

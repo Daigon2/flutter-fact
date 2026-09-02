@@ -1,19 +1,24 @@
 import 'dart:async';
 
 import 'package:fact_app/app/localization/localization_providers.dart';
+import 'package:fact_app/app/routing/app_routes.dart';
+import 'package:fact_app/features/challenges/application/active_hunt_providers.dart';
 import 'package:fact_app/features/challenges/application/hunt_hotspot.dart';
 import 'package:fact_app/features/challenges/application/hunt_plan.dart';
 import 'package:fact_app/features/challenges/application/hunt_route_generator.dart';
+import 'package:fact_app/features/challenges/application/hunt_run.dart';
 import 'package:fact_app/features/challenges/application/hunt_start_options.dart';
 import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
 import 'package:fact_app/features/challenges/presentation/notifiers/hunt_start_providers.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_setup_view.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_toast.dart';
+import 'package:fact_app/features/challenges/presentation/widgets/hunt_pause_view.dart';
+import 'package:fact_app/features/challenges/presentation/widgets/hunt_result_view.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/hunt_start_point_view.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_city.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,10 +31,35 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// `:4423-4447`), und E-25 hat die öffentliche Routenfläche auf sieben Pfade
 /// festgelegt.
 ///
-/// Was dieser Reiter weiterhin nicht kann: eine **laufende** Jagd anzeigen.
-/// Die Quelle zeigt statt des Assistenten den Pause- oder den
-/// Ergebnisbildschirm, solange eine läuft (`:4292-4317`). Beides ist nicht
-/// gebaut, siehe [_startHunt].
+/// ## Die laufende Jagd geht vor Assistent und Picker (`:4292-4317`)
+///
+/// `huntRunProvider` entscheidet, was dieser Reiter zeigt: läuft keine Jagd,
+/// bleibt alles wie zuvor (Assistent oder Picker über [_choice]); läuft eine
+/// und ist sie fertig ([HuntRun.isFinished]), zeigt der Reiter [HuntResultView];
+/// läuft sie noch, zeigt er [HuntPauseView]. Diese Prüfung steht **vor** der
+/// Fallunterscheidung nach [_choice] und nicht daneben, exakt wie die Quelle
+/// mit ihrem frühen `if (activeHunt)`.
+///
+/// **Warum `huntRunProvider` und nicht `activeHuntProvider` (Entscheidung
+/// 1 aus Schritt 39).** `activeHuntProvider` liefert auch eine aus dem
+/// Speicher wiederhergestellte Jagd, und die trägt weder Stationszustände
+/// noch Punkte, also genau das, was diese beiden Bildschirme brauchen.
+///
+/// **Die Begründung, die hier bis zum 02.09.2026 stand, war falsch**, und eine
+/// unabhängige Prüfung hat sie widerlegt. Sie lautete: eine Jagd nach einem
+/// Neustart sei „auf der Karte als Pille sichtbar, in diesem Reiter aber
+/// nicht", der Nutzer verliere sie also nicht ganz. Das stimmt nicht.
+/// `HuntPill` liest **ebenfalls** `huntRunProvider` (`hunt_pill.dart:136`),
+/// und `activeHuntProvider` hat in `lib/` keinen einzigen Verbraucher. Nach
+/// einem Neustart ist die Jagd **nirgends** sichtbar.
+///
+/// An der Verzweigung hier ändert das nichts, sie bliebe auch mit der
+/// richtigen Begründung dieselbe. Was sich ändert, ist die Einordnung: das ist
+/// keine hingenommene Kleinigkeit, sondern eine Produktvorgabe aus ADR-007,
+/// die heute an keiner Stelle eingelöst ist. Steht als **E-65** im Register,
+/// mit den zwei Wegen, die zur Wahl stehen. Ein abgespeckter Pausebildschirm
+/// ist weiterhin nicht gebaut, aber jetzt aus dem richtigen Grund: weil die
+/// Entscheidung darüber offen ist und nicht, weil es woanders schon ginge.
 ///
 /// ## Die zwei Gruppen-Rückrufe sind weiterhin leer
 ///
@@ -82,7 +112,7 @@ class ChallengesPage extends ConsumerStatefulWidget {
 /// (`:4331-4358`). Der Modus fehlt, weil dieser Assistent nur den Solo-Pfad
 /// zu Ende führt, und `routeKey` fehlt mit den kuratierten Themenrouten.
 typedef _HuntChoice = ({
-  FactPuzzleDifficulty difficulty,
+  PuzzleDifficulty difficulty,
   HuntDuration duration,
   List<String> genres,
 });
@@ -117,7 +147,7 @@ class _ChallengesPageState extends ConsumerState<ChallengesPage> {
 
   /// `handleSetupStart` für den Solo-Pfad, `:4319-4329`.
   void _onSetupDone(
-    FactPuzzleDifficulty difficulty,
+    PuzzleDifficulty difficulty,
     HuntDuration duration,
     List<String> genreCodes,
   ) {
@@ -132,22 +162,22 @@ class _ChallengesPageState extends ConsumerState<ChallengesPage> {
 
   /// `handleHotspotPick`, `:4331-4358`.
   ///
-  /// ## Die erzeugte Jagd hat heute keinen Empfänger, und das ist Absicht
+  /// ## Der Empfänger ist jetzt eingehängt
   ///
-  /// Die Quelle reicht sie mit `onHuntStart(generated)` (`:4354`) eine Ebene
-  /// höher, und der Kartenbildschirm spielt sie. **E-43 ist entschieden**, die
-  /// Solo-Jagd läuft auch im Neubau auf der Karte. Offen ist die technische
-  /// Frage, **wie `discovery` an den Jagdzustand kommt**: das wäre die fünfte
-  /// Cross-Feature-Kante, sie braucht nach Regel 10 einen öffentlichen
-  /// Vertrag, und die Entscheidung darüber ist **D-16** und liegt bei Dairen.
+  /// Die Quelle reicht die erzeugte Jagd mit `onHuntStart(generated)`
+  /// (`:4354`) eine Ebene höher, und der Kartenbildschirm spielt sie.
+  /// **D-16 war offen** (wie `discovery` an den Jagdzustand kommt) **und ist
+  /// beantwortet**: ADR-007 legt den Vertrag fest, ADR-009 die
+  /// Gruppen-Erweiterung, und `huntRunProvider` (`active_hunt_providers.dart`,
+  /// Schritt 36) ist der Besitzer des Zustands. Diese Methode hängt den
+  /// Empfänger deshalb an, statt hier zu enden: [HuntRunNotifier.start] setzt
+  /// den Lauf, `ChallengesPage.build` sieht ihn über `huntRunProvider` und
+  /// zeigt ab dem nächsten Bild [HuntPauseView] statt des Pickers, siehe den
+  /// Klassenkopf.
   ///
-  /// Bis dahin endet die Kette hier. Hier fehlt **nichts**, was jemand
-  /// vergessen hat; hier fehlt eine Antwort. Wer D-16 beantwortet bekommt,
-  /// hängt an dieser Stelle den Empfänger ein und ändert sonst nichts.
-  ///
-  /// Was **schon** gebaut ist: der Fehlschlag. Findet der Generator keine
-  /// einzige Station, zeigt die Quelle eine kurze Meldung und schickt zurück
-  /// in den Assistenten (`:4347-4352`). Genau das passiert hier auch.
+  /// Was **schon vorher** gebaut war und unverändert bleibt: der Fehlschlag.
+  /// Findet der Generator keine einzige Station, zeigt die Quelle eine kurze
+  /// Meldung und schickt zurück in den Assistenten (`:4347-4352`).
   void _startHunt(_HuntChoice choice, MapPosition point, List<Fact> facts) {
     final HuntPlan? plan = generateHuntRoute(
       facts: _factsOfCity(facts),
@@ -169,8 +199,22 @@ class _ChallengesPageState extends ConsumerState<ChallengesPage> {
       return;
     }
 
-    // D-16, siehe oben. Der Plan ist fertig und wird bis zur Antwort nicht
-    // weitergereicht.
+    // `unawaited` und keine `async`-Methode: `HuntRunNotifier._apply` setzt
+    // den Zustand **synchron**, bevor sie auf den Schreibvorgang wartet
+    // (siehe dort), also sieht `huntRunProvider` den neuen Lauf schon vor dem
+    // nächsten Frame, ganz ohne dass hier auf das zurückgegebene `Future`
+    // gewartet wird. Ein `await` hier würde also nur die Rückkehr aus einem
+    // `VoidCallback` verzögern, ohne das Ergebnis zu nutzen.
+    //
+    // **Wer den Schreibfehlschlag auffängt, stand hier bis zum 02.09.2026
+    // falsch.** Nicht `_apply`, das behandelt nur `toActiveHunt() == null`,
+    // sondern der **Speicher**: `SharedPreferencesKeyValueStore._write` fängt
+    // `on Object` und meldet an die Diagnose-Senke, das Future endet also nie
+    // mit einem Fehler. Das gilt für die heutige Umsetzung und nicht für den
+    // Vertrag: eine `ActiveHuntStore`-Umsetzung, die wirft, liefe mit
+    // `unawaited` in einen unbehandelten Fehler. Wer eine solche einhängt,
+    // sieht hier nach.
+    unawaited(ref.read(huntRunProvider.notifier).start(plan));
   }
 
   /// Der Kandidatenpool des Generators: die Fakten dieser Stadt.
@@ -195,12 +239,27 @@ class _ChallengesPageState extends ConsumerState<ChallengesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final HuntRun? run = ref.watch(huntRunProvider);
     final _HuntChoice? choice = _choice;
     final String? toast = _toast;
 
     return Stack(
       children: <Widget>[
-        if (choice == null) _setup() else _picker(choice),
+        // Die Meldung liegt über allen drei Zweigen, `:4163-4167` und der
+        // ganze `<Stack>` der Quelle, unverändert seit Schritt 35.
+        if (run != null && run.isFinished)
+          HuntResultView(run: run, onClose: _endHunt)
+        else if (run != null)
+          HuntPauseView(
+            run: run,
+            cityName: ChallengesPage.placeholderCityName,
+            onBackToMap: () => const MapRoute().go(context),
+            onAbort: _endHunt,
+          )
+        else if (choice == null)
+          _setup()
+        else
+          _picker(choice),
         if (toast != null)
           Positioned(
             top: ChallengeToast.topOffset,
@@ -216,6 +275,18 @@ class _ChallengesPageState extends ConsumerState<ChallengesPage> {
       ],
     );
   }
+
+  /// `onHuntAbort`, `:4300` und `:4312`: die Quelle ruft für „Ja, abbrechen"
+  /// und für „Fertig" denselben Rückruf, ohne zwischen Abbruch und
+  /// planmäßigem Ende zu unterscheiden. [HuntRunNotifier.end] räumt in beiden
+  /// Fällen dasselbe auf: Zustand löschen, Speicher leeren.
+  ///
+  /// `unawaited` aus demselben Grund wie in [_startHunt], und hier ist die
+  /// Klammer auch das einzige Zeichen, das es sagt: ohne sie fiele das Future
+  /// still weg, und kein Lint meldet das, weil diese Methode nicht `async`
+  /// ist. Bis zum 02.09.2026 war genau das der Fall, siebzig Zeilen unter
+  /// einer ausführlichen Begründung für das Gegenteil.
+  void _endHunt() => unawaited(ref.read(huntRunProvider.notifier).end());
 
   Widget _setup() {
     return ChallengeSetupView(

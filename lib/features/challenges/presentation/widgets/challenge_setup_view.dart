@@ -11,7 +11,7 @@ import 'package:fact_app/features/challenges/presentation/challenge_genre.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_bubble.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_genre_filter.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_player_badge.dart';
-import 'package:fact_app/features/facts/domain/value_objects/fact_puzzle_difficulty.dart';
+import 'package:fact_app/kernel/puzzle_difficulty.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -86,7 +86,7 @@ class ChallengeSetupView extends ConsumerStatefulWidget {
   static const Key startKey = Key('challenge-setup-start');
 
   /// Die Karte zu [difficulty], für Tests.
-  static Key difficultyKey(FactPuzzleDifficulty difficulty) =>
+  static Key difficultyKey(PuzzleDifficulty difficulty) =>
       Key('challenge-setup-difficulty-${difficulty.code}');
 
   /// Die Karte zu [duration], für Tests.
@@ -100,7 +100,7 @@ class ChallengeSetupView extends ConsumerStatefulWidget {
   /// den Solo-Pfad zu Ende führt. `routeKey` fehlt aus demselben Grund wie die
   /// Themenrouten selbst, siehe [_routeCard].
   final void Function(
-    FactPuzzleDifficulty difficulty,
+    PuzzleDifficulty difficulty,
     HuntDuration duration,
     List<String> genreCodes,
   )
@@ -121,7 +121,7 @@ class _ChallengeSetupViewState extends ConsumerState<ChallengeSetupView> {
   int _step = 1;
 
   /// `diff`, `:1589`.
-  FactPuzzleDifficulty? _difficulty;
+  PuzzleDifficulty? _difficulty;
 
   /// `duration`, `:1590`.
   HuntDuration? _duration;
@@ -152,7 +152,7 @@ class _ChallengeSetupViewState extends ConsumerState<ChallengeSetupView> {
 
   /// `confirmStep2()`, `:1614-1617`.
   void _confirm() {
-    final FactPuzzleDifficulty? difficulty = _difficulty;
+    final PuzzleDifficulty? difficulty = _difficulty;
     final HuntDuration? duration = _duration;
     if (difficulty == null || duration == null) {
       return;
@@ -245,7 +245,7 @@ class _ChallengeSetupViewState extends ConsumerState<ChallengeSetupView> {
         padding: const EdgeInsets.only(left: 4, bottom: 6),
         child: _sectionLabel(strings.text('challenge.difficulty'), colors),
       ),
-      for (final FactPuzzleDifficulty difficulty in FactPuzzleDifficulty.values)
+      for (final PuzzleDifficulty difficulty in PuzzleDifficulty.values)
         _difficultyCard(difficulty, strings, colors),
       // `marginTop: 10`, `marginBottom: 6`, `:1894`.
       Padding(
@@ -557,7 +557,7 @@ class _ChallengeSetupViewState extends ConsumerState<ChallengeSetupView> {
 
   /// Eine Schwierigkeitskarte, `:1869-1888`.
   Widget _difficultyCard(
-    FactPuzzleDifficulty difficulty,
+    PuzzleDifficulty difficulty,
     AppStrings strings,
     FactColors colors,
   ) {
@@ -639,25 +639,25 @@ class _ChallengeSetupViewState extends ConsumerState<ChallengeSetupView> {
   /// Geschwister aus den erzeugten Tabellen gehören zu einem anderen
   /// Bildschirm, siehe die Begründung dort.
   static const Map<
-    FactPuzzleDifficulty,
+    PuzzleDifficulty,
     ({String emoji, String labelKey, String descriptionKey})
   >
   _difficultyLook =
       <
-        FactPuzzleDifficulty,
+        PuzzleDifficulty,
         ({String emoji, String labelKey, String descriptionKey})
       >{
-        FactPuzzleDifficulty.leicht: (
+        PuzzleDifficulty.leicht: (
           emoji: '🚶',
           labelKey: 'challenge.easy',
           descriptionKey: 'challenge.setup.easyDesc',
         ),
-        FactPuzzleDifficulty.mittel: (
+        PuzzleDifficulty.mittel: (
           emoji: '🏃',
           labelKey: 'challenge.medium',
           descriptionKey: 'challenge.setup.mediumDesc',
         ),
-        FactPuzzleDifficulty.schwer: (
+        PuzzleDifficulty.schwer: (
           emoji: '🧭',
           labelKey: 'challenge.hard',
           descriptionKey: 'challenge.setup.hardDesc',

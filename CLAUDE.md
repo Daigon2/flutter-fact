@@ -56,7 +56,9 @@ When a rebuild step is finished, update `HANDOFF.md` in the same change: current
 ## Reference repository (read-only)
 
 The FACT monorepo is a separate repository and is **never modified from here**.
-It is the behavioral source of truth, not an architectural one.
+It is the behavioral source of truth, not an architectural one, and **not a
+quality standard**. See "The PWA is a reference, not a gold standard" below
+before treating anything you find there as a template.
 
 Path: `C:\Users\Janek Postpischil\OneDrive\DokumenteClaudeSortierung\Documents\01_Persönliches\12_Claude\Claude Code\Fact`
 
@@ -69,6 +71,38 @@ Path: `C:\Users\Janek Postpischil\OneDrive\DokumenteClaudeSortierung\Documents\0
 
 When PWA behavior and an accepted ADR disagree: keep the behavior, follow the
 ADR for structure, and report the conflict instead of resolving it silently.
+
+### The PWA is a reference, not a gold standard
+
+Owner's instruction, 02.09.2026: "Die PWA ist nicht der Goldstandard, sondern
+alles hier ist da, den Code besser zu machen und Fehler aufzudecken." Finding
+and fixing the source's defects is a **purpose** of this rebuild, not a side
+effect.
+
+So separate two things that both look like a deviation:
+
+- **Behavior** the source defines (a flow, a rule, a threshold, a piece of
+  copy) is the reference. Follow it, and report a conflict with an ADR rather
+  than resolving it yourself.
+- **A measured defect** is a finding, never a template. Build it correctly,
+  record the deviation with the source reference, and file the source's defect
+  as a register entry.
+
+Worked examples of the second kind, all measured: a puzzle that cannot be
+solved in English because the expected answer is German data (E-08); a screen
+showing its own i18n key because the key does not exist (E-28, E-63); a `||`
+fallback that can never fire because `t()` returns the key (E-63); points
+promised at 1.5x and credited at 1x (E-44).
+
+**English-speaking users see English.** Hardcoded German without an i18n key
+is a defect of the source, not parity to preserve. Where the source has no
+wording, the missing text is a content question for the owner, not a licence to
+ship the German one.
+
+Do not ask whether an obvious defect should be reproduced. Fix it, write down
+what you measured, and flag it. If the correct behavior needs a wording, a
+colour or a flow decision, that part goes to the owner; the defect itself does
+not.
 
 ## Windows realities
 

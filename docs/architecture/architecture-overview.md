@@ -106,7 +106,11 @@ Flutter application
 │   ├── shared technical types
 │   └── genuinely reusable UI primitives
 │
+├── kernel/
+│   └── value objects two or more domains both need
+│
 ├── services/
+│   ├── orientation (compass heading)
 │   ├── analytics
 │   ├── crash reporting
 │   ├── notifications
@@ -127,11 +131,24 @@ Flutter application
     ├── progression
     ├── challenges
     ├── tours
+    ├── puzzles
     ├── profile
     └── settings
 ```
 
 `services/` contains application-wide technical capabilities. Business services remain inside their owning feature.
+
+`kernel/` is the shared kernel, added on 2026-08-31 by ADR-008. It is the only
+place outside its own feature that a domain layer may import, and it exists
+because the alternative had been paid for three times: a verbatim copy of a value
+object in a second domain. A copy of a coordinate pair diverges visibly, but an
+enumeration with meaning diverges silently, and that is what forced the decision.
+
+It is deliberately not part of `core/`, and the distinction is the useful one to
+remember: `core/` holds technical primitives and must contain no business concept
+at all, while `kernel/` holds business concepts and admits them only under four
+rules in ADR-008. Both are shared; one is shared technique, the other shared
+meaning.
 
 `map/` is the map host, added on 2026-08-28. Four features draw on the same map,
 and putting the host inside one of them would force the other three to import

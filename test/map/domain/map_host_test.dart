@@ -4,8 +4,10 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const MapPosition munich = MapPosition(latitude: 48.1351, longitude: 11.582);
@@ -73,7 +75,25 @@ class FakeMapHost implements MapHost {
     _controller.add(view);
   }
 
-  Future<void> close() => _controller.close();
+  MapViewport? _viewport;
+
+  @override
+  MapViewport? get viewport => _viewport;
+
+  /// Tut so, als hätte `MapSurface` eine Größe gemeldet.
+  void measure(MapViewport size) => _viewport = size;
+
+  final StreamController<MapOverlayGroupTap> _groupTaps =
+      StreamController<MapOverlayGroupTap>.broadcast();
+
+  @override
+  Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
+
+  /// Tut so, als hätte das SDK einen Tipp auf eine Gruppe gemeldet.
+  void tapGroup(MapOverlayGroupTap tap) => _groupTaps.add(tap);
+
+  Future<void> close() =>
+      Future.wait(<Future<void>>[_controller.close(), _groupTaps.close()]);
 }
 
 MapCameraView viewAt(MapPosition center) =>
@@ -149,4 +169,49 @@ void main() {
 
     expect(host.submitted, hasLength(1));
   });
+
+  test('ohne gemessene Fläche ist die Kartenfläche null', () {
+    // `null` ist hier der Normalfall beim Start, genau wie bei `camera`.
+    expect(host.viewport, isNull);
+  });
+
+  test('nach der Messung steht die Größe der Kartenfläche', () {
+    const MapViewport size = MapViewport(
+      widthInScreenPixels: 400,
+      heightInScreenPixels: 800,
+    );
+
+    host.measure(size);
+
+    expect(host.viewport, size);
+  });
+
+  test(
+    'der Gruppen-Tipp-Strom meldet jeden Tipp in seiner Reihenfolge',
+    () async {
+      const MapOverlayGroupTap first = MapOverlayGroupTap(
+        overlayId: 'discovery.facts',
+        position: munich,
+      );
+      const MapOverlayGroupTap second = MapOverlayGroupTap(
+        overlayId: 'discovery.facts',
+        position: rome,
+      );
+      final Future<List<MapOverlayGroupTap>> seen = host.groupTaps
+          .take(2)
+          .toList();
+
+      host.tapGroup(first);
+      host.tapGroup(second);
+
+      // Verglichen wird über `identical` und nicht über `==`: `==` gibt es für
+      // [MapOverlayGroupTap] bewusst nicht, siehe dessen Kopfkommentar. Ein
+      // `expect` mit `equals` prüfte hier über `identical` mit zusätzlichen
+      // Schritten und würde eine zurückgegebene Objektgleichheit nicht von
+      // einer stillschweigend eingeführten `==`-Methode unterscheiden.
+      final List<MapOverlayGroupTap> taps = await seen;
+      expect(identical(taps[0], first), isTrue);
+      expect(identical(taps[1], second), isTrue);
+    },
+  );
 }

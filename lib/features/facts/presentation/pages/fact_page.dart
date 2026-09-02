@@ -30,7 +30,7 @@ import 'package:go_router/go_router.dart';
 ///
 /// **Die Akte darf niemals ohne räumliche Nähe erreichbar sein.** Der Fix in
 /// `screen-map.jsx:2137-2142` sagt es wörtlich: „ohne GPS NIE die
-/// Fakt-Detail-Seite direkt oeffnen. Sonst koennte man durch Antippen aus
+/// Fakt-Detail-Seite direkt öffnen. Sonst könnte man durch Antippen aus
 /// 1000 km Entfernung einen Fakt lesen". Ein Ballon-Tipp öffnet deshalb
 /// innerhalb von 150 Metern das Sammeln und außerhalb nur eine Mini-Kachel
 /// (`:2129-2145`). Wer diese Seite erreichbar macht, ohne diese Bedingung

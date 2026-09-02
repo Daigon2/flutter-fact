@@ -358,7 +358,7 @@ class _RenderFieldRow extends RenderBox
     with
         ContainerRenderObjectMixin<RenderBox, _FieldParentData>,
         RenderBoxContainerDefaultsMixin<RenderBox, _FieldParentData> {
-  _RenderFieldRow({required double spacing}) : _spacing = spacing;
+  _RenderFieldRow({required this._spacing});
 
   static const double _unbounded = double.infinity;
 

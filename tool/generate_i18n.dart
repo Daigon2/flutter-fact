@@ -18,6 +18,14 @@
 // Schlüssel dort muss in der PWA fehlen. Bekommt die Quelle einen davon, endet
 // das Skript mit Exit-Code 1 und nennt ihn. Siehe E-39 in REBUILD_STATUS.md.
 //
+// Und, ebenfalls in **beiden** Betriebsarten: jeder `t('schluessel', lang)`-
+// Aufruf im übrigen JSX muss einen Schlüssel benutzen, den es in einer
+// Sprachtabelle oder in der Ergänzung gibt. Ohne diese Prüfung ist ein
+// fehlender Schlüssel für das Werkzeug unsichtbar, denn `window.t` gibt bei
+// einem fehlenden Schlüssel laut `translations.jsx:1600-1605` den Schlüssel
+// selbst zurück, und der steht dann wörtlich auf dem Bildschirm. Genau diese
+// Lücke hat E-28 durchgelassen. Siehe REBUILD_STATUS.md.
+//
 // Der Quellpfad wird in dieser Reihenfolge bestimmt:
 //   1. `--source`
 //   2. Umgebungsvariable FACT_PWA_APP_DIR
@@ -71,6 +79,7 @@ void main(List<String> args) {
   // Vor beiden Betriebsarten, nicht nur vor dem Schreiben: sonst merkt der
   // überflüssig gewordene Ergänzungs-Eintrag nur, wer gerade neu erzeugt.
   _checkSupplement(tables);
+  _checkSourceUsage(sourceDir, tables);
 
   final files = _renderFiles(tables, config);
 
@@ -502,6 +511,249 @@ Set<String> _readSupplementKeys() {
   }
 
   return keys;
+}
+
+// ── Gegenprüfung der JSX-Aufrufstellen ───────────────────────────────────────
+
+/// Erkennt `t('...')`, `window.t('...')` und `window.t?.('...')` mit einem
+/// echten Zeichenketten-Literal in einfachen Anführungszeichen als Argument.
+///
+/// Der Lookbehind schließt Aufrufe aus, die zufällig auch auf „t(" enden,
+/// etwa `shortcut('...')` oder `delight('...')`. Nur ein Treffer, auf den
+/// direkt `,` oder `)` folgt, zählt als vollständiger Schlüssel: folgt
+/// stattdessen `+`, ist der Aufruf zusammengesetzt (`t('cat.' + x, lang)`),
+/// und der ganze Schlüssel steht nicht im Quelltext. Ein Test würde ihn sonst
+/// als „cat." melden, ein Schlüssel, den es nie geben kann.
+final _sourceCallPattern = RegExp(
+  r"(?<![A-Za-z0-9_.])(?:window\.t\?\.|window\.t|t)\(\s*'((?:[^'\\]|\\.)*)'\s*(?=[,)])",
+);
+
+/// Ein Schlüssel der PWA trägt immer einen Namensraum mit Punkt, siehe
+/// [_supplementKeyPattern]. Gegenprobe dazu: ein Treffer ohne Punkt ist kein
+/// PWA-Schlüssel und wird hier bewusst nicht geprüft.
+bool _looksLikeNamespacedKey(String key) => key.contains('.');
+
+/// Sicherungskopien sind kein laufender Code, ihre Schlüssel sagen nichts
+/// über die heutige PWA. Im echten Bestand: `screen-map.original.jsx`
+/// (Namensmuster `.original.`) und `_old_göttingen-data.jsx.bak` (Endung
+/// `.bak`).
+bool _isBackupFile(String name) =>
+    name.contains('.original.') || name.endsWith('.bak');
+
+/// Die beiden Wörterbücher selbst zählen nicht als Aufrufstellen, sie sind
+/// die Quelle, gegen die geprüft wird.
+bool _isDictionaryFile(String name) =>
+    name == 'translations.jsx' || name == 'audio-strings.jsx';
+
+/// Bekannte Lücken zwischen einem JSX-Aufruf und den Wörterbüchern. Beide
+/// liegen im anderen Repository und sind von hier nicht behebbar; ein harter
+/// Abbruch ohne diese Liste wäre sinnlos, weil das Werkzeug dann ab dem
+/// ersten Lauf dauerhaft rot wäre für etwas, das hier niemand beheben kann.
+/// Jeder weitere Eintrag braucht eine eigene E-Nummer, siehe
+/// REBUILD_STATUS.md, und Rücksprache, bevor er hier landet.
+const _knownMissingSourceKeys = <String>{
+  // `audio.dialog.volumeHint` (E-28) stand hier bis zum 02.09.2026 und ist an
+  // diesem Tag herausgefallen, **weil diese Prüfung ihn selbst gemeldet hat**.
+  // Der Wortlaut wurde freigegeben, der Schlüssel steht seither in
+  // `app_strings_supplement.dart`, damit ist er keine Lücke mehr und der
+  // Eintrag war tot. Genau dafür gibt es die Veraltungsmeldung: eine Liste,
+  // die niemand zwingt, aktuell zu bleiben, bewacht irgendwann nichts mehr.
+  'group.join.title', // E-63
+};
+
+/// Entfernt Zeilen- und Blockkommentare aus JS-Quelltext, ohne Zustände in
+/// String-Literalen zu verwechseln. Ein naives Entfernen ab dem ersten `//`
+/// würde eine URL wie `'http://…'` mitten im String kappen und den Rest der
+/// Zeile falsch als Kommentar behandeln.
+///
+/// Entfernte Abschnitte werden durch dieselbe Anzahl Zeilenumbrüche ersetzt,
+/// damit Zeilennummern in Fehlermeldungen weiterhin auf die richtige Zeile
+/// der Originaldatei zeigen.
+///
+/// Kennt keine `${…}`-Interpolation in Template-Strings: ein `//` oder `/*`
+/// innerhalb eines interpolierten Ausdrucks würde fälschlich als Teil des
+/// Strings gelten. Im echten Bestand kommt das nicht vor, siehe die
+/// Gegenprobe am echten Bestand in REBUILD_STATUS.md.
+String _stripComments(String source) {
+  final buffer = StringBuffer();
+  var i = 0;
+  while (i < source.length) {
+    final char = source[i];
+    if (char == "'" || char == '"' || char == '`') {
+      final quote = char;
+      buffer.write(char);
+      i++;
+      while (i < source.length) {
+        final c = source[i];
+        buffer.write(c);
+        if (c == r'\' && i + 1 < source.length) {
+          i++;
+          buffer.write(source[i]);
+          i++;
+          continue;
+        }
+        // **Der Zustand darf keine Zeile überleben.** Ein `'` oder `"`
+        // schließt in JavaScript spätestens am Zeilenende; steht bis dahin
+        // kein zweites, war das erste gar kein Anfang einer Zeichenkette,
+        // sondern Text. Genau das kommt im JSX ständig vor, als Minutenzeichen
+        // (`{min}'`) oder als typografisches Anführungszeichen im Fließtext.
+        //
+        // Ohne diesen Abbruch **kaskadiert** so ein Zeichen: der Scanner hält
+        // die Zeichenkette bis zum nächsten gleichen Zeichen offen, oft erst
+        // Zeilen später, und in der Zwischenzeit ist seine Parität verschoben.
+        // Ein `//` in einer echten Zeichenkette gilt dann als Zeilenkommentar,
+        // und alles bis Zeilenende fällt weg, samt einem `t()`-Aufruf darin.
+        // Am 02.09.2026 an einer Wegwerf-Datei ausgelöst: ein fehlender
+        // Schlüssel verschwand **still**, und still ist genau der Fehler,
+        // gegen den diese ganze Prüfung gebaut ist.
+        //
+        // Das Zurücksetzen macht den Fehler örtlich: ein verlesenes Zeichen
+        // verdirbt höchstens seine eigene Zeile. Für ` gilt es nicht, ein
+        // Template-Literal darf mehrzeilig sein.
+        if (quote != '`' && c == '\n') {
+          i++;
+          break;
+        }
+        i++;
+        if (c == quote) {
+          break;
+        }
+      }
+      continue;
+    }
+    if (char == '/' && i + 1 < source.length && source[i + 1] == '/') {
+      final end = source.indexOf('\n', i);
+      i = end == -1 ? source.length : end;
+      continue;
+    }
+    if (char == '/' && i + 1 < source.length && source[i + 1] == '*') {
+      final end = source.indexOf('*/', i + 2);
+      if (end == -1) {
+        break;
+      }
+      final removed = source.substring(i, end + 2);
+      buffer.write('\n' * '\n'.allMatches(removed).length);
+      i = end + 2;
+      continue;
+    }
+    buffer.write(char);
+    i++;
+  }
+  return buffer.toString();
+}
+
+/// Ein Fund: ein Aufruf im JSX, dessen Schlüssel weder in einer Sprachtabelle
+/// noch in der Ergänzung noch in [_knownMissingSourceKeys] steht.
+class _SourceMiss {
+  const _SourceMiss({
+    required this.file,
+    required this.line,
+    required this.key,
+  });
+
+  final String file;
+  final int line;
+  final String key;
+}
+
+/// Prüft jeden `t()`-Aufruf im übrigen JSX gegen die Sprachtabellen.
+///
+/// Ein Aufruf, dessen Schlüssel in keiner Sprache und nicht in der Ergänzung
+/// steht, ist ein Fund: die PWA zeigt an dieser Stelle im Ernstfall den
+/// Schlüssel selbst an. Die Gegenprüfung aus E-39 deckt das nicht ab, sie
+/// läuft in die andere Richtung und meldet Ergänzungs-Schlüssel, die es in
+/// der PWA inzwischen gibt.
+void _checkSourceUsage(
+  Directory sourceDir,
+  Map<String, _LanguageTable> tables,
+) {
+  final knownKeys = <String>{};
+  for (final table in tables.values) {
+    knownKeys.addAll(table.texts.keys);
+    knownKeys.addAll(table.lists.keys);
+  }
+  final supplementKeys = _readSupplementKeys();
+
+  final files =
+      sourceDir
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.toLowerCase().endsWith('.jsx'))
+          .where((file) {
+            final name = file.path.split(Platform.pathSeparator).last;
+            return !_isDictionaryFile(name) && !_isBackupFile(name);
+          })
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
+
+  final checkedKeys = <String>{};
+  final missing = <_SourceMiss>[];
+  final matchedKnownGaps = <String>{};
+
+  for (final file in files) {
+    final name = file.path.split(Platform.pathSeparator).last;
+    final text = _stripComments(file.readAsStringSync());
+    for (final match in _sourceCallPattern.allMatches(text)) {
+      final key = match.group(1)!;
+      if (!_looksLikeNamespacedKey(key)) {
+        continue;
+      }
+      checkedKeys.add(key);
+      if (knownKeys.contains(key) || supplementKeys.contains(key)) {
+        continue;
+      }
+      if (_knownMissingSourceKeys.contains(key)) {
+        matchedKnownGaps.add(key);
+        continue;
+      }
+      missing.add(
+        _SourceMiss(file: name, line: _lineOf(text, match.start), key: key),
+      );
+    }
+  }
+
+  if (missing.isNotEmpty) {
+    stderr.writeln(
+      'Quellnutzung: ${missing.length} Aufruf bzw. Aufrufe im JSX benutzen '
+      'einen Schlüssel, der in keiner Sprachtabelle und keiner Ergänzung '
+      'steht:',
+    );
+    for (final miss in missing) {
+      stderr.writeln('  ${miss.file}:${miss.line}: "${miss.key}"');
+    }
+    stderr.writeln(
+      'Entweder fehlt der Schlüssel wirklich in der PWA (eine neue E-Nummer '
+      'anfragen und den Schlüssel dann in _knownMissingSourceKeys eintragen) '
+      'oder das Muster hat einen Fehlalarm gefunden.',
+    );
+    exit(1);
+  }
+
+  // Genau wie bei _checkSupplement ein harter Abbruch statt einer bloßen
+  // Meldung: eine Liste bekannter Lücken, die niemand zwingt, aktuell zu
+  // halten, verrottet irgendwann lautlos und bewacht dann nichts mehr.
+  final staleKnownGaps = _knownMissingSourceKeys.difference(matchedKnownGaps);
+  if (staleKnownGaps.isNotEmpty) {
+    stderr.writeln(
+      'Quellnutzung: ${staleKnownGaps.length} Eintrag bzw. Einträge in '
+      '_knownMissingSourceKeys sind veraltet:',
+    );
+    for (final key in staleKnownGaps.toList()..sort()) {
+      stderr.writeln('  $key');
+    }
+    stderr.writeln(
+      'Entweder steht der Schlüssel jetzt in einer Sprachtabelle, oder er '
+      'kommt im JSX nicht mehr vor. In beiden Fällen aus '
+      '_knownMissingSourceKeys entfernen.',
+    );
+    exit(1);
+  }
+
+  stdout.writeln(
+    'Quellnutzung: ${checkedKeys.length} benutzte Schlüssel mit Namensraum '
+    'geprüft, ${_knownMissingSourceKeys.length} bekannte Lücke bzw. Lücken '
+    'davon unverändert.',
+  );
 }
 
 // ── Dart-Dateien erzeugen ────────────────────────────────────────────────────

@@ -56,17 +56,52 @@
 //     gleich aus. Textuell ist das nicht unterscheidbar, deshalb prüft das
 //     Skript nur fremdes `presentation/` und `data/` (Regel 8 und 9).
 //
-// Gemessene, noch nicht geschlossene Lücke
-// ----------------------------------------
-// Regel 17 (`presentation` zeigt nicht auf `data`, auch nicht auf das eigene)
-// hängt weiter an `_pointsIntoOwnFeatureLayer` und damit an `lib/features/`.
-// In einem Modul außerhalb davon, etwa `lib/map/presentation/` auf
-// `lib/map/data/`, meldet sie nichts. Das ist kein Entwurf, sondern der Rest
-// derselben Asymmetrie, die bei den Schichtmustern und bei Regel 8 und 9
-// geschlossen wurde; es fehlt dieselbe Ableitung über [_modulwurzel]. Der Fall
-// ist heute nicht auslösbar, weil es außerhalb von `lib/features/` kein
-// `data/` gibt. Ein Test hält den Zustand fest, damit er nicht unbemerkt
-// bleibt.
+// Zwei gemessene Lücken geschlossen
+// ---------------------------------
+// Beide standen in REBUILD_STATUS.md unter "Drei verbleibende Asymmetrien im
+// Architektur-Check" und sind seither geschlossen:
+//
+//  * Die Cross-Feature-Prüfung (`_crossFeaturePattern`) verlangte die Schicht
+//    direkt unter dem Feature. Ein fremdes `features/x/unterstruktur/data/`
+//    entkam damit den Regeln 8 und 9, während dieselbe Verschachtelung für
+//    die eigenen Schichten über [_hasSegment] schon geschlossen war. Das
+//    Muster erlaubt jetzt dieselbe Tiefe, nicht-gierig, damit
+//    `features/x/presentation/widgets/foo.dart` weiterhin die Schicht
+//    `presentation` liefert und nicht `widgets`.
+//  * Regel 17 (`presentation` zeigt nicht auf `data`, auch nicht auf das
+//    eigene) hing an `_pointsIntoOwnFeatureLayer` und damit an
+//    `lib/features/`. Ein Modul außerhalb davon, etwa `lib/map/presentation/`
+//    auf `lib/map/data/`, meldete nichts. Die Prüfung nutzt jetzt zusätzlich
+//    dieselbe Ableitung über [_modulwurzel], die für die Domäne schon
+//    dastand, als Oder neben der alten Prüfung: die alte deckt die ganze
+//    Feature-Unterstruktur ab, die neue das Modul einer Datei außerhalb von
+//    `lib/features/`. Fremdes `data/` bleibt bei Regel 9, weil [_modulwurzel]
+//    aus dem Pfad der geprüften Datei selbst kommt und ein fremder Import nie
+//    mit diesem Präfix beginnt.
+//
+// **Eine Kante bleibt an Regel 17 offen, und der Absatz darüber verschwieg
+// sie bis zum 02.09.2026.** Ein **verschachteltes** Modul ausserhalb von
+// `lib/features/`, das auf das `data/` seines Elternmoduls zeigt
+// (`lib/map/karte/presentation/a.dart` auf `package:fact_app/map/data/b.dart`),
+// wird nicht gemeldet: innerhalb von `lib/features/` deckt der erste Zweig
+// diese Tiefe ab, ausserhalb deckt der zweite nur die flache Form.
+// Nachgemessen von einer unabhängigen Prüfung an einem Probebaum. Heute nicht
+// auslösbar, weil es ausserhalb von `lib/features/` kein `data/` gibt, und
+// bewusst ohne Test, weil ein Test für einen unmöglichen Fall grün bleibt,
+// egal was das Skript tut. Wer dem Karten-Host ein `data/` gibt, prüft diese
+// Kante mit.
+//
+// Zweite bekannte Kante, laut und nicht still: [_hasSegment] nimmt **jedes**
+// Pfadsegment namens `data` als Schicht. Ein Import nach
+// `features/z/domain/value_objects/data/h.dart` meldet deshalb einen
+// Regel-17-Verstoss, obwohl er in die Domäne geht. Ein solcher Ordner
+// existiert nicht; entstünde er, wäre der Fehlalarm sofort sichtbar.
+//
+// Noch offen bleibt die dritte Asymmetrie aus derselben Liste: `application`
+// hat weiter nur eine Verbotsliste, keine Erlaubnisliste wie Domain und Kern.
+// Das setzt eine Aussage voraus, was "narrowly scoped Core" in
+// dependency-rules.md konkret bedeutet, und die fehlt dort. Eine
+// Architekturentscheidung, keine Erkennungslücke.
 
 import 'dart:io';
 
@@ -156,6 +191,17 @@ const _domainBans = <Ban>[
   ),
   Ban(
     r'^package:geolocator',
+    'Regel 4: Domain darf keine Geräte-SDK importieren',
+  ),
+  // Kein eigener Eintrag für flutter_rotation_sensor: der Paketname beginnt
+  // selbst mit `flutter_` und fällt damit bereits unter das Flutter-Verbot
+  // zwei Zeilen weiter oben, dieselbe Lage wie bei flutter_riverpod im Test
+  // „Ä2". Ein zweiter, engerer Eintrag träfe denselben Import ein zweites
+  // Mal. native_device_orientation trägt dieses Präfix nicht und bekommt
+  // deshalb unten einen eigenen Eintrag, siehe die Begründung bei
+  // [_orientationSdkBans].
+  Ban(
+    r'^package:native_device_orientation',
     'Regel 4: Domain darf keine Geräte-SDK importieren',
   ),
   Ban(
@@ -326,18 +372,106 @@ const _mapSdkBans = <Ban>[
 ///  * Sie gilt nur unterhalb von `lib/`, wie Regel 19 und 20. Ein Test darf
 ///    `geolocator` importieren, und
 ///    `test/services/location/geolocator_location_service_test.dart` tut es.
-///  * `shared_preferences` verhält sich heute identisch: außerhalb einer Domäne
-///    darf es jedes Verzeichnis importieren. Dafür entsteht hier bewusst keine
-///    Regel. Das Paket steht nicht in pubspec.yaml, und anders als bei
+///  * `shared_preferences` stand hier bis zum 31.08.2026 als bewusste Lücke:
+///    „Das Paket steht nicht in pubspec.yaml, und anders als bei
 ///    `webview_flutter` (Regel 19) gibt es keine getroffene Entscheidung, die
-///    ein Heimatverzeichnis benennt. Eine Regel wäre hier eine Entscheidung,
-///    keine Durchsetzung.
+///    ein Heimatverzeichnis benennt." **Beide Bedingungen sind seither
+///    weggefallen**, das Paket ist eine direkte Abhängigkeit und
+///    `lib/services/preferences/` ist sein Ort. Die Lücke ist damit Regel 22
+///    geworden, siehe [_prefsSdkBans].
 const _geoSdkBans = <Ban>[
   Ban(
     r'^package:geolocator',
     'Regel 21: das Geo-SDK gehört dem Ortungsdienst unter $_locationHome. Der '
         'Rest der App kennt nur den Domain-Vertrag des Dienstes, nicht das '
         'Vendor-Paket',
+  ),
+];
+
+/// Regel 22: den Gerätespeicher kennt nur der Präferenz-Adapter.
+///
+/// Dieselbe Bauart wie die Regeln 19 bis 21, und dieselbe Begründung:
+/// `lib/features/README.md` gibt `services/` als Ort für „Vendor-Adapter ohne
+/// Oberfläche", und ein Schlüssel-Wert-Speicher ist genau das. Der Rest der App
+/// kennt `KeyValueStore` aus `lib/core/preferences/`.
+///
+/// **Diese Regel ist eine Durchsetzung geworden, nachdem sie lange keine sein
+/// durfte.** Der Doku-Block von [_geoSdkBans] führte `shared_preferences`
+/// ausdrücklich als bewusste Lücke, mit zwei Bedingungen: das Paket stehe nicht
+/// in `pubspec.yaml`, und es gebe keine Entscheidung, die ein
+/// Heimatverzeichnis benennt. Am 31.08.2026 ist das Paket freigegeben und
+/// aufgenommen worden, und dieselbe Änderung benennt das Verzeichnis. Damit ist
+/// aus der Entscheidung eine Durchsetzung geworden.
+///
+/// Das Präfix und nicht der volle Name, wie bei Regel 21 und aus demselben
+/// Grund: `shared_preferences_android`, `_foundation`, `_web` und vor allem
+/// `shared_preferences_platform_interface` gehören zur Familie, und das
+/// Interface-Paket ist der naheliegendste Umweg, weil dort
+/// `SharedPreferencesStorePlatform` liegt. Genau daran hätte ein Test fast
+/// vorbeigegriffen: der Zweig „Schreiben abgelehnt" in
+/// `SharedPreferencesKeyValueStore` ist nur über dieses Paket erreichbar. Er
+/// bleibt deshalb ungeprüft, statt die Regel zu umgehen.
+///
+/// Die Regel gilt wie 19 bis 21 nur unterhalb von `lib/`. Ein Test darf das
+/// Paket importieren, und
+/// `test/services/preferences/shared_preferences_key_value_store_test.dart`
+/// tut es.
+const _prefsSdkBans = <Ban>[
+  Ban(
+    r'^package:shared_preferences',
+    'Regel 22: der Gerätespeicher gehört dem Präferenz-Adapter unter '
+        '$_preferencesHome. Der Rest der App kennt nur den '
+        'KeyValueStore-Vertrag aus core, nicht das Vendor-Paket',
+  ),
+];
+
+/// Regel 24: den Kompass-Sensor kennt nur der Orientierungsdienst.
+///
+/// Dieselbe Bauart wie die Regeln 21 und 22, und dieselbe Begründung:
+/// `lib/features/README.md` gibt `services/` als Ort für „Vendor-Adapter ohne
+/// Oberfläche", und `flutter_rotation_sensor` ist genau das für den
+/// Kompass-Sensor.
+///
+/// **Zwei Einträge und nicht einer.** Anders als bei Regel 21 und 22 fängt ein
+/// Präfix auf den Paketnamen selbst hier nicht die ganze Familie: die
+/// transitive Abhängigkeit `native_device_orientation` (`pubspec.lock`,
+/// Version 2.1.1) trägt einen eigenen Paketnamen, der nicht mit
+/// `flutter_rotation_sensor` beginnt, anders als `geolocator_platform_interface`
+/// oder `shared_preferences_platform_interface`, die den Namen ihres
+/// Hauptpakets als Präfix tragen. `native_device_orientation` bringt eine
+/// eigene Gerätestellungs-API mit und ist damit der naheliegendste Umweg am
+/// Orientierungsdienst vorbei, genau wie `geolocator_platform_interface` es
+/// für Regel 21 ist. Beide Paketnamen stehen deshalb als eigene [Ban]-Einträge.
+///
+/// ## Warum [_domainBans] hier nur einen Eintrag für `native_device_orientation`
+/// bekommt und keinen für `flutter_rotation_sensor`
+///
+/// `flutter_rotation_sensor` beginnt selbst mit `flutter_` und fällt in einer
+/// Domäne bereits unter das allgemeine Flutter-Verbot aus [_domainBans]. Ein
+/// zweiter, engerer Eintrag dort träfe denselben Import ein zweites Mal, mit
+/// zwei Sätzen für dieselbe Zeile; siehe den Test „Ä2: ein benanntes Verbot
+/// verdrängt die allgemeine Meldung" für dasselbe Prinzip an anderer Stelle.
+/// `native_device_orientation` trägt kein `flutter_`-Präfix, würde also ohne
+/// eigenen Eintrag nur die allgemeine Domain-Erlaubnisliste treffen, und
+/// bekommt deshalb einen eigenen Eintrag in [_domainBans], damit eine Domäne
+/// dieselbe genaue Regel 4 liest wie bei `geolocator` für Regel 21.
+///
+/// Die Regel gilt wie 19 bis 22 nur unterhalb von `lib/`. Ein Test darf beide
+/// Pakete importieren, und
+/// `test/services/orientation/rotation_sensor_orientation_service_test.dart`
+/// tut es, soweit die Testdatei es ohne Plattformkanal kann.
+const _orientationSdkBans = <Ban>[
+  Ban(
+    r'^package:flutter_rotation_sensor',
+    'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst unter '
+        '$_orientationHome. Der Rest der App kennt nur den Domain-Vertrag '
+        'des Dienstes, nicht das Vendor-Paket',
+  ),
+  Ban(
+    r'^package:native_device_orientation',
+    'Regel 24: der Kompass-Sensor gehört dem Orientierungsdienst unter '
+        '$_orientationHome. Der Rest der App kennt nur den Domain-Vertrag '
+        'des Dienstes, nicht das Vendor-Paket',
   ),
 ];
 
@@ -415,6 +549,16 @@ final _layers = <LayerRule>[
     pathMatch: _ausserhalbLocationHome,
     bans: _geoSdkBans,
   ),
+  LayerRule(
+    name: 'praeferenz-sdk',
+    pathMatch: _ausserhalbPreferencesHome,
+    bans: _prefsSdkBans,
+  ),
+  LayerRule(
+    name: 'orientierungs-sdk',
+    pathMatch: _ausserhalbOrientationHome,
+    bans: _orientationSdkBans,
+  ),
   // Gate 7 gilt projektweit, nicht nur im Produktionscode. Ein GetIt-Container
   // in einem Test, einem Integrationstest oder einem Werkzeugskript ist
   // derselbe Regelbruch.
@@ -473,6 +617,34 @@ const _mapHome = 'lib/map/';
 /// nach `services/` und in kein Feature.
 const _locationHome = 'lib/services/location/';
 
+/// Der geteilte Kern, ADR-008.
+///
+/// Der einzige Ort außerhalb der eigenen Feature-Domäne, aus dem eine Domäne
+/// importieren darf. Was hier liegt, ist in ADR-008 namentlich aufgeführt; ein
+/// weiterer Eintrag ist eine Ergänzung dieses ADR und keine Datei.
+const _kernelHome = 'lib/kernel/';
+
+/// Der Kern, wie er in einem Import steht.
+///
+/// Abgeleitet aus [_kernelHome], damit Verzeichnis und Importpfad nicht
+/// auseinanderlaufen können.
+final _kernelImportPrefix =
+    'package:fact_app/${_kernelHome.substring('lib/'.length)}';
+
+/// Der Präferenz-Adapter, der einzige Ort, an dem der Gerätespeicher
+/// vorkommen darf.
+///
+/// Wie [_locationHome] eine unterstützende Technik und keine Geschäftsdomäne.
+/// Der Vertrag dazu steht in `lib/core/preferences/key_value_store.dart`.
+const _preferencesHome = 'lib/services/preferences/';
+
+/// Der Orientierungsdienst, der einzige Ort, an dem der Kompass-Sensor
+/// vorkommen darf.
+///
+/// Wie [_locationHome] eine unterstützende Technik und keine Geschäftsdomäne,
+/// siehe den Kopfkommentar von `lib/services/orientation/orientation_service.dart`.
+const _orientationHome = 'lib/services/orientation/';
+
 /// Alles unterhalb von `lib/`, außer [_mapHome] und außer jeder Domäne.
 ///
 /// Die erste Ausnahme ist der Zweck der Regel: der Host darf das SDK.
@@ -503,6 +675,26 @@ final _ausserhalbMapHome = RegExp(
 /// ihr einziger erlaubter Ort nicht auseinanderlaufen können.
 final _ausserhalbLocationHome = RegExp(
   '^lib/(?!${_locationHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
+);
+
+/// Alles unterhalb von `lib/`, außer [_preferencesHome] und außer jeder Domäne.
+///
+/// Wortgleich zu [_ausserhalbLocationHome] aufgebaut und aus denselben zwei
+/// Gründen: der Adapter darf sein SDK, und in einer Domäne ist die Meldung von
+/// Regel 4 die genauere. `_domainBans` verbietet `^package:shared_preferences`
+/// dort schon seit langem, und zwar bevor es das Paket in `pubspec.yaml` gab.
+final _ausserhalbPreferencesHome = RegExp(
+  '^lib/(?!${_preferencesHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
+);
+
+/// Alles unterhalb von `lib/`, außer [_orientationHome] und außer jeder
+/// Domäne.
+///
+/// Wortgleich zu [_ausserhalbLocationHome] und [_ausserhalbPreferencesHome]
+/// aufgebaut und aus denselben zwei Gründen: der Dienst darf sein SDK, und in
+/// einer Domäne ist die Meldung von Regel 4 die genauere.
+final _ausserhalbOrientationHome = RegExp(
+  '^lib/(?!${_orientationHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
 );
 
 /// Alles unterhalb von `lib/`, außer [_avatarHome] und außer jeder Domäne.
@@ -602,8 +794,18 @@ final _contractBans = <RegExp, String>{
 };
 
 final _featurePattern = RegExp(r'^lib/features/([^/]+)/');
+// Nicht-gierig zwischen Feature und Schicht, aus demselben Grund wie bei
+// [_hasSegment]: die Schicht darf beliebig tief unter dem Feature liegen.
+// `features/x/unterstruktur/data/...` ist damit dasselbe `data` wie
+// `features/x/data/...`. Nicht-gierig statt gierig, damit
+// `features/x/presentation/widgets/foo.dart` weiterhin die Schicht
+// `presentation` liefert (die erste Übereinstimmung, direkt hinter dem
+// Feature) und nicht ein zufälliges tieferes Segment. Für die eigenen
+// Schichten war das schon über [_hasSegment] geschlossen, hier war es noch
+// offen: derselbe Import entkam Regel 8 und 9, wenn das fremde Feature eine
+// Unterstruktur hatte.
 final _crossFeaturePattern = RegExp(
-  r'package:fact_app/features/([^/]+)/(presentation|data)/',
+  r'package:fact_app/features/([^/]+)/(?:[^/]+/)*?(presentation|data)/',
 );
 
 /// Findet Direktiven am Zeilenanfang im strukturellen Quelltext. Das
@@ -1102,6 +1304,41 @@ bool _isAllowedDomainImport(
       _hasSegment(resolved.substring(modulwurzel.length), 'domain')) {
     return true;
   }
+  // Regel 23, ADR-008: der geteilte Kern. Die eine Auflockerung von Gate 6,
+  // und sie ist absichtlich die kleinste, die D-18 löst: **ein** zusätzlicher
+  // erlaubter Importpfad, kein Loch in Regel 11 und keine Ausnahmeliste, die
+  // jemand pflegen müsste. Was im Kern liegen darf, steht in ADR-008 und wird
+  // von [_kernelBans] und [_isAllowedKernelImport] eng gehalten.
+  if (resolved.startsWith(_kernelImportPrefix)) {
+    return true;
+  }
+  for (final package in _domainAllowedPackages) {
+    if (resolved == 'package:$package' ||
+        resolved.startsWith('package:$package/')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Regel 23, zweite Hälfte: was der Kern selbst importieren darf.
+///
+/// Eine Erlaubnisliste und keine Verbotsliste, aus demselben Grund, aus dem die
+/// Domäne eine hat: ein neues Vendor-Paket, an das niemand gedacht hat, muss
+/// **abgelehnt** werden und nicht durchrutschen. Der Kern liegt tiefer als jede
+/// Domäne, ein Fremdimport dort wäre der teuerste im ganzen Baum.
+///
+/// Erlaubt sind genau drei Dinge: das Dart-SDK, der Kern selbst, und die
+/// geprüften reinen Dart-Pakete aus [_domainAllowedPackages], die heute leer
+/// ist. Insbesondere **nicht** erlaubt: `core`, `features`, `map`, `services`,
+/// `app`, Flutter, Riverpod und jedes Vendor-SDK.
+bool _isAllowedKernelImport(String resolved) {
+  if (resolved.startsWith('dart:')) {
+    return true;
+  }
+  if (resolved.startsWith(_kernelImportPrefix)) {
+    return true;
+  }
   for (final package in _domainAllowedPackages) {
     if (resolved == 'package:$package' ||
         resolved.startsWith('package:$package/')) {
@@ -1121,8 +1358,10 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
       .where((l) => l.pathMatch.hasMatch(posixPath))
       .toList();
   final istDomaene = _domainPath.hasMatch(posixPath);
+  final istKern = posixPath.startsWith(_kernelHome);
   final istPresentation = _presentationPath.hasMatch(posixPath);
   final domaenenModul = _modulwurzel(posixPath, 'domain');
+  final presentationModul = _modulwurzel(posixPath, 'presentation');
   // Regel 8 und 9 gelten für alles unter `lib/`, nicht nur innerhalb von
   // `features/`. Zwei Ausnahmen, beide mit Grund:
   //
@@ -1132,9 +1371,14 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
   //  * `lib/core/`: [_coreBans] verbietet `package:fact_app/features/` schon
   //    pauschal und nennt dabei die genauere Regel 11. Ohne diese Ausnahme
   //    stünden für denselben Import zwei Sätze im Bericht.
+  //  * `lib/kernel/`: dieselbe Abgrenzung wie bei `lib/core/`. Die
+  //    Erlaubnisliste des Kerns lehnt `package:fact_app/features/` ohnehin ab
+  //    und nennt dabei Regel 23, die genauere Aussage. Ohne diese Ausnahme
+  //    stünden für denselben Import zwei Sätze im Bericht.
   final pruefeFremdeFeatureSchichten =
       posixPath.startsWith('lib/') &&
       !posixPath.startsWith(_appComposition) &&
+      !posixPath.startsWith(_kernelHome) &&
       !posixPath.startsWith('lib/core/');
 
   for (final directive in view.directives) {
@@ -1187,6 +1431,26 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
         );
       }
 
+      // Regel 23, ADR-008: der Kern bleibt rein. Steht direkt neben der
+      // Erlaubnisliste der Domäne, weil es dieselbe Bauform ist, nur strenger:
+      // die Domäne darf ihre eigene Domäne und den Kern, der Kern darf nur
+      // sich selbst.
+      if (istKern && !_isAllowedKernelImport(resolved)) {
+        found.add(
+          Violation(
+            file: posixPath,
+            line: lineNo,
+            detail: detail,
+            rule:
+                '[kernel] Regel 23: der geteilte Kern darf nur das Dart-SDK, '
+                'sich selbst und geprüfte reine Dart-Pakete importieren. Was '
+                'im Kern liegt, sehen alle Domänen; ein Fremdimport hier '
+                'koppelt jede von ihnen. Der Kern ist kein Ablageort, siehe '
+                'ADR-008',
+          ),
+        );
+      }
+
       // Gate 4 und 5: das presentation oder data eines Features, gelesen von
       // außerhalb dieses Features. Hier hing die Prüfung früher an
       // `ownFeature`, und wer null war, wurde übersprungen: derselbe Import
@@ -1215,16 +1479,45 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
 
       // Regel 17: die Tabelle erlaubt Presentation nur Application, Domain
       // und eng abgegrenztes Core. Das eigene `data/` steht nicht in der
-      // Zeile. Geprüft wird nur das eigene Feature: fremdes `data/` meldet
-      // schon Regel 9, und zwei Meldungen für denselben Import helfen
-      // niemandem.
+      // Zeile. Geprüft wird nur das eigene Feature bzw. eigene Modul: fremdes
+      // `data/` meldet schon Regel 9, und zwei Meldungen für denselben Import
+      // helfen niemandem.
       //
-      // Bekannte, gemessene Lücke: außerhalb von `lib/features/` greift diese
-      // Prüfung nicht, siehe den Kopfkommentar unter "Gemessene, noch nicht
-      // geschlossene Lücke".
-      if (istPresentation &&
-          ownFeature != null &&
-          _pointsIntoOwnFeatureLayer(ownFeature, resolved, 'data')) {
+      // Zwei Bedingungen als Oder, aber nur ein found.add, damit aus zwei
+      // wahren Bedingungen nie zwei Meldungen werden:
+      //
+      //  * die alte, feature-weite Prüfung über [_pointsIntoOwnFeatureLayer].
+      //    Sie bleibt nötig, weil sie über die ganze Feature-Unterstruktur
+      //    reicht, nicht nur über das Modul der geprüften Datei: eine Datei
+      //    in `features/tours/karte/presentation/` darf auch nicht auf
+      //    `features/tours/anderswo/data/` zeigen, und [_modulwurzel] allein
+      //    sähe nur `features/tours/karte/`.
+      //  * dieselbe Ableitung über [_modulwurzel], die für die Domäne schon
+      //    dasteht (siehe [_isAllowedDomainImport]). Sie schließt die
+      //    gemessene Lücke aus dem Kopfkommentar: ein Modul außerhalb von
+      //    `lib/features/`, etwa `lib/map/presentation/` auf
+      //    `lib/map/data/`, hatte bis hierher kein `ownFeature` und wurde
+      //    deshalb übersprungen.
+      //
+      // Kein Doppelmelden gegenüber Regel 9: [_modulwurzel] kommt aus dem
+      // Pfad der geprüften Datei selbst. Ein fremdes `features/x/data/` kann
+      // also nie mit diesem Präfix beginnen, die Abgrenzung auf das eigene
+      // Modul ergibt sich von selbst, ohne eigene Ausnahmeliste.
+      //
+      // Eine Schicht direkt unter `lib/` liefert bei [_modulwurzel] bewusst
+      // `null` (dort wäre die Wurzel das ganze Paket). Der zweite Zweig
+      // bleibt dann einfach aus, das ist keine Ausnahme, sondern dieselbe
+      // Absicht, die [_modulwurzel] schon für sich beansprucht.
+      final zeigtAufEigenesData =
+          (ownFeature != null &&
+              _pointsIntoOwnFeatureLayer(ownFeature, resolved, 'data')) ||
+          (presentationModul != null &&
+              resolved.startsWith(presentationModul) &&
+              _hasSegment(
+                resolved.substring(presentationModul.length),
+                'data',
+              ));
+      if (istPresentation && zeigtAufEigenesData) {
         found.add(
           Violation(
             file: posixPath,

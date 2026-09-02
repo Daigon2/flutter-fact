@@ -12,8 +12,10 @@ import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -122,7 +124,11 @@ void main() {
 
     testWidgets('oberhalb der Grenze steht der Ballon da', (tester) async {
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 30)]),
@@ -145,11 +151,16 @@ void main() {
     testWidgets('wer keine Bildschirmlage hat, wird nicht gezeichnet', (
       tester,
     ) async {
-      // Bei 58 Grad Neigung liegt alles jenseits des Horizonts hinter der
-      // Kamera. Ein Ballon ohne Lage gehört nicht auf (0, 0).
+      // Ein Ballon ohne Lage gehört nicht auf (0, 0). Das ist der eine der
+      // zwei Fälle, die der Vertrag auseinanderhält: **keine** Lage. Der
+      // andere, eine Lage hinter der Kamera, steht in der Probe darunter.
       host.projectionAnswer = <MapScreenPoint?>[
         null,
-        const MapScreenPoint(xInScreenPixels: 100, yInScreenPixels: 200),
+        const MapScreenPoint(
+          xInScreenPixels: 100,
+          yInScreenPixels: 200,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(
@@ -167,11 +178,56 @@ void main() {
       expect(find.byKey(const ValueKey<String>('nah')), findsNothing);
     });
 
+    testWidgets('wer hinter der Kamera liegt, wird nicht gezeichnet', (
+      tester,
+    ) async {
+      // D-17. Bei 58 Grad Neigung liegt alles jenseits des Horizonts hinter
+      // der Kamera, und `projectToScreen` liefert dafür **kein** `null`,
+      // sondern eine gespiegelte Zahl, die wie eine Lage mitten im Bild
+      // aussieht (`REBUILD_STATUS.md`, „Die vier Gerätemessungen“,
+      // Messung 3). Genau das ist hier gestellt: der gespiegelte Punkt liegt
+      // auf einer Lage, an der ein Ballon ohne Weiteres gezeichnet würde.
+      //
+      // **Der zweite, echte Ballon gehört zur Probe** (Muster 21): ohne ihn
+      // wäre „nichts gezeichnet“ auch das Ergebnis eines Overlays, das
+      // überhaupt nichts mehr zeichnet.
+      host.projectionAnswer = <MapScreenPoint?>[
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: false,
+        ),
+        const MapScreenPoint(
+          xInScreenPixels: 100,
+          yInScreenPixels: 200,
+          isInFrontOfCamera: true,
+        ),
+      ];
+      final ProviderContainer container = containerWith(
+        FactProximity(
+          points: <FactProximityPoint>[
+            pointAt('gespiegelt', meters: 10),
+            pointAt('echt', meters: 100),
+          ],
+        ),
+      );
+      await pumpOverlay(tester, container: container);
+      await mapComesAlive(tester);
+
+      expect(paintersOf(tester), hasLength(1));
+      expect(find.byKey(const ValueKey<String>('echt')), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('gespiegelt')), findsNothing);
+    });
+
     testWidgets('die Fläche verschluckt keine Geste', (tester) async {
       // Das Antippen eines Ballons ist Schritt 21. Bis dahin gehören alle
       // Berührungen der Karte darunter.
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 30)]),
@@ -215,7 +271,11 @@ void main() {
         addTearDown(tester.view.reset);
 
         host.projectionAnswer = <MapScreenPoint?>[
-          const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          const MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ];
         final ProviderContainer container = containerWith(
           FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 75)]),
@@ -239,7 +299,11 @@ void main() {
       // der Faktor bei 0,833 und nicht bei 1. Ein Ballon ohne diesen Faktor
       // wäre an der Grenze zwanzig Prozent zu groß.
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 75)]),
@@ -262,8 +326,16 @@ void main() {
       tester,
     ) async {
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 100, yInScreenPixels: 200),
-        const MapScreenPoint(xInScreenPixels: 300, yInScreenPixels: 200),
+        const MapScreenPoint(
+          xInScreenPixels: 100,
+          yInScreenPixels: 200,
+          isInFrontOfCamera: true,
+        ),
+        const MapScreenPoint(
+          xInScreenPixels: 300,
+          yInScreenPixels: 200,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(
@@ -291,8 +363,16 @@ void main() {
       // rückwärts. Läge der ferne oben, verdeckte er ausgerechnet den
       // größten.
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 100, yInScreenPixels: 200),
-        const MapScreenPoint(xInScreenPixels: 300, yInScreenPixels: 200),
+        const MapScreenPoint(
+          xInScreenPixels: 100,
+          yInScreenPixels: 200,
+          isInFrontOfCamera: true,
+        ),
+        const MapScreenPoint(
+          xInScreenPixels: 300,
+          yInScreenPixels: 200,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(
@@ -316,7 +396,11 @@ void main() {
   group('Bewegung', () {
     testWidgets('der Ballon dreht sich, und der Winkel wächst', (tester) async {
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 10)]),
@@ -351,7 +435,11 @@ void main() {
       final FactProximityPoint point = pointAt('7', meters: 10);
       final double speed = factSpinSpeedAt(point.emphasis);
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(points: <FactProximityPoint>[point]),
@@ -372,8 +460,16 @@ void main() {
       // vorher hüpften alle Marker, und auf dichten Karten sahen Nutzer
       // „dauerndes Gehuepfe".
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 100, yInScreenPixels: 200),
-        const MapScreenPoint(xInScreenPixels: 300, yInScreenPixels: 200),
+        const MapScreenPoint(
+          xInScreenPixels: 100,
+          yInScreenPixels: 200,
+          isInFrontOfCamera: true,
+        ),
+        const MapScreenPoint(
+          xInScreenPixels: 300,
+          yInScreenPixels: 200,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(
@@ -408,7 +504,11 @@ void main() {
 
     testWidgets('das Auf-und-ab folgt der Kurve der Quelle', (tester) async {
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 10)]),
@@ -440,7 +540,11 @@ void main() {
 
     testWidgets('mit einem Ballon in Reichweite läuft er', (tester) async {
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 10)]),
@@ -474,7 +578,11 @@ void main() {
         );
         addTearDown(container.dispose);
         host.projectionAnswer = <MapScreenPoint?>[
-          const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+          const MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
         ];
         final FactProximity near = FactProximity(
           points: <FactProximityPoint>[pointAt('7', meters: 10)],
@@ -523,7 +631,11 @@ void main() {
   group('Die Projektion', () {
     testWidgets('jede Kamerameldung fragt neu', (tester) async {
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 30)]),
@@ -576,7 +688,11 @@ void main() {
       expect(host.peakInFlight, 1);
 
       host.answerProjection(<MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ]);
       await tester.pump();
       await tester.pump();
@@ -599,7 +715,11 @@ void main() {
       );
       addTearDown(container.dispose);
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
 
       await pumpOverlay(tester, container: container);
@@ -639,8 +759,16 @@ void main() {
         );
         addTearDown(container.dispose);
         host.projectionAnswer = <MapScreenPoint?>[
-          const MapScreenPoint(xInScreenPixels: 100, yInScreenPixels: 200),
-          const MapScreenPoint(xInScreenPixels: 300, yInScreenPixels: 200),
+          const MapScreenPoint(
+            xInScreenPixels: 100,
+            yInScreenPixels: 200,
+            isInFrontOfCamera: true,
+          ),
+          const MapScreenPoint(
+            xInScreenPixels: 300,
+            yInScreenPixels: 200,
+            isInFrontOfCamera: true,
+          ),
         ];
 
         await pumpOverlay(tester, container: container);
@@ -703,7 +831,11 @@ void main() {
       expect(tester.takeException(), isA<StateError>());
 
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       host.bind(
         const MapCameraView(
@@ -728,7 +860,11 @@ void main() {
       // `_animated` gebaut ist. Im Test blieb es unsichtbar, weil `tearDown`
       // den Strom ohnehin schließt und danach niemand mehr sendet.
       host.projectionAnswer = <MapScreenPoint?>[
-        const MapScreenPoint(xInScreenPixels: 200, yInScreenPixels: 400),
+        const MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
       ];
       final ProviderContainer container = containerWith(
         FactProximity(points: <FactProximityPoint>[pointAt('7', meters: 30)]),
@@ -896,6 +1032,14 @@ class FakeMapHost implements MapHost {
   /// nach `dispose`, und eine Ausnahme aus einem Mikrotask ist ein wackliger
   /// Messwert. `hasListener` ist ein Rechteck.
   bool get hasCameraListener => _cameras.hasListener;
+
+  /// Kein Test hier braucht eine gemessene Fläche.
+  @override
+  MapViewport? get viewport => null;
+
+  /// Kein Test hier braucht einen Gruppen-Tipp.
+  @override
+  Stream<MapOverlayGroupTap> get groupTaps => const Stream.empty();
 
   @override
   void submitIntent(MapCameraIntent intent) {}

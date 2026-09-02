@@ -123,6 +123,26 @@ void main() {
 
   Finder dialog() => find.byType(AudioActivationDialog);
 
+  /// Der Lautstärke-Hinweis, gesucht über seinen **vollständigen** Inhalt.
+  ///
+  /// Das `🔊` steht in der Quelle vor dem Aufruf und nicht im übersetzten Text
+  /// (`screen-auth.jsx:251`). Wer nur den Schlüsselwert sucht, findet den
+  /// Absatz nicht, und wer nur das Zeichen sucht, findet auch einen, in dem
+  /// die Übersetzung fehlt.
+  Finder volumeHint([AppLanguage language = AppLanguage.de]) => find.text(
+    '🔊 ${AppStrings.of(language).text('audio.dialog.volumeHint')}',
+  );
+
+  /// Der **Kasten** um den Hinweis, nicht sein Text.
+  ///
+  /// Für Abstände ist das der Unterschied zwischen richtig und zehn Pixel
+  /// daneben: der Kasten trägt `padding: '10px 12px'`, der Text beginnt also
+  /// zehn Pixel unter seiner Oberkante. Gemessen und nicht überlegt, der Test
+  /// lief zuerst auf 30 statt auf 20.
+  Finder volumeHintBox() => find
+      .ancestor(of: volumeHint(), matching: find.byType(DecoratedBox))
+      .first;
+
   group('Öffnen', () {
     testWidgets('der Dialog erscheint nicht von selbst', (tester) async {
       // `screen-auth.jsx:269` startet `showAudioDialog` auf `false`. Es gibt
@@ -417,11 +437,14 @@ void main() {
       expect(AudioActivationDialog.cornerRadius, 18);
     });
 
-    testWidgets('die Abstände zwischen Titel, Text und Knöpfen', (
+    testWidgets('die Abstände zwischen Titel, Text, Hinweis und Knöpfen', (
       tester,
     ) async {
       // `marginBottom: 12` unter dem Titel, `marginBottom: 20` unter dem
-      // Fließtext.
+      // Fließtext, `marginBottom: 18` unter dem Hinweiskasten. Die letzten
+      // beiden sind **nicht** dieselbe Zahl, und beide werden einzeln geprüft:
+      // zwei fast gleiche Werte sind genau die Sorte, die beim Aufräumen
+      // zusammengelegt wird.
       await pumpSplash(tester);
       await tapAudioGuide(tester);
 
@@ -432,14 +455,84 @@ void main() {
           matching: find.byType(SingleChildScrollView),
         ),
       );
+      final hint = tester.getRect(volumeHintBox());
       final buttons = tester.getRect(
         find.descendant(of: dialog(), matching: find.byType(Wrap)),
       );
 
       expect(scroller.top - title.bottom, AudioActivationDialog.titleGap);
-      expect(buttons.top - scroller.bottom, AudioActivationDialog.bodyGap);
+      expect(hint.top - scroller.bottom, AudioActivationDialog.bodyGap);
+      expect(buttons.top - hint.bottom, AudioActivationDialog.hintGap);
       expect(AudioActivationDialog.titleGap, 12);
       expect(AudioActivationDialog.bodyGap, 20);
+      expect(AudioActivationDialog.hintGap, 18);
+    });
+
+    testWidgets('der Lautstärke-Hinweis steht da, und nicht sein Schlüssel', (
+      tester,
+    ) async {
+      // E-28, und bis zum 02.09.2026 stand hier nichts. Die laufende PWA zeigt
+      // an dieser Stelle wörtlich `🔊 audio.dialog.volumeHint`, weil der
+      // Schlüssel in keinem ihrer beiden Wörterbücher steht und `window.t` bei
+      // einem fehlenden Schlüssel den Namen zurückgibt. Der Wortlaut ist am
+      // 02.09.2026 freigegeben worden, die technische Sperre war mit E-39
+      // ohnehin weg.
+      await pumpSplash(tester);
+      await tapAudioGuide(tester);
+
+      expect(volumeHint(), findsOneWidget);
+
+      // Die Gegenprobe zu E-28 selbst. Ohne sie wäre dieser Test auch grün,
+      // wenn hier der Rohschlüssel erschiene, also genau der Fehler der
+      // Quelle.
+      expect(find.textContaining('audio.dialog.volumeHint'), findsNothing);
+    });
+
+    testWidgets('englischsprachige Nutzer sehen den Hinweis auf Englisch', (
+      tester,
+    ) async {
+      // Der Grundsatz vom 02.09.2026: hartcodiertes Deutsch ist ein Defekt der
+      // Quelle und keine Parität. Dieser Schlüssel ist der erste in der
+      // Ergänzung mit **zwei verschiedenen** Werten. Ohne diesen Test fiele es
+      // nicht auf, wenn jemand den deutschen Satz doppelt einträgt, so wie es
+      // die Blöcke `challenge.huntPill.*` und Verwandte noch tun.
+      await pumpSplash(tester, language: AppLanguage.en);
+      await tapAudioGuide(tester);
+
+      expect(volumeHint(AppLanguage.en), findsOneWidget);
+      expect(
+        en.text('audio.dialog.volumeHint'),
+        isNot(de.text('audio.dialog.volumeHint')),
+      );
+    });
+
+    testWidgets('Maße und Farben des Hinweiskastens', (tester) async {
+      // `background: 'rgba(245,197,24,0.15)'`, `border: '1px solid
+      // rgba(245,197,24,0.45)'`, `borderRadius: 10`, `padding: '10px 12px'`,
+      // `screen-auth.jsx:246-252`. `#F5C518` trägt denselben Wert wie
+      // `FactColors.gold` in beiden Themes.
+      await pumpSplash(tester);
+      await tapAudioGuide(tester);
+
+      final box = tester.widget<DecoratedBox>(volumeHintBox());
+      final decoration = box.decoration as BoxDecoration;
+
+      expect(decoration.color, AudioActivationDialog.hintBackground);
+      expect(
+        decoration.borderRadius,
+        BorderRadius.circular(AudioActivationDialog.hintCornerRadius),
+      );
+      expect(decoration.border!.top.color, AudioActivationDialog.hintBorder);
+
+      // Die Deckkraft aus der Quelle **nachgerechnet** und nicht abgeschrieben:
+      // ein Vergleich der Konstante mit sich selbst prüft nichts.
+      expect(AudioActivationDialog.hintBackground.a * 255, closeTo(38, 1));
+      expect(AudioActivationDialog.hintBorder.a * 255, closeTo(115, 1));
+      expect(AudioActivationDialog.hintCornerRadius, 10);
+      expect(
+        AudioActivationDialog.hintPadding,
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      );
     });
 
     testWidgets('Schrift des Titels und des Fließtextes', (tester) async {
@@ -667,7 +760,10 @@ void main() {
           )
           .toList();
       // Titel, Fließtext und zwei Knöpfe.
-      expect(paragraphs, hasLength(4), reason: 'nichts oder zu wenig gemessen');
+      // Vier bis zum 02.09.2026, seither fünf: der Lautstärke-Hinweis ist
+      // dazugekommen (E-28). Diese Wache hat den Zuwachs gemeldet, statt ihn
+      // durchzulassen, und genau dafür steht sie hier.
+      expect(paragraphs, hasLength(5), reason: 'nichts oder zu wenig gemessen');
 
       for (final paragraph in paragraphs) {
         final decoration = paragraph.text.style?.decoration;

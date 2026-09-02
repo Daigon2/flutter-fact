@@ -10,6 +10,7 @@ import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/discovery/presentation/discovery_anchors.dart';
 import 'package:fact_app/features/discovery/presentation/fact_categories.dart';
+import 'package:fact_app/features/discovery/presentation/fact_group_expand.dart';
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/map_camera_intents.dart';
 import 'package:fact_app/features/discovery/presentation/map_mode.dart';
@@ -24,11 +25,17 @@ import 'package:fact_app/map/domain/map_camera_gate.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
+import 'package:fact_app/map/domain/map_overlay_tap.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_position_rect.dart';
 import 'package:fact_app/map/domain/map_screen_point.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/services/location/device_position.dart';
 import 'package:fact_app/services/location/location_providers.dart';
 import 'package:fact_app/services/location/location_service.dart';
+import 'package:fact_app/services/orientation/device_heading.dart';
+import 'package:fact_app/services/orientation/orientation_providers.dart';
+import 'package:fact_app/services/orientation/orientation_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -84,15 +91,18 @@ void main() {
 
   late FakeMapHost host;
   late FakeLocationService location;
+  late FakeOrientationService orientation;
 
   setUp(() {
     host = FakeMapHost();
     location = FakeLocationService();
+    orientation = FakeOrientationService();
   });
 
   tearDown(() async {
     await host.close();
     await location.close();
+    await orientation.close();
   });
 
   /// Eine Überlagerung mit einem Fakt **auf** der Ortung und einem weit weg.
@@ -141,6 +151,7 @@ void main() {
         if (diagnostics != null)
           diagnosticSinkProvider.overrideWithValue(diagnostics),
         locationServiceProvider.overrideWithValue(location),
+        orientationServiceProvider.overrideWithValue(orientation),
         // **Ohne diesen Override endet jeder Test hier in „A Timer is still
         // pending".** Der Standard `unavailableFactRepository` wirft, und
         // Riverpod 3 wiederholt einen gescheiterten Provider von sich aus bis
@@ -163,6 +174,8 @@ void main() {
     WidgetTester tester, {
     required ProviderContainer container,
     bool branchIsActive = true,
+    Duration Function()? now,
+    Widget? huntOverlay,
   }) {
     return tester.pumpWidget(
       UncontrolledProviderScope(
@@ -183,6 +196,8 @@ void main() {
                   // Kompositions-Adapter auf App-Ebene: `discovery` darf
                   // `map/presentation/` nicht selbst importieren (Regel 18).
                   mapSurface: mapSurfaceStandIn,
+                  huntOverlay: huntOverlay,
+                  now: now,
                 ),
               ),
             ),
@@ -205,6 +220,9 @@ void main() {
     longitude: longitude,
     accuracyInMeters: accuracy,
   );
+
+  /// Ein geprüfter Kopfwert des Kompasses.
+  DeviceHeading headingAt(double degrees) => DeviceHeading.tryFrom(degrees)!;
 
   /// Die Karte meldet sich mit einer Startkamera, wie `bindSurface` es tut.
   Future<void> mapComesAlive(
@@ -353,6 +371,53 @@ void main() {
       );
       expect(rotation.transform.getRotation().storage[1], closeTo(-1, 0.001));
     });
+
+    testWidgets('ohne Jagd-Overlay zeigt der Bildschirm dafür nichts an', (
+      tester,
+    ) async {
+      // `huntOverlay` ist nullbar, siehe `MapPage.huntOverlay`: der weit
+      // überwiegende Normalzustand ist, dass keine Jagd läuft.
+      await pumpPage(tester, container: newContainer());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey<String>('jagd-pille')), findsNothing);
+    });
+
+    testWidgets(
+      'das Jagd-Overlay liegt über der Karte und unter dem Top-Chrome',
+      (tester) async {
+        const Widget huntOverlayStandIn = SizedBox(
+          key: ValueKey<String>('jagd-pille'),
+        );
+        await pumpPage(
+          tester,
+          container: newContainer(),
+          huntOverlay: huntOverlayStandIn,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byWidget(huntOverlayStandIn), findsOneWidget);
+
+        final Stack stack = tester.widget<Stack>(
+          find
+              .ancestor(
+                of: find.byWidget(mapSurfaceStandIn),
+                matching: find.byType(Stack),
+              )
+              .first,
+        );
+        final int mapIndex = stack.children.indexOf(mapSurfaceStandIn);
+        final int chromeIndex = stack.children.lastIndexWhere(
+          (widget) => widget is MapTopChrome,
+        );
+        final int overlayIndex = stack.children.indexWhere(
+          (widget) =>
+              widget is Positioned && widget.child == huntOverlayStandIn,
+        );
+        expect(overlayIndex, greaterThan(mapIndex));
+        expect(overlayIndex, lessThan(chromeIndex));
+      },
+    );
 
     testWidgets('die dunkle Fassung bleibt unverdrahtet', (tester) async {
       // `mapDark` wird in der Quelle nie `true`, siehe `MapTopChrome.isDark`.
@@ -757,6 +822,197 @@ void main() {
     });
   });
 
+  group('Die Karte folgt dem Kompass, screen-map.jsx:2805-2895', () {
+    MapTopChrome chromeOf(WidgetTester tester) =>
+        tester.widget<MapTopChrome>(find.byType(MapTopChrome));
+
+    testWidgets('ein Kopfwert löst genau eine Absicht mit der geglätteten, '
+        'nicht der rohen Richtung aus', (tester) async {
+      // 0 (Startwert der Glättung) und ein Kopfwert von 100 ergeben 25, nicht
+      // 100: `0 + (100 - 0) * 0.25 = 25`.
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      orientation.emit(headingAt(100));
+      await tester.pump();
+
+      final MapCameraIntent intent = host.intents.single;
+      expect(intent, isA<MapCameraFollow>());
+      expect(
+        (intent as MapCameraFollow).kind,
+        MapCameraFollowKind.compassBearing,
+      );
+      expect(
+        intent.change.bearing,
+        25,
+        reason: 'die geglättete Richtung, nicht der Rohwert 100',
+      );
+    });
+
+    testWidgets('mehrere Kopfwerte laufen durch dieselbe Glättung, nicht '
+        'jeder für sich', (tester) async {
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      orientation.emit(headingAt(100));
+      await tester.pump();
+      orientation.emit(headingAt(100));
+      await tester.pump();
+
+      expect(host.intents, hasLength(2));
+      expect(
+        host.intents[0].change.bearing,
+        25,
+        reason: 'erster Schritt: 0 nach 100 ergibt 25',
+      );
+      expect(
+        host.intents[1].change.bearing,
+        43.75,
+        reason:
+            'zweiter Schritt von 25 aus, nicht noch einmal von 0: '
+            '25 + (100 - 25) * 0.25 = 43.75. Würde jeder Kopfwert für sich '
+            'geglättet, stünde hier wieder 25',
+      );
+    });
+
+    testWidgets('ohne Kopfwerte entsteht keine Absicht', (tester) async {
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(
+        host.intents.where(
+          (intent) =>
+              intent is MapCameraFollow &&
+              intent.kind == MapCameraFollowKind.compassBearing,
+        ),
+        isEmpty,
+      );
+    });
+
+    testWidgets('ohne lebende Karte bleibt der Kopfwert ohne Absicht', (
+      tester,
+    ) async {
+      // Derselbe Wächter wie beim GPS-Folgen, `_canSteer`.
+      await pumpPage(tester, container: newContainer());
+
+      orientation.emit(headingAt(100));
+      await tester.pump();
+      await tester.pump();
+
+      expect(host.intents, isEmpty);
+    });
+
+    testWidgets('im unsichtbaren Zweig bleibt der Kopfwert ohne Absicht', (
+      tester,
+    ) async {
+      // Ein einzelner, wiederverwendeter Container über den ganzen Test, wie
+      // bei „beim Sichtbarwerden wird der Sky-Fall nachgeholt": zwei frische
+      // Container in einem Test ließen den `factOverlayProvider` des ersten
+      // ungenutzt und unversorgt stehen liegen.
+      final ProviderContainer container = newContainer();
+      await pumpPage(tester, container: container, branchIsActive: false);
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      orientation.emit(headingAt(100));
+      await tester.pump();
+      await tester.pump();
+
+      expect(host.intents, isEmpty);
+    });
+
+    testWidgets(
+      'der Wachhund meldet einen toten Kompass nach mehr als 5 Sekunden, '
+      'davor nicht, und ein neuer Kopfwert setzt ihn zurück',
+      (tester) async {
+        final TestClock clock = TestClock();
+        await pumpPage(tester, container: newContainer(), now: clock.call);
+        await tester.pump();
+
+        expect(
+          chromeOf(tester).isCompassDead,
+          isFalse,
+          reason: 'unmittelbar nach dem Start ist der Kompass nicht tot',
+        );
+
+        // Vier Sekunden, zwei Wachhund-Takte (bei 2 und 4 Sekunden), beide
+        // noch unter der 5-Sekunden-Schwelle.
+        clock.advance(const Duration(seconds: 4));
+        await tester.pump(const Duration(seconds: 4));
+        expect(
+          chromeOf(tester).isCompassDead,
+          isFalse,
+          reason: 'vier Sekunden liegen unter der Schwelle von fünf',
+        );
+
+        // Zwei weitere Sekunden, macht sechs seit dem Start: über der
+        // Schwelle, und der nächste Takt (bei 6 Sekunden) muss das melden.
+        clock.advance(const Duration(seconds: 2));
+        await tester.pump(const Duration(seconds: 2));
+        expect(
+          chromeOf(tester).isCompassDead,
+          isTrue,
+          reason: 'sechs Sekunden liegen über der Schwelle von fünf',
+        );
+
+        // Ein neuer Kopfwert setzt den Wachhund zurück, ohne auf den
+        // nächsten Takt zu warten. Zweimal gepumpt, wie bei einer Ortung: der
+        // erste Umlauf stellt die Stromausgabe zu, der Zuhörer setzt den
+        // Zustand, erst der zweite baut die Oberfläche neu.
+        orientation.emit(headingAt(10));
+        await tester.pump();
+        await tester.pump();
+        expect(chromeOf(tester).isCompassDead, isFalse);
+      },
+    );
+
+    testWidgets('die Nadel dreht weiter nach der Kartenblickrichtung, ein '
+        'Kopfwert allein bewegt sie nicht', (tester) async {
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester, bearing: 40);
+      await tester.pump();
+      expect(chromeOf(tester).bearingDegrees, 40);
+
+      // Ein Kopfwert allein löst zwar eine Absicht an den Host aus (siehe
+      // oben), aber der Doppelgänger führt sie nicht aus und meldet keine
+      // neue Kamera zurück; die Nadel darf sich deshalb nicht bewegen.
+      orientation.emit(headingAt(200));
+      await tester.pump();
+      expect(chromeOf(tester).bearingDegrees, 40);
+
+      // Eine echte Kameraänderung dagegen schon.
+      await mapComesAlive(tester, bearing: 55);
+      await tester.pump();
+      expect(chromeOf(tester).bearingDegrees, 55);
+    });
+
+    testWidgets('die Kündigung des Kompass-Abonnements im Entsorgen wirkt', (
+      tester,
+    ) async {
+      await pumpPage(tester, container: newContainer());
+      await mapComesAlive(tester);
+      host.intents.clear();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      // Ohne die Kündigung riefe der Strom `_onHeading` auf einem längst
+      // entsorgten `State` auf, entweder mit einer Ausnahme beim `setState`
+      // (falls der Kompass zwischenzeitlich als tot markiert war) oder,
+      // unauffälliger, mit einer weiteren Absicht an einen `ref`, der nicht
+      // mehr gültig ist.
+      orientation.emit(headingAt(100));
+      await tester.pump();
+
+      expect(host.intents, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   group('Die Fakten landen auf der Karte', () {
     // **Diese Gruppe läuft in `tester.runAsync`, und das ist gemessen und
     // nicht Geschmack.** `Picture.toImage` antwortet aus der Engine, nicht aus
@@ -1006,6 +1262,643 @@ void main() {
       expect(host.overlays, hasLength(afterFirstFix));
     });
   });
+
+  group('Ein Tipp auf eine Gruppe fährt aufs Rechteck', () {
+    // **Genau die Sorte Verdrahtung, die in Schritt 15/16 schon einmal ohne
+    // jeden Test durchging** (`REBUILD_STATUS.md`, Muster 10): sechs Zeilen
+    // Durchreichung, die in der App wirklich laufen. Geprüft wird deshalb
+    // nicht „es entsteht irgendeine Absicht", sondern die wirklich abgegebene
+    // Absicht mit Mittelpunkt, Zoom und Dauer.
+
+    const MapOverlayPoint near = MapOverlayPoint(
+      id: 'nah',
+      position: MapPosition(latitude: 48.1351, longitude: 11.582),
+      styleId: 'fact.hist.uncollected',
+      state: 'uncollected',
+    );
+    const MapOverlayPoint far = MapOverlayPoint(
+      id: 'fern',
+      position: MapPosition(latitude: 48.3, longitude: 11.582),
+      styleId: 'fact.hist.uncollected',
+      state: 'uncollected',
+    );
+    const MapOverlay overlayWithTwoFacts = MapOverlay(
+      id: factOverlayId,
+      points: <MapOverlayPoint>[near, far],
+    );
+    const MapOverlayGroupTap tapOnFacts = MapOverlayGroupTap(
+      overlayId: factOverlayId,
+      position: MapPosition(latitude: 48.14, longitude: 11.59),
+    );
+
+    /// Lässt eine ausstehende Projektion antworten und die Folgen ankommen.
+    Future<void> settle(WidgetTester tester) async {
+      await tester.pump();
+      await tester.pump();
+    }
+
+    testWidgets(
+      'nur der eine Kandidat im Radius geht ins Rechteck, mit 700 ms Dauer',
+      (tester) async {
+        await pumpPage(
+          tester,
+          container: newContainer(overlay: overlayWithTwoFacts),
+        );
+        // Zoom unter `factOverlayMinZoom` (11): `DiscoveryBalloonAnchor` im
+        // selben Baum projiziert sonst selbst über denselben Host und
+        // verunreinigt `host.projected`, das dieser Test auswertet.
+        await mapComesAlive(tester, zoom: 5);
+        // Zweimal gepumpt: die erste Ausgabe von `factOverlayProvider` ist
+        // `AsyncLoading`, erst danach löst sich das Future auf und
+        // `_onFactOverlay` setzt `_latestOverlay`.
+        await tester.pump();
+        await tester.pump();
+        host.intents.clear();
+
+        // Zwei Kandidaten und die Tippstelle gehen in **einem** Aufruf hinaus,
+        // in dieser Reihenfolge: `near`, `far`, Tippstelle. `far` liegt weit
+        // draußen (1000 Gerätepixel vom Tipp), `near` genau auf ihm.
+        host.projectionAnswer = const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+        ];
+        host.viewport = const MapViewport(
+          widthInScreenPixels: 400,
+          heightInScreenPixels: 800,
+        );
+
+        host.emitGroupTap(tapOnFacts);
+        await settle(tester);
+
+        expect(host.projected, hasLength(1), reason: 'ein gemeinsamer Aufruf');
+        expect(
+          host.projected.single,
+          <MapPosition>[near.position, far.position, tapOnFacts.position],
+          reason: 'Kandidaten zuerst, die Tippstelle mitprojiziert am Ende',
+        );
+
+        expect(host.intents, hasLength(1));
+        final MapCameraIntent intent = host.intents.single;
+        expect(intent, isA<MapCameraOneShot>());
+        expect(
+          intent.motion,
+          const MapCameraAnimated(Duration(milliseconds: 700)),
+        );
+        expect(
+          intent.change.center,
+          near.position,
+          reason:
+              'nur "nah" liegt im Radius, das Rechteck ist also ein einzelner '
+              'Punkt und sein Mittelpunkt ist genau dieser Punkt',
+        );
+        expect(
+          intent.change.zoom,
+          18,
+          reason:
+              'ein Rechteck der Fläche null (ein einzelner Punkt) stellt an '
+              'keine Richtung eine Bedingung, `rectFitZoom` liefert dafür '
+              'unverändert die Obergrenze 18 zurück (`map_camera_fit_test.dart`, '
+              '„Fläche null"); die Untergrenze 16 hebt sie nicht wieder, weil '
+              'max(18, 16) = 18',
+        );
+        expect(intent.change.bearing, isNull);
+        expect(intent.change.pitch, isNull);
+      },
+    );
+
+    testWidgets('beide Kandidaten im Radius: das Rechteck spannt beide auf', (
+      tester,
+    ) async {
+      await pumpPage(
+        tester,
+        container: newContainer(overlay: overlayWithTwoFacts),
+      );
+      // Zoom unter `factOverlayMinZoom` (11): `DiscoveryBalloonAnchor` im
+      // selben Baum projiziert sonst selbst über denselben Host und
+      // verunreinigt `host.projected`, das dieser Test auswertet.
+      await mapComesAlive(tester, zoom: 5);
+      // Zweimal gepumpt: die erste Ausgabe von `factOverlayProvider` ist
+      // `AsyncLoading`, erst danach löst sich das Future auf und
+      // `_onFactOverlay` setzt `_latestOverlay`.
+      await tester.pump();
+      await tester.pump();
+      host.intents.clear();
+
+      // Beide Kandidaten liegen jetzt nah am Tipp (50 und 30 Gerätepixel),
+      // deutlich innerhalb von 70 Stilpixeln mal 3 (Bildverhältnis der
+      // Testumgebung) = 210 Gerätepixeln.
+      host.projectionAnswer = const <MapScreenPoint?>[
+        MapScreenPoint(
+          xInScreenPixels: 150,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 230,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+      ];
+      host.viewport = const MapViewport(
+        widthInScreenPixels: 400,
+        heightInScreenPixels: 800,
+      );
+
+      host.emitGroupTap(tapOnFacts);
+      await settle(tester);
+
+      final MapCameraIntent intent = host.intents.single;
+      expect(
+        intent.change.center,
+        MapPositionRect.enclosingOrNull(<MapPosition>[
+          near.position,
+          far.position,
+        ])!.center,
+      );
+    });
+
+    // Zwei weitere Tipps, nur mit anderer Tippstelle als [tapOnFacts]: das
+    // reicht, um in `host.projected` zu unterscheiden, welcher Tipp welche
+    // Anfrage ausgelöst hat.
+    const MapOverlayGroupTap tapOnFactsAgain = MapOverlayGroupTap(
+      overlayId: factOverlayId,
+      position: MapPosition(latitude: 48.145, longitude: 11.595),
+    );
+    const MapOverlayGroupTap tapOnFactsLatest = MapOverlayGroupTap(
+      overlayId: factOverlayId,
+      position: MapPosition(latitude: 48.15, longitude: 11.6),
+    );
+
+    testWidgets(
+      'drei Tipps kurz hintereinander: kommt die Antwort auf den ersten '
+      'erst nach den beiden anderen zurück, entsteht trotzdem nur eine '
+      'Absicht, und zwar die zum dritten (letzten) Tipp',
+      (tester) async {
+        // **Die Probe für Fund 1.** Ohne Sequenzsicherung startet
+        // `_onGroupTap` für jeden Tipp eine eigene, unabhängige Anfrage;
+        // kommt die Antwort auf den älteren Tipp dann später zurück als die
+        // auf den neueren, überschreibt ihre Absicht die frische, und die
+        // Kamera fährt auf die falsche Gruppe zurück. Mit der
+        // Sequenzsicherung (`_groupTapInFlight`, `_pendingGroupTap`) läuft
+        // nie mehr als eine Anfrage gleichzeitig: Die Anfrage zum gemerkten
+        // Tipp startet erst, nachdem die laufende beantwortet ist, und deren
+        // eigene, jetzt veraltete Antwort löst keine Absicht mehr aus.
+        //
+        // **Der dritte Tipp prüft zusätzlich, dass es keine Warteschlange
+        // gibt.** Trifft er ein, während schon der zweite gemerkt ist, muss
+        // er den zweiten verwerfen und an dessen Stelle treten; eine Probe,
+        // die den zweiten stattdessen festhielte (der ältere gewinnt statt
+        // des neueren), bliebe sonst unentdeckt, weil nur zwei Tipps dafür
+        // nicht reichen.
+        await pumpPage(
+          tester,
+          container: newContainer(overlay: overlayWithTwoFacts),
+        );
+        // Zoom unter `factOverlayMinZoom` (11), aus demselben Grund wie in
+        // den anderen Tests dieser Gruppe.
+        await mapComesAlive(tester, zoom: 5);
+        await tester.pump();
+        await tester.pump();
+        host.intents.clear();
+        host.viewport = const MapViewport(
+          widthInScreenPixels: 400,
+          heightInScreenPixels: 800,
+        );
+        host.projectionGates = <Completer<List<MapScreenPoint?>>>[];
+
+        host.emitGroupTap(tapOnFacts);
+        await tester.pump();
+        host.emitGroupTap(tapOnFactsAgain);
+        await tester.pump();
+        host.emitGroupTap(tapOnFactsLatest);
+        await tester.pump();
+
+        expect(
+          host.projectionGates,
+          hasLength(1),
+          reason:
+              'weder der zweite noch der dritte Tipp lösen schon eine '
+              'eigene Anfrage aus, solange die erste noch läuft',
+        );
+        expect(
+          host.peakInFlight,
+          1,
+          reason: 'nie zwei Anfragen gleichzeitig unterwegs',
+        );
+
+        // Die Antwort auf den ersten (ältesten) Tipp: „near" liegt auf der
+        // Tippstelle, „far" weit weg, die Auswahl wäre also „near".
+        host.answerProjectionAt(0, const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+        ]);
+        await tester.pump();
+        await tester.pump();
+
+        expect(
+          host.projectionGates,
+          hasLength(2),
+          reason: 'erst jetzt startet die Anfrage zum gemerkten Tipp',
+        );
+        expect(
+          host.projected[1].last,
+          tapOnFactsLatest.position,
+          reason:
+              'gemerkt bleibt der dritte, jüngste Tipp, nicht der zweite: '
+              'es gibt keine Warteschlange, der letzte verwirft jeden '
+              'davor',
+        );
+        expect(
+          host.intents,
+          isEmpty,
+          reason:
+              'die Antwort auf den ersten Tipp ist schon veraltet, '
+              'sobald ein weiterer gemerkt ist, und gibt keine Absicht ab',
+        );
+
+        // Die Antwort auf den gemerkten (dritten) Tipp: umgekehrt, jetzt
+        // liegt „far" auf der Tippstelle.
+        host.answerProjectionAt(1, const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+        ]);
+        await tester.pump();
+        await tester.pump();
+
+        expect(
+          host.intents,
+          hasLength(1),
+          reason: 'genau eine Absicht insgesamt, nicht eine je Tipp',
+        );
+        expect(
+          host.intents.single.change.center,
+          far.position,
+          reason:
+              'die Absicht gehört zum dritten, gemerkten Tipp, dessen '
+              'Antwort "far" auswählt, nicht "near" aus der veralteten '
+              'ersten',
+        );
+      },
+    );
+
+    testWidgets('ein Tipp mit fremder overlayId bleibt folgenlos', (
+      tester,
+    ) async {
+      await pumpPage(
+        tester,
+        container: newContainer(overlay: overlayWithTwoFacts),
+      );
+      // Zoom unter `factOverlayMinZoom` (11): `DiscoveryBalloonAnchor` im
+      // selben Baum projiziert sonst selbst über denselben Host und
+      // verunreinigt `host.projected`, das dieser Test auswertet.
+      await mapComesAlive(tester, zoom: 5);
+      // Zweimal gepumpt: die erste Ausgabe von `factOverlayProvider` ist
+      // `AsyncLoading`, erst danach löst sich das Future auf und
+      // `_onFactOverlay` setzt `_latestOverlay`.
+      await tester.pump();
+      await tester.pump();
+      host.intents.clear();
+      host.viewport = const MapViewport(
+        widthInScreenPixels: 400,
+        heightInScreenPixels: 800,
+      );
+
+      host.emitGroupTap(
+        const MapOverlayGroupTap(
+          overlayId: 'tours.stations',
+          position: MapPosition(latitude: 48.14, longitude: 11.59),
+        ),
+      );
+      await settle(tester);
+
+      expect(host.intents, isEmpty);
+      expect(
+        host.projected,
+        isEmpty,
+        reason: 'nicht einmal die Projektion wird angestoßen',
+      );
+    });
+
+    testWidgets('ohne viewport (vor dem ersten Layout) entsteht keine '
+        'Absicht', (tester) async {
+      await pumpPage(
+        tester,
+        container: newContainer(overlay: overlayWithTwoFacts),
+      );
+      // Zoom unter `factOverlayMinZoom` (11): `DiscoveryBalloonAnchor` im
+      // selben Baum projiziert sonst selbst über denselben Host und
+      // verunreinigt `host.projected`, das dieser Test auswertet.
+      await mapComesAlive(tester, zoom: 5);
+      // Zweimal gepumpt: die erste Ausgabe von `factOverlayProvider` ist
+      // `AsyncLoading`, erst danach löst sich das Future auf und
+      // `_onFactOverlay` setzt `_latestOverlay`.
+      await tester.pump();
+      await tester.pump();
+      host.intents.clear();
+      // `host.viewport` bleibt ausdrücklich `null`.
+
+      host.emitGroupTap(tapOnFacts);
+      await settle(tester);
+
+      expect(host.intents, isEmpty);
+      expect(host.projected, isEmpty);
+    });
+
+    testWidgets(
+      'ohne Bildschirmlage der Tippstelle selbst entsteht keine Absicht',
+      (tester) async {
+        await pumpPage(
+          tester,
+          container: newContainer(overlay: overlayWithTwoFacts),
+        );
+        // Zoom unter `factOverlayMinZoom` (11), aus demselben Grund wie im
+        // ersten Test dieser Gruppe: `DiscoveryBalloonAnchor` soll nicht
+        // mitprojizieren.
+        await mapComesAlive(tester, zoom: 5);
+        await tester.pump();
+        await tester.pump();
+        host.intents.clear();
+        host.viewport = const MapViewport(
+          widthInScreenPixels: 400,
+          heightInScreenPixels: 800,
+        );
+        // Die Tippstelle selbst hat keine Bildschirmlage (letztes Element
+        // `null`), obwohl beide Kandidaten eine haben.
+        host.projectionAnswer = const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 210,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          null,
+        ];
+
+        host.emitGroupTap(tapOnFacts);
+        await settle(tester);
+
+        expect(host.intents, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'kein Punkt im Radius: keine Absicht, aber eine Diagnose-Meldung',
+      (tester) async {
+        final RecordingSink sink = RecordingSink();
+        await pumpPage(
+          tester,
+          container: newContainer(
+            overlay: overlayWithTwoFacts,
+            diagnostics: sink,
+          ),
+        );
+        await mapComesAlive(tester, zoom: 5);
+        await tester.pump();
+        await tester.pump();
+        host.intents.clear();
+        host.viewport = const MapViewport(
+          widthInScreenPixels: 400,
+          heightInScreenPixels: 800,
+        );
+        // Beide Kandidaten weit weg von der Tippstelle.
+        host.projectionAnswer = const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 2000,
+            yInScreenPixels: 2000,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 3000,
+            yInScreenPixels: 3000,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+        ];
+
+        host.emitGroupTap(tapOnFacts);
+        await settle(tester);
+
+        expect(host.intents, isEmpty);
+        expect(
+          sink.events.map((event) => event.name),
+          contains(groupTapFoundNoMembersEvent),
+        );
+      },
+    );
+
+    testWidgets(
+      'nur die Punkte der wirklich gelegten Überlagerung sind Kandidaten, '
+      'nicht die vollständige Liste',
+      (tester) async {
+        // **Die Probe, die die Mutation „volle Liste statt der Überlagerung, '
+        // die wirklich auf der Karte liegt" fängt.** `near` lebt gerade als
+        // Ballon-Widget und ist deshalb aus der nativen Liste heraus; nur
+        // `far` darf noch Kandidat sein.
+        final ProviderContainer container = newContainer(
+          overlay: overlayWithTwoFacts,
+        );
+        await pumpPage(tester, container: container);
+        await mapComesAlive(tester, zoom: 16);
+        await tester.pump();
+        await tester.pump();
+        await emitFix(tester, fixAt());
+        host.intents.clear();
+        host.viewport = const MapViewport(
+          widthInScreenPixels: 400,
+          heightInScreenPixels: 800,
+        );
+        host.projectionAnswer = const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+        ];
+
+        host.emitGroupTap(tapOnFacts);
+        await settle(tester);
+
+        // **Keine Zusicherung gegen `host.projected` hier**: bei diesem Zoom
+        // (16, nötig für `factAnimationRunsAt`) projiziert
+        // `DiscoveryBalloonAnchor` im selben Baum über denselben Host mit,
+        // und beide Aufrufe landen ununterscheidbar in derselben Liste. Die
+        // eigentliche Zusicherung dieses Tests ist ohnehin die Absicht, nicht
+        // der Kanalaufruf.
+        expect(
+          host.intents.single.change.center,
+          far.position,
+          reason: '"near" lebt gerade und ist kein nativer Kandidat mehr',
+        );
+      },
+    );
+
+    testWidgets('ein Tipp nach dem Entsorgen des Bildschirms bleibt '
+        'folgenlos', (tester) async {
+      await pumpPage(
+        tester,
+        container: newContainer(overlay: overlayWithTwoFacts),
+      );
+      // Zoom unter `factOverlayMinZoom` (11): `DiscoveryBalloonAnchor` im
+      // selben Baum projiziert sonst selbst über denselben Host und
+      // verunreinigt `host.projected`, das dieser Test auswertet.
+      await mapComesAlive(tester, zoom: 5);
+      // Zweimal gepumpt: die erste Ausgabe von `factOverlayProvider` ist
+      // `AsyncLoading`, erst danach löst sich das Future auf und
+      // `_onFactOverlay` setzt `_latestOverlay`.
+      await tester.pump();
+      await tester.pump();
+      host.intents.clear();
+      host.viewport = const MapViewport(
+        widthInScreenPixels: 400,
+        heightInScreenPixels: 800,
+      );
+      host.pendingProjection = Completer<List<MapScreenPoint?>>();
+
+      host.emitGroupTap(tapOnFacts);
+      await tester.pump();
+
+      // Der Bildschirm verschwindet, während die Projektion noch unterwegs
+      // ist.
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      host.answerProjection(const <MapScreenPoint?>[
+        MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 1200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+        MapScreenPoint(
+          xInScreenPixels: 200,
+          yInScreenPixels: 400,
+          isInFrontOfCamera: true,
+        ),
+      ]);
+      await tester.pump();
+      await tester.pump();
+
+      expect(host.intents, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'ein Tipp, der erst nach dem Entsorgen des Bildschirms eintrifft, '
+      'bleibt folgenlos',
+      (tester) async {
+        // **Anders als der Test oben.** Dort trifft der Tipp noch vor dem
+        // Entsorgen ein, nur seine Antwort kommt danach zurück; das prüft
+        // `mounted` in der `.then()`-Fortsetzung. Hier trifft der Tipp selbst
+        // erst nach dem Entsorgen ein, und das prüft das Abmelden in
+        // `dispose`: bliebe `_groupTapSubscription` dort abonniert, riefe der
+        // Strom `_onGroupTap` auf einem längst entsorgten `State` auf.
+        await pumpPage(
+          tester,
+          container: newContainer(overlay: overlayWithTwoFacts),
+        );
+        await mapComesAlive(tester, zoom: 5);
+        await tester.pump();
+        await tester.pump();
+        host.intents.clear();
+        host.viewport = const MapViewport(
+          widthInScreenPixels: 400,
+          heightInScreenPixels: 800,
+        );
+        host.projectionAnswer = const <MapScreenPoint?>[
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 1200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+          MapScreenPoint(
+            xInScreenPixels: 200,
+            yInScreenPixels: 400,
+            isInFrontOfCamera: true,
+          ),
+        ];
+
+        await tester.pumpWidget(const SizedBox.shrink());
+
+        host.emitGroupTap(tapOnFacts);
+        await settle(tester);
+
+        expect(host.intents, isEmpty);
+        expect(
+          host.projected,
+          isEmpty,
+          reason:
+              'ohne Abonnement erreicht der Tipp `_onGroupTap` gar nicht '
+              'erst',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// Ein Karten-Host, der jede Absicht mitschreibt statt sie auszuführen.
@@ -1027,6 +1920,20 @@ class FakeMapHost implements MapHost {
 
   @override
   Stream<MapCameraView> get cameraChanges => _cameras.stream;
+
+  /// `null`, bis ein Test [viewport] setzt: genau der Zustand vor dem ersten
+  /// Layout der Kartenfläche.
+  @override
+  MapViewport? viewport;
+
+  final StreamController<MapOverlayGroupTap> _groupTaps =
+      StreamController<MapOverlayGroupTap>.broadcast();
+
+  @override
+  Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
+
+  /// Schiebt einen Gruppen-Tipp in den Strom, wie `MapOverlayHost` es täte.
+  void emitGroupTap(MapOverlayGroupTap tap) => _groupTaps.add(tap);
 
   @override
   void submitIntent(MapCameraIntent intent) => intents.add(intent);
@@ -1081,18 +1988,42 @@ class FakeMapHost implements MapHost {
   /// Was die Projektion liefert, wenn sie sofort antwortet.
   List<MapScreenPoint?>? projectionAnswer;
 
+  /// Ist diese Liste gesetzt (nicht `null`), reiht jeder Aufruf von
+  /// [projectToScreen] einen eigenen Riegel hier ein, statt sofort oder über
+  /// [pendingProjection] zu antworten.
+  ///
+  /// **Der Unterschied zu [pendingProjection]:** der eine Riegel dort passt
+  /// nur für eine einzelne unterwegs befindliche Anfrage; zwei Anfragen, die
+  /// sich zeitlich überlappen, teilten sich denselben Riegel und ließen sich
+  /// nicht mehr unabhängig beantworten. Diese Liste gibt jedem Aufruf, in der
+  /// Reihenfolge seines Eingangs, seinen eigenen Riegel, damit ein Test die
+  /// Reihenfolge der **Antworten** unabhängig von der Reihenfolge der
+  /// **Aufrufe** bestimmen kann, siehe [answerProjectionAt]. Das ist der Kern
+  /// von Fund 1: die Antwort auf den ersten Tipp soll nach der Antwort auf
+  /// den zweiten zurückkommen.
+  List<Completer<List<MapScreenPoint?>>>? projectionGates;
+
   @override
   Future<List<MapScreenPoint?>> projectToScreen(List<MapPosition> positions) {
     projected.add(positions);
     inFlight++;
     peakInFlight = inFlight > peakInFlight ? inFlight : peakInFlight;
-    final Completer<List<MapScreenPoint?>>? gate = pendingProjection;
-    final Future<List<MapScreenPoint?>> answer = gate != null
-        ? gate.future
-        : Future<List<MapScreenPoint?>>.value(
-            projectionAnswer ??
-                List<MapScreenPoint?>.filled(positions.length, null),
-          );
+    final List<Completer<List<MapScreenPoint?>>>? gates = projectionGates;
+    final Future<List<MapScreenPoint?>> answer;
+    if (gates != null) {
+      final Completer<List<MapScreenPoint?>> gate =
+          Completer<List<MapScreenPoint?>>();
+      gates.add(gate);
+      answer = gate.future;
+    } else {
+      final Completer<List<MapScreenPoint?>>? gate = pendingProjection;
+      answer = gate != null
+          ? gate.future
+          : Future<List<MapScreenPoint?>>.value(
+              projectionAnswer ??
+                  List<MapScreenPoint?>.filled(positions.length, null),
+            );
+    }
     return answer.whenComplete(() => inFlight--);
   }
 
@@ -1103,14 +2034,23 @@ class FakeMapHost implements MapHost {
     gate?.complete(answer);
   }
 
+  /// Lässt den Aufruf mit dem Index [index] aus [projectionGates] antworten,
+  /// in der Reihenfolge des Eingangs bei [projectToScreen] gezählt, nicht in
+  /// der Reihenfolge der Antworten. Index 0 ist also immer der **erste**
+  /// Aufruf, ganz gleich, ob er zuerst oder zuletzt antwortet.
+  void answerProjectionAt(int index, List<MapScreenPoint?> answer) {
+    projectionGates![index].complete(answer);
+  }
+
   /// Die Karte steht: dasselbe Signal, das `MapCameraHost.bindSurface` sendet.
   void bind(MapCameraView view) {
     _camera = view;
     _cameras.add(view);
   }
 
-  /// Schließt den Kamerastrom.
-  Future<void> close() => _cameras.close();
+  /// Schließt den Kamerastrom und den Gruppen-Tipp-Strom.
+  Future<void> close() =>
+      Future.wait<void>([_cameras.close(), _groupTaps.close()]);
 }
 
 /// Eine Diagnose-Senke, die mitschreibt.
@@ -1136,4 +2076,36 @@ class FakeLocationService implements LocationService {
 
   /// Schließt den Strom.
   Future<void> close() => _controller.close();
+}
+
+/// Ein Orientierungsdienst, dessen Kopfwerte der Test selbst setzt.
+///
+/// Dasselbe Muster wie [FakeLocationService], nur für [DeviceHeading].
+class FakeOrientationService implements OrientationService {
+  /// `broadcast`, aus demselben Grund wie bei [FakeLocationService].
+  final StreamController<DeviceHeading> _controller =
+      StreamController<DeviceHeading>.broadcast();
+
+  @override
+  Stream<DeviceHeading> headingUpdates() => _controller.stream;
+
+  /// Schiebt einen Kopfwert in den Strom.
+  void emit(DeviceHeading heading) => _controller.add(heading);
+
+  /// Schließt den Strom.
+  Future<void> close() => _controller.close();
+}
+
+/// Eine von Hand vorspulbare Uhr für den Kompass-Wachhund.
+///
+/// Dasselbe Muster wie `TestClock` in `map_camera_host_test.dart`: der Test
+/// stellt [now] selbst weiter, ohne echtes Warten und ohne sich auf die
+/// Verzahnung von `Stopwatch` und `fake_async` zu verlassen, die
+/// `map_page.dart`s eigener Kommentar bei `_now` beschreibt.
+class TestClock {
+  Duration now = Duration.zero;
+
+  Duration call() => now;
+
+  void advance(Duration by) => now += by;
 }

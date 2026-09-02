@@ -196,8 +196,32 @@ class AudioActivationDialog extends ConsumerWidget {
   /// `marginBottom: 20` unter dem Fließtext.
   static const double bodyGap = 20;
 
+  /// `marginBottom: 18` am Hinweiskasten, `screen-auth.jsx:250`.
+  ///
+  /// Nicht dieselbe Zahl wie [bodyGap]: der Fließtext trägt `marginBottom: 20`
+  /// (`screen-auth.jsx`, `const body`), der Kasten darunter 18. Zwei Werte, die
+  /// fast gleich sind, verleiten zum Zusammenlegen; sie stehen deshalb einzeln
+  /// mit je ihrer Fundstelle.
+  static const double hintGap = 18;
+
   /// `gap: 10` zwischen den Knöpfen.
   static const double buttonGap = 10;
+
+  /// `background: 'rgba(245,197,24,0.15)'`, `screen-auth.jsx:249`.
+  static const Color hintBackground = Color(0x26F5C518);
+
+  /// `border: '1px solid rgba(245,197,24,0.45)'`, `screen-auth.jsx:249`.
+  static const Color hintBorder = Color(0x73F5C518);
+
+  /// `borderRadius: 10` am Hinweiskasten, `screen-auth.jsx:250`. Nicht
+  /// [cornerRadius], das sind die 18 des Dialogkastens.
+  static const double hintCornerRadius = 10;
+
+  /// `padding: '10px 12px'`, `screen-auth.jsx:250`.
+  static const EdgeInsets hintPadding = EdgeInsets.symmetric(
+    horizontal: 12,
+    vertical: 10,
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -272,6 +296,8 @@ class AudioActivationDialog extends ConsumerWidget {
                         child: SingleChildScrollView(child: _body(strings)),
                       ),
                       const SizedBox(height: bodyGap),
+                      _volumeHint(strings),
+                      const SizedBox(height: hintGap),
                       _buttons(context, ref, strings),
                     ],
                   ),
@@ -338,29 +364,63 @@ class AudioActivationDialog extends ConsumerWidget {
   /// Reihenfolge wie in der Quelle: Abbrechen links, Aktivieren rechts
   /// (`screen-auth.jsx:254-255`).
   ///
-  /// ## Hier stünde der Lautstärke-Hinweis, und er entfällt
+  /// Der Lautstärke-Hinweis steht seit dem 02.09.2026 darüber, siehe
+  /// [_volumeHint].
+  /// Der gelbe Hinweiskasten zwischen Fließtext und Knopfzeile,
+  /// `screen-auth.jsx:246-252`.
   ///
-  /// `screen-auth.jsx:246-252` rendert zwischen Fließtext und Knopfzeile einen
-  /// gelben Hinweiskasten: `fontFamily: 'DM Sans', fontSize: 13,
-  /// lineHeight: 1.4, background: 'rgba(245,197,24,0.15)', border: '1px solid
-  /// rgba(245,197,24,0.45)', borderRadius: 10, padding: '10px 12px',
-  /// marginBottom: 18, color: '#1a1a1a'`, Inhalt `🔊 ` plus
-  /// `t('audio.dialog.volumeHint')`.
+  /// ## Warum er lange nicht da war, und was sich geändert hat
   ///
-  /// **Diesen Schlüssel gibt es nicht.** Im ganzen App-Ordner der PWA ist die
-  /// Verwendungsstelle der einzige Treffer, `audio-strings.jsx` kennt ihn
-  /// weder auf Deutsch noch auf Englisch. `window.t` fällt auf den
-  /// Schlüsselnamen zurück, die PWA zeigt dem Nutzer also wörtlich
-  /// `🔊 audio.dialog.volumeHint`. Das ist ein Fehler der Quelle, kein Text.
+  /// Der Schlüssel `audio.dialog.volumeHint` steht in **keinem** der beiden
+  /// Wörterbücher der PWA. `window.t` gibt bei einem fehlenden Schlüssel den
+  /// Schlüsselnamen zurück, die laufende PWA zeigt dem Nutzer dort also
+  /// wörtlich `🔊 audio.dialog.volumeHint`. Das ist E-28.
   ///
-  /// Nicht nachgebaut, und keine der beiden Notlösungen genommen: einen Text
-  /// zu erfinden geht nicht, weil die Sprachdateien aus der PWA generiert
-  /// werden und ein handgeschriebener Schlüssel beim nächsten Lauf von
-  /// `tool/generate_i18n.dart` verschwindet, was `--check` rot macht. Einen
-  /// rohen Schlüsselnamen anzuzeigen wäre die Übernahme des Fehlers.
+  /// Zwei Sperren sind seither gefallen. Die technische mit **E-39**: ein
+  /// handgeschriebener Schlüssel überlebt den Generator jetzt, weil
+  /// `app_strings_supplement.dart` der vorgesehene Ort dafür ist. Und die
+  /// fachliche am 02.09.2026, mit der Freigabe des Wortlauts durch den
+  /// Eigentümer. Vorher stand hier begründet **nichts**: einen Nutzertext zu
+  /// erfinden war keine Lösung, einen rohen Schlüsselnamen anzuzeigen wäre die
+  /// Übernahme des Fehlers gewesen.
   ///
-  /// Zum Nachrüsten fehlt genau eine Sache: der fachlich festgelegte Text in
-  /// der PWA. Danach ist es dieser Kasten mit den Maßen oben.
+  /// ## Die Maße kommen aus der Quelle, die Farbe hat einen Namen
+  ///
+  /// `fontSize: 13, lineHeight: 1.4, borderRadius: 10, padding: '10px 12px'`,
+  /// Textfarbe `#1a1a1a`, Familie `DM Sans`, also [FactFont.body].
+  ///
+  /// Hintergrund und Rahmen sind `rgba(245,197,24, …)`, und `#F5C518` ist
+  /// [FactColors.gold], in beiden Themes derselbe Wert. Er steht hier trotzdem
+  /// als roher Wert, aus demselben Grund wie jede andere Farbe in dieser Datei:
+  /// dieser Dialog folgt keinem Theme, sondern setzt die festen Werte der
+  /// Quelle, die ihn ebenfalls nicht themt. Ein Themezugriff für einen
+  /// themeunabhängigen Wert wäre eine Abhängigkeit ohne Gegenwert.
+  ///
+  /// Das `🔊` steht in der Quelle als Zeichen **vor** dem Text und nicht im
+  /// Text (`{'🔊 '}` plus Aufruf). Deshalb trägt der Schlüssel es nicht mit:
+  /// ein Emoji in einer Übersetzung wäre in jeder Sprache zu wiederholen und
+  /// beim ersten Vergessen weg.
+  Widget _volumeHint(AppStrings strings) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: hintBackground,
+        border: Border.all(color: hintBorder),
+        borderRadius: BorderRadius.circular(hintCornerRadius),
+      ),
+      child: Padding(
+        padding: hintPadding,
+        child: Text(
+          '🔊 ${strings.text('audio.dialog.volumeHint')}',
+          style: FactTypography.bodyText.copyWith(
+            fontSize: 13,
+            height: 1.4,
+            color: const Color(0xFF1A1A1A),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buttons(BuildContext context, WidgetRef ref, AppStrings strings) {
     return Wrap(
       alignment: WrapAlignment.end,

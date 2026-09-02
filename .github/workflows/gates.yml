@@ -34,7 +34,15 @@ name: Gates
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      # Die Arbeitszweige laufen mit. Bis zum 31.08.2026 stand hier nur
+      # `main`, und das hieß: auf genau dem Zweig, auf dem gebaut wird, lief
+      # kein einziges Gate maschinell. Gemessen und nicht vermutet, `gh run
+      # list` zeigte an diesem Abend fünf Pushes ohne einen einzigen Lauf.
+      # Ein Tor, das erst beim Zusammenführen zuschlägt, meldet den Fehler
+      # eine Tagesarbeit zu spät.
+      - "claude/**"
   pull_request:
 
 # Ein laufender Durchgang wird abgebrochen, wenn derselbe Zweig neu geschoben
@@ -72,11 +80,34 @@ jobs:
       - name: Gate 1, Format
         run: dart format --output=none --set-exit-if-changed lib test tool
 
+      # `--fatal-infos`, seit dem 02.09.2026. Ohne die Flagge kippt ein
+      # `info` das Tor nicht, und genau daran standen hier über Wochen 24
+      # Hinweise, die niemanden mehr erreicht haben: wo 24 Meldungen stehen,
+      # fällt die 25. nicht auf. Seit sie weg sind, kostet die Flagge nichts
+      # und hält den Stand.
       - name: Gate 2, Analyzer
-        run: dart analyze
+        run: dart analyze --fatal-infos
 
       - name: Gate 3, Architektur
         run: dart run tool/check_architecture.dart
 
       - name: Gate 4, Tests
         run: flutter test
+
+      # Der erzeugte Code, und der Posten ist viel kleiner, als er im
+      # Statusdokument aussah. Von den sechs `*.g.dart` im Baum stammt genau
+      # **eine** von `build_runner`, `lib/app/routing/app_routes.g.dart` aus
+      # `go_router_builder`. Die anderen fünf erzeugen die drei eigenen
+      # Werkzeuge, und die haben ihre Drift-Prüfung mit `--check` längst.
+      #
+      # **Warum nur hier und nicht lokal.** Der Lauf dauert gemessen 40
+      # Sekunden, und das für eine einzige Datei; die vier lokalen Tore
+      # zusammen liegen darunter. Ein Tor, das niemand mehr abwartet, ist
+      # keins. Dazu kommt, dass `git diff` auf Windows an dieser Datei durch
+      # die Zeilenenden-Umschreibung anschlägt, obwohl der Inhalt gleich ist,
+      # am 02.09.2026 gemessen. Hier läuft Linux, dort gibt es das Problem
+      # nicht.
+      - name: Erzeugter Code, go_router_builder
+        run: |
+          dart run build_runner build --delete-conflicting-outputs
+          git diff --exit-code -- lib/app/routing/app_routes.g.dart

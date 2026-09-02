@@ -6,6 +6,7 @@ import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_intent.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/domain/map_viewport.dart';
 import 'package:fact_app/map/presentation/map_camera_host.dart';
 import 'package:fact_app/map/presentation/map_surface.dart';
 import 'package:flutter/material.dart';
@@ -66,6 +67,33 @@ MapCameraOneShot skyFall() => const MapCameraOneShot(
   motion: MapCameraAnimated(Duration(milliseconds: 1200)),
   origin: MapCameraIntentOrigin.discovery,
 );
+
+/// Zählt mit, wie oft `MapSurface` die Größe der Kartenfläche meldet.
+///
+/// Ohne diesen Zähler wäre „meldet nur bei Änderung" nicht von außen zu
+/// unterscheiden: der Endwert von `viewport` ist in beiden Fällen derselbe,
+/// ob nun ein- oder zweimal geschrieben wurde. Der Zähler macht die
+/// **Häufigkeit** selbst zur Zusicherung.
+class CountingViewportHost extends MapCameraHost {
+  int viewportReports = 0;
+
+  /// Der zuletzt gemeldete Skalierungsfaktor, oder `null`.
+  ///
+  /// Gemerkt und nicht nur gezählt: der Host braucht ihn für den Horizont
+  /// (`map_camera_horizon.dart`), und ohne diese Zusicherung könnte
+  /// `MapSurface` eine 1 durchreichen, ohne dass etwas rot würde.
+  double? lastDevicePixelRatio;
+
+  @override
+  void handleViewportChange(
+    MapViewport viewport, {
+    required double devicePixelRatio,
+  }) {
+    viewportReports++;
+    lastDevicePixelRatio = devicePixelRatio;
+    super.handleViewportChange(viewport, devicePixelRatio: devicePixelRatio);
+  }
+}
 
 void main() {
   late RecordingSink sink;
@@ -236,6 +264,133 @@ void main() {
     // Gleichheit des Pakets statt den gesetzten Wert.
     expect(map.minMaxZoomPreference.maxZoom, 20);
     expect(map.minMaxZoomPreference.minZoom, isNull);
+  });
+
+  testWidgets('misst die Kartenfläche und meldet sie dem Host', (tester) async {
+    // Der `LayoutBuilder` misst, **bevor** die Karte überhaupt gemountet ist:
+    // `MapLibreMap.onMapCreated` läuft im Widget-Test nie, also wäre ohne
+    // diesen Weg `MapHost.viewport` hier für immer `null`.
+    final CountingViewportHost host = CountingViewportHost();
+
+    await pumpSurface(
+      tester,
+      child: MapSurface(
+        initialCamera: startCamera,
+        debugCreateHost: () => host,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final Size size = tester.getSize(find.byType(MapSurface));
+    expect(host.viewport, isNotNull);
+    // **In Stilpixeln, nicht in Gerätepixeln.** `tester.getSize` liefert
+    // logische Pixel, genau das, was ein `LayoutBuilder` hergibt, und genau
+    // das, was `MapViewport` nach seinem Kopfkommentar tragen muss.
+    expect(host.viewport!.widthInScreenPixels, size.width);
+    expect(host.viewport!.heightInScreenPixels, size.height);
+  });
+
+  testWidgets('meldet den Skalierungsfaktor der Fläche mit', (tester) async {
+    // **Der Host braucht ihn, und ohne diese Probe käme eine 1 durch.** Die
+    // Projektion antwortet in Geräte-Pixeln, `MapViewport` misst in
+    // Stilpixeln, und der Horizont der geneigten Karte braucht beide in einer
+    // Formel (D-17, `map_camera_horizon.dart`).
+    //
+    // **Gesetzt über `tester.view` und nicht über eine eigene
+    // `MediaQuery`**: die eigene läge unter der echten und wäre wirkungslos
+    // (`REBUILD_STATUS.md`, „Wie Tests hier blind werden“, Muster 11).
+    //
+    // **Zwei Faktoren statt einem**, damit eine fest eingetragene Zahl nicht
+    // durchkommt. 2,625 ist der des Messgeräts.
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final CountingViewportHost host = CountingViewportHost();
+
+    tester.view.devicePixelRatio = 2.625;
+    await pumpSurface(
+      tester,
+      child: MapSurface(
+        initialCamera: startCamera,
+        debugCreateHost: () => host,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(host.lastDevicePixelRatio, 2.625);
+
+    tester.view.devicePixelRatio = 1.5;
+    await tester.pumpAndSettle();
+
+    expect(host.lastDevicePixelRatio, 1.5);
+  });
+
+  testWidgets('meldet auch dann, wenn sich nur der Skalierungsfaktor ändert', (
+    tester,
+  ) async {
+    // **Der Fall, den der Vergleich in `_reportViewport` sonst verschluckt.**
+    // Physische Größe und Faktor ändern sich hier so, dass die **logische**
+    // Größe gleich bleibt: 2400 × 1800 bei 3,0 und 1200 × 900 bei 1,5 sind
+    // beide 800 × 600 Stilpixel. Der [MapViewport] ist also identisch, und
+    // ein Vergleich, der nur ihn prüft, meldet nicht erneut. Der Host bliebe
+    // dann auf dem alten Faktor stehen, und der Horizont läge um dessen
+    // Verhältnis daneben. Auf dem Gerät ist das der Wechsel auf einen zweiten
+    // Bildschirm.
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final CountingViewportHost host = CountingViewportHost();
+
+    tester.view
+      ..devicePixelRatio = 3
+      ..physicalSize = const Size(2400, 1800);
+    await pumpSurface(
+      tester,
+      child: MapSurface(
+        initialCamera: startCamera,
+        debugCreateHost: () => host,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final MapViewport? before = host.viewport;
+    expect(host.viewportReports, 1);
+
+    tester.view
+      ..devicePixelRatio = 1.5
+      ..physicalSize = const Size(1200, 900);
+    await tester.pumpAndSettle();
+
+    expect(host.viewport, before, reason: 'dieselbe Fläche in Stilpixeln');
+    expect(host.viewportReports, 2);
+    expect(host.lastDevicePixelRatio, 1.5);
+  });
+
+  testWidgets('meldet die Fläche nur bei einer echten Größenänderung', (
+    tester,
+  ) async {
+    // **Die Mutationsprobe, die diesen Test rechtfertigt:** ohne den
+    // Vergleich in `_reportViewport` schriebe jeder harmlose Neuaufbau, etwa
+    // durch `setState` beim Laden des Stils, den Host erneut, ohne dass sich
+    // sichtbar etwas ändert. Ein Zähler am Host macht genau das beobachtbar.
+    final CountingViewportHost host = CountingViewportHost();
+
+    await pumpSurface(
+      tester,
+      child: MapSurface(
+        initialCamera: startCamera,
+        debugCreateHost: () => host,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(host.viewportReports, 1);
+
+    // Ein Neuaufbau ohne jede Größenänderung, wie ihn auch ein `setState`
+    // an anderer Stelle im Baum auslösen könnte.
+    tester.element(find.byType(MapSurface)).markNeedsBuild();
+    await tester.pump();
+
+    expect(
+      host.viewportReports,
+      1,
+      reason: 'die Größe hat sich nicht geändert',
+    );
   });
 
   testWidgets('entsorgt beim Ausbauen den Host samt Kamerastrom', (

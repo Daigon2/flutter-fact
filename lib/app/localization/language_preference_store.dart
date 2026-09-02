@@ -3,10 +3,12 @@ import 'package:fact_app/app/localization/app_language.dart';
 /// Vertrag für die gespeicherte Sprachwahl des Nutzers.
 ///
 /// Hier lebt nur der Vertrag. Wer wirklich schreibt, entscheidet
-/// `features/settings`, denn die Sprach*präferenz* ist eine Einstellung,
-/// während das Nachschlagen anwendungsweit ist. `shared_preferences` ist im
-/// Projekt bewusst nicht installiert, an dieser Schnittstelle hängt also keine
-/// Speichertechnik.
+/// `features/settings`: seit dem 31.08.2026 ist das
+/// `KeyValueLanguagePreferenceStore` in `features/settings/data`, denn die
+/// Sprach*präferenz* ist eine Einstellung, während das Nachschlagen
+/// anwendungsweit ist. An dieser Schnittstelle hängt weiterhin keine
+/// Speichertechnik: die Umsetzung kennt `KeyValueStore` aus `core`, und das
+/// Vendor-Paket kennt nur `lib/services/preferences/` (Regel 22).
 ///
 /// `readLanguage` ist absichtlich synchron. `bootstrap()` lädt die Präferenz
 /// vor dem ersten Frame und überschreibt den Provider mit einer gefüllten
@@ -23,11 +25,13 @@ abstract interface class LanguagePreferenceStore {
   Future<void> writeLanguage(AppLanguage language);
 }
 
-/// Flüchtiger Standard, solange `features/settings` nichts persistiert, und
-/// Vorgabe für Tests.
+/// Flüchtiger Speicher, Vorgabe für Tests.
 ///
-/// Die Wahl überlebt den Neustart nicht. Das ist hier gewollt: eine halbe
-/// Persistenz wäre schwerer zu erkennen als gar keine.
+/// Die Wahl überlebt den Neustart nicht. **Bis zum 31.08.2026 war das auch der
+/// Zustand der laufenden App**, seither überschreibt `bootstrap()` diesen
+/// Provider mit `KeyValueLanguagePreferenceStore`. Hier bleibt er, weil ein
+/// Test keinen Gerätespeicher braucht und weil ein flüchtiger Standard
+/// leichter zu erkennen ist als eine halbe Persistenz.
 class InMemoryLanguagePreferenceStore implements LanguagePreferenceStore {
   /// [initial] setzt eine bereits getroffene Wahl, etwa in einem Test.
   InMemoryLanguagePreferenceStore([AppLanguage? initial]) : _language = initial;
