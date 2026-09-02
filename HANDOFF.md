@@ -15,6 +15,30 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 
 ---
 
+## Zuerst: ein echter API-Schlüssel liegt ausgeliefert im Klartext
+
+Am 02.09.2026 beim Zuschnitt von Schritt 25 gefunden, und es ist die einzige
+Zeile in dieser Datei, die **heute** eine Handlung verlangt.
+
+`02_Frontend/app/audio-player.jsx:12` hält eine Konstante `OPENAI_KEY` mit
+einem vollständigen `sk-proj-…`-Schlüssel. Die Datei wird **nicht** gebündelt,
+sondern im Quelltext ausgeliefert: `index.html:180` lädt sie als
+`<script type="text/babel" src="audio-player.jsx?v=5">`. Wer die Seite offen
+hatte, konnte den Schlüssel lesen.
+
+Genau eine Fundstelle, geprüft: nicht im Backend, nicht im eingefrorenen
+Flutter-Port. **Der Schlüssel steht bewusst nirgends in diesem Repository**,
+auch nicht in `REBUILD_STATUS.md`; dieses Repository ist öffentlich.
+
+**Die Behebung ist kein Code und liegt beim Eigentümer:** den Schlüssel bei
+OpenAI zurückziehen und neu ausstellen. Ihn nur aus der Datei zu löschen
+genügt nicht, er steht in der Versionsgeschichte des anderen Repositories und
+war ausgeliefert. Steht als E-70, Stufe 4.
+
+Für den Neubau ändert das nichts, es bestätigt die Entscheidung: E-15 heißt
+„Gerät zuerst", und die Cloud-Variante läuft laut derselben Entscheidung über
+Edge Function und Proxy, nie über einen Schlüssel im Client.
+
 ## Eine Sache liegt vor allem anderen, seit dem 02.09.2026
 
 **Dieses Repository ist öffentlich.** Nachgesehen, nicht angenommen:
