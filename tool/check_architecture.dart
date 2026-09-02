@@ -79,6 +79,24 @@
 //    aus dem Pfad der geprüften Datei selbst kommt und ein fremder Import nie
 //    mit diesem Präfix beginnt.
 //
+// **Eine Kante bleibt an Regel 17 offen, und der Absatz darüber verschwieg
+// sie bis zum 02.09.2026.** Ein **verschachteltes** Modul ausserhalb von
+// `lib/features/`, das auf das `data/` seines Elternmoduls zeigt
+// (`lib/map/karte/presentation/a.dart` auf `package:fact_app/map/data/b.dart`),
+// wird nicht gemeldet: innerhalb von `lib/features/` deckt der erste Zweig
+// diese Tiefe ab, ausserhalb deckt der zweite nur die flache Form.
+// Nachgemessen von einer unabhängigen Prüfung an einem Probebaum. Heute nicht
+// auslösbar, weil es ausserhalb von `lib/features/` kein `data/` gibt, und
+// bewusst ohne Test, weil ein Test für einen unmöglichen Fall grün bleibt,
+// egal was das Skript tut. Wer dem Karten-Host ein `data/` gibt, prüft diese
+// Kante mit.
+//
+// Zweite bekannte Kante, laut und nicht still: [_hasSegment] nimmt **jedes**
+// Pfadsegment namens `data` als Schicht. Ein Import nach
+// `features/z/domain/value_objects/data/h.dart` meldet deshalb einen
+// Regel-17-Verstoss, obwohl er in die Domäne geht. Ein solcher Ordner
+// existiert nicht; entstünde er, wäre der Fehlalarm sofort sichtbar.
+//
 // Noch offen bleibt die dritte Asymmetrie aus derselben Liste: `application`
 // hat weiter nur eine Verbotsliste, keine Erlaubnisliste wie Domain und Kern.
 // Das setzt eine Aussage voraus, was "narrowly scoped Core" in

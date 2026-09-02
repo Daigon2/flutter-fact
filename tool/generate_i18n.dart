@@ -587,6 +587,28 @@ String _stripComments(String source) {
           i++;
           continue;
         }
+        // **Der Zustand darf keine Zeile überleben.** Ein `'` oder `"`
+        // schließt in JavaScript spätestens am Zeilenende; steht bis dahin
+        // kein zweites, war das erste gar kein Anfang einer Zeichenkette,
+        // sondern Text. Genau das kommt im JSX ständig vor, als Minutenzeichen
+        // (`{min}'`) oder als typografisches Anführungszeichen im Fließtext.
+        //
+        // Ohne diesen Abbruch **kaskadiert** so ein Zeichen: der Scanner hält
+        // die Zeichenkette bis zum nächsten gleichen Zeichen offen, oft erst
+        // Zeilen später, und in der Zwischenzeit ist seine Parität verschoben.
+        // Ein `//` in einer echten Zeichenkette gilt dann als Zeilenkommentar,
+        // und alles bis Zeilenende fällt weg, samt einem `t()`-Aufruf darin.
+        // Am 02.09.2026 an einer Wegwerf-Datei ausgelöst: ein fehlender
+        // Schlüssel verschwand **still**, und still ist genau der Fehler,
+        // gegen den diese ganze Prüfung gebaut ist.
+        //
+        // Das Zurücksetzen macht den Fehler örtlich: ein verlesenes Zeichen
+        // verdirbt höchstens seine eigene Zeile. Für ` gilt es nicht, ein
+        // Template-Literal darf mehrzeilig sein.
+        if (quote != '`' && c == '\n') {
+          i++;
+          break;
+        }
         i++;
         if (c == quote) {
           break;

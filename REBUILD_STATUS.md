@@ -1466,12 +1466,16 @@ Letzterer liefert auch eine aus dem Speicher wiederhergestellte Jagd, und die
 trägt weder Stationszustände noch Punkte, also genau das, was diese beiden
 Bildschirme zeigen.
 
-Folge, unbequem und stehen gelassen: **eine Jagd, die einen App-Neustart
-überlebt hat, ist auf der Karte als Pille sichtbar, im Challenge-Reiter aber
-nicht.** Dort steht wieder der Assistent. Das ist die schon in
-`HuntRunNotifier.build` dokumentierte Grenze aus ADR-007, die hier zum ersten
-Mal auf einen Bildschirm durchschlägt. Ein abgespeckter Pausebildschirm für
-genau diesen Fall wäre erfundenes Verhalten und ist nicht gebaut.
+Die Folge davon habe ich beim Schreiben **falsch behauptet**, und die
+unabhängige Prüfung derselben Nacht hat es widerlegt. Hier stand: „ist auf der
+Karte als Pille sichtbar, im Challenge-Reiter aber nicht". `HuntPill` liest
+aber ebenfalls `huntRunProvider` (`hunt_pill.dart:136`), und
+`activeHuntProvider` hat in `lib/` **keinen Verbraucher**. Nach einem Neustart
+ist die Jagd **nirgends** sichtbar. Der ganze Trost, dass der Nutzer sie
+wenigstens auf der Karte behält, war erfunden. Als **E-65** aufgenommen, samt
+der Feststellung, dass die Produktvorgabe aus ADR-007 damit an keiner Stelle
+eingelöst ist. Ein abgespeckter Pausebildschirm ist weiterhin nicht gebaut,
+jetzt aber, weil die Entscheidung offen ist.
 
 ### Zwei Kleinigkeiten aus dem Bericht, beide richtig entschieden
 
@@ -1592,7 +1596,13 @@ schreibt danach in den Speicher, genau wie es der Kopfkommentar von
 Rangfolge: **läuft eine Jagd, gilt der Halter; läuft keine, gilt der Speicher.**
 Die zweite Quelle ist kein Rest, sondern der Ertrag der Persistenz von heute
 Vormittag: eine Jagd, die einen Neustart überlebt hat, steht im Speicher und
-bleibt auf der Karte sichtbar, obwohl es keinen laufenden `HuntRun` gibt.
+**soll** sichtbar bleiben, obwohl es keinen laufenden `HuntRun` gibt.
+
+**Nachtrag vom 02.09.2026, und er entwertet den Absatz darüber teilweise:**
+diese zweite Quelle wird nie abgefragt, weil `activeHuntProvider` in `lib/`
+keinen Verbraucher hat. `HuntPill` liest seit Schritt 37 direkt
+`huntRunProvider`. Die Rangfolge ist als Entwurf richtig und als Beschreibung
+des laufenden Programms falsch. E-65.
 
 **Keine Wiederherstellung eines spielbaren Laufs**, und das ist die von ADR-007
 gezogene Grenze: aus einem gespeicherten `ActiveHunt` lässt sich kein `HuntRun`
@@ -2709,6 +2719,18 @@ Nicht im REBUILD_PLAN, aber notwendig:
   85 → 90 Tests am Skript, sechs Mutationen (drei vom Bauenden, drei von der
   prüfenden Seite), alle gefallen. Die verschärfte Prüfung findet im Bestand
   **keinen** Verstoß, es gab also nichts nachzuziehen.
+- [ ] **Zwei Testlücken an den Bildschirmen von Schritt 39**, am 02.09.2026 von
+  der unabhängigen Prüfung benannt. Erstens fehlt der **zusammengesetzte Weg**:
+  die drei neuen Tests seeden den Lauf, statt durch Assistent, Picker, Start und
+  Abbruch zu gehen. Genau dort sitzt aber die Stelle, die ein Leser falsch
+  erinnert, nämlich dass `_choice` die Jagd überlebt und nach „Fertig" wieder
+  der Picker dasteht (das ist Parität, `screen-challenge.jsx:4331-4358` verlässt
+  `handleHotspotPick` im Erfolgsfall ohne `setView`). Zweitens fehlen **Maß- und
+  Schriftproben**: `challenges_page_test.dart` fährt 390/360/320 mal Schrift 1
+  und 2, die beiden neuen Bildschirme kennen weder `textScale` noch 320. Die
+  Rückfrage im Pausebildschirm ist eine nicht scrollbare `Column` in einem
+  `Center`, also die Bauform, die dieses Dokument zweimal als „schneidet lautlos
+  ab" protokolliert hat. Kein Überlauf ausgelöst, nur die Zusicherung fehlt.
 - [ ] **Die dritte Asymmetrie bleibt offen, und sie ist keine Erkennungslücke.**
   `application` hat weiter nur eine Verbotsliste, keine Erlaubnisliste wie
   Domäne und Kern. Das setzt eine Aussage voraus, was „narrowly scoped Core"
@@ -4390,6 +4412,7 @@ eine Fundstelle.
 | E-62 | **Der Pause- und der Ergebnisbildschirm der Jagd zeigen keine Zeit, sondern den Platzhalter `—`.** Die Quelle rechnet dort `Date.now() - hunt.startedAt` (`screen-challenge.jsx:2807-2808` und `:2954`) und lässt dafür einen Sekundentakt laufen. `HuntRun` trägt bewusst keine Zeitstempel, und der gespeicherte Vertrag `ActiveHunt` auch nicht: E-19 ist mit „der Server rechnet“ entschieden, und Dairens Satz dazu lautet „der baubare Teil ist alles, was den Ablauf anzeigt“. Angezeigt wird hier nichts, was der Client kennt, also steht der Platzhalter da, den die Quelle selbst für fehlende Werte benutzt (`:2828`). **Die Kachel und die Zeile bleiben stehen**, damit das Layout stimmt und der Tag, an dem ein Startzeitstempel vom Server kommt, eine Zeile kostet und keinen Umbau. Kein Sicherheitsbefund, sondern eine sichtbare Lücke mit bekannter Ursache und bekannter Behebung. | 2 | Schritt 39, Behebung mit dem Backend-Auftrag |
 | E-63 | **Der Beitritts-Dialog der Gruppe zeigt seinen eigenen Schlüsselnamen als Überschrift, und der dafür geschriebene Rückfall kann nie greifen.** Am 31.08.2026 gemessen, nicht vermutet. `screen-challenge.jsx:2025` schreibt `t('group.join.title', lang) || 'Session-Code eingeben'`. Den Schlüssel `group.join.title` gibt es in `translations.jsx` nicht, weder deutsch noch englisch; seine Geschwister `group.join.cta`, `.invalidCode` und `.submit` gibt es alle drei. **Der Rückfall ist toter Code:** `window.t` (`translations.jsx:1600-1605`) gibt bei fehlendem Schlüssel den **Schlüssel selbst** zurück, und der ist wahrheitswertig, also feuert `||` nie. Auf dem Bildschirm steht damit in beiden Sprachen die Zeichenkette `group.join.title`. Dieselbe Fehlerklasse wie E-28, gefunden mit derselben Messung, die auch die Prüfung im i18n-Generator begründet. Für den Neubau heißt das: Schritt 40 erfindet hier eine Überschrift oder übernimmt den hartcodierten deutschen Satz, den der Autor gemeint hat, und beides gehört entschieden statt stillschweigend gewählt. | 2 | Schritt 40 |
 | E-64 | **Dieses Repository ist öffentlich, und es enthält das geprüfte Verzeichnis der Backend-Lücken zusammen mit der Projekt-URL der laufenden Instanz.** Am 31.08.2026 festgestellt, nicht vermutet: `gh repo view` meldet für `Daigon2/flutter-fact` die Sichtbarkeit `PUBLIC`, und `docs/operations/backend-inventory.md` nennt die Projekt-URL. Das Register in dieser Datei führt E-06, E-07, E-23, E-24, E-54 und E-58 mit Tabellen-, Policy- und Funktionsnamen. Der Schlüssel selbst liegt **nicht** im Repository, `SupabaseConfig` liest ihn über `String.fromEnvironment`; der öffentliche Schlüssel der PWA ist aber ohnehin aus jedem Browser zu holen, er ist dafür gedacht. **Damit steht öffentlich, welche Tür offen ist und wo sie sitzt.** **Zwei Dinge sind zu trennen.** Erstens: die Sichtbarkeit umzustellen behebt nichts rückwirkend, was einmal öffentlich war, kann kopiert und indiziert sein. Zweitens: die eigentliche Behebung ist ohnehin, die Lücken zu schließen, und die sind laut Backend-Bestandsaufnahme überwiegend wenige Zeilen SQL. Die Sichtbarkeit zu ändern verringert nur, was ab jetzt dazukommt. **Beides ist eine Entscheidung des Eigentümers und wurde von hier aus nicht getroffen.** | **4** | sofort |
+| E-65 | **Die Persistenz der laufenden Jagd wird nirgends gelesen, und die Produktvorgabe aus ADR-007 ist damit an keiner Stelle eingelöst.** Am 02.09.2026 von einer unabhängigen Prüfung gefunden und nachgezählt: `activeHuntProvider` hat in `lib/` **keinen einzigen Verbraucher**. `HuntPill` liest seit Schritt 37 direkt `huntRunProvider` (`hunt_pill.dart:136`), weil sie Stationen, Hinweise und Punkte braucht, die ein `ActiveHunt` nicht trägt. Der Schreibweg funktioniert, der Leseweg hat keinen Abnehmer. **Folge:** eine Jagd, die einen App-Neustart überlebt, ist weder auf der Karte noch im Challenge-Reiter sichtbar, und `bootstrap.dart:180-183` zitiert genau diesen Fall als das, was ADR-007 ausschließt. **Zweite Folge, kleiner aber unsauber:** der Eintrag `fact_active_challenge` lässt sich dann auch nicht mehr löschen, weil `HuntRunNotifier.end()` bei `state == null` sofort zurückkehrt; er wird erst von der nächsten Jagd überschrieben. **Zur Wahl stehen zwei Wege.** (a) Die Pille bekommt eine abgespeckte Lesart aus `ActiveHunt`: Stationszähler, Titel und Entfernung stehen dort alle, Hinweise und Punkte nicht. Das löst die Vorgabe ein, ohne den Plan zu speichern. (b) Der Start räumt einen nicht fortsetzbaren Eintrag auf und die Vorgabe wird als unerfüllbar zurückgegeben, dann gehört ADR-007 geändert. **Die Wahl ist nicht von hier aus getroffen worden.** Der Fund ist kein Codefehler dieser Nacht, sondern eine Lücke aus Schritt 37, die eine falsche Behauptung in vier Dokumentstellen als erledigt aussehen ließ; die Behauptung ist berichtigt. | 3 | vor Schritt 40 |
 
 ## Wie Tests hier blind werden
 

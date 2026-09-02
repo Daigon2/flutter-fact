@@ -80,7 +80,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2308 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2311 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -346,6 +346,57 @@ Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zw
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
 
+### 02.09.2026, Eine unabhängige Prüfung, und sie hat zwei echte Löcher gefunden
+
+Die ganze Nacht hat dieselbe Instanz die Aufträge geschrieben **und** geprüft,
+die die Arbeit vergeben hat. Am Ende hat ein unabhängiger Blick über fünf
+Commits gelesen. Er hat sich gelohnt, und zwar zweimal ernsthaft.
+
+**Der erste Fund entwertet eine Begründung, die ich selbst geschrieben habe.**
+Ich hatte in vier Dokumentstellen behauptet, eine Jagd nach einem App-Neustart
+sei „auf der Karte als Pille sichtbar, im Challenge-Reiter aber nicht". Das ist
+falsch. `HuntPill` liest **ebenfalls** `huntRunProvider`, und
+`activeHuntProvider` hat in `lib/` **keinen einzigen Verbraucher**. Nach einem
+Neustart ist die Jagd **nirgends** sichtbar, und die Produktvorgabe aus
+ADR-007, die `bootstrap.dart` wörtlich zitiert, ist an keiner Stelle eingelöst.
+Der Schreibweg der Persistenz funktioniert, der Leseweg hat keinen Abnehmer.
+
+Das Bittere daran: die falsche Behauptung war der **Trost**, mit dem ich eine
+Entwurfsentscheidung begründet habe. Sie ließ eine offene Lücke wie eine
+hingenommene Kleinigkeit aussehen. Alle vier Stellen sind berichtigt, der Fund
+steht als **E-65** mit den zwei Wegen, die zur Wahl stehen. Gewählt ist keiner,
+das gehört nicht hierher.
+
+**Der zweite Fund betrifft ausgerechnet die Prüfung gegen stille Fehler.** Der
+Kommentar-Entferner des i18n-Generators hielt eine mit `'` begonnene
+Zeichenkette über Zeilen offen. Ein Minutenzeichen im JSX-Text (`{min}'`) kippt
+damit seine Parität, und ein `//` in einer echten Zeichenkette gilt danach als
+Zeilenkommentar. Der `t()`-Aufruf dahinter fällt **still** weg. An einer
+Wegwerf-Datei ausgelöst und reproduziert.
+
+Die Reparatur ist eine Zeile und folgt aus der Sprache: eine `'`- oder
+`"`-Zeichenkette schließt in JavaScript spätestens am Zeilenende, der Zustand
+wird also am Umbruch zurückgesetzt. Damit verdirbt ein verlesenes Zeichen
+höchstens seine eigene Zeile. Für ` gilt es nicht, ein Template-Literal darf
+mehrzeilig sein. **An der echten PWA ändert sich nichts**, 452 Schlüssel wie
+zuvor: heute hat die Kaskade nichts verschluckt, die Reparatur ist vorbeugend.
+
+**Und dabei ist mir ein zweiter eigener Fehler aufgefallen**, den erst eine
+Mutation gezeigt hat: mein Test für das Template-Literal legte den Aufruf
+**hinter** das Literal, und dort fand ihn auch ein Scanner, der beim Backtick
+genauso zurücksetzt. Der Test prüfte nichts. Scharf wird er erst mit einem `//`
+**im** Literal. Wieder Muster 25, nur andersherum: es reicht nicht, den Fall
+hinzuschreiben, er muss auch der Fall sein.
+
+**Der neue `--fatal-infos`-Riegel hat am ersten Tag zugeschlagen**, an meinem
+eigenen Testcode, zwei `prefer_single_quotes`. Genau dafür ist er da.
+
+Was die Prüfung **nicht** gefunden hat, ist auch eine Aussage: der Code tut,
+was die Commit-Nachrichten sagen, die Tore stehen wirklich auf grün, und der
+Umbau an Regel 17 hält der Gegenprobe stand, samt der Zusicherung, dass fremdes
+`data/` nur **eine** Meldung erzeugt.
+
+
 ### 02.09.2026, Der Analysator steht auf null, und bleibt jetzt dort
 
 24 Hinweise `prefer_initializing_formals` standen wochenlang, Gate 2 blieb
@@ -498,9 +549,12 @@ Dauer. E-19 ist mit „der Server rechnet“ entschieden, `HuntRun` hat bewusst
 keine Zeitstempel, und Dairens Satz deckt den Fall ab. Kachel und Zeile bleiben
 stehen, damit das später eine Zeile kostet und keinen Umbau.
 
-**Sichtbar geworden, nicht neu entstanden:** eine Jagd, die einen App-Neustart
-überlebt hat, ist auf der Karte als Pille da, im Challenge-Reiter nicht. Das ist
-die Grenze aus ADR-007, die hier zum ersten Mal auf einen Bildschirm durchschlägt.
+**Und hier habe ich mich geirrt, nachgewiesen von der Prüfung derselben Nacht.**
+Ich schrieb, eine Jagd nach einem Neustart sei „auf der Karte als Pille da, im
+Challenge-Reiter nicht". `HuntPill` liest aber ebenfalls `huntRunProvider`, und
+`activeHuntProvider` hat in `lib/` keinen Verbraucher. Nach einem Neustart ist
+die Jagd **nirgends** sichtbar, und die Produktvorgabe aus ADR-007, die
+`bootstrap.dart` zitiert, ist an keiner Stelle eingelöst. E-65.
 
 **Richtiggestellt: E-44.** Der 1,5-Faktor am letzten Stopp war Schritt 37
 zugeordnet, sitzt aber in der abgelösten Altansicht. Im neuen Ablauf kommt er

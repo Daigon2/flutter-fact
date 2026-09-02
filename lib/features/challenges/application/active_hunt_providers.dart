@@ -118,11 +118,20 @@ class HuntRunNotifier extends Notifier<HuntRun?> {
   /// ohne den dahinterstehenden `HuntPlan` mit seinem Fakt und Rätsel je
   /// Station, denn genau die werden nicht gespeichert (siehe den
   /// Kopfkommentar von `hunt_plan.dart`). Aus einer gespeicherten
-  /// `ActiveHunt` lässt sich deshalb kein [HuntRun] bauen. Eine Jagd, die
-  /// einen App-Neustart überlebt hat, bleibt über [activeHuntProvider] auf
-  /// der Karte sichtbar (siehe dort für die Rangfolge), aber ohne [HuntRun]
+  /// `ActiveHunt` lässt sich deshalb kein [HuntRun] bauen, und ohne [HuntRun]
   /// lässt sie sich nicht fortsetzen. Die vollständige Wiederherstellung ist
   /// ein eigener, späterer Schritt.
+  ///
+  /// **Hier stand bis zum 02.09.2026 ein Trostpflaster, das es nicht gibt:**
+  /// „bleibt über [activeHuntProvider] auf der Karte sichtbar". Eine
+  /// unabhängige Prüfung hat nachgezählt, und [activeHuntProvider] hat in
+  /// `lib/` **keinen einzigen Verbraucher**. `HuntPill` liest seit Schritt 37
+  /// selbst [huntRunProvider], weil sie Stationen, Hinweise und Punkte
+  /// braucht und ein `ActiveHunt` die nicht trägt. Eine Jagd nach einem
+  /// Neustart ist deshalb **nirgends** sichtbar, weder auf der Karte noch im
+  /// Challenge-Reiter, und die Produktvorgabe aus ADR-007, die `bootstrap.dart`
+  /// zitiert, ist heute an keiner Stelle eingelöst. Steht als **E-65** im
+  /// Register, mit den zwei Wegen, die zur Wahl stehen.
   @override
   HuntRun? build() => null;
 
@@ -215,8 +224,16 @@ final NotifierProvider<HuntRunNotifier, HuntRun?> huntRunProvider =
 
 /// Die laufende Jagd, oder `null`, wenn keine läuft.
 ///
-/// Das ist der Provider, den `discovery/presentation` beobachtet, und der
-/// einzige Zugang von außen zum Jagdzustand.
+/// Gedacht als der Provider, den `discovery/presentation` beobachtet, und als
+/// der einzige Zugang von außen zum Jagdzustand.
+///
+/// **Er hat heute keinen Verbraucher, und das ist am 02.09.2026 nachgezählt.**
+/// Gebaut wurde die Anzeige anders als entworfen: `HuntPill` ist ein Widget von
+/// `challenges` und wird über die App-Komposition in die Karte gereicht, also
+/// darf und muss sie [huntRunProvider] direkt lesen. `discovery` beobachtet
+/// hier nichts. Was unten über die Rangfolge steht, ist als Entwurf richtig und
+/// als Beschreibung des laufenden Programms falsch: die zweite Quelle wird nie
+/// abgefragt. Siehe **E-65**.
 ///
 /// ## Zwei Quellen, und ihre Rangfolge
 ///
@@ -224,10 +241,14 @@ final NotifierProvider<HuntRunNotifier, HuntRun?> huntRunProvider =
 /// der Wert aus dessen `toActiveHunt()`. Läuft keine, kommt er wie zuvor aus
 /// dem Speicher. Das ist keine beliebige Reihenfolge: eine Jagd, die einen
 /// Neustart der App überlebt hat, steht im Speicher, obwohl es keinen
-/// laufenden [HuntRun] gibt (siehe [HuntRunNotifier.build]), und soll dort
-/// trotzdem auf der Karte sichtbar bleiben. Der Speicher ist also nicht nur
-/// die Ersatzquelle, sondern die einzige Quelle für genau diesen Fall, und
-/// genau dafür ist die Persistenz aus ADR-007 gebaut.
+/// laufenden [HuntRun] gibt (siehe [HuntRunNotifier.build]), und **soll** dort
+/// trotzdem sichtbar bleiben. Der Speicher wäre also nicht nur die
+/// Ersatzquelle, sondern die einzige Quelle für genau diesen Fall, und genau
+/// dafür ist die Persistenz aus ADR-007 gebaut.
+///
+/// **Der Konjunktiv steht hier seit dem 02.09.2026 mit Absicht.** Solange
+/// niemand diesen Provider liest, wird die zweite Quelle nie abgefragt, und
+/// der ganze Absatz beschreibt einen Entwurf und kein Verhalten. E-65.
 ///
 /// ## Warum das jetzt einen Beobachter benachrichtigt
 ///

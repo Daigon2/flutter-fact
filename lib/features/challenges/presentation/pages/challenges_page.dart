@@ -43,14 +43,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// **Warum `huntRunProvider` und nicht `activeHuntProvider` (Entscheidung
 /// 1 aus Schritt 39).** `activeHuntProvider` liefert auch eine aus dem
 /// Speicher wiederhergestellte Jagd, und die trägt weder Stationszustände
-/// noch Punkte, also genau das, was diese beiden Bildschirme brauchen. Die
-/// Folge: **eine Jagd, die einen App-Neustart überlebt hat, ist auf der
-/// Karte als Pille sichtbar, in diesem Reiter aber nicht.** Dort steht dann
-/// wieder der Assistent. Das ist keine Nachlässigkeit dieses Schritts,
-/// sondern die schon dokumentierte Lücke aus `HuntRunNotifier.build`
-/// (`active_hunt_providers.dart`), die hier zum ersten Mal sichtbar wird.
-/// Ein abgespeckter Pausebildschirm für genau diesen Fall ist bewusst nicht
-/// gebaut.
+/// noch Punkte, also genau das, was diese beiden Bildschirme brauchen.
+///
+/// **Die Begründung, die hier bis zum 02.09.2026 stand, war falsch**, und eine
+/// unabhängige Prüfung hat sie widerlegt. Sie lautete: eine Jagd nach einem
+/// Neustart sei „auf der Karte als Pille sichtbar, in diesem Reiter aber
+/// nicht", der Nutzer verliere sie also nicht ganz. Das stimmt nicht.
+/// `HuntPill` liest **ebenfalls** `huntRunProvider` (`hunt_pill.dart:136`),
+/// und `activeHuntProvider` hat in `lib/` keinen einzigen Verbraucher. Nach
+/// einem Neustart ist die Jagd **nirgends** sichtbar.
+///
+/// An der Verzweigung hier ändert das nichts, sie bliebe auch mit der
+/// richtigen Begründung dieselbe. Was sich ändert, ist die Einordnung: das ist
+/// keine hingenommene Kleinigkeit, sondern eine Produktvorgabe aus ADR-007,
+/// die heute an keiner Stelle eingelöst ist. Steht als **E-65** im Register,
+/// mit den zwei Wegen, die zur Wahl stehen. Ein abgespeckter Pausebildschirm
+/// ist weiterhin nicht gebaut, aber jetzt aus dem richtigen Grund: weil die
+/// Entscheidung darüber offen ist und nicht, weil es woanders schon ginge.
 ///
 /// ## Die zwei Gruppen-Rückrufe sind weiterhin leer
 ///
@@ -194,11 +203,17 @@ class _ChallengesPageState extends ConsumerState<ChallengesPage> {
     // den Zustand **synchron**, bevor sie auf den Schreibvorgang wartet
     // (siehe dort), also sieht `huntRunProvider` den neuen Lauf schon vor dem
     // nächsten Frame, ganz ohne dass hier auf das zurückgegebene `Future`
-    // gewartet wird. Diese Methode hat nach dem Setzen nichts mehr zu tun,
-    // ein Fehlschlag beim Speichern behandelt `_apply` bereits selbst
-    // (verwerfen statt reparieren); ein `await` hier würde also nur die
-    // Rückkehr aus einem `VoidCallback` verzögern, ohne das Ergebnis zu
-    // nutzen.
+    // gewartet wird. Ein `await` hier würde also nur die Rückkehr aus einem
+    // `VoidCallback` verzögern, ohne das Ergebnis zu nutzen.
+    //
+    // **Wer den Schreibfehlschlag auffängt, stand hier bis zum 02.09.2026
+    // falsch.** Nicht `_apply`, das behandelt nur `toActiveHunt() == null`,
+    // sondern der **Speicher**: `SharedPreferencesKeyValueStore._write` fängt
+    // `on Object` und meldet an die Diagnose-Senke, das Future endet also nie
+    // mit einem Fehler. Das gilt für die heutige Umsetzung und nicht für den
+    // Vertrag: eine `ActiveHuntStore`-Umsetzung, die wirft, liefe mit
+    // `unawaited` in einen unbehandelten Fehler. Wer eine solche einhängt,
+    // sieht hier nach.
     unawaited(ref.read(huntRunProvider.notifier).start(plan));
   }
 
@@ -265,7 +280,13 @@ class _ChallengesPageState extends ConsumerState<ChallengesPage> {
   /// und für „Fertig" denselben Rückruf, ohne zwischen Abbruch und
   /// planmäßigem Ende zu unterscheiden. [HuntRunNotifier.end] räumt in beiden
   /// Fällen dasselbe auf: Zustand löschen, Speicher leeren.
-  void _endHunt() => ref.read(huntRunProvider.notifier).end();
+  ///
+  /// `unawaited` aus demselben Grund wie in [_startHunt], und hier ist die
+  /// Klammer auch das einzige Zeichen, das es sagt: ohne sie fiele das Future
+  /// still weg, und kein Lint meldet das, weil diese Methode nicht `async`
+  /// ist. Bis zum 02.09.2026 war genau das der Fall, siebzig Zeilen unter
+  /// einer ausführlichen Begründung für das Gegenteil.
+  void _endHunt() => unawaited(ref.read(huntRunProvider.notifier).end());
 
   Widget _setup() {
     return ChallengeSetupView(

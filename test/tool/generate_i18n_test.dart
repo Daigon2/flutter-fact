@@ -203,6 +203,72 @@ function irrelevant(lang) {
     });
   });
 
+  group('Quellnutzung: ein Apostroph im JSX-Text kaskadiert nicht', () {
+    // Am 02.09.2026 von einer unabhängigen Prüfung gefunden und hier
+    // festgenagelt. Der Kommentar-Entferner hielt eine mit `'` begonnene
+    // Zeichenkette über Zeilen offen. Ein Minutenzeichen (`{min}'`) oder ein
+    // typografisches Anführungszeichen im JSX-Text verschob damit seine
+    // Parität, und ein `//` in einer echten Zeichenkette galt danach als
+    // Zeilenkommentar. Der Aufruf dahinter fiel **still** weg, und still ist
+    // genau der Fehler, gegen den diese Prüfung gebaut ist.
+
+    test('ein Minutenzeichen im Text verschluckt den Aufruf der nächsten '
+        'Zeile nicht', () {
+      writeSource(
+        'screen-test.jsx',
+        "function A() { return <div>{min}'</div>; }\n"
+            "const url = 'https://example.com/x'; "
+            "const b = t('fehlt.hier', lang);\n",
+      );
+
+      final result = run(<String>[]);
+
+      // Die zweite Zeile trägt beides: eine echte Zeichenkette mit `//`
+      // darin, die **nicht** als Kommentar zählen darf, und den Aufruf
+      // dahinter, der gefunden werden muss.
+      expect(result.exitCode, isNot(0), reason: result.stdout.toString());
+      expect(result.stderr, contains('fehlt.hier'));
+    });
+
+    test('eine echte Zeichenkette mit // darin bleibt geschützt', () {
+      // Die Gegenrichtung, ohne die der Test auch mit einem Entferner grün
+      // wäre, der Zeichenketten gar nicht mehr kennt: dann würde `//` in der
+      // URL wieder als Kommentar gelten und den Aufruf kappen.
+      writeSource(
+        'screen-test.jsx',
+        "const url = 'https://example.com/x'; "
+            "const b = t('fehlt.zwei', lang);\n",
+      );
+
+      final result = run(<String>[]);
+      expect(result.exitCode, isNot(0));
+      expect(result.stderr, contains('fehlt.zwei'));
+    });
+
+    test('ein Template-Literal darf weiterhin über Zeilen gehen', () {
+      // Das Zurücksetzen gilt nur für `'` und `"`, ein Backtick-Literal ist
+      // mehrzeilig erlaubt. **Diese Fassung ist die zweite:** die erste legte
+      // den Aufruf hinter das Literal, und dort fand ihn auch ein Scanner, der
+      // beim Backtick genauso zurücksetzt. Sie prüfte also nichts, und eine
+      // Mutation hat das belegt, statt dass es jemand geahnt hätte.
+      //
+      // Scharf wird es nur mit einem `//` **im** Literal: bleibt der Zustand
+      // über die Zeile stehen, ist das Text und der Aufruf darin überlebt das
+      // Entfernen. Setzt er zurück, beginnt Zeile zwei ausserhalb einer
+      // Zeichenkette, `//` gilt als Kommentar, und der Aufruf fällt weg.
+      writeSource(
+        'screen-test.jsx',
+        'const s = `Zeile eins\n'
+            "  // t('im.literal', lang)\n"
+            '  Zeile drei`;\n',
+      );
+
+      final result = run(<String>[]);
+      expect(result.exitCode, isNot(0), reason: result.stdout.toString());
+      expect(result.stderr, contains('im.literal'));
+    });
+  });
+
   group('Quellnutzung: zusammengesetzte Aufrufe und Schlüssel ohne Punkt', () {
     test('ein zusammengesetzter Aufruf mit Pluszeichen bleibt still', () {
       writeSource(
