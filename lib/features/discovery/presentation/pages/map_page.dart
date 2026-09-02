@@ -12,6 +12,7 @@ import 'package:fact_app/features/discovery/presentation/fact_group_expand.dart'
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/fact_proximity.dart';
 import 'package:fact_app/features/discovery/presentation/map_camera_intents.dart';
+import 'package:fact_app/features/discovery/presentation/notifiers/fact_beacon_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/fact_overlay_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/map_mode_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
@@ -566,6 +567,16 @@ class _MapPageState extends ConsumerState<MapPage> {
       _onFactOverlay,
       fireImmediately: true,
     );
+
+    // **Nur halten, nicht lesen.** `FactBeaconNotifier` gibt es für seine
+    // Wirkung: er hört am Ortungsstrom und macht bei Nähe ein Geräusch. Ein
+    // Provider, den niemand liest, entsteht in Riverpod nie, und dann bliebe
+    // der Audio-Beacon still, ohne Fehler und ohne Meldung. Diese Zeile ist
+    // sein einziger Halter.
+    //
+    // Der leere Rückruf ist Absicht: an seiner Zählung hängt hier nichts,
+    // und ein `watch` baute diesen Bildschirm bei jedem Hinweiston neu.
+    ref.listenManual(factBeaconProvider, (int? previous, int next) {});
   }
 
   @override

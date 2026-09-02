@@ -84,6 +84,7 @@ dependencies:
   shared_preferences: ^2.5.5
   supabase_flutter: ^2.17.2
   flutter_tts: ^4.2.5
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   build_runner: ^2.15.1
@@ -106,6 +107,12 @@ flutter:
     # von tool/bake_map_style.dart, nicht von Hand bearbeiten.
     # Drift prüfen: dart run tool/bake_map_style.dart --check
     - assets/map/fact_map_style.json
+
+    # Der Hinweiston des Audio-Modus, unveraendert aus
+    # 02_Frontend/app/assets/beacon.mp3 der Verhaltensquelle uebernommen
+    # (4170 Bytes). Die Quelle laedt ihn als assets/beacon.mp3; hier liegt
+    # er unter assets/audio/, weil assets/ hier mehrere Arten haelt.
+    - assets/audio/beacon.mp3
 
   fonts:
     - family: Nunito

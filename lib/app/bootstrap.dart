@@ -19,6 +19,8 @@ import 'package:fact_app/features/identity/presentation/notifiers/first_launch_p
 import 'package:fact_app/features/settings/application/audio_mode_providers.dart';
 import 'package:fact_app/features/settings/data/key_value_audio_mode_store.dart';
 import 'package:fact_app/features/settings/data/key_value_language_preference_store.dart';
+import 'package:fact_app/services/audio/audioplayers_tone_service.dart';
+import 'package:fact_app/services/audio/tone_providers.dart';
 import 'package:fact_app/services/diagnostics/console_diagnostic_sink.dart';
 import 'package:fact_app/services/location/geolocator_location_service.dart';
 import 'package:fact_app/services/location/location_providers.dart';
@@ -180,6 +182,14 @@ ProviderScope productionProviderScope({
       // spricht die App nach dem Entsorgen ihrer Scope weiter.
       speechServiceProvider.overrideWith((ref) {
         final FlutterTtsSpeechService service = FlutterTtsSpeechService();
+        ref.onDispose(service.dispose);
+        return service;
+      }),
+      // Der Hinweiston des Audio-Modus. Ohne diesen Override bleibt der
+      // Beacon stumm und spricht nur; mit `ref.onDispose` aus demselben
+      // Grund wie beim Sprachdienst, der Adapter hält einen Plattform-Spieler.
+      toneServiceProvider.overrideWith((ref) {
+        final AudioplayersToneService service = AudioplayersToneService();
         ref.onDispose(service.dispose);
         return service;
       }),

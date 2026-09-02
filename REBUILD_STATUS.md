@@ -1117,7 +1117,72 @@ plus 19 Mutationen, alle gefallen.
 
 - [x] 21. Fact-Detail-Sheet · [x] 22. Collect-Reveal-Overlay (**war mit Schritt 20 bereits gebaut**, am 02.09.2026 nachgemessen, siehe unten)
 - [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [x] 25. Audio-Service (02.09.2026; „normal“ heißt im Paket 0,5 und nicht 1,0, und die Quelle hat einen echten API-Schlüssel ausgeliefert)
-- [ ] 26. Map-Audio-Kopplung (frei, der Dienst steht seit Schritt 25)
+- [x] 26. Map-Audio-Kopplung (03.09.2026; der Hinweiston mit Hysterese, und die Ansage geht **nicht** über den Fakt-Vorleser)
+
+### Schritt 26, der Audio-Beacon, und die Hysterese ist der Kern
+
+2593 Tests, vierzehn Mutationen, alle gefallen. Wer im Fakt-Finder-Modus mit
+eingeschaltetem Audio-Guide an einem Fakt vorbeikommt, hört einen Ton und
+danach „Alter Peter, 80 Meter, auf 2 Uhr".
+
+Gebaut sind `lib/services/audio/` (Vertrag, `audioplayers`-Adapter, Provider),
+**Regel 26** als fünftes Heimatverzeichnis für ein Vendor-SDK,
+`fact_audio_beacon.dart` mit der reinen Regel und `FactBeaconNotifier` als
+Auslöser am Ortungsstrom. Der Hinweiston selbst ist unverändert aus
+`02_Frontend/app/assets/beacon.mp3` übernommen.
+
+#### Die Hysterese ist leicht zu übersehen und der eigentliche Inhalt
+
+Der Ton kommt unter **150** Metern, der Merkzustand fällt erst über **200**.
+Dazwischen passiert nichts. Wer die zweite Zahl auf die erste zieht, weil zwei
+Grenzen für dieselbe Sache wie ein Versehen aussehen, baut genau den Fehler,
+den die Spanne verhindert: jemand, der an der Grenze steht und sich um zwei
+Meter bewegt, bekäme alle fünf Sekunden denselben Ton.
+
+Dazu kommt die Fünf-Sekunden-Sperre, und die steht **vor** der Suche: höchstens
+ein Ton je Fenster, nicht einer je Fakt.
+
+#### Die Ansage läuft nicht über den Fakt-Vorleser, und das ist der Punkt
+
+Die Quelle schiebt für ihre Ansagen eine Fakt-Attrappe mit leerem Titel in
+ihren Spieler, weil ihr `AudioPlayer` den laufenden Fakt selbst hält. Ihr
+eigener Kommentar nennt die Folge: „passing { titel: '' } made MiniPlayer pop
+up with an empty title for every beacon" (`audio-player.jsx:347-348`). Im
+Neubau hält `factSpeechProvider` den Fakt und `SpeechService` spricht nur Text;
+der Beacon spricht deshalb **am Dienst vorbei am Fakt-Zustand**, und der
+Kopfhörer-Knopf in der Akte bekommt davon nichts mit. Genau dafür war die
+Trennung aus Schritt 25 da.
+
+#### Drei Eigenheiten des Pakets, wieder im Quelltext nachgelesen
+
+1. **Der Pfad trägt kein `assets/`**, `AudioCache` setzt seinen eigenen Präfix
+   davor. Wer ihn mitschreibt, sucht unter `assets/assets/…`.
+2. **`play` nimmt die Stereo-Verteilung als Parameter mit.** Ein `setBalance`
+   davor wäre ein zweiter Kanalaufruf ohne Wirkung.
+3. **Die Bedeutung von `balance` passt genau auf die Quelle**, `-1` links bis
+   `1` rechts, und die Quelle rechnet `Math.sin(bearing)` auf denselben
+   Bereich. Hier gibt es **nichts** umzurechnen, anders als bei der
+   Sprechgeschwindigkeit in Schritt 25. Das ist der Grund, warum jede
+   Eigenheit einzeln nachgelesen gehört, statt von der einen auf die andere zu
+   schließen.
+
+**Und eine vierte, die einen Testlauf gekostet hat:** der Konstruktor von
+`AudioPlayer` greift sofort auf den Plattformkanal zu. Der Adapter legt seinen
+Spieler deshalb erst beim ersten Ton an. Das ist auch die bessere Bauform: die
+App belegt beim Start keine Audio-Ressourcen für ein Merkmal, das die meisten
+nie einschalten. Aufgefallen ist es, weil `bootstrap_test` **ohne jede
+Fehlermeldung** rot wurde.
+
+#### Was aus Schritt 26 bewusst fehlt
+
+**Der Tour-Zweig** (`screen-map.jsx:2721-2733`), der im Tour-Modus den nächsten
+ungesammelten Stopp vorliest. Er braucht `tourRoute` und `tourReady`, also
+Phase 6.
+
+**Die Kopfhörer-Verteilung ist gebaut, aber nicht einschaltbar.** Die Quelle
+verteilt nur bei `Storage.getHeadphoneMode()`, und diese Einstellung hängt am
+Einstellungs-Bildschirm wie die Sprechgeschwindigkeit (E-71). Der Weg ist
+durchgezogen und geprüft, der Schalter fehlt; ohne ihn klingt der Ton mittig.
 
 ### Schritt 25, der Audio-Dienst, und die Zahl 1,0 wäre die schnellste Stufe
 
@@ -4924,7 +4989,7 @@ eine Fundstelle.
 | E-68 | **Man sammelt in der Quelle auch ohne jeden Tipp, und dabei springt einem eine Anmeldeaufforderung entgegen.** Am 02.09.2026 beim Zuschnitt von Schritt 22 gefunden, und im Neubau gab es davon bis dahin keine Zeile. `scanAutoOpenRef` (`screen-map.jsx:1471-1489`) läuft bei jeder Ortung und löst innerhalb von 18 Metern von selbst `triggerCollect` aus. Das ist **eine Buchung, keine Anzeige**, auch wenn der Kommentar darüber „pop a fact's full sheet" sagt und „30m" nennt, wo der Code 18 prüft. Und `onCollectFact` beginnt mit `if (!requireAuth()) return;` (`app.jsx:681`): wer nicht angemeldet ist, bekommt die Aufforderung **beim Vorbeigehen**, ohne etwas angetippt zu haben. **Der Neubau baut die 18 Meter, weil das das gemessene Verhalten ist, und die Anmeldesperre nicht.** Sie hängt an einer Frage, die noch offen ist: der Neubau hat für das Sammeln überhaupt keine Anmeldeschranke, und E-19 legt fest, dass der Client keinen Betrag bestimmt. Zu entscheiden ist, ob das automatische Sammeln für Gäste stumm mitlaufen und erst bei der Anmeldung nachbuchen soll, oder ob es für Gäste gar nicht stattfindet. Der Vorbeigeh-Prompt der Quelle ist jedenfalls die schlechteste der drei Möglichkeiten. | 2 | vor Auslieferung |
 | E-69 | **Denselben Fakt zweimal anzutippen bringt zweimal 50 Münzen, und zwar unbegrenzt oft.** Am 02.09.2026 beim Bau des Sammel-Speichers gefunden und dreifach nachgemessen. `onCollectFact` (`app.jsx:680-716`) hat **keine** Prüfung auf „schon gesammelt": `Storage.collectFact(id)` entdoppelt zwar die Liste (`storage.jsx:49-52`), aber `Storage.addCoins(50)` und `Api.addCoins(userId, 50)` laufen **bei jedem Aufruf** (`:712`, `:714`). Und der zweite Aufruf ist erreichbar: die Tipp-Regel (`screen-map.jsx:2129-2145`) fragt den Sammelzustand nicht, ein gesammelter Fakt verhält sich wie jeder andere. Wer innerhalb von 150 Metern eines Fakts steht und ihn wiederholt antippt, erzeugt 50 Münzen je Tipp, lokal **und** auf dem Server. Die Erfahrungspunkte sind nicht betroffen, `computeXP` rechnet aus `collected.length`. **Das ist die scharfe Fassung von E-06:** dort geht es darum, dass `increment_coins` den Betrag nicht prüft, hier um unbegrenzte Wiederholung desselben Betrags. Es widerspricht Janeks Regel vom 02.09.2026 („jeder Fakt gibt nur einmal Coins") direkt. **Der Neubau ist davon durch Bauweise frei**, und das ist keine Nachlässigkeit, sondern das Ergebnis von E-19: er bucht überhaupt keine Münzen im Client, und `CollectedFactsNotifier.collect` ist idempotent. Zu tun ist es im anderen Repository, zusammen mit E-06 und E-24. | 3 | vor dem PWA-Release |
 | E-70 | **In der Quelle liegt ein vollständiger OpenAI-API-Schlüssel im Klartext, in einer Datei, die jeder Browser ausgeliefert bekommt.** Am 02.09.2026 beim Zuschnitt von Schritt 25 gefunden. Fundstelle: `02_Frontend/app/audio-player.jsx:12`, eine Konstante `OPENAI_KEY` mit einem echten `sk-proj-…`-Schlüssel, direkt darunter Stimme und Modell. **Die Datei wird ausgeliefert, nicht gebündelt:** `index.html:180` lädt sie als `<script type="text/babel" src="audio-player.jsx?v=5">`, also im Quelltext und ohne jede Verarbeitung. Wer die Seite offen hatte, konnte den Schlüssel lesen. **Vier Fundstellen, und meine erste Zählung war falsch:** sie stand kurz als „genau eine", weil die Suche auf `02_Frontend` begrenzt war und gebaute Artefakte übersprungen hat. Tatsächlich sind es `02_Frontend/app/audio-player.jsx:12` (die Quelle), `02_Frontend/dist/assets/index-4JDjuKco.js` (das gebaute Web-Bündel), `02_Frontend/android/app/src/main/assets/public/assets/index-4JDjuKco.js` (dasselbe Bündel in den Android-Assets, also im Paket, wenn es je verteilt wurde) und `06_Planung/plans/2026-05-14-openai-tts.md:275`. Nicht im Backend, nicht im eingefrorenen Flutter-Port. **Der Schlüssel selbst steht bewusst nirgends in diesem Repository**, auch nicht hier; dieses Repository ist öffentlich (E-64). **Es war eine bewusste Abwägung und kein Versehen:** das Planungsdokument sagt, der Schlüssel werde im Quelltext sichtbar sein, das sei „acceptable for a personal project at this scale", und man solle rotieren, falls unerwartete Kosten auftauchen. Das war der 14.05.2026; seither gibt es `DACH_Rollout_Plan.md` und den Weg in die App Stores. **Ob die Abwägung heute noch gilt, entscheidet der Eigentümer, nicht dieses Repository.** **Die Behebung ist nicht Code:** den Schlüssel bei OpenAI zurückziehen und neu ausstellen. Ihn nur aus den Dateien zu löschen genügt nicht, er steht in der Versionsgeschichte des anderen Repositories und war ausgeliefert. Für den Neubau ändert sich dadurch nichts, er bestätigt die Entscheidung: E-15 legt „Gerät zuerst" fest, und Janek hat am 31.08.2026 dazu gesagt „soll aber nirgends rumliegen, ist ja schließlich ein api key". Die Cloud-Variante läuft über Edge Function und Proxy, nie über einen Schlüssel im Client. | 4 | sofort |
-| E-71 | **Für die Sprechgeschwindigkeit und die Stimme gibt es im Neubau keine Einstellung, und die Zahl dahinter ist eine Falle.** Am 02.09.2026 mit Schritt 25 aufgenommen. Die Quelle hat im Profil einen Schieber (`Storage.getAudioRate`, Rückfall `1.0`, `storage.jsx:168`) und eine Stimmenwahl (`Storage.getAudioVoice`, `:171`). Beide fehlen, weil es den Einstellungs-Bildschirm noch nicht gibt; der Neubau benutzt `defaultSpeechRate` als Konstante und die Standardstimme des Geräts. **Wer den Schieber baut, muss die Umrechnung kennen:** der Vertrag trägt die menschliche Einheit (1,0 ist normal), `flutter_tts` nicht (dort ist 0,5 normal), und die Umrechnung sitzt in `FlutterTtsSpeechService._pluginRate`. Ein Schieber, der seinen Wert direkt an das Paket gibt, verdoppelt jede Einstellung. Die Stimmenwahl hängt zusätzlich an E-15. Wird zu einem siebten Speicher am `KeyValueStore`, wenn er kommt. | 2 | mit dem Einstellungs-Bildschirm |
+| E-71 | **Für die Sprechgeschwindigkeit und die Stimme gibt es im Neubau keine Einstellung, und die Zahl dahinter ist eine Falle.** Am 02.09.2026 mit Schritt 25 aufgenommen. Die Quelle hat im Profil einen Schieber (`Storage.getAudioRate`, Rückfall `1.0`, `storage.jsx:168`) und eine Stimmenwahl (`Storage.getAudioVoice`, `:171`). Beide fehlen, weil es den Einstellungs-Bildschirm noch nicht gibt; der Neubau benutzt `defaultSpeechRate` als Konstante und die Standardstimme des Geräts. **Wer den Schieber baut, muss die Umrechnung kennen:** der Vertrag trägt die menschliche Einheit (1,0 ist normal), `flutter_tts` nicht (dort ist 0,5 normal), und die Umrechnung sitzt in `FlutterTtsSpeechService._pluginRate`. Ein Schieber, der seinen Wert direkt an das Paket gibt, verdoppelt jede Einstellung. Die Stimmenwahl hängt zusätzlich an E-15. **Seit Schritt 26 hängt ein drittes daran:** der Kopfhörer-Modus (`Storage.getHeadphoneMode()`, `storage.jsx:174`), der die Stereo-Verteilung des Hinweistons einschaltet. Der Weg dorthin ist gebaut und geprüft, der Schalter fehlt, und ohne ihn klingt der Ton mittig. Wird zu einem siebten Speicher am `KeyValueStore`, wenn er kommt. | 2 | mit dem Einstellungs-Bildschirm |
 | E-72 | **Die iOS-Audio-Kategorie des Vortrags ist ungeprüft, und sie entscheidet, ob der Stummschalter ihn abschaltet.** Am 02.09.2026 offen gelassen. `flutter_tts` bietet `setIosAudioCategory` und `setSharedInstance`; der Neubau ruft beides **nicht** und nimmt damit die Voreinstellung. Ob der Vortrag dann über den Medienkanal läuft, ob er sich mit anderer Wiedergabe mischt und was bei aktivem Stummschalter passiert, ist am Gerät zu messen und nicht zu raten. **Es hängt an derselben Frage wie E-28:** dort ist begründet, dass der Stummschalter auf keiner der beiden Plattformen die Medienlautstärke steuert, und genau das gilt nur, wenn die Kategorie stimmt. Die Quelle kann dazu nichts sagen, sie läuft im Browser. Zu tun: eine Messung auf einem iPhone, danach eine Zeile im Adapter oder eine begründete Zeile, warum keine nötig ist. | 2 | vor Auslieferung |
 
 ## Wie Tests hier blind werden

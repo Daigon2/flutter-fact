@@ -31,6 +31,9 @@ import 'package:fact_app/features/settings/application/audio_mode_providers.dart
 import 'package:fact_app/features/settings/data/key_value_audio_mode_store.dart';
 import 'package:fact_app/features/settings/data/key_value_language_preference_store.dart';
 import 'package:fact_app/features/settings/domain/audio_mode_store.dart';
+import 'package:fact_app/services/audio/audioplayers_tone_service.dart';
+import 'package:fact_app/services/audio/tone_providers.dart';
+import 'package:fact_app/services/audio/tone_service.dart';
 import 'package:fact_app/services/diagnostics/console_diagnostic_sink.dart';
 import 'package:fact_app/services/location/geolocator_location_service.dart';
 import 'package:fact_app/services/location/location_providers.dart';
@@ -344,6 +347,24 @@ void main() {
       addTearDown(container.dispose);
 
       expect(container.read(activeHuntStoreProvider).readActiveHunt(), hunt);
+    });
+
+    test('bindet toneServiceProvider an die Tonwiedergabe', () {
+      // Ohne diesen Override bleibt der Audio-Beacon stumm und spricht nur.
+      final container = ProviderContainer(overrides: _scope().overrides);
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(toneServiceProvider),
+        isA<AudioplayersToneService>(),
+      );
+    });
+
+    test('ohne den Override bleibt die Tonwiedergabe still', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(toneServiceProvider), same(unavailableToneService));
     });
 
     test('bindet speechServiceProvider an die Sprachausgabe des Geräts', () {

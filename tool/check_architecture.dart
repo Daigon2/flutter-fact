@@ -205,6 +205,14 @@ const _domainBans = <Ban>[
     r'^package:native_device_orientation',
     'Regel 4: Domain darf keine Geräte-SDK importieren',
   ),
+  // `audioplayers` traegt kein `flutter_`-Praefix und faellt in einer Domaene
+  // deshalb nur unter die allgemeine Erlaubnisliste. Ein eigener Eintrag gibt
+  // ihr dieselbe genaue Meldung wie `geolocator` fuer Regel 21, siehe die
+  // Begruendung bei [_toneSdkBans].
+  Ban(
+    r'^package:audioplayers',
+    'Regel 4: Domain darf keine Geräte-SDK importieren',
+  ),
   Ban(
     r'^package:maplibre',
     'Regel 4: Domain darf keine Karten-SDK importieren',
@@ -506,6 +514,29 @@ const _speechSdkBans = <Ban>[
   ),
 ];
 
+/// Regel 26: die Tonwiedergabe kennt nur der Ton-Dienst.
+///
+/// Dieselbe Bauart wie die Regeln 21, 22, 24 und 25. **Ein Eintrag genügt**,
+/// obwohl `audioplayers` sechs Plattformpakete mitbringt
+/// (`audioplayers_android`, `_darwin`, `_linux`, `_web`, `_windows`,
+/// `_platform_interface`): alle sechs tragen den Namen des Hauptpakets als
+/// Präfix, anders als `native_device_orientation` bei Regel 24. Am 02.09.2026
+/// in `pubspec.lock` geprüft, nicht angenommen.
+///
+/// **Anders als bei Regel 25 bekommt [_domainBans] hier einen eigenen
+/// Eintrag.** `flutter_tts` beginnt mit `flutter_` und fällt in einer Domäne
+/// schon unter das allgemeine Flutter-Verbot; `audioplayers` nicht. Ohne den
+/// Eintrag läse eine Domäne für diesen Import die unspezifische Meldung der
+/// Erlaubnisliste statt Regel 4.
+const _toneSdkBans = <Ban>[
+  Ban(
+    r'^package:audioplayers',
+    'Regel 26: die Tonwiedergabe gehört dem Ton-Dienst unter '
+        '$_toneHome. Der Rest der App kennt nur den Vertrag des Dienstes, '
+        'nicht das Vendor-Paket',
+  ),
+];
+
 /// Gate 7: ADR-005 verbietet ein zweites DI-System, projektweit.
 const _globalBans = <Ban>[
   Ban(r'^package:get_it', 'ADR-005: GetIt ist ausgeschlossen'),
@@ -594,6 +625,11 @@ final _layers = <LayerRule>[
     name: 'sprach-sdk',
     pathMatch: _ausserhalbSpeechHome,
     bans: _speechSdkBans,
+  ),
+  LayerRule(
+    name: 'ton-sdk',
+    pathMatch: _ausserhalbToneHome,
+    bans: _toneSdkBans,
   ),
   // Gate 7 gilt projektweit, nicht nur im Produktionscode. Ein GetIt-Container
   // in einem Test, einem Integrationstest oder einem Werkzeugskript ist
@@ -687,6 +723,12 @@ const _orientationHome = 'lib/services/orientation/';
 /// siehe den Kopfkommentar von `lib/services/speech/speech_service.dart`.
 const _speechHome = 'lib/services/speech/';
 
+/// Der Ton-Dienst, der einzige Ort, an dem `audioplayers` vorkommen darf.
+///
+/// Wie [_locationHome] eine unterstützende Technik und keine Geschäftsdomäne,
+/// siehe den Kopfkommentar von `lib/services/audio/tone_service.dart`.
+const _toneHome = 'lib/services/audio/';
+
 /// Alles unterhalb von `lib/`, außer [_mapHome] und außer jeder Domäne.
 ///
 /// Die erste Ausnahme ist der Zweck der Regel: der Host darf das SDK.
@@ -746,6 +788,15 @@ final _ausserhalbOrientationHome = RegExp(
 /// die genauere.
 final _ausserhalbSpeechHome = RegExp(
   '^lib/(?!${_speechHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
+);
+
+/// Alles unterhalb von `lib/`, außer [_toneHome] und außer jeder Domäne.
+///
+/// Wortgleich zu den vier darüber aufgebaut und aus denselben zwei Gründen:
+/// der Dienst darf sein SDK, und in einer Domäne ist die Meldung von Regel 4
+/// die genauere.
+final _ausserhalbToneHome = RegExp(
+  '^lib/(?!${_toneHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
 );
 
 /// Alles unterhalb von `lib/`, außer [_avatarHome] und außer jeder Domäne.

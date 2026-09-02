@@ -660,6 +660,22 @@ import 'package:flutter_tts/flutter_tts.dart';
 
 class SpracheDaneben {}
 ''',
+  // Ä17: die Tonwiedergabe gehört dem Ton-Dienst. Wie bei den Regeln 21,
+  // 22, 24 und 25 verbietet Regel 4 sie nur in einer Domäne; jedes andere
+  // Verzeichnis unterhalb von lib/ durfte sie vor Regel 26 holen.
+  'lib/features/discovery/presentation/ton_versuch.dart': r'''
+import 'package:audioplayers/audioplayers.dart';
+
+class TonVersuch {}
+''',
+  // Ä17: und in einer Domäne greift Regel 4 mit einem eigenen Eintrag.
+  // Anders als flutter_tts trägt audioplayers kein `flutter_`-Präfix, fiele
+  // dort also sonst nur unter die allgemeine Erlaubnisliste.
+  'lib/features/tours/domain/entities/ton_in_domaene.dart': r'''
+import 'package:audioplayers/audioplayers.dart';
+
+class TonInDomaene {}
+''',
   // Lücke 1 geschlossen: die Cross-Feature-Prüfung griff nur die Schicht
   // direkt unter dem fremden Feature. Ein fremdes presentation und ein
   // fremdes data hinter einer Unterstruktur entkamen den Regeln 8 und 9,
@@ -716,6 +732,13 @@ class OrientierungsAdapter {}
 import 'package:flutter_tts/flutter_tts.dart';
 
 class SprachAdapter {}
+''',
+  // Ä17 Gegenprobe: im Ton-Dienst ist audioplayers erlaubt. Sonst hätte
+  // Regel 26 kein Ziel, sondern wäre ein Verbot ohne Ort.
+  'lib/services/audio/ton_adapter.dart': r'''
+import 'package:audioplayers/audioplayers.dart';
+
+class TonAdapter {}
 ''',
   // Ä14 Gegenprobe: eine Feature-Domäne darf den Kern importieren. Das ist die
   // Gegenprobe, um die es Dairen mit D-18 ging: ohne sie ist Regel 23 nur eine
@@ -1122,6 +1145,8 @@ void main() {
         'lib/features/discovery/presentation/orientierung_familie.dart',
         'lib/features/facts/presentation/sprach_versuch.dart',
         'lib/app/sprache_daneben.dart',
+        'lib/features/discovery/presentation/ton_versuch.dart',
+        'lib/features/tours/domain/entities/ton_in_domaene.dart',
         'lib/features/tours/presentation/pages/fremdes_feature_verschachtelt.dart',
         'lib/map/presentation/luecke_eigenes_data.dart',
         'lib/map/presentation/fremdes_feature_data_regel17.dart',
@@ -1981,6 +2006,32 @@ void main() {
         );
       },
     );
+
+    test('Ä17: die Tonwiedergabe außerhalb des Ton-Dienstes', () {
+      // Vor Regel 26 lief dieser Import überall unterhalb von lib/ durch,
+      // außer in einem domain/-Segment.
+      erwarteFunde(
+        verstoss,
+        'lib/features/discovery/presentation/ton_versuch.dart',
+        <(int, String)>[
+          (1, 'Regel 26: die Tonwiedergabe gehört dem Ton-Dienst'),
+        ],
+      );
+    });
+
+    test('Ä17: in einer Domäne meldet Regel 4 und nicht Regel 26', () {
+      // Die schichtgenaue Regel gewinnt, die allgemeine schweigt, und
+      // umgekehrt: in einer Domäne ist Regel 4 die genauere Aussage. Ohne
+      // den eigenen Eintrag in _domainBans stünde hier die unspezifische
+      // Meldung der Erlaubnisliste.
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/domain/entities/ton_in_domaene.dart',
+        <(int, String)>[
+          (1, 'Regel 4: Domain darf keine Geräte-SDK importieren'),
+        ],
+      );
+    });
 
     test('Ä16: die Sprachausgabe außerhalb des Sprachdienstes', () {
       // Vor Regel 25 lief dieser Import überall unterhalb von lib/ durch,

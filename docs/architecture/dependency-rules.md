@@ -98,8 +98,9 @@ independent business domain.
 24. `flutter_rotation_sensor` and `native_device_orientation` may only be
     imported below `lib/services/orientation/`.
 25. `flutter_tts` may only be imported below `lib/services/speech/`.
+26. `audioplayers` may only be imported below `lib/services/audio/`.
 
-Rules 19 to 22 and rules 24 to 25 give a vendor SDK one home directory. They are not a ban, they
+Rules 19 to 22 and rules 24 to 26 give a vendor SDK one home directory. They are not a ban, they
 are an assignment: the map SDK belongs to the map host, the geolocation SDK
 belongs to the location service, and the WebView belongs to the avatar. Rule 4
 already keeps the map and geolocation SDKs out of every `domain` directory, but
@@ -135,6 +136,14 @@ number: "normal" speech rate is `0.5` in `flutter_tts` and `1.0` in the
 reference PWA. A caller that reaches past the adapter and sets the rate itself
 gets the fastest setting while believing it set the normal one. See the library
 comment of `flutter_tts_speech_service.dart`.
+
+Rule 26 was added on 2026-09-03 with step 26, and it is the fifth
+application of the same shape. One entry covers the whole family: all six
+platform packages (`audioplayers_android`, `_darwin`, `_linux`, `_web`,
+`_windows`, `_platform_interface`) carry the main package name as a prefix,
+checked in `pubspec.lock`. Unlike rule 25 it also gets its own entry in the
+domain bans, because `audioplayers` does not start with `flutter_` and would
+otherwise only hit the generic allow-list message inside a `domain` directory.
 
 Rule 22 was added on 2026-08-31, together with the package itself.
 `tool/check_architecture.dart` had until then carried `shared_preferences` as a

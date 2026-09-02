@@ -109,7 +109,7 @@ Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
 den Schritten 33 bis 37 und 39.
 
-**Fertig sind 29 von 50:** 1 bis 17, dazu 19 bis 22, 25, 27, 33 bis 37 und 39. Schritt 14 ist
+**Fertig sind 30 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 33 bis 37 und 39. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -123,7 +123,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2539 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2593 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -215,12 +215,10 @@ siehe „Rechner einrichten".
 **Am 02.09.2026 sind drei Schritte auf einmal frei geworden, und zwar durch
 zwei Sätze.** Janek: „ja 1. passt und dann mach webview gern".
 
-- **`flutter_tts` ist freigegeben, und Schritt 25 ist damit gebaut.** Offen
-  bleibt **Schritt 26**, die Kopplung an die Karte: dort hängen der
-  Audio-Beacon mit Stereo-Panning, die Ansagen zu Richtung und Entfernung und
-  die Auslösung bei Nähe. Der Dienst dafür steht, samt Zustandsstrom für mehr
-  als einen Zuhörer. Die Nebenwirkung ist weg: der Audio-Modus hat seit
-  Schritt 25 einen Abnehmer.
+- **`flutter_tts` und `audioplayers` sind aufgenommen, Schritt 25 und 26 sind
+  gebaut.** Der Audio-Modus hat einen Abnehmer, und der Hinweiston kommt bei
+  Nähe. Offen ist aus diesem Bereich nur noch der Tour-Zweig des Beacons, und
+  der gehört zu Phase 6.
 - **`webview_flutter` ist wieder freigegeben, und die 3D-Laufzeit ist
   entschieden: WebView mit Three.js.** Damit ist **Schritt 18** (Avatar) frei.
   Der Grund für diese Wahl steht in `REBUILD_STATUS.md`: in `08_Flutter/` ist
@@ -412,6 +410,43 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 03.09.2026, Schritt 26, der Audio-Beacon, und die Hysterese ist der Kern
+
+2593 Tests, vierzehn Mutationen, alle gefallen. **30 von 50.** Wer im
+Fakt-Finder-Modus mit eingeschaltetem Audio-Guide an einem Fakt vorbeikommt,
+hört einen Ton und danach „Alter Peter, 80 Meter, auf 2 Uhr".
+
+**Die Hysterese ist der eigentliche Inhalt und leicht zu übersehen.** Der Ton
+kommt unter 150 Metern, der Merkzustand fällt erst über 200, und dazwischen
+passiert nichts. Wer die zweite Zahl auf die erste zieht, weil zwei Grenzen für
+dieselbe Sache wie ein Versehen aussehen, baut genau das, was sie verhindert:
+wer an der Grenze steht und sich zwei Meter bewegt, bekäme alle fünf Sekunden
+denselben Ton. Dazu die Fünf-Sekunden-Sperre, und die steht **vor** der Suche.
+
+**Die Ansage läuft am Fakt-Vorleser vorbei, und dafür war die Trennung aus
+Schritt 25 da.** Die Quelle schiebt für Ansagen eine Fakt-Attrappe mit leerem
+Titel in ihren Spieler; ihr eigener Kommentar nennt die Folge, „made MiniPlayer
+pop up with an empty title for every beacon". Hier hält `factSpeechProvider`
+den Fakt, der Dienst spricht nur Text, und der Beacon spricht über den Dienst.
+Der Kopfhörer-Knopf in der Akte bekommt vom Hinweiston nichts mit.
+
+**Drei Eigenheiten von `audioplayers`, wieder im Quelltext nachgelesen:** der
+Pfad trägt kein `assets/`, `play` nimmt die Verteilung als Parameter mit, und
+die Bedeutung von `balance` passt **genau** auf die Quelle, hier ist also
+nichts umzurechnen. Das ist der Grund, jede Eigenheit einzeln nachzulesen statt
+von Schritt 25 auf Schritt 26 zu schließen: dort war die Umrechnung der Fund,
+hier wäre sie der Fehler.
+
+**Eine vierte hat einen Testlauf gekostet.** Der Konstruktor von `AudioPlayer`
+greift sofort auf den Plattformkanal zu; `bootstrap_test` wurde daran rot,
+**ohne jede Fehlermeldung**. Der Adapter legt seinen Spieler jetzt erst beim
+ersten Ton an, was auch die bessere Bauform ist: beim Start belegt die App
+keine Audio-Ressourcen für ein Merkmal, das die meisten nie einschalten.
+
+**Gebaut, aber nicht einschaltbar:** die Kopfhörer-Verteilung. Sie hängt am
+Einstellungs-Bildschirm wie die Sprechgeschwindigkeit, jetzt als dritter Punkt
+in E-71. Der Weg ist durchgezogen und geprüft, der Schalter fehlt.
 
 ### 02.09.2026, Schritt 25, und die Zahl der Quelle wäre die schnellste Stufe
 
