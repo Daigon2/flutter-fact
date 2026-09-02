@@ -3715,10 +3715,31 @@ steht“, also Rang und Punktestand. Coins kommen nicht in die Rückgabe.
 unwichtiger.** Die Rückgabe enthält heute `user_id`, also Konto-Kennungen. Mit
 einem angemeldeten Aufrufer war das Nachklapp, weil Kennungen ohnehin über die
 für alle lesbaren Kommentare zu holen sind. Ohne Anmeldung ist eine Liste von
-Konto-UUIDs **ohne jede Hürde maschinell einsammelbar**. `user_id` durch ein
-`is_me` zu ersetzen ist damit die eigentliche Behebung von E-16 und nicht mehr
-Hygiene. Für einen nicht angemeldeten Aufrufer ist `is_me` immer `false`, das
-braucht keinen Sonderfall.
+Konto-UUIDs **ohne jede Hürde maschinell einsammelbar**: fünf Städte mal zwei
+Zeiträume sind zehn Aufrufe für bis zu hundert Kennungen, mit dem öffentlichen
+Schlüssel und ohne Konto. `user_id` durch ein `is_me` zu ersetzen ist damit die
+eigentliche Behebung von E-16 und nicht mehr Hygiene.
+
+**Ein Satz von mir dazu war falsch, und der Fehler hätte erst am Dart-Client
+zugeschlagen.** Ich hatte geschrieben, `is_me` sei für einen nicht angemeldeten
+Aufrufer „immer `false`, das braucht keinen Sonderfall“. Das stimmt nicht.
+`p.id = v_uid` mit einem leeren `v_uid` ergibt in SQL nicht `false`, sondern
+**`null`**: ein Vergleich gegen einen unbekannten Wert ist unbekannt. Über
+PostgREST kommt daraus JSON `null`. In JavaScript geht das zufällig gut, weil
+`row.is_me === true` und `some(r => r.is_me)` bei `null` beide falsch sind. **In
+Dart nicht:** `null as bool` wirft einen `TypeError`, am 02.09.2026 an einer
+Wegwerf-Datei nachgemessen, und ein `bool?` erzwingt an jeder Verwendungsstelle
+eine Entscheidung, die niemand wollte. Die Migration schreibt deshalb
+`(p.id = v_uid) is true`, was drei Werte auf zwei zusammenlegt. Der Schluss war
+richtig, der Mechanismus nicht.
+
+**Eine Frage bleibt dabei offen, und sie hängt an einem Wort.** Der Eigentümer
+sagt, die Rangliste bleibe sichtbar. Es gibt aber zwei: die globale und die je
+Stadt. Die Städte-Rangliste ist genau die Stelle, an der Städtenamen doch
+durchkommen, und ohne Anmeldung tut sie das wieder für jeden. Ein Mittelweg
+wäre eine Zeile: eine Sitzung nur für `p_city <> 'global'` verlangen. Ob
+„die Rangliste“ die globale meint oder beide, ist nicht von hier aus zu
+entscheiden.
 
 **Zum Toggle, weil ausdrücklich gefragt: nicht bauen.** Rang, Punktestand und
 Städte**zahl** sind eine Rangliste. Städte**namen** sind ein Bewegungsprofil,

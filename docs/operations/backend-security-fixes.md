@@ -3053,6 +3053,30 @@ Abschnitt „Janeks Antworten auf den dritten Block", Unterabschnitt J-B:
 > Städte**, keine Städtenamen. Und es gibt **nur einen Username**, keinen echten
 > Namen.
 
+**Der erste Teil davon ist am selben Tag zurückgenommen worden, und zwar wegen
+eines Befundes aus diesem Abschnitt.** Die Messung zu Frage 2 hat ergeben, dass
+die PWA vor dem Profilbildschirm keine Anmeldeschranke hat: ein Besucher ohne
+Konto sieht dort heute die vollständige Rangliste, und nach der ersten Fassung
+von Block 7a hätte er stattdessen `ranking.noData` gesehen. Antwort des
+Eigentümers:
+
+> „achso, ja mei, dann sieht man halt doch die Rangfolge und die Coins etc.
+> passt schon auch wenn man nicht angemeldet ist. bevor das aussieht wie ein
+> Fehler. Kannst du schon machen und schafft ja vielleicht auch den reiz sich
+> anzumelden."
+
+**Damit gilt:** die Rangliste bleibt ohne Anmeldung sichtbar. `get_leaderboard`
+verlangt keine Sitzung und bleibt für `anon` ausführbar. Alles andere aus J-B
+bleibt unverändert, im Einzelnen in 14.1.
+
+**Zum Wort „Coins": die Rangliste führt keine.** Sie liefert `score`, also die
+Zahl gesammelter Fakten (`supabase-schema.sql:369-374`); `profiles.coins` ist
+das persönliche Guthaben und steht in keiner der vier Zweige. Der Satz ist als
+„das, was in der Rangliste steht" gelesen, also Rang und Punktestand. Beim
+Umbau ist nichts aufgetaucht, das dieser Lesart widerspricht, und **`coins`
+kommt nicht in die Rückgabe**: es wäre ein neuer Wert über eine andere Person,
+keine Rücknahme.
+
 Damit steht die Aussage, die in Abschnitt 12 gefehlt hat. Was jetzt folgt, ist
 die Umsetzung. Format und Bedingungen wie in Abschnitt 11: die Buchstaben der
 Diagnoseabfragen laufen hinter T weiter, die Negativtests hinter 63, und
@@ -3093,6 +3117,12 @@ Standard an `PUBLIC`, und `PUBLIC` schließt `anon` ein. **Der Teil des Befundes
 Sekunde zu bestätigen. Migration 4 hat `get_leaderboard` ausdrücklich
 ausgelassen und auf E-16 verwiesen (11.2 und Block 4b, „ABSICHTLICH NICHT IN
 DIESER MIGRATION").
+
+**Belegt heißt hier nicht behoben.** Nach der Rücknahme vom 02.09.2026 ist der
+Zugriff ohne Konto gewollt, und Block 7a lässt ihn stehen. Was der Befund
+richtig gesehen hat, ist die Kombination: ohne Konto eine **Kennung** zu
+bekommen, mit der man dann zwei Tabellen ausliest. Der zweite Teil fällt in 7a,
+der erste in 7b.
 
 #### Frage 2: Wer ruft sie, und mit welchen Spalten rechnet der Aufrufer?
 
@@ -3228,16 +3258,37 @@ widersprechbar ist.
 
 | Block | Was | Bricht die PWA? | Läuft |
 |---|---|---|---|
-| **7a** | die beiden `USING (true)`-Policies fallen; `get_leaderboard` verlangt eine Sitzung, gibt nur noch den Username aus und ist nur noch für `authenticated` ausführbar; `get_my_rank` ist an das eigene Konto gebunden | **nein**, Nachweis in 14.2 | **heute** |
+| **7a** | die beiden `USING (true)`-Policies fallen; `get_leaderboard` gibt nur noch den Username aus; `get_my_rank` ist an das eigene Konto gebunden | **nein**, Nachweis in 14.2 | **heute** |
 | **7b** | die Rückgabe von `get_leaderboard` wird umgebaut: `user_id` raus, `is_me` rein, `city_count` dazu, `'Entdecker'` raus | **ja**, `screen-profil.jsx:88`, `:103`, `:117` | **nach einem PWA-Release** |
 
-**Die Sicherheitswirkung steckt vollständig in 7a.** Nach 7a schließt eine
-Kontokennung nichts mehr auf: die beiden Tabellen antworten nur noch auf die
-eigene Zeile, `profiles` tut das seit Migration 1, und schreibend war der Weg
-seit den Migrationen 1, 2a, 4a und 6 schon zu. 7b nimmt die Kennung zusätzlich
-aus der Rückgabe, weil sie dort nichts zu suchen hat, aber es schließt keine
-Lücke mehr, siehe den Nebenbefund zu Frage 3. **Wer 7b für dringend hält,
-priorisiert falsch.**
+**Was 7a leistet.** Eine Kontokennung schließt danach nichts mehr auf: die
+beiden Tabellen antworten nur noch auf die eigene Zeile, `profiles` tut das seit
+Migration 1, und schreibend war der Weg seit den Migrationen 1, 2a, 4a und 6
+schon zu. Das ist der Kern von E-16 und unabhängig von der Anmeldefrage,
+schließlich hat `user_city_scores` gar keinen Client-Leser und die Trophäen
+werden nur mit der eigenen Kennung gelesen (14.0, Frage 3).
+
+**7b ist mit der Rücknahme vom Nachklapp zur zweiten Hälfte der Behebung
+geworden, und diese Einordnung ist ausdrücklich korrigiert.** Die erste Fassung
+dieses Abschnitts nannte 7b Hygiene, mit der Begründung, Kontokennungen seien
+über `read comments` ohnehin zu bekommen. Das Argument stimmt weiter, trägt aber
+weniger weit, sobald der Aufrufer **kein Konto braucht**:
+
+- Über `read comments` bekommt man Kennungen von Leuten, die kommentiert haben,
+  einzeln und ohne Punktestand. Über `get_leaderboard` bekommt man die zehn
+  besten je Stadt und Zeitraum, mit Kennung, Pseudonym und Punktestand in einer
+  Antwort.
+- Ohne Anmeldung ist das **ohne jede Hürde und maschinell einsammelbar**: fünf
+  Städte mal zwei Zeiträume sind zehn Aufrufe für bis zu hundert Kennungen, mit
+  dem öffentlichen Schlüssel, ohne Konto, ohne Ratenbegrenzung, die dieses
+  Dokument kennt.
+- Solange nur 7a gelaufen ist, ist das der Zustand. Er ist nicht schlimmer als
+  heute, aber er ist auch nicht behoben: **`is_me` statt `user_id` ist die
+  eigentliche Behebung von E-16, und nicht mehr der Nachklapp.**
+
+Für einen anonymen Aufrufer ist `is_me` immer falsch, und zwar in 7b
+ausdrücklich `false` und nicht `null`, siehe den Hinweis zum Dreiwerte-Vergleich
+in 14.3. Ein Sonderfall für „ohne Konto" ist dafür nicht nötig.
 
 **Warum die Städtezahl in 7b liegt und nicht in 7a.** Sie ist für die PWA
 harmlos: eine zusätzliche Spalte kommt als zusätzlicher Schlüssel im JSON an und
@@ -3276,7 +3327,7 @@ derselbe Block mit zwei Zeilen weniger.
 - **Migration 3a ist gleichgültig.** 7a und 7b hängen nicht am PWA-Release, der
   3a blockiert, und umgekehrt.
 
-### 14.2 Migration 7a: die Leseseite schließt (E-16)
+### 14.2 Migration 7a: die Leseseite der beiden Tabellen schließt (E-16)
 
 Dateiname im Backend-Repo: `2026-09-02_e16_read_side.sql`
 
@@ -3293,24 +3344,24 @@ ihren angezeigten Namen ändern. N aus 11.7 gilt weiter.
 -- dazu get_leaderboard (:365-441) ohne Sitzungsprüfung und mit EXECUTE für
 -- PUBLIC, weil im ganzen 03_Backend/ keine Rechtezeile für sie existiert.
 --
--- Entscheidung vom 02.09.2026 (REBUILD_STATUS.md, J-B): ohne Anmeldung nichts.
--- Mit Anmeldung Rang, Punktestand und Anzahl der Städte, keine Städtenamen.
--- Es gibt nur einen Username, keinen echten Namen.
+-- Entscheidung vom 02.09.2026 (REBUILD_STATUS.md, J-B), einschließlich der
+-- Rücknahme vom selben Tag:
+--   Rang, Punktestand und Anzahl der Städte, keine Städtenamen;
+--   nur ein Username, kein echter Name;
+--   die Rangliste bleibt AUCH OHNE ANMELDUNG sichtbar. Der Eigentümer:
+--   "dann sieht man halt doch die Rangfolge und die Coins etc. passt schon
+--   auch wenn man nicht angemeldet ist. bevor das aussieht wie ein Fehler."
 --
--- Bricht heute nichts. Erhebung in 14.0, Frage 2 und 3:
+-- Bricht heute nichts, und zwar für niemanden. Erhebung in 14.0, Frage 2 und 3:
 --   kein Client liest fremde Zeilen aus einer der beiden Tabellen;
 --   api.jsx:80 und :234-240 filtern auf die eigene Kennung;
 --   user_city_scores liest überhaupt kein Client direkt;
---   die Rückgabe von get_leaderboard behält alle vier Spalten.
---
--- SICHTBARE VERHALTENSÄNDERUNG, und sie ist die Entscheidung, kein Fehler:
---   Die PWA hat keine Anmeldeschranke. route === 'profil' wird ohne Sitzung
---   gerendert (app.jsx:1059), requireAuth (app.jsx:541) sichert nur
---   schreibende Aktionen. Ein Besucher ohne Konto sieht heute auf dem
---   Profilbildschirm die vollständige Rangliste; danach sieht er
---   t('ranking.noData'), weil screen-profil.jsx:22 den Fehler abfängt.
---   Das ist "ohne Anmeldung nichts" und wird als Fehler gemeldet werden, wenn
---   es niemand vorher sagt.
+--   die Rückgabe von get_leaderboard behält alle vier Spalten;
+--   ein Besucher ohne Konto sieht die Rangliste weiter. Das ist der Punkt der
+--   Rücknahme: die PWA hat vor dem Profilbildschirm keine Anmeldeschranke
+--   (route === 'profil' wird ohne Sitzung gerendert, app.jsx:1059; requireAuth
+--   in app.jsx:541 sichert nur schreibende Aktionen), eine leere Rangliste
+--   hätte dort wie ein Fehler ausgesehen.
 --
 -- WAS DIESER BLOCK NICHT ANFASST:
 --   die Rückgabespalten von get_leaderboard -> Block 7b, weil
@@ -3319,7 +3370,15 @@ ihren angezeigten Namen ändern. N aus 11.7 gilt weiter.
 --   die drei Stadtschlüssel-Normalisierungen -> E-56, Abschnitt 12;
 --   handle_fact_collected -> die dortige Zählung ist falsch (14.0, Frage 4),
 --     aber sie entscheidet über eine Trophäe und damit über eine Spielregel;
---   das SELECT-Recht der Rolle anon auf den beiden Tabellen, Begründung unten.
+--   das SELECT-Recht der Rolle anon auf den beiden Tabellen, Begründung unten;
+--   das Ausführrecht von anon auf get_leaderboard. Es BLEIBT, siehe Schritt 3.
+--
+-- WAS OFFEN BLEIBT, WEIL DIE RANGLISTE OHNE KONTO LESBAR IST:
+--   Solange nur dieser Block gelaufen ist, gibt get_leaderboard weiter
+--   Kontokennungen an anon heraus, bis zu zehn je Stadt und Zeitraum. Diese
+--   Kennungen schließen danach nichts mehr auf, aber sie sind einsammelbar.
+--   Deshalb ist Block 7b nach der Rücknahme kein Nachklapp mehr, sondern die
+--   zweite Hälfte der Behebung. Einordnung in 14.1.
 -- ============================================================================
 
 begin;
@@ -3370,10 +3429,11 @@ drop policy if exists "public read trophies"    on public.user_trophies;
 -- Fehlerklasse für einen Aufrufer, den dieses Dokument nicht kennt. Dieselbe
 -- Begründung wie bei _is_group_member in 11.2.
 
--- 2. get_leaderboard: Sitzung verlangen, echten Namen entfernen, search_path
---    setzen. Reines create or replace, der Rückgabetyp bleibt Wort für Wort
---    gleich (rank, user_id, display_name, score). Die vier Zweige und die
---    Sortierung sind unverändert aus supabase-schema.sql:365-441 übernommen,
+-- 2. get_leaderboard: echten Namen entfernen, search_path setzen. KEINE
+--    Sitzungsprüfung, das ist die Rücknahme vom 02.09.2026. Reines
+--    create or replace, der Rückgabetyp bleibt Wort für Wort gleich
+--    (rank, user_id, display_name, score). Die vier Zweige und die Sortierung
+--    sind unverändert aus supabase-schema.sql:365-441 übernommen,
 --    einschließlich der Stadt-Normalisierung: E-56 ist hier nicht Gegenstand.
 create or replace function public.get_leaderboard(
   p_city   text default 'global',
@@ -3390,13 +3450,11 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  -- Ohne Konto nichts. Die äußere Grenze ist das entzogene Ausführrecht in
-  -- Schritt 3; diese Prüfung liegt im Rumpf und fängt den Fall, dass eine
-  -- Rolle mit EXECUTE ohne "sub"-Claim ankommt.
-  if auth.uid() is null then
-    raise exception 'get_leaderboard: not authenticated' using errcode = '42501';
-  end if;
-
+  -- Hier stand in der ersten Fassung eine Prüfung auf auth.uid(). Sie ist mit
+  -- der Rücknahme vom 02.09.2026 weg, und zwar bewusst ohne Ersatz: die
+  -- Rangliste ist eine Top-10-Liste und keine Auskunft über eine bestimmte
+  -- Person. Die gezielte Frage nach dem Rang EINER Kennung ist get_my_rank,
+  -- und die bleibt an das Konto gebunden, siehe Schritt 4.
   if p_period = 'weekly' then
     if p_city = 'global' then
       return query
@@ -3466,12 +3524,20 @@ begin
 end;
 $$;
 
--- 3. Ausführrechte. EXECUTE steht bei einer Funktion per PostgreSQL-Standard
---    an PUBLIC, und PUBLIC schließt anon ein. Genau das ist der Teil "ohne
---    Konto" des Befundes. Ein create or replace ändert bestehende Rechte
---    nicht, diese zwei Zeilen sind also die eigentliche Änderung.
-revoke all    on function public.get_leaderboard(text, text) from public, anon;
-grant  execute on function public.get_leaderboard(text, text) to authenticated;
+-- 3. Ausführrechte: anon behält sie. Das ist die Rücknahme, und es ist die
+--    einzige Stelle des Blocks, die sie berührt.
+--    Trotzdem nicht "nichts tun": EXECUTE steht heute per PostgreSQL-Standard
+--    an PUBLIC, weil im ganzen 03_Backend/ keine Rechtezeile für diese
+--    Funktion existiert. Ein Recht an PUBLIC ist kein Beschluss, sondern ein
+--    Standard, den niemand gewählt hat, und es gilt auch für jede Rolle, die
+--    diese Datenbank künftig bekommt. Die zwei Empfänger, die es geben soll,
+--    stehen deshalb ausdrücklich da. Gleiche Bauform wie
+--    check_username in Block 4b, Schritt 3, und aus demselben Grund: wäre der
+--    Standard hier je angefasst worden, wäre die Rangliste stumm leer.
+--    service_role ist davon nicht betroffen, Supabase vergibt dessen Rechte je
+--    Rolle und nicht über PUBLIC (siehe Block 4b).
+revoke all     on function public.get_leaderboard(text, text) from public;
+grant  execute on function public.get_leaderboard(text, text) to anon, authenticated;
 
 -- 4. get_my_rank an das eigene Konto binden. Die Funktion nimmt heute eine
 --    fremde Kennung und liefert deren Rang (supabase-schema.sql:443-512); das
@@ -3602,7 +3668,10 @@ create policy "public read city scores" on public.user_city_scores
 create policy "public read trophies" on public.user_trophies
   for select using (true);
 
-grant execute on function public.get_leaderboard(text, text) to public, anon, authenticated;
+-- Nur nötig, wenn Abfrage V vorher tatsächlich ein Recht an PUBLIC gezeigt
+-- hat. anon und authenticated behalten ihr Recht aus Schritt 3 von 7a, das
+-- muss hier nichts wiederherstellen.
+grant execute on function public.get_leaderboard(text, text) to public;
 
 commit;
 
@@ -3610,13 +3679,16 @@ notify pgrst, 'reload schema';
 ```
 
 Die beiden Funktionsrümpfe stehen damit **nicht** wieder auf dem Stand von
-`supabase-schema.sql`. Das ist Absicht: die Sitzungsprüfung in
-`get_leaderboard` und die Kontobindung in `get_my_rank` sind kein Teil der
-Produktentscheidung, sondern Behebungen derselben Klasse wie E-06 und E-52. Wer
-sie wirklich zurückdrehen will, nimmt die Rümpfe aus
-`supabase-schema.sql:365-441` und `:443-512` wörtlich. Ohne diesen Schritt ist
-der Zustand nach dem Rückrollen sicherer als vorher, und das ist der richtige
-Ausgang.
+`supabase-schema.sql`. Das ist Absicht: die Kontobindung in `get_my_rank` ist
+kein Teil der Produktentscheidung, sondern eine Behebung derselben Klasse wie
+E-06 und E-52. Wer sie wirklich zurückdrehen will, nimmt den Rumpf aus
+`supabase-schema.sql:443-512` wörtlich. Ohne diesen Schritt ist der Zustand
+nach dem Rückrollen sicherer als vorher, und das ist der richtige Ausgang.
+
+**Was die Rückabwicklung nicht enthält, weil es sie nicht mehr braucht:** eine
+Zeile, die die Anmeldepflicht für `get_leaderboard` aufhebt. Die erste Fassung
+dieses Blocks hatte eine, weil 7a eine Anmeldepflicht setzte. Mit der Rücknahme
+vom 02.09.2026 gibt es keine, und damit auch nichts zurückzunehmen.
 
 ### 14.3 Migration 7b: die Rückgabe wird umgebaut. Läuft noch nicht
 
@@ -3647,15 +3719,19 @@ Drei Änderungen an der Rückgabe, jede mit ihrem eigenen Grund:
 -- BRECHENDE ÄNDERUNG für 02_Frontend/app/screen-profil.jsx:88, :103 und :117.
 -- Erst nach dem PWA-Release ausführen, der dort auf is_me umstellt.
 --
--- VORAUSSETZUNG: Block 7a ist gelaufen. Dieser Block wiederholt die
--- Sitzungsprüfung, weil er den Rumpf ohnehin neu schreibt, aber er ersetzt
--- Schritt 1 aus 7a nicht: die beiden Policies sind dort gefallen, nicht hier.
+-- VORAUSSETZUNG: Block 7a ist gelaufen. Dieser Block ersetzt Schritt 1 aus 7a
+-- nicht: die beiden Policies sind dort gefallen, nicht hier.
+--
+-- OHNE ANMELDUNG WEITER SICHTBAR, wie in 7a. Es gibt hier keine
+-- Sitzungsprüfung, und anon behält das Ausführrecht.
 --
 -- WARUM DROP UND NICHT CREATE OR REPLACE: eine neue Spalte in returns table
 -- ändert den Rückgabetyp, und den kann create or replace nicht ändern (42P13).
 -- Ein drop function nimmt alle Ausführrechte mit, und ein frisch angelegtes
 -- Funktionsobjekt trägt wieder EXECUTE für PUBLIC. Schritt 3 unten ist deshalb
--- nicht Wiederholung, sondern Pflicht.
+-- nicht Wiederholung, sondern Pflicht: sonst hängt das Recht von anon wieder an
+-- einem Standard statt an einem Beschluss, und das Recht von PUBLIC wäre
+-- zurück.
 -- ============================================================================
 
 begin;
@@ -3683,18 +3759,17 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
+  -- Ohne Sitzung ist v_uid null. Das ist kein Fehlerfall, sondern der
+  -- Normalfall eines Besuchers ohne Konto: er bekommt die Liste, und is_me ist
+  -- für jede Zeile false. Siehe den Hinweis zum Dreiwerte-Vergleich unten.
   v_uid uuid := auth.uid();
 begin
-  if v_uid is null then
-    raise exception 'get_leaderboard: not authenticated' using errcode = '42501';
-  end if;
-
   if p_period = 'weekly' then
     if p_city = 'global' then
       return query
         select
           row_number() over (order by count(*) desc)::bigint,
-          (p.id = v_uid),
+          (p.id = v_uid) is true,
           p.username,
           count(*)::bigint,
           public._city_count(p.id)
@@ -3708,7 +3783,7 @@ begin
       return query
         select
           row_number() over (order by count(*) desc)::bigint,
-          (p.id = v_uid),
+          (p.id = v_uid) is true,
           p.username,
           count(*)::bigint,
           public._city_count(p.id)
@@ -3734,7 +3809,7 @@ begin
       return query
         select
           row_number() over (order by p.score_total desc)::bigint,
-          (p.id = v_uid),
+          (p.id = v_uid) is true,
           p.username,
           p.score_total::bigint,
           public._city_count(p.id)
@@ -3746,7 +3821,7 @@ begin
       return query
         select
           row_number() over (order by ucs.score desc)::bigint,
-          (p.id = v_uid),
+          (p.id = v_uid) is true,
           p.username,
           ucs.score::bigint,
           public._city_count(p.id)
@@ -3760,18 +3835,33 @@ begin
 end;
 $$;
 
--- 3. Ausführrechte neu setzen. Der drop hat sie mitgenommen, und das create
---    hat EXECUTE wieder an PUBLIC vergeben. Ohne diese zwei Zeilen ist der
---    Befund "ohne Konto" wieder offen, obwohl 7a ihn geschlossen hatte. Das
---    ist die gefährlichste Stelle dieses Blocks, weil sie nichts bricht,
---    wenn man sie vergisst.
-revoke all    on function public.get_leaderboard(text, text) from public, anon;
-grant  execute on function public.get_leaderboard(text, text) to authenticated;
+-- 3. Ausführrechte neu setzen, identisch zu Schritt 3 in 7a. Der drop hat sie
+--    mitgenommen, und das create hat EXECUTE wieder an PUBLIC vergeben. Wer
+--    diese zwei Zeilen vergisst, bricht nichts: anon kommt über das
+--    PUBLIC-Recht weiter durch, die Rangliste läuft, und niemand merkt es.
+--    Genau deshalb stehen sie hier. Der Unterschied ist nicht das Ergebnis für
+--    heute, sondern dass danach im Katalog steht, WER rufen darf, statt dass es
+--    aus einem Standard folgt.
+revoke all     on function public.get_leaderboard(text, text) from public;
+grant  execute on function public.get_leaderboard(text, text) to anon, authenticated;
 
 commit;
 
 notify pgrst, 'reload schema';
 ```
+
+**Warum `is true` und nicht einfach `p.id = v_uid`.** Das ist die eine Stelle,
+an der die Rücknahme beinahe einen Fehler eingebaut hätte. Ohne Sitzung ist
+`v_uid` gleich `null`, und `p.id = null` ist in SQL **nicht `false`, sondern
+`null`**: der Vergleich mit einem unbekannten Wert ist unbekannt. Eine
+`boolean`-Spalte mit `null` kommt über PostgREST als JSON-`null` an. In
+JavaScript geht das durch Zufall gut aus, weil `row.is_me === true` und
+`rows.some(r => r.is_me)` beide auf einem `null` falsch sind. In Dart geht es
+**nicht** gut aus: ein `as bool` auf `null` ist ein Laufzeitfehler, und ein
+`bool?` erzwingt an jeder Nutzungsstelle eine Entscheidung, die niemand treffen
+wollte. `(p.id = v_uid) is true` macht aus den drei Werten zwei und liefert für
+jeden Besucher ohne Konto ein echtes `false`. Die Spalte ist damit `not null` im
+Ergebnis, ohne dass es irgendwo als Sonderfall behandelt werden muss.
 
 **Die Städtezahl steckt in einem Helfer, und zwar aus einem Grund.**
 `_city_count` wird in allen vier Zweigen gebraucht. Vierfach kopiert wäre sie
@@ -3833,8 +3923,8 @@ drop function if exists public.get_leaderboard(text, text);
 -- Rumpfes in einem Dokument driften auseinander, und beim Rückabwickeln
 -- entsteht genau daraus ein Halbzustand.
 
-revoke all    on function public.get_leaderboard(text, text) from public, anon;
-grant  execute on function public.get_leaderboard(text, text) to authenticated;
+revoke all     on function public.get_leaderboard(text, text) from public;
+grant  execute on function public.get_leaderboard(text, text) to anon, authenticated;
 
 drop function if exists public._city_count(uuid);
 
@@ -3869,13 +3959,22 @@ select tablename,
 -- V) Wer darf die beiden Leserfunktionen heute rufen, und welche Fassung steht
 --    in der Datenbank? pg_get_function_result ist der Punkt: daran ist
 --    ablesbar, ob 7a oder 7b schon gelaufen ist, ohne dass man es glauben muss.
---    Erwartet vor 7a: anon_darf = true für get_leaderboard.
+--    Erwartet vor 7a: anon_darf = true für get_leaderboard, und das bleibt
+--    nach 7a auch so. Der Unterschied ist nicht der Wert, sondern woher er
+--    kommt: vorher aus dem PUBLIC-Standard, nachher aus einem ausdrücklichen
+--    Grant an anon. Ablesbar ist das nicht an dieser Abfrage, sondern an
+--    proacl, deshalb steht sie unten mit dabei.
 --    Erwartet vor 7a: anon_darf = false für get_my_rank, WENN Migration 4
 --    gelaufen ist. Steht dort true, ist Block 4b nie gelaufen, und das ist ein
 --    eigener Befund.
 select p.oid::regprocedure                                     as funktion,
        has_function_privilege('anon',          p.oid, 'EXECUTE') as anon_darf,
        has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_darf,
+       -- Die Rechteliste im Rohzustand. Steht hier =X/ ohne Empfänger vor dem
+       -- Schrägstrich, hält PUBLIC das Recht; steht anon=X/, ist es
+       -- ausdrücklich vergeben. Ein null bedeutet "nie angefasst", also der
+       -- Standard, also PUBLIC.
+       p.proacl                                                 as rechte_roh,
        pg_get_function_result(p.oid)                            as rueckgabe,
        p.prosecdef                                              as security_definer,
        pg_get_userbyid(p.proowner)                              as owner,
@@ -3929,12 +4028,22 @@ select ucs.user_id,
  order by 2 desc
  limit 10;
 
--- Y) nach Block 7a.
---    Erwartet: keine Zeile mit ist_public = true, und anon_darf = false für
---    beide Funktionen. Das ist zugleich die Regressionsprobe: ein späteres,
---    gut gemeintes "create policy ... using (true)" oder ein
---    "grant execute on all functions in schema public to anon" macht in einer
---    Zeile alles wieder auf.
+-- Y) nach Block 7a. Die Erwartung ist an zwei Stellen bewusst NICHT "alles
+--    dicht", und wer das nicht weiß, rollt eine korrekte Migration zurück.
+--    Erwartet:
+--      Tabellen: keine Zeile mit ist_public = true. Beide USING-(true)-Policies
+--        sind weg, je Tabelle bleibt genau die Policy mit auth.uid().
+--      get_leaderboard: anon_darf = true. ABSICHT, Rücknahme vom 02.09.2026.
+--      get_my_rank:     anon_darf = false, WENN Migration 4 gelaufen ist. Das
+--        Recht entzieht Block 4b, nicht 7a; 7a bindet nur den Rumpf. Steht hier
+--        true, ist das kein Fehlschlag von 7a, sondern der Befund aus Abfrage V.
+--        Ohne Konto kommt trotzdem nichts heraus, die Rumpfprüfung wirft 42501.
+--        Eine gezielte Frage nach dem Rang einer bestimmten Kennung ist ein
+--        Auskunftsdienst über eine andere Person und keine Liste.
+--    Zugleich die Regressionsprobe: ein späteres, gut gemeintes
+--    "create policy ... using (true)" auf einer der beiden Tabellen macht in
+--    einer Zeile die Leseseite wieder auf, und daran ändert die Rücknahme
+--    nichts. Sie betrifft die Rangliste, nicht die Tabellen.
 select tablename, policyname, cmd, (qual = 'true') as ist_public
   from pg_policies
  where schemaname = 'public'
@@ -3943,13 +4052,21 @@ select tablename, policyname, cmd, (qual = 'true') as ist_public
 
 select p.oid::regprocedure                                     as funktion,
        has_function_privilege('anon',          p.oid, 'EXECUTE') as anon_darf,
-       has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_darf
+       has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_darf,
+       p.proacl                                                 as rechte_roh
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
    and p.proname in ('get_leaderboard', 'get_my_rank');
 
 -- Z) nach Block 7b. Stimmt die Städtezahl, und läuft der Helfer überhaupt?
+--    NEBENBEI: dass diese Abfrage überhaupt läuft, ist eine Folge der
+--    Rücknahme. Im SQL-Editor gibt auth.uid() null zurück, weil kein JWT
+--    anliegt; die erste Fassung von 7a hätte hier mit
+--    'get_leaderboard: not authenticated' abgebrochen, und die eigene
+--    Nachkontrolle wäre nicht ausführbar gewesen. Wer eine Funktion mit
+--    Sitzungspflicht prüfen will, braucht dafür einen Client mit Token, nicht
+--    den Editor.
 --    Im SQL-Editor läuft die Abfrage als Eigentümer, also ohne Policy-Grenze:
 --    hier steht der wahre Wert. Liefert get_leaderboard dagegen überall 0,
 --    dann greift für den Funktionseigentümer doch eine Policy, und dann ist
@@ -3986,7 +4103,8 @@ Block 7a:
 
 | # | Handlung | Vor der Migration | Danach erwartet | Prüft |
 |---|---|---|---|---|
-| 64 | `anon` ruft `get_leaderboard('global','weekly')` | **erlaubt, zehn Zeilen mit Kennung und Namen** | Fehler, kein `EXECUTE` (`42501`, über PostgREST je nach Fassung auch `PGRST202`) | Kernfall „ohne Anmeldung nichts". **Ersetzt Test 48** |
+| 64 | `anon` ruft `get_leaderboard('global','weekly')` | erlaubt, zehn Zeilen | **erlaubt, zehn Zeilen** | **Nichtbruch, und der Test zur Rücknahme vom 02.09.2026.** Test 48 bleibt damit gültig, statt ersetzt zu werden; nur seine Begründung ändert sich von „E-16 bleibt bewusst offen" zu „die Rangliste ist ohne Konto sichtbar, so entschieden" |
+| 64a | `anon` ruft `get_leaderboard`, `B` hat `show_real_name = true` | **erlaubt, `anon` sieht den echten Namen von `B`** | erlaubt, `anon` sieht den Username von `B` | **das ist, was 7a für einen anonymen Aufrufer ändert.** Der Punktestand bleibt sichtbar, der echte Name nicht |
 | 65 | `A` ruft `get_leaderboard('global','weekly')` | erlaubt | **erlaubt, vier Spalten wie bisher** | Nichtbruch, `screen-profil.jsx:20` |
 | 66 | `A` liest `user_trophies` von `B` | **erlaubt, alle Zeilen** | **null Zeilen, kein Fehler** | Kernfall E-16. **Ersetzt Test 63** |
 | 67 | `A` liest die eigenen `user_trophies` genau wie `api.jsx:80` | erlaubt | **erlaubt** | **der riskanteste Nichtbruch-Test** |
@@ -4008,18 +4126,29 @@ Block 7b:
 | 78 | `A` ruft `get_leaderboard` und `B` steht darin | `row.user_id` ist die Kennung von `B` | `row.is_me` ist `false`, keine Kennung | die Kennung ist aus der Rückgabe |
 | 79 | `A` hat Fakten in München, Regensburg und einen ohne `city` | Städtezahl gibt es nicht | `city_count` ist **2**, nicht 3 | `'unknown'` ist keine Stadt |
 | 80 | `B` hat keinen Username und steht in den Top 10 | `display_name` ist `Entdecker` | `display_name` ist `null` | der deutsche Text fällt aus der Datenbank |
-| 81 | `anon` ruft `get_leaderboard` | Fehler, kein `EXECUTE` (Zustand nach 7a) | **weiterhin Fehler** | das `drop function` hat die Rechte mitgenommen, Schritt 3 hat sie wieder gesetzt |
+| 81 | `anon` ruft `get_leaderboard` | erlaubt (Zustand nach 7a) | **erlaubt, mit den fünf neuen Spalten** | das `drop function` hat die Rechte mitgenommen, Schritt 3 hat sie wieder gesetzt. **Dieser Test scheitert nicht, wenn Schritt 3 fehlt**, weil dann das PUBLIC-Recht greift; er belegt nur, dass die Rangliste weiter läuft. Ob das Recht aus einem Beschluss oder einem Standard kommt, sagt `proacl` in Abfrage Y |
+| 81a | `anon` ruft `get_leaderboard` und liest `is_me` | die Spalte existiert nicht | `is_me` ist **`false`** in jeder Zeile, nicht `null` | `(p.id = v_uid) is true`; ohne das `is true` käme `null` und ein Dart-`as bool` würde werfen |
 | 82 | `A` ruft `_city_count(B)` direkt | die Funktion existiert nicht | Fehler, kein `EXECUTE` | der Helfer ist keine API |
 
-**Die vier Tests, an denen es hängt.** Test 67, weil ein Fehlschlag bedeutet,
-dass jeder Nutzer in der PWA eine leere Trophäenreihe sieht und die
-Trophäen-Nachprüfung in `app.jsx:573` stumm nichts mehr findet. Test 76, weil
-ein Fehlschlag bedeutet, dass die Eigentümerannahme aus Abfrage N falsch ist und
-dann auch Migration 3 und 6 zurückzurollen sind. Test 65, weil er die eine
-Zusicherung von 7a prüft, nämlich dass die Rückgabe unangetastet bleibt. Test
-81, weil das vergessene Schritt 3 in 7b nichts bricht und deshalb nicht
-auffällt: der Befund wäre wieder offen, und alles würde weiter funktionieren.
-Die eigentlichen Sicherheitstests 64, 66, 68 und 71 sind die einfachen.
+**Die Liste hat sich durch die Rücknahme verschoben, und zwar nicht nur um ein
+Vorzeichen.** Vorher war der schärfste Test „`anon` kommt nicht mehr durch".
+Diesen Test gibt es nicht mehr; an seiner Stelle steht mit 64 ein
+**Nichtbruch**-Test, und Nichtbruch-Tests sind die riskanteren, weil ein
+Fehlschlag Produktion bedeutet und nicht eine offene Lücke.
+
+**Die vier Tests, an denen es jetzt hängt.** Test 64, weil ein Fehlschlag genau
+den Zustand herstellt, den die Rücknahme verhindern soll: eine leere Rangliste
+für jeden Besucher ohne Konto, die wie ein Fehler aussieht. Test 67, weil ein
+Fehlschlag bedeutet, dass jeder Nutzer in der PWA eine leere Trophäenreihe sieht
+und die Trophäen-Nachprüfung in `app.jsx:573` stumm nichts mehr findet. Test 76,
+weil ein Fehlschlag bedeutet, dass die Eigentümerannahme aus Abfrage N falsch
+ist und dann auch Migration 3 und 6 zurückzurollen sind. Test 65, weil er die
+eine Zusicherung von 7a prüft, nämlich dass die Rückgabe unangetastet bleibt.
+
+Die eigentlichen Sicherheitstests sind 66, 68 und 71, und die sind die
+einfachen: sie schlagen entweder fehl oder nicht. **Test 64a ist der einzige,
+der die Wirkung von 7a für einen anonymen Aufrufer überhaupt zeigt**: für ihn
+ändert sich sonst nichts, außer dass ein echter Name verschwindet.
 
 ### 14.6 Auswirkung auf diese App und auf die PWA
 
@@ -4070,9 +4199,17 @@ was Migration 7a im Backend erzwingt.
 
 #### Auf die PWA: 7a nein, 7b ja
 
-**7a bricht nichts**, aber es ändert für Besucher ohne Konto sichtbar das
-Verhalten, siehe den Kommentarblock in 14.2. Dazu zwei Punkte, die in ein
-PWA-Auftragspaket gehören und **nicht** in diese Migration:
+**7a bricht nichts, und nach der Rücknahme auch nichts für Besucher ohne
+Konto.** Die Rangliste bleibt für sie da, mit Rang, Pseudonym und Punktestand.
+Das Einzige, was sich für sie ändert: bei einem Konto mit `show_real_name`
+stand dort bisher der **echte Name**, jetzt steht der Username. Das ist die
+Verbesserung, nicht der Verlust.
+
+Die erste Fassung dieses Abschnitts nannte hier eine „sichtbare
+Verhaltensänderung" für nicht angemeldete Besucher. Sie ist der Grund, warum die
+Anmeldepflicht zurückgenommen wurde, und damit ist sie weg. Was bleibt, sind
+zwei Punkte, die in ein PWA-Auftragspaket gehören und **nicht** in diese
+Migration:
 
 1. **Der Schalter „Echten Namen zeigen" wird zu einer Lüge.**
    `screen-profil.jsx:693` schreibt weiter `show_real_name`, und die Spalte ist
@@ -4090,6 +4227,12 @@ PWA-Auftragspaket gehören und **nicht** in diese Migration:
 |---|---|---|---|
 | 88 | `const isMe = String(row.user_id) === String(userId)` | immer `false`, keine Hervorhebung | `const isMe = row.is_me === true` |
 | 117 | `!rows.some(r => String(r.user_id) === String(userId))` | immer `true`, der eigene Rang wird unten angehängt, obwohl er in der Liste steht | `!rows.some(r => r.is_me)` |
+
+Für einen Besucher ohne Konto sind beide Zeilen nach 7b richtig und ohne
+Sonderfall: `is_me` ist `false`, also gibt es keine Hervorhebung, und der
+angehängte eigene Rang erscheint nicht, weil `myRank` ohne Sitzung `null` bleibt
+(`app.jsx:267` ruft `getMyRank` nur innerhalb von `if (!session) return;`,
+`app.jsx:232`).
 | 103 | `{row.display_name}` | leer bei Konten ohne Username | `{row.display_name || t('ranking.anonymous', lang)}`, und der Schlüssel muss erst existieren |
 
 Die dritte Zeile ist der Grund, warum 7b nicht nur ein Suchen und Ersetzen ist:
@@ -4111,13 +4254,40 @@ Abschnitt 2.
   dieser Liste steht, war messbar in München, und der Aufrufer weiß es. Die
   Stadtfilter sind ein bestehendes Produktmerkmal
   (`screen-profil.jsx:9`, fünf Pillen), also ist „keine Städtenamen" für die
-  Top 10 je Stadt nicht einhaltbar, solange es Stadt-Ranglisten gibt. Der
-  Unterschied zum Ist-Zustand ist erheblich: heute geht es für **jeden** Nutzer
-  und **ohne Konto**, danach für zehn je Stadt und nur mit Konto. **Das ist eine
-  Produktfrage und bleibt offen:** entweder die Stadt-Ranglisten fallen, oder
-  die Aussage lautet „keine Städtenamen, außer man steht in den besten zehn
-  einer Stadt". Beides ist vertretbar, das eine ist nicht das andere. Nicht
-  entschieden, nicht gebaut.
+  Top 10 je Stadt nicht einhaltbar, solange es Stadt-Ranglisten gibt.
+
+  **Die Rücknahme vom 02.09.2026 verschärft diesen Punkt, statt ihn zu
+  erledigen, und das ist die wichtigste Nebenwirkung des Tages.** Vorher war die
+  Auskunft „diese Person war in München" auf zehn Konten je Stadt begrenzt
+  **und** an eine Anmeldung gebunden; jetzt ist sie es nicht mehr. Der
+  Unterschied zum Ist-Zustand schrumpft damit auf: heute für **jeden** Nutzer
+  über die Tabelle, danach für zehn je Stadt über die Funktion, beides ohne
+  Konto. Die Verkleinerung bleibt echt, aber die Anmeldung ist keine Hürde mehr,
+  die man dazurechnen darf.
+
+  **Das ist eine Produktfrage und bleibt offen:** entweder die Stadt-Ranglisten
+  fallen, oder sie verlangen als einzige eine Sitzung (technisch eine Zeile:
+  `if p_city <> 'global' and auth.uid() is null then raise ...`, und die globale
+  Liste bliebe offen), oder die Aussage lautet „keine Städtenamen, außer man
+  steht in den besten zehn einer Stadt". Drei vertretbare Antworten, und keine
+  ist die andere. **Nicht entschieden, nicht gebaut**, und ausdrücklich nicht
+  als Technik in 7a hineingeschrieben: die Rücknahme sagt „die Rangliste bleibt
+  sichtbar", nicht „die globale Rangliste bleibt sichtbar", und diesen
+  Unterschied darf ich nicht selbst festlegen.
+- **Zwischen 7a und 7b sind Kontokennungen ohne Konto einsammelbar.** Das ist
+  kein neuer Zustand, sondern der heutige, und er endet mit 7b. Er steht hier,
+  weil die Rücknahme ihn verlängert: solange nur 7a gelaufen ist, liefert
+  `get_leaderboard` weiter `user_id` an `anon`, bis zu zehn je Stadt und
+  Zeitraum. Die Kennungen schließen dann nichts mehr auf, aber sie sind ein
+  stabiler Personenbezug und über `read comments` mit Kommentartexten
+  verknüpfbar. **Wer 7a ausführt und 7b auf unbestimmte Zeit liegen lässt, hat
+  E-16 halb behoben**, und die Hälfte, die fehlt, ist die, die durch die
+  Rücknahme wichtiger geworden ist (14.1).
+- **Eine Ratenbegrenzung für `get_leaderboard` gibt es nicht, und dieses
+  Dokument kennt keine.** Ob Supabase davor eine hat, ist aus dem Repository
+  nicht zu sehen. Bei einer Funktion, die ohne Konto zehn Zeilen je Aufruf
+  liefert, ist das eine Frage, die man einmal beantworten sollte, statt sie
+  anzunehmen. Sie gehört nicht in eine Migration.
 - **Der Wortlaut für ein Konto ohne Username.** Nach 7b liefert der Server
   `null`, und der Client braucht einen Text. Inhaltsfrage. Bis sie beantwortet
   ist, läuft 7b nicht, weil sonst eine leere Zeile in der Rangliste steht.
@@ -4155,7 +4325,9 @@ Abschnitt 2.
 ### 14.8 Wo dieser Nachtrag von seinem Auftrag abweicht
 
 Vollständig, weil eine stillschweigende Abweichung schlimmer ist als eine
-gemeldete.
+gemeldete. Die Einträge 11 bis 15 sind mit der Rücknahme vom 02.09.2026
+dazugekommen; 1 bis 10 standen schon vorher da und gelten unverändert, außer
+dass Eintrag 6 nicht mehr in dieselbe Richtung zeigt.
 
 | # | Auftrag | Was daraus geworden ist | Warum |
 |---|---|---|---|
@@ -4164,8 +4336,13 @@ gemeldete.
 | 3 | Policies verschärfen | zusätzlich `get_my_rank` an das Konto gebunden | Die Funktion nimmt eine fremde Kennung und liefert deren Rang (`:443`). Nach dem Policy-Drop wäre sie der letzte Weg, der über eine fremde Kennung eine Auskunft gibt. Nicht Teil von E-16, aber dieselbe Klasse wie E-06 Punkt 2 und im selben Block kostenlos |
 | 4 | „Prüfe, ob sich die Städtezahl aus `user_city_scores` zählen lässt" | ja, aber **nicht** so wie `handle_fact_collected:288` es tut | `'unknown'` ist ein `city_key` wie jeder andere. Der bestehende Zähler ist falsch, und die naheliegende Umsetzung hätte den Fehler übernommen. Ergebnis: die Anzeige weicht bewusst von der Trophäenschwelle ab |
 | 5 | „Ein Direktzugriff auf fremde Zeilen fällt weg, sobald die Policy fällt" | er fällt weg, aber es gab **keinen** | Kein Client liest fremde Zeilen aus einer der beiden Tabellen (14.0, Frage 3). Das `USING (true)` war ein Recht ohne Aufrufer. Die Migration bricht deshalb weniger, als der Befund vermuten lässt |
-| 6 | die Kennung aus der Rangliste nehmen schließt das Loch | es schließt es **nicht** | `read comments` ist `USING (true)` und `comments.user_id` verweist auf `profiles` (`:51-57`, `:159-160`). Kontokennungen sind ohne Rangliste zu bekommen. Was E-16 schließt, ist, dass eine Kennung etwas aufschließt, und das leistet 7a. 7b ist Hygiene, und in 14.1 steht ausdrücklich, dass wer sie für dringend hält, falsch priorisiert |
+| 6 | die Kennung aus der Rangliste nehmen schließt das Loch | es schließt es **nicht allein**, aber es ist mehr als Hygiene | `read comments` ist `USING (true)` und `comments.user_id` verweist auf `profiles` (`:51-57`, `:159-160`). Kontokennungen sind ohne Rangliste zu bekommen. Was E-16 schließt, ist, dass eine Kennung etwas aufschließt, und das leistet 7a. **Die erste Fassung nannte 7b deshalb Hygiene, und das ist mit der Rücknahme korrigiert:** ohne Anmeldung ist eine Liste von Kennungen mit Punktestand hürdenlos einsammelbar, siehe Eintrag 12 und 14.1 |
 | 7 | Negativtest „vorher gelingt, nachher scheitert" | zusätzlich der Hinweis, dass eine Policy **null Zeilen** liefert und keinen Fehler | Ohne diesen Absatz werden die Tests 66, 68 und 70 als Fehlschlag gelesen, obwohl sie bestanden sind. Dazu Nichtbruch-Tests (65, 67, 69, 72, 73, 76, 81), und die sind hier wieder die riskanteren |
 | 8 | „Keine neue Tabelle" | keine Tabelle, aber ein neues **Funktionsobjekt** `_city_count` in 7b | Es ist keine Tabelle und kein Datenvertrag nach außen, sondern ein interner Helfer ohne Ausführrecht für jeden Client, wie `_haversine_m` in Block 4b. Die Alternative ohne neues Objekt steht in 14.7, damit die Wahl beim Eigentümer liegt |
 | 9 | E-16 ist eine Policy-Frage | die Stadt-Ranglisten verraten Städtenamen und können es nicht nicht tun | „Keine Städtenamen" und „es gibt Stadt-Ranglisten" sind nicht beide vollständig erfüllbar. Das ist eine offene Produktfrage und steht in 14.7, statt in der Migration entschieden zu werden |
 | 10 | nur Migration schreiben | zusätzlich zwei PWA-Aufträge benannt (Schalter entfernen, i18n-Schlüssel anlegen) | Der Schalter „Echten Namen zeigen" speichert nach 7a einen Wert, den niemand liest. Ein Schalter, der lügt, ist schlechter als keiner, und die Migration allein erzeugt genau diesen Zustand |
+| 11 | „`EXECUTE` bleibt bei `anon`" | `EXECUTE` bleibt bei `anon`, aber **nicht mehr bei PUBLIC**: `revoke all ... from public` plus `grant execute ... to anon, authenticated` | „Nichts tun" wäre die wörtliche Umsetzung gewesen. Dann hinge das Recht weiter an einem PostgreSQL-Standard, den niemand gewählt hat, und es gölte für jede Rolle, die diese Datenbank künftig bekommt. Das Ergebnis für heute ist identisch, im Katalog steht danach ein Beschluss statt eines Standards. Gleiche Bauform wie `check_username` in Block 4b, Schritt 3 |
+| 12 | „`is_me` ist für einen anonymen Aufrufer immer `false`, das funktioniert ohne Sonderfall" | **fast.** `p.id = v_uid` ergibt bei `v_uid is null` nicht `false`, sondern `null`; die vier Zweige heißen deshalb `(p.id = v_uid) is true` | In SQL ist ein Vergleich mit `null` unbekannt und nicht falsch. In JavaScript geht ein `null` durch Zufall gut aus (`=== true` und `some()` sind beide falsch darauf), in Dart wirft ein `as bool` auf `null`. Ohne das `is true` wäre die Aussage des Auftrags erst nach dem nächsten Client-Fehler falsch geworden |
+| 13 | Negativtests der Anmeldepflicht „entsprechend weg oder umgedreht" | Test 64 umgedreht, Test 81 umgedreht, **64a und 81a neu** | Ein umgedrehter Test 64 prüft nur noch, dass sich nichts geändert hat. Was 7a für einen anonymen Aufrufer tatsächlich ändert, ist der Wegfall des echten Namens, und dafür gab es keinen Test. 81a fängt den `null`-gegen-`false`-Fall aus Eintrag 12. **Test 48 aus 11.8 bleibt damit gültig** und wird nicht mehr ersetzt, nur seine Begründung ändert sich |
+| 14 | die Rücknahme betrifft eine Stelle | sie betrifft eine Stelle im **SQL** und vier in der **Einordnung** | Die Sicherheitsaussage von 7a hat sich verschoben (14.1), die Städte-Ranglisten sind ohne Konto abfragbar geworden (14.7, verschärft), zwischen 7a und 7b sind Kennungen hürdenlos einsammelbar (14.7, neu), und die kritischen Tests sind jetzt Nichtbruch-Tests statt Sicherheitstests (14.5). Der Einzeiler im SQL ist der kleinste Teil der Änderung |
+| 15 | (kein Auftragspunkt, Selbstkorrektur) | die erste Fassung von 7a hätte die eigene Nachkontrolle unausführbar gemacht | Im SQL-Editor liegt kein JWT an, `auth.uid()` ist dort `null`. Abfrage Z ruft `get_leaderboard` direkt auf und wäre an der Sitzungsprüfung abgebrochen. Die Rücknahme behebt das nebenbei; ohne sie hätte in Z ein Hinweis fehlen müssen. Vermerkt, weil dieselbe Falle für jede künftige Funktion mit Sitzungspflicht gilt |
