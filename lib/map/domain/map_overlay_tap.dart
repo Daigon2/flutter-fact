@@ -40,3 +40,53 @@ final class MapOverlayGroupTap {
   @override
   String toString() => 'MapOverlayGroupTap($overlayId, position: $position)';
 }
+
+/// Ein Tipp auf einen **einzelnen** Punkt der Überlagerung [overlayId].
+///
+/// ## Warum das ein eigener Typ ist und nicht ein Feld an [MapOverlayGroupTap]
+///
+/// Die beiden tragen verschiedene Aussagen. Ein Gruppen-Tipp sagt „hier liegen
+/// mehrere, öffne sie", ein Punkt-Tipp sagt „genau dieser eine". Ein
+/// gemeinsamer Typ mit nullbarer [pointId] verschöbe die Unterscheidung in
+/// eine `if`-Abfrage bei jedem Verbraucher, und der erste, der sie vergisst,
+/// behandelt eine Gruppe wie einen Fakt.
+///
+/// Wertgleichheit hat auch dieser Typ nicht, aus derselben Begründung wie
+/// [MapOverlayGroupTap]: zweimal auf denselben Ballon getippt sind zwei Tipps.
+final class MapOverlayPointTap {
+  /// Erzeugt einen Punkt-Tipp.
+  const MapOverlayPointTap({
+    required this.overlayId,
+    required this.pointId,
+    required this.position,
+  });
+
+  /// Welche Überlagerung getroffen wurde.
+  final String overlayId;
+
+  /// Die Kennung des getroffenen Punktes, also `MapOverlayPoint.id`.
+  ///
+  /// **Verlässlich, weil sie oben im Merkmal steht und nicht unter
+  /// `properties`.** `overlayGeoJson` legt sie dorthin, und der Kopfkommentar
+  /// dort begründet, warum: der Antipp-Rückruf des SDK reicht `properties`
+  /// gar nicht mit, eine Kennung unter `properties.id` käme als die
+  /// Zeichenkette `"null"` an. Für ein von MapLibre selbst erzeugtes
+  /// **Gruppen**-Merkmal gilt genau das, und deshalb trägt
+  /// [MapOverlayGroupTap] bewusst keine Kennung.
+  final String pointId;
+
+  /// Wo auf der Karte getippt wurde.
+  ///
+  /// **Nicht die Koordinate des Punktes**, sondern die Stelle, auf die der
+  /// Finger traf; das SDK liefert nur diese. Wer die Koordinate des Punktes
+  /// braucht, schlägt sie über [pointId] in seiner eigenen Überlagerung nach.
+  /// Der Unterschied ist keine Feinheit: eine Entfernungsregel, die mit der
+  /// Fingerstelle rechnet statt mit dem Fakt, ist um die halbe Ballonbreite
+  /// falsch, und das sind auf Zoom 16 einige Meter.
+  final MapPosition position;
+
+  /// Ohne die Zahlen, siehe [MapOverlayGroupTap.toString].
+  @override
+  String toString() =>
+      'MapOverlayPointTap($overlayId, point: $pointId, position: $position)';
+}

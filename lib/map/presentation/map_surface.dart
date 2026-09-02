@@ -264,7 +264,16 @@ class _MapSurfaceState extends ConsumerState<MapSurface> {
         String id,
         String layerId,
         Annotation? annotation,
-      ) => _host.handleFeatureTapped(layerId: layerId, at: coordinates),
+      ) => _host.handleFeatureTapped(
+        // **Die Kennung des Merkmals kommt hier herein und wird hier nicht
+        // ausgewertet.** Was sie bedeutet, entscheidet [MapOverlayHost]: für
+        // einen einzelnen Punkt ist sie die Fakt-Kennung, für eine Gruppe
+        // wertlos. Beides steht dort begründet, hier steht bewusst nichts,
+        // das selbst entscheidet.
+        featureId: id,
+        layerId: layerId,
+        at: coordinates,
+      ),
     );
   }
 

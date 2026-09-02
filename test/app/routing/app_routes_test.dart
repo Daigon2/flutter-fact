@@ -254,12 +254,25 @@ void main() {
       expect(const FactRoute(factId: 42).location, '/map/fact/42');
     });
 
-    test('kein Bildschirm im Bestand navigiert dorthin', () {
+    test('genau ein Bildschirm im Bestand navigiert dorthin, und es ist der '
+        'Sammelweg', () {
       // **Produktregel, `screen-map.jsx:2137-2142`:** die Akte darf niemals
-      // ohne räumliche Nähe erreichbar sein. Bis die Näherungsbedingung aus
-      // Schritt 20 steht, gibt es bewusst keinen Einstieg. Fällt dieser Test,
-      // hat jemand einen gelegt, und die Frage ist dann, ob er die Bedingung
-      // mitgebracht hat.
+      // ohne räumliche Nähe erreichbar sein. Bis Schritt 20 gab es deshalb
+      // **keinen** Einstieg, und dieser Test sicherte genau das zu, mit dem
+      // Vermerk „fällt dieser Test, hat jemand einen gelegt, und die Frage ist
+      // dann, ob er die Bedingung mitgebracht hat".
+      //
+      // **Er ist gefallen, und die Antwort auf die Frage ist ja.** Schritt 20
+      // hat den Sammelweg gebaut: `_onOpenFact` navigiert 1400 Millisekunden
+      // nach einem Tipp hierher, der `decideFactTap` passiert hat, also nur
+      // mit Ortung und nur innerhalb des Sammelradius.
+      //
+      // Der Test bewacht ab jetzt die Zahl statt der Null. **Ein zweiter
+      // Einstieg lässt ihn wieder fallen**, und dann gilt dieselbe Frage
+      // erneut. Dass er auf `map_page.dart` festgenagelt ist und nicht nur
+      // auf „irgendeine Datei", ist die Hälfte, die trägt: eine Prüfung auf
+      // „höchstens einer" wäre auch grün, wenn der eine woanders läge und der
+      // Sammelweg seinen verloren hätte.
       final Iterable<File> dartFiles = Directory('lib')
           .listSync(recursive: true)
           .whereType<File>()
@@ -270,11 +283,16 @@ void main() {
         if (source.contains('FactRoute(') &&
             !file.path.endsWith('app_routes.dart') &&
             !file.path.endsWith('app_routes.g.dart')) {
-          callers.add(file.path);
+          // `uri.path` statt `path`: unter Windows trennt `path` mit
+          // Backslashes, und der Vergleich unten soll auf beiden Systemen
+          // dieselbe Zeichenkette treffen.
+          callers.add(file.uri.path);
         }
       }
 
-      expect(callers, isEmpty);
+      expect(callers, <String>[
+        'lib/features/discovery/presentation/pages/map_page.dart',
+      ]);
     });
   });
 }

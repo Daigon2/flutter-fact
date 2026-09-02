@@ -1926,14 +1926,22 @@ class FakeMapHost implements MapHost {
   @override
   MapViewport? viewport;
 
+  final StreamController<MapOverlayPointTap> _pointTaps =
+      StreamController<MapOverlayPointTap>.broadcast();
+
   final StreamController<MapOverlayGroupTap> _groupTaps =
       StreamController<MapOverlayGroupTap>.broadcast();
 
   @override
   Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
 
+  @override
+  Stream<MapOverlayPointTap> get pointTaps => _pointTaps.stream;
+
   /// Schiebt einen Gruppen-Tipp in den Strom, wie `MapOverlayHost` es täte.
   void emitGroupTap(MapOverlayGroupTap tap) => _groupTaps.add(tap);
+
+  void emitPointTap(MapOverlayPointTap tap) => _pointTaps.add(tap);
 
   @override
   void submitIntent(MapCameraIntent intent) => intents.add(intent);
@@ -2049,8 +2057,11 @@ class FakeMapHost implements MapHost {
   }
 
   /// Schließt den Kamerastrom und den Gruppen-Tipp-Strom.
-  Future<void> close() =>
-      Future.wait<void>([_cameras.close(), _groupTaps.close()]);
+  Future<void> close() => Future.wait<void>([
+    _cameras.close(),
+    _groupTaps.close(),
+    _pointTaps.close(),
+  ]);
 }
 
 /// Eine Diagnose-Senke, die mitschreibt.

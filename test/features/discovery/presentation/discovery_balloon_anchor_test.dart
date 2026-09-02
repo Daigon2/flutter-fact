@@ -838,6 +838,9 @@ class FakeAnchorMapHost implements MapHost {
   Stream<MapOverlayGroupTap> get groupTaps => const Stream.empty();
 
   @override
+  Stream<MapOverlayPointTap> get pointTaps => const Stream.empty();
+
+  @override
   void submitIntent(MapCameraIntent intent) {}
 
   @override

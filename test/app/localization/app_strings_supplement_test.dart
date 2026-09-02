@@ -35,7 +35,7 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die fünfundsechzig belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die sechsundsechzig belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
@@ -80,6 +80,11 @@ void main() {
       // englisch hergeleiteten `challenge.hotspot.`-Werte aus E-46 warten
       // weiterhin auf Freigabe; diese Zählprobe prüft ohnehin nur den
       // Bestand und keine Werte.
+      //
+      // **`map.teaser.locationUnknown` kam am 02.09.2026 mit Schritt 20 dazu**,
+      // `screen-map.jsx:3856-3858`. Er gehört zur ersten Gruppe und nicht zu
+      // `audio.dialog.volumeHint`: beide Sprachen stehen wörtlich in der
+      // Quelle, sie führt den Text nur nicht als Schlüssel.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
         'audio.dialog.volumeHint',
         'tour.stepCounter',
@@ -87,6 +92,7 @@ void main() {
         'tour.step9.meta',
         'fact.fileNumber',
         'fact.sourceMissing',
+        'map.teaser.locationUnknown',
         'puzzle.stationCounter',
         'puzzle.riddleCounter',
         'puzzle.taskLabel',

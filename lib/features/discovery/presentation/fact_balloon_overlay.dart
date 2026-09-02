@@ -49,8 +49,15 @@
 ///
 /// ## Was bewusst fehlt
 ///
-/// Das Antippen (Schritt 21), das goldene Aussehen (es gibt weder Auslöser
-/// noch Bild) und das automatische Einsammeln bei 18 Metern.
+/// Das goldene Aussehen (es gibt weder Auslöser noch Bild) und das
+/// automatische Einsammeln bei 18 Metern.
+///
+/// **Das Antippen ist seit Schritt 20 da**, siehe [FactBalloonOverlay.onBalloonTap].
+/// Der Kommentar hier nannte dafür bis dahin Schritt 21, und das war falsch:
+/// Schritt 21 hat die Fakt-Akte gebaut und ausdrücklich **ohne** Einstieg,
+/// mit dem Vermerk „Öffnen darf sie erst Schritt 20". Ein naher Ballon ist
+/// genau der Fall, in dem gesammelt wird, er gehört also hierher und nicht
+/// dorthin.
 ///
 /// **Der Tutorial-Anker `balloon` stand bis zum 31.08.2026 auch hier**, mit dem
 /// Vermerk, er zeige auf den Marker nächst der **Rahmenmitte** und nicht nächst
@@ -99,7 +106,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// dazwischen verschöbe jeden Ballon um dessen Höhe.
 class FactBalloonOverlay extends ConsumerStatefulWidget {
   /// Erzeugt die Überlagerung.
-  const FactBalloonOverlay({super.key});
+  const FactBalloonOverlay({this.onBalloonTap, super.key});
+
+  /// Was ein Tipp auf einen lebenden Ballon auslöst.
+  ///
+  /// ## Warum dieser Weg überhaupt gebraucht wird
+  ///
+  /// **Ein naher Ballon liegt nicht mehr nativ.** `map_page.dart` nimmt ihn
+  /// mit `factOverlayWithout` aus der Punktliste, solange er lebt, damit er
+  /// nicht doppelt dasteht. Damit meldet `MapHost.pointTaps` ihn auch nicht:
+  /// im SDK gibt es kein Merkmal mehr, das man treffen könnte. Genau die
+  /// Fakten innerhalb von 150 Metern sind aber die, bei denen gesammelt wird.
+  /// Ohne diesen Rückruf wäre der Sammelweg im **Normalfall** unerreichbar,
+  /// und erreichbar nur unterhalb der Gruppierungsgrenze, wo die Ballons
+  /// nativ bleiben (siehe `factAnimationRunsAt`).
+  ///
+  /// ## `null` heißt: diese Fläche verschluckt nichts
+  ///
+  /// Ohne Rückruf liegt die ganze Überlagerung wie bisher in einem
+  /// [IgnorePointer], jede Geste gehört der Karte. Mit Rückruf wird **nur**
+  /// die Fläche jedes einzelnen Ballons berührbar, nicht der Stapel: ein
+  /// [Stack] ohne getroffenes Kind nimmt an dieser Stelle nichts an, ein
+  /// Schwenk zwischen zwei Ballons erreicht also weiter die Karte.
+  final void Function(FactProximityPoint point)? onBalloonTap;
 
   @override
   ConsumerState<FactBalloonOverlay> createState() => _FactBalloonOverlayState();
@@ -365,34 +394,35 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
     // Begründung und Messung stehen an [_balloonAt].
     final double pixelRatio = MediaQuery.devicePixelRatioOf(context);
 
-    // **Kein Empfänger für Berührungen.** Das Antippen eines Ballons ist
-    // Schritt 21; bis dahin darf diese Fläche keine Geste verschlucken, die
-    // der Karte gehört.
-    return IgnorePointer(
-      child: Stack(
-        // **`expand` und nicht der Standard.** Ein `Stack`, dessen Kinder alle
-        // gesetzt sind, nimmt sonst die **kleinste** erlaubte Größe an, und er
-        // beschneidet hart: unter losen Zwängen wäre die Fläche null mal null
-        // und jeder Ballon weggeschnitten. Heute bekommt sie feste Zwänge vom
-        // Stapel des Kartenbildschirms; diese Zeile hält die Aussage auch
-        // dann, wenn sie einmal woanders hängt.
-        fit: StackFit.expand,
-        children: <Widget>[
-          // Rückwärts, damit der nächste Ballon zuletzt gezeichnet wird und
-          // damit obenauf liegt: `FactProximity.points` ist aufsteigend nach
-          // Entfernung sortiert.
-          for (final FactProximityPoint point in points.reversed)
-            if (_screen[point.id] case final MapScreenPoint at)
-              _balloonAt(
-                point,
-                at,
-                scale,
-                isNearest: point.id == nearestId,
-                pixelRatio: pixelRatio,
-              ),
-        ],
-      ),
+    final Widget stack = Stack(
+      // **`expand` und nicht der Standard.** Ein `Stack`, dessen Kinder alle
+      // gesetzt sind, nimmt sonst die **kleinste** erlaubte Größe an, und er
+      // beschneidet hart: unter losen Zwängen wäre die Fläche null mal null
+      // und jeder Ballon weggeschnitten. Heute bekommt sie feste Zwänge vom
+      // Stapel des Kartenbildschirms; diese Zeile hält die Aussage auch
+      // dann, wenn sie einmal woanders hängt.
+      fit: StackFit.expand,
+      children: <Widget>[
+        // Rückwärts, damit der nächste Ballon zuletzt gezeichnet wird und
+        // damit obenauf liegt: `FactProximity.points` ist aufsteigend nach
+        // Entfernung sortiert.
+        for (final FactProximityPoint point in points.reversed)
+          if (_screen[point.id] case final MapScreenPoint at)
+            _balloonAt(
+              point,
+              at,
+              scale,
+              isNearest: point.id == nearestId,
+              pixelRatio: pixelRatio,
+            ),
+      ],
     );
+    if (widget.onBalloonTap == null) {
+      // **Kein Empfänger für Berührungen**, siehe [onBalloonTap]: dann darf
+      // diese Fläche keine Geste verschlucken, die der Karte gehört.
+      return IgnorePointer(child: stack);
+    }
+    return stack;
   }
 
   /// Setzt einen Ballon an seine Bildschirmlage.
@@ -434,6 +464,7 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
     required bool isNearest,
     required double pixelRatio,
   }) {
+    final void Function(FactProximityPoint)? onBalloonTap = widget.onBalloonTap;
     final FactBalloonMetrics metrics = FactBalloonMetrics(
       emphasis: point.emphasis,
     );
@@ -444,16 +475,34 @@ class _FactBalloonOverlayState extends ConsumerState<FactBalloonOverlay>
       top: at.yInScreenPixels / pixelRatio - size.height,
       width: size.width,
       height: size.height,
-      child: RepaintBoundary(
-        child: CustomPaint(
-          size: size,
-          painter: FactBalloonPainter(
-            style: point.style,
-            metrics: metrics,
-            scale: scale,
-            spinDegrees: _spin.angleOf(point.id),
-            // **Nur der nächste hüpft**, siehe `FactProximity.nearest`.
-            floatProgress: isNearest ? factBalloonFloatProgress(_elapsed) : 0,
+      // **`HitTestBehavior.opaque`, und ohne sie ginge fast nichts.** Ein
+      // `CustomPaint` hat kein eigenes Trefferverhalten: es zeichnet, ohne
+      // sich für Berührungen zuständig zu erklären. Ein `GestureDetector`
+      // ohne diesen Wert reagierte deshalb nirgends. Dieselbe Lehre wie bei
+      // der Jagd-Pille, dort ohne Zeichenfläche und nur neben dem Text.
+      //
+      // Die berührbare Fläche ist das Rechteck des Ballons, nicht seine
+      // gemalte Form. Das ist gröber als die Quelle (dort ist es der
+      // DOM-Knoten mit `border-radius`), und die Richtung ist die richtige:
+      // ein Tipp knapp neben dem Kopf sammelt, statt die Karte zu
+      // verschieben. Zu klein wäre schlimmer, denn dann wüsste der Nutzer
+      // nicht, warum sein Tipp nichts tut.
+      child: GestureDetector(
+        onTap: onBalloonTap == null ? null : () => onBalloonTap(point),
+        behavior: onBalloonTap == null
+            ? HitTestBehavior.deferToChild
+            : HitTestBehavior.opaque,
+        child: RepaintBoundary(
+          child: CustomPaint(
+            size: size,
+            painter: FactBalloonPainter(
+              style: point.style,
+              metrics: metrics,
+              scale: scale,
+              spinDegrees: _spin.angleOf(point.id),
+              // **Nur der nächste hüpft**, siehe `FactProximity.nearest`.
+              floatProgress: isNearest ? factBalloonFloatProgress(_elapsed) : 0,
+            ),
           ),
         ),
       ),

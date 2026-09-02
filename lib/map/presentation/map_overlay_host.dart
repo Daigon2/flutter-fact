@@ -121,6 +121,14 @@ class MapOverlayHost {
   final StreamController<MapOverlayGroupTap> _groupTaps =
       StreamController<MapOverlayGroupTap>.broadcast();
 
+  /// Meldet jeden Tipp auf einen einzelnen Punkt. Siehe [pointTaps].
+  ///
+  /// `broadcast` aus genau derselben, oben ausgeführten Begründung wie
+  /// [_groupTaps]: die Folge `attach`, `detach`, `attach` mit demselben Host
+  /// hört zweimal auf denselben Strom.
+  final StreamController<MapOverlayPointTap> _pointTaps =
+      StreamController<MapOverlayPointTap>.broadcast();
+
   MapOverlayDriver? _driver;
 
   /// Die Kette der SDK-Aufrufe, siehe [_enqueue].
@@ -214,6 +222,9 @@ class MapOverlayHost {
   /// Meldet jeden Tipp auf eine Gruppe. Der Karten-Host reicht das nur durch.
   Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
 
+  /// Meldet jeden Tipp auf einen einzelnen Punkt. Reicht ebenfalls nur durch.
+  Stream<MapOverlayPointTap> get pointTaps => _pointTaps.stream;
+
   /// Das SDK meldet einen Tipp. Ruft die Kartenfläche aus
   /// `controller.onFeatureTapped.add(...)`.
   ///
@@ -222,19 +233,34 @@ class MapOverlayHost {
   ///
   /// 1. **Ein Gruppen-Layer:** [groupTaps] meldet einen Tipp mit der Kennung
   ///    der Überlagerung.
-  /// 2. **Der Punkt-Layer:** nichts, still. Kein Empfänger, also kein Vertrag
-  ///    (ADR-002). Der Auslöser für eine Änderung steht bei [groupTaps].
+  /// 2. **Der Punkt-Layer:** [pointTaps] meldet einen Tipp mit der Kennung der
+  ///    Überlagerung **und** der des Punktes. Bis Schritt 20 blieb dieser Fall
+  ///    still, weil es keinen Empfänger gab; der Auslöser dafür stand bei
+  ///    [groupTaps] und ist eingetreten.
   /// 3. **Eine unbekannte Kennung:** [unknownLayerTapEvent], siehe dort.
-  void handleFeatureTapped({required String layerId, required LatLng at}) {
+  ///
+  /// [featureId] ist die Kennung, die das SDK am getroffenen Merkmal meldet.
+  /// **Für einen Gruppen-Tipp wird sie bewusst nicht benutzt**, siehe
+  /// [mapOverlayLayerTapOf], Abschnitt „Nur `lng`/`lat` und `layerId`": bei
+  /// einem von MapLibre erzeugten Gruppen-Merkmal ist sie nicht nachweislich
+  /// vorhanden, und alle Gruppen trügen dann dieselbe. Für einen einzelnen
+  /// Punkt ist sie verlässlich, weil `overlayGeoJson` sie selbst oben ins
+  /// Merkmal schreibt.
+  void handleFeatureTapped({
+    required String featureId,
+    required String layerId,
+    required LatLng at,
+  }) {
     switch (mapOverlayLayerTapOf(
+      featureId: featureId,
       layerId: layerId,
       coordinates: at,
       installedOverlayIds: _installed,
     )) {
       case MapOverlayLayerTapGroup(:final MapOverlayGroupTap tap):
         _groupTaps.add(tap);
-      case MapOverlayLayerTapPoint():
-        break;
+      case MapOverlayLayerTapPoint(:final MapOverlayPointTap tap):
+        _pointTaps.add(tap);
       case MapOverlayLayerTapUnknown():
         _diagnostics.report(
           DiagnosticEvent(unknownLayerTapEvent, <String, String>{
@@ -250,6 +276,7 @@ class MapOverlayHost {
     _images.clear();
     _overlays.clear();
     unawaited(_groupTaps.close());
+    unawaited(_pointTaps.close());
   }
 
   // ---------------------------------------------------------------------------
@@ -427,13 +454,17 @@ final class MapOverlayLayerTapGroup extends MapOverlayLayerTap {
 
 /// Der Layer ist der Punkt-Layer einer installierten Überlagerung.
 ///
-/// Kein Vertrag heute (ADR-002): es gibt keinen Empfänger für einen
-/// Punkt-Tipp. Siehe [MapOverlayHost.groupTaps] für den Auslöser, ab dem sich
-/// das ändert.
+/// **Seit Schritt 20 trägt dieser Fall einen Tipp.** Bis dahin war er leer,
+/// mit dem Vermerk, es gebe keinen Empfänger und deshalb keinen Vertrag
+/// (ADR-002). Der Auslöser, den [MapOverlayHost.groupTaps] dafür benannt hat,
+/// ist eingetreten: das Sammel-Erlebnis öffnet einen einzelnen Fakt.
 @visibleForTesting
 final class MapOverlayLayerTapPoint extends MapOverlayLayerTap {
-  /// Erzeugt den Fall.
-  const MapOverlayLayerTapPoint();
+  /// Erzeugt den Fall mit dem fertigen Tipp.
+  const MapOverlayLayerTapPoint(this.tap);
+
+  /// Der Tipp, wie er über [MapOverlayHost.pointTaps] gemeldet wird.
+  final MapOverlayPointTap tap;
 }
 
 /// Kein installierter Layer einer bekannten Überlagerung trägt diese Kennung.
@@ -469,8 +500,14 @@ final class MapOverlayLayerTapUnknown extends MapOverlayLayerTap {
 /// Gruppen-Merkmal im Pub-Cache nicht als vorhanden nachweisbar (der Typ liegt
 /// in `maplibre-native`); ist sie `null`, macht `payload["id"].toString()`
 /// (`controller.dart:121`) daraus die Zeichenkette `"null"`, und **alle**
-/// Gruppen trügen dieselbe Kennung, lautlos. Verlässlich ist einzig
-/// [layerId], denn die Kennungen dafür vergibt dieser Host selbst.
+/// Gruppen trügen dieselbe Kennung, lautlos.
+///
+/// **Für einen einzelnen Punkt gilt das nicht, und seit Schritt 20 wird sie
+/// dort gebraucht.** Diese Kennung stammt nicht von MapLibre, sondern von
+/// `overlayGeoJson`, das sie **oben** ins Merkmal schreibt und nicht unter
+/// `properties`; der Kopfkommentar dort begründet genau diese Zeile. Sie
+/// kommt deshalb als [featureId] herein und geht ausschließlich in einen
+/// Punkt-Tipp. Ein Gruppen-Tipp bekommt sie weiterhin nicht zu sehen.
 ///
 /// ## Die Zuordnung ist Mitgliedschaft, keine Zerlegung der Zeichenkette
 ///
@@ -480,6 +517,7 @@ final class MapOverlayLayerTapUnknown extends MapOverlayLayerTap {
 /// Funktionen darüber.
 @visibleForTesting
 MapOverlayLayerTap mapOverlayLayerTapOf({
+  required String featureId,
   required String layerId,
   required LatLng coordinates,
   required Iterable<String> installedOverlayIds,
@@ -500,7 +538,16 @@ MapOverlayLayerTap mapOverlayLayerTapOf({
       );
     }
     if (layerId == overlayPointLayerId(overlayId)) {
-      return const MapOverlayLayerTapPoint();
+      return MapOverlayLayerTapPoint(
+        MapOverlayPointTap(
+          overlayId: overlayId,
+          pointId: featureId,
+          position: MapPosition(
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+          ),
+        ),
+      );
     }
   }
   return const MapOverlayLayerTapUnknown();

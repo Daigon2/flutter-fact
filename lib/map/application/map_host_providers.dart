@@ -100,9 +100,15 @@ final class MapHostRegistry implements MapHost {
   final StreamController<MapOverlayGroupTap> _groupTaps =
       StreamController<MapOverlayGroupTap>.broadcast();
 
+  /// Der Strom der Punkt-Tipps, aus demselben Grund wie [_groupTaps]: er
+  /// gehört der Registry und überlebt einen Wechsel des Hosts.
+  final StreamController<MapOverlayPointTap> _pointTaps =
+      StreamController<MapOverlayPointTap>.broadcast();
+
   MapHost? _host;
   StreamSubscription<MapCameraView>? _subscription;
   StreamSubscription<MapOverlayGroupTap>? _groupTapsSubscription;
+  StreamSubscription<MapOverlayPointTap>? _pointTapsSubscription;
 
   /// Die zuletzt registrierten Bilder, nach Stil-Kennung.
   ///
@@ -144,9 +150,11 @@ final class MapHostRegistry implements MapHost {
     }
     unawaited(_subscription?.cancel());
     unawaited(_groupTapsSubscription?.cancel());
+    unawaited(_pointTapsSubscription?.cancel());
     _host = host;
     _subscription = host.cameraChanges.listen(_cameraChanges.add);
     _groupTapsSubscription = host.groupTaps.listen(_groupTaps.add);
+    _pointTapsSubscription = host.pointTaps.listen(_pointTaps.add);
     // Bilder vor Überlagerungen: ein Symbol-Layer ohne sein Bild zeichnet
     // nichts, und zwar ohne Fehlermeldung.
     if (_images.isNotEmpty) {
@@ -175,8 +183,10 @@ final class MapHostRegistry implements MapHost {
     }
     unawaited(_subscription?.cancel());
     unawaited(_groupTapsSubscription?.cancel());
+    unawaited(_pointTapsSubscription?.cancel());
     _subscription = null;
     _groupTapsSubscription = null;
+    _pointTapsSubscription = null;
     _host = null;
     return true;
   }
@@ -185,13 +195,16 @@ final class MapHostRegistry implements MapHost {
   void dispose() {
     unawaited(_subscription?.cancel());
     unawaited(_groupTapsSubscription?.cancel());
+    unawaited(_pointTapsSubscription?.cancel());
     _subscription = null;
     _groupTapsSubscription = null;
+    _pointTapsSubscription = null;
     _host = null;
     _images.clear();
     _overlays.clear();
     unawaited(_cameraChanges.close());
     unawaited(_groupTaps.close());
+    unawaited(_pointTaps.close());
   }
 
   @override
@@ -237,6 +250,13 @@ final class MapHostRegistry implements MapHost {
   /// jedes Bildschirmaufbaus.
   @override
   Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
+
+  /// Meldet jeden Punkt-Tipp, auch über einen Wechsel des Hosts hinweg.
+  ///
+  /// Dieselbe Bauart und dieselbe Begründung wie [groupTaps]. **Ohne Host ist
+  /// er still und meldet das nicht.**
+  @override
+  Stream<MapOverlayPointTap> get pointTaps => _pointTaps.stream;
 
   @override
   void submitIntent(MapCameraIntent intent) {

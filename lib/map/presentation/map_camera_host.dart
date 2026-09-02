@@ -472,8 +472,15 @@ class MapCameraHost implements MapHost {
   /// Reicht durch, siehe Klassenkommentar: die Zuordnung des getroffenen
   /// Layers zu einer Überlagerung gehört [MapOverlayHost], der besitzt die
   /// Kennungen.
-  void handleFeatureTapped({required String layerId, required LatLng at}) =>
-      _overlays.handleFeatureTapped(layerId: layerId, at: at);
+  void handleFeatureTapped({
+    required String featureId,
+    required String layerId,
+    required LatLng at,
+  }) => _overlays.handleFeatureTapped(
+    featureId: featureId,
+    layerId: layerId,
+    at: at,
+  );
 
   // ---------------------------------------------------------------------------
   // MapHost
@@ -490,6 +497,9 @@ class MapCameraHost implements MapHost {
 
   @override
   Stream<MapOverlayGroupTap> get groupTaps => _overlays.groupTaps;
+
+  @override
+  Stream<MapOverlayPointTap> get pointTaps => _overlays.pointTaps;
 
   /// Nimmt eine Absicht an, fragt das Gate und führt aus oder meldet.
   ///

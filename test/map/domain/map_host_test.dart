@@ -83,17 +83,28 @@ class FakeMapHost implements MapHost {
   /// Tut so, als hätte `MapSurface` eine Größe gemeldet.
   void measure(MapViewport size) => _viewport = size;
 
+  final StreamController<MapOverlayPointTap> _pointTaps =
+      StreamController<MapOverlayPointTap>.broadcast();
+
   final StreamController<MapOverlayGroupTap> _groupTaps =
       StreamController<MapOverlayGroupTap>.broadcast();
 
   @override
   Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
 
+  @override
+  Stream<MapOverlayPointTap> get pointTaps => _pointTaps.stream;
+
   /// Tut so, als hätte das SDK einen Tipp auf eine Gruppe gemeldet.
   void tapGroup(MapOverlayGroupTap tap) => _groupTaps.add(tap);
 
-  Future<void> close() =>
-      Future.wait(<Future<void>>[_controller.close(), _groupTaps.close()]);
+  void tapPoint(MapOverlayPointTap tap) => _pointTaps.add(tap);
+
+  Future<void> close() => Future.wait(<Future<void>>[
+    _controller.close(),
+    _groupTaps.close(),
+    _pointTaps.close(),
+  ]);
 }
 
 MapCameraView viewAt(MapPosition center) =>

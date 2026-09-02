@@ -1280,6 +1280,7 @@ void main() {
       final Future<MapOverlayGroupTap> seen = host.groupTaps.first;
 
       host.handleFeatureTapped(
+        featureId: '7',
         layerId: 'discovery.facts.groups',
         at: const LatLng(48.1351, 11.582),
       );

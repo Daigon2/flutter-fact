@@ -70,6 +70,35 @@
 -- nicht live läuft und ein Ausfall dort in Kauf genommen ist. Der PWA-Release,
 -- der auf collect_fact_validated umstellt, bleibt nötig, blockiert diesen
 -- Block aber nicht mehr.
+--
+-- ############################################################################
+-- ACHTUNG, EINE SPIELREGEL AENDERT SICH MIT, UND ZWAR UNBEMERKT
+-- ############################################################################
+--
+-- Am 02.09.2026 beim Bau von Schritt 20 gemessen, drei Fundstellen:
+--
+--   * 02_Frontend/app/app.jsx:712-714 bucht im Solo-Sammelweg **50** Coins,
+--     client-seitig (`Storage.addCoins(50)`, `Api.addCoins(userId, 50)`). Das
+--     ist der Weg, der heute laeuft.
+--   * 03_Backend/supabase-schema.sql:125-127, also `collect_fact_validated`,
+--     bucht **10**. Und diese Funktion hat in der **ganzen Referenz keinen
+--     einzigen Aufrufer**, geprueft ueber 02_Frontend und 03_Backend: nur die
+--     Definition und ein Kommentarverweis. Sie ist heute toter Code.
+--   * 02_Frontend/app/screen-map.jsx:1196 zeigt in der Animation **12**.
+--
+-- Diese Migration schliesst den direkten Insert und zwingt damit auf
+-- `collect_fact_validated`. **Sobald die PWA dorthin umgestellt wird, faellt
+-- die Belohnung von 50 auf 10**, ohne dass es jemand entschieden hat. Das ist
+-- eine Balance-Aenderung, versteckt in einer Sicherheitsmigration.
+--
+-- **Sie blockiert diese Migration nicht.** Bis die PWA umgestellt ist, sammelt
+-- dort ohnehin niemand mehr. Aber sie muss **vor** dem PWA-Release entschieden
+-- sein, sonst entscheidet sie der Zufall. Gehoert zu E-06 und zu Janeks
+-- Belohnungsregel vom 02.09.2026 (J-C in REBUILD_STATUS.md): je Nutzer und
+-- Fakt zwei Anlaesse, jeder genau einmal fuer immer.
+--
+-- ############################################################################
+--
 -- ============================================================================
 
 begin;

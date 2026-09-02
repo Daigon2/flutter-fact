@@ -160,17 +160,35 @@ abstract interface class MapHost {
   /// Tipp erzeugt also nie zwei Ereignisse, auch dort nicht, wo sich mehrere
   /// Layer einer Gruppe überlappen.
   ///
-  /// ## Was hier ausdrücklich fehlt: der Tipp auf einen einzelnen Punkt
+  /// ## Der Tipp auf einen einzelnen Punkt liegt daneben, nicht hier
   ///
-  /// Es gibt heute keinen Empfänger dafür (ADR-002), deshalb keinen Vertrag:
-  /// ein Punkt-Tipp verschwindet still. Der Auslöser, ab dem das nachgezogen
-  /// wird, ist der erste Bildschirm, der einen einzelnen Fakt von der Karte
-  /// aus öffnen will.
+  /// Bis Schritt 20 stand an dieser Stelle, dass es für einen Punkt-Tipp
+  /// keinen Empfänger gibt und deshalb keinen Vertrag (ADR-002). **Der
+  /// Auslöser ist eingetreten**, und zwar genau der, der hier benannt war:
+  /// das Sammel-Erlebnis öffnet einen einzelnen Fakt von der Karte aus.
+  /// [pointTaps] ist deshalb ein zweiter Strom neben diesem, kein Feld an
+  /// [MapOverlayGroupTap], siehe die Begründung an [MapOverlayPointTap].
   ///
   /// [Stream] aus demselben Grund wie bei [cameraChanges]: die einzige
   /// erlaubte reaktive Primitive in `map/domain/`
   /// (`tool/check_architecture.dart`, Regel 1 und 2).
   Stream<MapOverlayGroupTap> get groupTaps;
+
+  /// Meldet jeden Tipp auf einen **einzelnen Punkt** einer Überlagerung.
+  ///
+  /// Dieselbe Bauart und dieselbe Zusage wie [groupTaps], einschließlich
+  /// „höchstens ein Ereignis je Tipp": das SDK nimmt den ersten getroffenen
+  /// Layer, und Gruppen- und Punkt-Layer schließen sich über ihre Filter
+  /// ohnehin aus (`groupFilter` gegen `singlePointFilter`).
+  ///
+  /// ## Was dieser Strom **nicht** meldet
+  ///
+  /// Einen Tipp auf einen Punkt, der gerade nicht nativ liegt. Wer nahe
+  /// Punkte aus der Überlagerung nimmt und als eigene Widgets über die Karte
+  /// zeichnet, bekommt deren Tipps auch von seinen Widgets und nicht von
+  /// hier. Das ist keine Lücke, sondern die Folge davon, wem der Punkt gerade
+  /// gehört; `discovery` tut genau das innerhalb von 150 Metern.
+  Stream<MapOverlayPointTap> get pointTaps;
 
   /// Rechnet [positions] in Bildschirmlagen um, in derselben Reihenfolge.
   ///

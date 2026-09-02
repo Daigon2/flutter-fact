@@ -990,6 +990,147 @@ void main() {
       });
     });
   });
+
+  group('Antippen, Schritt 20', () {
+    /// Baut die Überlagerung **mit** Rückruf.
+    Future<List<FactProximityPoint>> pumpTappable(
+      WidgetTester tester, {
+      required FactProximity proximity,
+    }) async {
+      final List<FactProximityPoint> tapped = <FactProximityPoint>[];
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: containerWith(proximity),
+          child: MaterialApp(
+            home: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[FactBalloonOverlay(onBalloonTap: tapped.add)],
+            ),
+          ),
+        ),
+      );
+      await mapComesAlive(tester);
+      return tapped;
+    }
+
+    testWidgets('ein Tipp auf den Ballon meldet genau diesen Punkt', (
+      tester,
+    ) async {
+      host.projectionAnswer = <MapScreenPoint?>[
+        const MapScreenPoint(
+          xInScreenPixels: 300,
+          yInScreenPixels: 600,
+          isInFrontOfCamera: true,
+        ),
+      ];
+      final List<FactProximityPoint> tapped = await pumpTappable(
+        tester,
+        proximity: FactProximity(
+          points: <FactProximityPoint>[pointAt('7', meters: 30)],
+        ),
+      );
+
+      await tester.tap(find.byType(CustomPaint).last, warnIfMissed: false);
+      await tester.pump();
+
+      expect(tapped.map((FactProximityPoint p) => p.id).toList(), <String>[
+        '7',
+      ]);
+    });
+
+    testWidgets('mit Rückruf liegt die Fläche nicht mehr im IgnorePointer', (
+      tester,
+    ) async {
+      host.projectionAnswer = <MapScreenPoint?>[
+        const MapScreenPoint(
+          xInScreenPixels: 300,
+          yInScreenPixels: 600,
+          isInFrontOfCamera: true,
+        ),
+      ];
+      await pumpTappable(
+        tester,
+        proximity: FactProximity(
+          points: <FactProximityPoint>[pointAt('7', meters: 30)],
+        ),
+      );
+
+      expect(
+        find.descendant(
+          of: find.byType(FactBalloonOverlay),
+          matching: find.byType(IgnorePointer),
+        ),
+        findsNothing,
+      );
+      // Die Gegenprobe, dass wirklich ein Ballon steht: sonst wäre die Zeile
+      // darüber auch bei `SizedBox.shrink()` grün.
+      expect(paintersOf(tester), hasLength(1));
+    });
+
+    testWidgets('ein Tipp neben allen Ballons meldet nichts', (tester) async {
+      // **Die Karte behält ihre Gesten.** Nur die Fläche jedes einzelnen
+      // Ballons ist berührbar, nicht der ganze Stapel; ein Schwenk zwischen
+      // zwei Ballons muss weiter bei der Karte ankommen.
+      host.projectionAnswer = <MapScreenPoint?>[
+        const MapScreenPoint(
+          xInScreenPixels: 300,
+          yInScreenPixels: 600,
+          isInFrontOfCamera: true,
+        ),
+      ];
+      final List<FactProximityPoint> tapped = await pumpTappable(
+        tester,
+        proximity: FactProximity(
+          points: <FactProximityPoint>[pointAt('7', meters: 30)],
+        ),
+      );
+
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pump();
+
+      expect(tapped, isEmpty);
+    });
+
+    testWidgets('bei zwei Ballons meldet der Tipp den getroffenen', (
+      tester,
+    ) async {
+      // **Ohne diesen Fall wäre ein „immer der erste" nicht sichtbar.**
+      // Dasselbe Muster wie bei den zwei installierten Überlagerungen in
+      // `map_overlay_host_test.dart`.
+      host.projectionAnswer = <MapScreenPoint?>[
+        // Reihenfolge wie in `FactProximity.points`, aufsteigend nach
+        // Entfernung: der nähere zuerst.
+        const MapScreenPoint(
+          xInScreenPixels: 300,
+          yInScreenPixels: 600,
+          isInFrontOfCamera: true,
+        ),
+        const MapScreenPoint(
+          xInScreenPixels: 900,
+          yInScreenPixels: 1800,
+          isInFrontOfCamera: true,
+        ),
+      ];
+      final List<FactProximityPoint> tapped = await pumpTappable(
+        tester,
+        proximity: FactProximity(
+          points: <FactProximityPoint>[
+            pointAt('nah', meters: 30),
+            pointAt('fern', meters: 120),
+          ],
+        ),
+      );
+
+      // Der Ballon mit 120 Metern sitzt bei (300 | 600) logischen Pixeln
+      // (900/3 | 1800/3), der nähere bei (100 | 200).
+      await tester.tapAt(const Offset(300, 590));
+      await tester.pump();
+
+      expect(tapped.map((FactProximityPoint p) => p.id).toList(), <String>[
+        'fern',
+      ]);
+    });
+  });
 }
 
 /// Eine Nachbarschaft, die ein Test von außen ändern kann.
@@ -1040,6 +1181,9 @@ class FakeMapHost implements MapHost {
   /// Kein Test hier braucht einen Gruppen-Tipp.
   @override
   Stream<MapOverlayGroupTap> get groupTaps => const Stream.empty();
+
+  @override
+  Stream<MapOverlayPointTap> get pointTaps => const Stream.empty();
 
   @override
   void submitIntent(MapCameraIntent intent) {}

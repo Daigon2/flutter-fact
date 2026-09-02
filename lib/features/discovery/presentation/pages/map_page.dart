@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:fact_app/app/routing/app_routes.dart';
 import 'package:fact_app/core/async/detached_work.dart';
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/discovery/presentation/discovery_balloon_anchor.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_images.dart';
-import 'package:fact_app/features/discovery/presentation/fact_balloon_overlay.dart';
+import 'package:fact_app/features/discovery/presentation/fact_collect_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/fact_group_expand.dart';
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/fact_proximity.dart';
@@ -72,15 +73,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// beim Sky-Fall eine Zeile weiter unten.
 ///
 /// **Was beim Antippen eines einzelnen Ballons passiert, steht bewusst nicht
-/// hier.** Der Punkt-Tipp hat bis Schritt 21 keinen Empfänger, ein Strom auf
-/// Vorrat wäre Zustand, den niemand prüft. **Der Tipp auf eine Gruppe dagegen
-/// hat seit Schritt 15 Block 3 einen Empfänger**, [_onGroupTap]: er fährt die
-/// Kamera auf ein Rechteck, das die eigenen, genäherten Gruppenmitglieder
-/// umschließt.
+/// hier.** Es steht in `fact_collect_overlay.dart`, seit Schritt 20; dieser
+/// Bildschirm setzt das Widget nur ein und liefert die drei Dinge, die die
+/// Komposition angehen: die angezeigte Münzzahl, wohin der Sammel-Rückruf
+/// geht und wie das Fakt-Blatt geöffnet wird. **Der Tipp auf eine Gruppe
+/// dagegen hat seit Schritt 15 Block 3 einen Empfänger hier**, [_onGroupTap]:
+/// er fährt die Kamera auf ein Rechteck, das die eigenen, genäherten
+/// Gruppenmitglieder umschließt.
 ///
 /// ## Seit Schritt 17 liegen die nahen Fakten nicht mehr nativ
 ///
-/// [FactBalloonOverlay] zeichnet die Handvoll Fakten innerhalb von 150 Metern
+/// `FactBalloonOverlay` zeichnet die Handvoll Fakten innerhalb von 150 Metern
 /// als Flutter-Widgets über der Karte, mit Größe, Glühen und Drehung. Dieser
 /// Bildschirm trägt davon genau ein Stück: er **nimmt sie aus der nativen
 /// Punktliste heraus**, solange sie leben, siehe [_animatedIds]. Ohne das
@@ -190,6 +193,64 @@ class MapPage extends ConsumerStatefulWidget {
 
   /// Fortschritt im Level ohne `features/progression`, in Prozent.
   static const double placeholderLevelPercent = 0;
+
+  /// Die Zahl, die der Münzflug beim Sammeln anzeigt.
+  ///
+  /// ## Warum sie hier steht und nicht im Widget
+  ///
+  /// Weil sie zur Ökonomie gehört und die gehört `features/progression`,
+  /// genau wie [placeholderCoins] darüber. `FactCollectBurst.coinAmount` ist
+  /// **erforderlich**, damit niemand versehentlich eine stille
+  /// Voreinstellung erbt; entschieden wird die Zahl also hier, an derselben
+  /// Stelle wie die anderen Platzhalter dieser Domäne.
+  ///
+  /// ## Woher die 10 kommt, und was daran unangenehm ist
+  ///
+  /// Gemessen am 02.09.2026, drei Zahlen für dasselbe Ereignis:
+  ///
+  /// | Zahl | Fundstelle |
+  /// |---|---|
+  /// | 12 | die Anzeige der Quelle, `screen-map.jsx:1196` |
+  /// | 50 | was der Solo-Sammelweg wirklich bucht, `app.jsx:712` und `:714` |
+  /// | 10 | `collect_fact_validated`, `supabase-schema.sql:125` und `:127` |
+  ///
+  /// **Gewählt ist die 10**, und zwar nicht, weil sie die Anzeige der Quelle
+  /// wäre (die ist 12 und stimmt mit keiner Buchung überein, das ist die
+  /// Anzeigehälfte von E-06), sondern weil sie die einzige **serverseitig**
+  /// entschiedene ist. Die 50 kommt aus dem Zweig, in dem der Client den
+  /// Betrag selbst bestimmt, und genau diesen Zweig verwirft der Neubau
+  /// ausdrücklich („der Client bestimmt nie einen gutgeschriebenen Betrag",
+  /// E-06, und „der Server ist die einzige Wahrheit", E-49).
+  ///
+  /// **Die Wahl ist damit nicht abgeschlossen.** `collect_fact_validated` hat
+  /// in der ganzen Referenz **keinen Aufrufer**; die 10 ist heute toter Code.
+  /// Welche Zahl der Neubau gutschreibt, hängt am Belohnungsjournal (J-C) und
+  /// ist eine offene Entscheidung. Bis sie fällt, zeigt diese Zeile die
+  /// serverseitige Zahl an und keine erfundene.
+  static const int collectCoinAmount = 10;
+
+  /// Gemeldet, wenn gesammelt wurde und niemand es verbucht hat.
+  ///
+  /// ## Warum ein Diagnose-Ereignis und nicht schlicht nichts
+  ///
+  /// Weil „nichts" von „vergessen" nicht zu unterscheiden wäre. Der
+  /// Sammel-Rückruf feuert an der richtigen Stelle und zur richtigen Zeit,
+  /// nur nimmt ihn niemand an: das Buchungsjournal aus J-C ist eine
+  /// Entscheidung der Stufe 3, es gibt weder Tabelle noch RPC dafür. Dieses
+  /// Ereignis ist die ehrliche Markierung dieser Naht, und es ist die Stelle,
+  /// an der die Buchung angeschlossen wird.
+  ///
+  /// **Es feuert nicht im Sekundentakt**, anders als die Ereignisse, die
+  /// dieses Repository sonst bewusst vermeidet: höchstens einmal je
+  /// gesammeltem Fakt.
+  static const String unbookedCollectEvent = 'discovery.collect.unbooked';
+
+  /// Gemeldet, wenn eine Fakt-Kennung aus der Überlagerung keine Zahl ist.
+  ///
+  /// Ein Verdrahtungsfehler und kein Normalfall, siehe [_MapPageState._onOpenFact].
+  /// Die Kennung darf hier ins Log, denn sie ist genau das Kaputte; eine
+  /// Koordinate steht nicht daneben.
+  static const String unreadableFactIdEvent = 'discovery.collect.unreadable_id';
 
   /// Stadtname ohne Kartenmitte und ohne `features/city`.
   ///
@@ -424,7 +485,7 @@ class _MapPageState extends ConsumerState<MapPage> {
   ///
   /// ## Warum die native Liste überhaupt schrumpft
   ///
-  /// Ein Fakt in Reichweite wird von [FactBalloonOverlay] als Widget über der
+  /// Ein Fakt in Reichweite wird von `FactBalloonOverlay` als Widget über der
   /// Karte gezeichnet. Bliebe er zusätzlich im Symbol-Layer, stünde er
   /// doppelt da: einmal lebend, einmal als stehendes Bild darunter. Der
   /// Unterschied fällt genau dann auf, wenn er wächst, also im auffälligsten
@@ -952,6 +1013,56 @@ class _MapPageState extends ConsumerState<MapPage> {
         );
   }
 
+  /// Es wurde gesammelt, `onCollectFact` in `screen-map.jsx:3069`.
+  ///
+  /// **Heute wird nichts verbucht**, siehe [MapPage.unbookedCollectEvent] für
+  /// den Grund und für die Stelle, an der das Journal einmal anhängt.
+  void _onFactCollected(String factId) {
+    ref
+        .read(diagnosticSinkProvider)
+        .report(
+          // **Ohne die Fakt-Kennung**, und das ist keine Sparsamkeit:
+          // zusammen mit der öffentlich bekannten Koordinate dieses Fakts
+          // wäre sie eine genaue Standortspur, und `security.md` §6 verbietet
+          // genau das. Dass gesammelt wurde, ist die ganze Aussage, die
+          // dieses Ereignis tragen muss.
+          DiagnosticEvent(MapPage.unbookedCollectEvent),
+        );
+  }
+
+  /// Das Fakt-Blatt öffnen, `onSelectFact` in `screen-map.jsx:3075`.
+  ///
+  /// ## Der einzige Einstieg in `FactRoute`, und er trägt die Bedingung
+  ///
+  /// `app_routes.dart` hält an der Route fest, dass die Akte niemals ohne
+  /// räumliche Nähe erreichbar sein darf, mit dem Wortlaut des Fixes aus der
+  /// Quelle. Dieser Aufruf ist der erste und einzige Einstieg, und er liegt
+  /// hinter `decideFactTap`: hierher kommt nur, wer innerhalb des
+  /// Sammelradius getippt hat, mit einer Ortung. Wer einen zweiten Einstieg
+  /// legt, muss dieselbe Bedingung mitbringen.
+  ///
+  /// Die Kennung kommt als Zeichenkette aus der Überlagerung, weil GeoJSON
+  /// nur Zeichenketten trägt; hier wird sie in die Zahl der Route
+  /// zurückverwandelt. **Ein nicht lesbarer Wert öffnet nichts**, statt mit
+  /// einem `!` abzustürzen: die Kennungen setzt `factOverlayOf` selbst aus
+  /// `Fact.id`, ein Fehlschlag wäre also ein Verdrahtungsfehler und keine
+  /// Nutzereingabe, und ein Absturz auf der Karte wäre die teuerste Art, ihn
+  /// zu melden.
+  void _onOpenFact(String factId) {
+    final int? id = int.tryParse(factId);
+    if (id == null) {
+      ref
+          .read(diagnosticSinkProvider)
+          .report(
+            DiagnosticEvent(MapPage.unreadableFactIdEvent, <String, String>{
+              'factId': factId,
+            }),
+          );
+      return;
+    }
+    FactRoute(factId: id).go(context);
+  }
+
   /// Langer Druck auf den Kompass: harter Reset (`screen-map.jsx:3158-3172`).
   void _onCompassLongPress() {
     if (_camera == null) {
@@ -990,9 +1101,20 @@ class _MapPageState extends ConsumerState<MapPage> {
         // **Unmittelbar über der Kartenfläche und im selben `Stack`.** Die
         // Bildschirmlagen, die das Karten-SDK liefert, zählen ab der linken
         // oberen Ecke **der Karte** (`controller.dart:1779`); ein Rahmen
-        // dazwischen verschöbe jeden Ballon. Und unter dem Top-Chrome, damit
-        // ein wachsender Ballon nicht über die Stadt-Pille läuft.
-        const FactBalloonOverlay(),
+        // dazwischen verschöbe jeden Ballon und jede Münze. Und unter dem
+        // Top-Chrome, damit ein wachsender Ballon nicht über die Stadt-Pille
+        // läuft.
+        //
+        // `FactCollectOverlay` enthält `FactBalloonOverlay`, es steht hier
+        // also nicht zusätzlich. Warum die beiden zusammengehören, steht im
+        // Kopf von `fact_collect_overlay.dart`: ein naher Ballon liegt nicht
+        // nativ, sein Tipp kommt deshalb aus dem Zeichner und nicht aus
+        // `MapHost.pointTaps`.
+        FactCollectOverlay(
+          coinAmount: MapPage.collectCoinAmount,
+          onCollected: _onFactCollected,
+          onOpenFact: _onOpenFact,
+        ),
         // Meldet den Tutorial-Anker `DiscoveryAnchors.balloon` an, ohne selbst
         // etwas zu zeichnen; siehe `discovery_balloon_anchor.dart`. Nach
         // `FactBalloonOverlay`, damit beide dieselbe Kartenfläche als
@@ -1009,6 +1131,24 @@ class _MapPageState extends ConsumerState<MapPage> {
         // wörtlich und nicht ein Bezug auf `FloatingTabBar`: die Pille kennt
         // die Maße der schwebenden Tab-Leiste nicht, und beide sind
         // unabhängig voneinander gegen die sichere Fläche bemessen.
+        //
+        // **Eine gemessene Abweichung in der Malreihenfolge, und sie ist
+        // bewusst offen gelassen.** Die Quelle staffelt: Ballons im
+        // Kartencontainer auf `zIndex:0` (`:3086`), Jagd-Pille auf 50
+        // (`:1074`), Mini-Vorschau auf 60 (`:3845`), Münzflug auf 70
+        // (`:1183`). Hier liegt die Pille **über** Vorschau und Münzflug,
+        // weil `FactCollectOverlay` beide zusammen mit den Ballons trägt und
+        // die Ballons unten bleiben müssen. Sichtbar wird der Unterschied nur,
+        // wenn eine Jagd läuft **und** der Nutzer einen fernen Ballon
+        // antippt: die Vorschau (unten 110, Höhe rund 72) und die Pille
+        // (unten 94, Höhe 60) überlappen dann, und die Pille verdeckt sie.
+        //
+        // Jede der drei Auflösungen kostet mehr, als sie hier einbringt: ein
+        // dritter Registry-Zwischenspeicher für den Ballon-Tipp, ein
+        // `GlobalKey` auf einen öffentlichen `State`, oder ein Widget-Schlitz
+        // in `FactCollectOverlay`, dessen einziger Zweck die Malreihenfolge
+        // wäre. Die Behebung ist später ein Parameter; solange steht sie
+        // hier, gemessen, statt unbemerkt zu sein.
         if (widget.huntOverlay != null)
           Positioned(
             left: 12,

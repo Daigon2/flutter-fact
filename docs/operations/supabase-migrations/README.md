@@ -24,7 +24,7 @@ alten Migrationen überhaupt gelaufen sind.
 |---|---|---|---|
 | `01-e24-profiles-spalten.sql` | E-24 | `coins`, `score_total`, `ai_used`, `ai_limit` sind nicht mehr per `UPDATE` setzbar. Nimmt D-8 mit. | nein |
 | `02-e06-increment-coins.sql` | E-06 | `increment_coins` schreibt nur noch das eigene Konto, und nur bis zum Deckel (500, verstellbar). | nein |
-| `03-e23-collected-facts.sql` | E-23 | Der Client fügt nicht mehr direkt in `collected_facts` ein. Die 150-Meter-Prüfung ist nicht mehr umgehbar. | **ja, vollständig** |
+| `03-e23-collected-facts.sql` | E-23 | Der Client fügt nicht mehr direkt in `collected_facts` ein. Die 150-Meter-Prüfung ist nicht mehr umgehbar. **Ändert unbemerkt eine Spielregel, siehe den Kopf der Datei.** | **ja, vollständig** |
 | `04-e52-ausfuehrrechte.sql` | E-52 | `unlock_trophy` ist kontogebunden; ohne Konto ist keine schreibende RPC mehr rufbar. | nein |
 | `05-e53-fakt-freigabe.sql` | E-53 | Ein Nutzer kann seinen Fakt nicht mehr selbst freigeben. | nein |
 | `06-e55-rangliste-schreibrechte.sql` | E-55 | Punktestände und Trophäen sind nicht mehr clientschreibbar. | nein |

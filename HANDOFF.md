@@ -66,7 +66,7 @@ Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
 den Schritten 33 bis 37 und 39.
 
-**Fertig sind 26 von 50:** 1 bis 17, dazu 19, 21, 27, 33 bis 37 und 39. Schritt 14 ist
+**Fertig sind 27 von 50:** 1 bis 17, dazu 19, 20, 21, 27, 33 bis 37 und 39. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -80,7 +80,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2315 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2400 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -345,6 +345,69 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 02.09.2026, Schritt 20, und der Kern-Griff der App hatte keinen Empfänger
+
+2315 → 2400 Tests. Ein Tipp auf einen einzelnen Fakt-Ballon tut jetzt etwas:
+innerhalb von 150 Metern sammeln, sonst nur die Vorschau, und **ohne Ortung nie
+die Detailseite**. Das ist die Vor-Ort-Mechanik der App, in der Quelle mit
+einem `FIX (Daniel + Janek)`-Kommentar versehen, der einen früheren Schlupf
+nennt, über den ein Nutzer in Italien einen Münchner Fakt vollständig lesen
+konnte.
+
+Fünf Pflichtmutationen, alle gefallen. Danach zwei eigene Gegenproben auf genau
+die zwei Funde, die **nicht** im Auftrag standen; die erste fiel, die zweite
+überlebte.
+
+**Der Fund, ohne den der ganze Schritt wirkungslos gewesen wäre**, stand nicht
+in meinem Auftrag. Fakten innerhalb von 150 Metern nimmt `map_page.dart` aus
+der nativen Ebene heraus und zeichnet sie als Flutter-Widgets, und die lagen
+komplett in einem `IgnorePointer`. `MapHost.pointTaps` meldet sie also **nie**,
+und das sind genau die Fakten, bei denen gesammelt wird. Mit nur dem
+beauftragten Empfänger hätte der Sammelweg ausschliesslich unterhalb der
+Gruppierungsgrenze funktioniert. Gemeldet, gebaut, und ein Test heisst jetzt
+„der Tipp auf einen lebenden Ballon sammelt, obwohl der Punkt nicht mehr nativ
+liegt".
+
+**Eine Mutation hat überlebt, und die Lücke war eine Frage der Reihenfolge.**
+Das Widget hält die Ortung mit `listenManual(..., fireImmediately: true)`, und
+der Kommentar daran nennt den Grund: nach einem Tabwechsel entsteht das Widget
+neu, während längst eine Ortung vorliegt. Ohne die Flagge bliebe sie ungelesen,
+die Regel entschiede „ohne Ortung", und es gäbe **nie** ein Sammeln. Die Flagge
+zu entfernen brach trotzdem keinen Test: **alle Tests der Datei ordnen erst das
+Widget und dann die Ortung an**, und in dieser Richtung feuert der Hörer
+ohnehin. Der neue Test dreht die Reihenfolge um. Muster 25, nur andersherum:
+nicht die Zusicherung war zu schwach, sondern der Aufbau prüfte den Fall nie.
+
+### Meine Auftragsprämisse war falsch, und sie betrifft eine Migration
+
+Ich hatte geschrieben, der Server buche beim Sammeln 10 Coins. **Es sind drei
+Zahlen an drei Stellen**, alle am 02.09.2026 nachgemessen:
+
+* `app.jsx:712-714` bucht im **Solo-Sammelweg 50**, client-seitig. Das ist der
+  Weg, der heute läuft.
+* `collect_fact_validated` bucht **10** und hat in der **ganzen Referenz keinen
+  einzigen Aufrufer**. Toter Code.
+* Die Animation zeigt **12**.
+
+**Folge für Migration 3a, und die gehört gelesen, bevor sie läuft:** sie
+schliesst den direkten Insert und zwingt damit auf `collect_fact_validated`.
+Sobald die PWA dorthin umgestellt wird, **fällt die Belohnung von 50 auf 10**,
+ohne dass es jemand entschieden hat. Eine Balance-Änderung, versteckt in einer
+Sicherheitsmigration. Sie blockiert die Migration nicht, weil bis zur
+Umstellung dort ohnehin niemand sammelt, muss aber vor dem PWA-Release
+entschieden sein. Steht als Warnblock im Kopf von
+`03-e23-collected-facts.sql`.
+
+**Und eine vierte Fundstelle für die 150, die einzige serverseitige:**
+`collect_fact_validated` prüft `> 150`, nimmt genau 150,0 also an. Der Server
+ist einschliessend, der Neubau ausschliessend; die Richtung ist die harmlose.
+Nebenfund zur Prüfbarkeit: genau 150,0 Meter sind über Koordinaten gar nicht
+erreichbar, per Bisektion gemessen. `fact_proximity_test.dart` hatte dieselbe
+Beobachtung und daraus geschlossen, den Rand **nicht** zu prüfen. Schritt 20
+zieht den Vergleich als eigenes Prädikat heraus, erst damit ist E-67 prüfbar.
+Der blinde Fleck in `fact_proximity_test.dart` bleibt.
+
 
 ### 02.09.2026, Englisch ist jetzt Englisch, und E-16 hat eine Migration
 

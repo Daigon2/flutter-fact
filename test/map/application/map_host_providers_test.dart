@@ -94,17 +94,28 @@ class FakeMapHost implements MapHost {
   /// Tut so, als hätte `MapSurface` eine Größe gemeldet.
   void measure(MapViewport size) => _viewport = size;
 
+  final StreamController<MapOverlayPointTap> _pointTaps =
+      StreamController<MapOverlayPointTap>.broadcast();
+
   final StreamController<MapOverlayGroupTap> _groupTaps =
       StreamController<MapOverlayGroupTap>.broadcast();
 
   @override
   Stream<MapOverlayGroupTap> get groupTaps => _groupTaps.stream;
 
+  @override
+  Stream<MapOverlayPointTap> get pointTaps => _pointTaps.stream;
+
   /// Tut so, als hätte das SDK einen Tipp auf eine Gruppe gemeldet.
   void tapGroup(MapOverlayGroupTap tap) => _groupTaps.add(tap);
 
-  Future<void> close() =>
-      Future.wait(<Future<void>>[_controller.close(), _groupTaps.close()]);
+  void tapPoint(MapOverlayPointTap tap) => _pointTaps.add(tap);
+
+  Future<void> close() => Future.wait(<Future<void>>[
+    _controller.close(),
+    _groupTaps.close(),
+    _pointTaps.close(),
+  ]);
 }
 
 /// Ein `MapCameraDriver`, der nichts tut.
@@ -513,6 +524,7 @@ void main() {
       registry.attach(realHost);
 
       realHost.handleFeatureTapped(
+        featureId: '7',
         layerId: 'discovery.facts.groups',
         at: const LatLng(48.1351, 11.582),
       );
@@ -520,6 +532,120 @@ void main() {
 
       expect(seen, hasLength(1));
       expect(seen.single.overlayId, 'discovery.facts');
+    });
+  });
+
+  group('Der Punkt-Tipp-Strom', () {
+    test('überlebt einen Wechsel des Hosts', () async {
+      // Dieselbe Bauart und dieselbe Begründung wie beim Gruppen-Tipp: der
+      // Strom gehört der Registry, nicht dem Host. Ohne das hielte ein
+      // Feature nach einem Kartenwechsel ein totes Abonnement, und zwar ohne
+      // Fehler: es wäre einfach still, und niemand könnte mehr sammeln.
+      final List<MapOverlayPointTap> seen = <MapOverlayPointTap>[];
+      final StreamSubscription<MapOverlayPointTap> subscription = registry
+          .pointTaps
+          .listen(seen.add);
+      addTearDown(subscription.cancel);
+
+      const MapOverlayPointTap first = MapOverlayPointTap(
+        overlayId: 'discovery.facts',
+        pointId: '7',
+        position: munich,
+      );
+      const MapOverlayPointTap second = MapOverlayPointTap(
+        overlayId: 'discovery.facts',
+        pointId: '8',
+        position: rome,
+      );
+
+      registry.attach(host);
+      host.tapPoint(first);
+      await pumpEventQueue();
+
+      registry.detach(host);
+      final FakeMapHost secondHost = FakeMapHost();
+      addTearDown(secondHost.close);
+      registry.attach(secondHost);
+      secondHost.tapPoint(second);
+      await pumpEventQueue();
+
+      // `identical` und nicht `==`: [MapOverlayPointTap] hat bewusst keine
+      // Wertgleichheit, siehe dessen Kopfkommentar.
+      expect(seen, hasLength(2));
+      expect(identical(seen[0], first), isTrue);
+      expect(identical(seen[1], second), isTrue);
+    });
+
+    test('meldet nach dem Ausklinken nichts mehr vom alten Host', () async {
+      final List<MapOverlayPointTap> seen = <MapOverlayPointTap>[];
+      final StreamSubscription<MapOverlayPointTap> subscription = registry
+          .pointTaps
+          .listen(seen.add);
+      addTearDown(subscription.cancel);
+
+      registry.attach(host);
+      registry.detach(host);
+      host.tapPoint(
+        const MapOverlayPointTap(
+          overlayId: 'discovery.facts',
+          pointId: '7',
+          position: rome,
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(seen, isEmpty);
+    });
+
+    test('überlebt attach, detach, attach mit demselben Host', () async {
+      // Dieselbe Begründung wie beim Gruppen-Tipp, für den zweiten Strom:
+      // ohne `broadcast` wirft das zweite `listen` in dieser Folge, auch
+      // nach einem `cancel` des ersten.
+      final MapCameraHost realHost = MapCameraHost(diagnostics: sink);
+      addTearDown(realHost.dispose);
+      realHost.bindSurface(
+        driver: _NoopCameraDriver(),
+        camera: viewAt(munich),
+        overlays: _NoopOverlayDriver(),
+      );
+      realHost.setOverlay(overlayNamed('discovery.facts'));
+      await realHost.debugOverlays.debugSettled;
+
+      final List<MapOverlayPointTap> seen = <MapOverlayPointTap>[];
+      final StreamSubscription<MapOverlayPointTap> subscription = registry
+          .pointTaps
+          .listen(seen.add);
+      addTearDown(subscription.cancel);
+
+      registry.attach(realHost);
+      registry.detach(realHost);
+      registry.attach(realHost);
+
+      realHost.handleFeatureTapped(
+        featureId: '7',
+        layerId: 'discovery.facts.points',
+        at: const LatLng(48.1351, 11.582),
+      );
+      await pumpEventQueue();
+
+      expect(seen, hasLength(1));
+      expect(seen.single.pointId, '7');
+    });
+
+    test('ohne Host ist er still und meldet das nicht', () async {
+      // Dieselbe Antwort wie beim Kamerastrom: das Abonnement bleibt gültig
+      // und bekommt seine Werte, sobald eine Karte steht. Ein Ereignis dafür
+      // wäre der Normalfall jedes Bildschirmaufbaus.
+      final List<MapOverlayPointTap> seen = <MapOverlayPointTap>[];
+      final StreamSubscription<MapOverlayPointTap> subscription = registry
+          .pointTaps
+          .listen(seen.add);
+      addTearDown(subscription.cancel);
+
+      await pumpEventQueue();
+
+      expect(seen, isEmpty);
+      expect(sink.events, isEmpty);
     });
   });
 

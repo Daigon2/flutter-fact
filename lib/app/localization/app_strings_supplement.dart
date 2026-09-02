@@ -137,6 +137,28 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // bei `fact.fileNumber`; übernommen ist genau dieser Wortlaut.
     'fact.sourceMissing': 'Quelle fehlt',
 
+    // Die Entfernungszeile der Mini-Vorschau **ohne Ortung**,
+    // `screen-map.jsx:3856-3858`:
+    // `lang === 'en' ? '🔒 Location unknown — too far' : '🔒 Standort
+    // unbekannt — zu weit weg'`. Ein Ternär im JSX, kein `t()`-Aufruf, also
+    // kein Schlüssel in der PWA.
+    //
+    // **Beide Sprachen stehen wörtlich in der Quelle**, wie bei
+    // `fact.sourceMissing` und anders als bei `fact.fileNumber`. Hier ist
+    // also nichts erfunden und nichts entschieden, nur abgeschrieben.
+    //
+    // **Ausdrücklich nicht der E-28-Fall.** Dort zeigt die PWA dem Nutzer den
+    // nackten Schlüsselnamen, weil der Schlüssel fehlt; hier zeigt sie
+    // fertigen Text und führt ihn bloß nicht als Schlüssel. Der Unterschied
+    // entscheidet, ob ein Eintrag hierher darf, siehe den Kopf dieser Datei.
+    //
+    // Das Schlosszeichen gehört zum Text und nicht zum Widget, weil es in
+    // der Quelle in derselben Zeichenkette steht wie das Wort. Der
+    // Gedankenstrich bleibt, wie bei `puzzle.photoCaption`: die Schreibregel
+    // gegen Gedankenstriche gilt für selbst formulierten Text, nicht für eine
+    // Abschrift.
+    'map.teaser.locationUnknown': '🔒 Standort unbekannt — zu weit weg',
+
     // ── Rätsel-Sheet, `puzzle-sheet.jsx` ───────────────────────────────
     //
     // Vier sichtbare Texte, keiner davon mit Schlüssel in der PWA. Alle
@@ -535,6 +557,8 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // Test und ist dort je einzeln begründet.
     'fact.fileNumber': 'File #{nr}',
     'fact.sourceMissing': 'Source missing',
+    // Wörtlich aus der Quelle, `screen-map.jsx:3857`. Siehe die DE-Karte.
+    'map.teaser.locationUnknown': '🔒 Location unknown — too far',
     // Derselbe deutsche Wert wie in der DE-Karte: der Ternär in
     // `puzzle-sheet.jsx:150` schreibt in beiden Zweigen „Station".
     'puzzle.stationCounter': 'Station {station}',

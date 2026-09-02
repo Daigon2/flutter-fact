@@ -203,12 +203,19 @@ class MapRoute extends GoRouteData with $MapRoute {
 /// genau dieses Loch geoeffnet hat (Italien-User bekam Muenchen-Fakt voll
 /// angezeigt)."
 ///
-/// Ein Ballon-Tipp führt deshalb **nicht** hierher: innerhalb von 150 Metern
-/// löst er das Sammeln aus, außerhalb zeigt er nur eine Mini-Kachel
-/// (`:2129-2145`). Der Weg in die Akte führt über das Sammeln, und das ist
-/// Schritt 20. Wer hier oder anderswo eine Navigation auf diese Route legt,
-/// muss die Näherungsbedingung mitbringen; ohne sie ist die Vor-Ort-Mechanik
-/// der ganzen App umgangen.
+/// Ein Ballon-Tipp führt deshalb **nicht** unmittelbar hierher: innerhalb von
+/// 150 Metern löst er das Sammeln aus, außerhalb zeigt er nur eine
+/// Mini-Kachel (`:2129-2145`). Der Weg in die Akte führt über das Sammeln.
+///
+/// **Seit Schritt 20 gibt es genau einen Einstieg, und er trägt die
+/// Bedingung.** `_MapPageState._onOpenFact` in
+/// `features/discovery/presentation/pages/map_page.dart` navigiert hierher,
+/// und zwar 1400 Millisekunden nach einem Tipp, der `decideFactTap` passiert
+/// hat: also nur mit Ortung und nur innerhalb des Sammelradius. Der Test
+/// „genau ein Einstieg im Bestand, und er liegt hinter der
+/// Näherungsbedingung" in `test/app/routing/app_routes_test.dart` nagelt
+/// beides fest. Wer einen **zweiten** legt, muss die Bedingung mitbringen;
+/// ohne sie ist die Vor-Ort-Mechanik der ganzen App umgangen.
 ///
 /// ## Warum unterhalb von `/map` und nicht daneben
 ///
