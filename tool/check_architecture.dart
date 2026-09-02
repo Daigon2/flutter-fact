@@ -56,17 +56,34 @@
 //     gleich aus. Textuell ist das nicht unterscheidbar, deshalb prüft das
 //     Skript nur fremdes `presentation/` und `data/` (Regel 8 und 9).
 //
-// Gemessene, noch nicht geschlossene Lücke
-// ----------------------------------------
-// Regel 17 (`presentation` zeigt nicht auf `data`, auch nicht auf das eigene)
-// hängt weiter an `_pointsIntoOwnFeatureLayer` und damit an `lib/features/`.
-// In einem Modul außerhalb davon, etwa `lib/map/presentation/` auf
-// `lib/map/data/`, meldet sie nichts. Das ist kein Entwurf, sondern der Rest
-// derselben Asymmetrie, die bei den Schichtmustern und bei Regel 8 und 9
-// geschlossen wurde; es fehlt dieselbe Ableitung über [_modulwurzel]. Der Fall
-// ist heute nicht auslösbar, weil es außerhalb von `lib/features/` kein
-// `data/` gibt. Ein Test hält den Zustand fest, damit er nicht unbemerkt
-// bleibt.
+// Zwei gemessene Lücken geschlossen
+// ---------------------------------
+// Beide standen in REBUILD_STATUS.md unter "Drei verbleibende Asymmetrien im
+// Architektur-Check" und sind seither geschlossen:
+//
+//  * Die Cross-Feature-Prüfung (`_crossFeaturePattern`) verlangte die Schicht
+//    direkt unter dem Feature. Ein fremdes `features/x/unterstruktur/data/`
+//    entkam damit den Regeln 8 und 9, während dieselbe Verschachtelung für
+//    die eigenen Schichten über [_hasSegment] schon geschlossen war. Das
+//    Muster erlaubt jetzt dieselbe Tiefe, nicht-gierig, damit
+//    `features/x/presentation/widgets/foo.dart` weiterhin die Schicht
+//    `presentation` liefert und nicht `widgets`.
+//  * Regel 17 (`presentation` zeigt nicht auf `data`, auch nicht auf das
+//    eigene) hing an `_pointsIntoOwnFeatureLayer` und damit an
+//    `lib/features/`. Ein Modul außerhalb davon, etwa `lib/map/presentation/`
+//    auf `lib/map/data/`, meldete nichts. Die Prüfung nutzt jetzt zusätzlich
+//    dieselbe Ableitung über [_modulwurzel], die für die Domäne schon
+//    dastand, als Oder neben der alten Prüfung: die alte deckt die ganze
+//    Feature-Unterstruktur ab, die neue das Modul einer Datei außerhalb von
+//    `lib/features/`. Fremdes `data/` bleibt bei Regel 9, weil [_modulwurzel]
+//    aus dem Pfad der geprüften Datei selbst kommt und ein fremder Import nie
+//    mit diesem Präfix beginnt.
+//
+// Noch offen bleibt die dritte Asymmetrie aus derselben Liste: `application`
+// hat weiter nur eine Verbotsliste, keine Erlaubnisliste wie Domain und Kern.
+// Das setzt eine Aussage voraus, was "narrowly scoped Core" in
+// dependency-rules.md konkret bedeutet, und die fehlt dort. Eine
+// Architekturentscheidung, keine Erkennungslücke.
 
 import 'dart:io';
 
@@ -759,8 +776,18 @@ final _contractBans = <RegExp, String>{
 };
 
 final _featurePattern = RegExp(r'^lib/features/([^/]+)/');
+// Nicht-gierig zwischen Feature und Schicht, aus demselben Grund wie bei
+// [_hasSegment]: die Schicht darf beliebig tief unter dem Feature liegen.
+// `features/x/unterstruktur/data/...` ist damit dasselbe `data` wie
+// `features/x/data/...`. Nicht-gierig statt gierig, damit
+// `features/x/presentation/widgets/foo.dart` weiterhin die Schicht
+// `presentation` liefert (die erste Übereinstimmung, direkt hinter dem
+// Feature) und nicht ein zufälliges tieferes Segment. Für die eigenen
+// Schichten war das schon über [_hasSegment] geschlossen, hier war es noch
+// offen: derselbe Import entkam Regel 8 und 9, wenn das fremde Feature eine
+// Unterstruktur hatte.
 final _crossFeaturePattern = RegExp(
-  r'package:fact_app/features/([^/]+)/(presentation|data)/',
+  r'package:fact_app/features/([^/]+)/(?:[^/]+/)*?(presentation|data)/',
 );
 
 /// Findet Direktiven am Zeilenanfang im strukturellen Quelltext. Das
@@ -1316,6 +1343,7 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
   final istKern = posixPath.startsWith(_kernelHome);
   final istPresentation = _presentationPath.hasMatch(posixPath);
   final domaenenModul = _modulwurzel(posixPath, 'domain');
+  final presentationModul = _modulwurzel(posixPath, 'presentation');
   // Regel 8 und 9 gelten für alles unter `lib/`, nicht nur innerhalb von
   // `features/`. Zwei Ausnahmen, beide mit Grund:
   //
@@ -1433,16 +1461,45 @@ List<Violation> _checkImports(String posixPath, SourceView view) {
 
       // Regel 17: die Tabelle erlaubt Presentation nur Application, Domain
       // und eng abgegrenztes Core. Das eigene `data/` steht nicht in der
-      // Zeile. Geprüft wird nur das eigene Feature: fremdes `data/` meldet
-      // schon Regel 9, und zwei Meldungen für denselben Import helfen
-      // niemandem.
+      // Zeile. Geprüft wird nur das eigene Feature bzw. eigene Modul: fremdes
+      // `data/` meldet schon Regel 9, und zwei Meldungen für denselben Import
+      // helfen niemandem.
       //
-      // Bekannte, gemessene Lücke: außerhalb von `lib/features/` greift diese
-      // Prüfung nicht, siehe den Kopfkommentar unter "Gemessene, noch nicht
-      // geschlossene Lücke".
-      if (istPresentation &&
-          ownFeature != null &&
-          _pointsIntoOwnFeatureLayer(ownFeature, resolved, 'data')) {
+      // Zwei Bedingungen als Oder, aber nur ein found.add, damit aus zwei
+      // wahren Bedingungen nie zwei Meldungen werden:
+      //
+      //  * die alte, feature-weite Prüfung über [_pointsIntoOwnFeatureLayer].
+      //    Sie bleibt nötig, weil sie über die ganze Feature-Unterstruktur
+      //    reicht, nicht nur über das Modul der geprüften Datei: eine Datei
+      //    in `features/tours/karte/presentation/` darf auch nicht auf
+      //    `features/tours/anderswo/data/` zeigen, und [_modulwurzel] allein
+      //    sähe nur `features/tours/karte/`.
+      //  * dieselbe Ableitung über [_modulwurzel], die für die Domäne schon
+      //    dasteht (siehe [_isAllowedDomainImport]). Sie schließt die
+      //    gemessene Lücke aus dem Kopfkommentar: ein Modul außerhalb von
+      //    `lib/features/`, etwa `lib/map/presentation/` auf
+      //    `lib/map/data/`, hatte bis hierher kein `ownFeature` und wurde
+      //    deshalb übersprungen.
+      //
+      // Kein Doppelmelden gegenüber Regel 9: [_modulwurzel] kommt aus dem
+      // Pfad der geprüften Datei selbst. Ein fremdes `features/x/data/` kann
+      // also nie mit diesem Präfix beginnen, die Abgrenzung auf das eigene
+      // Modul ergibt sich von selbst, ohne eigene Ausnahmeliste.
+      //
+      // Eine Schicht direkt unter `lib/` liefert bei [_modulwurzel] bewusst
+      // `null` (dort wäre die Wurzel das ganze Paket). Der zweite Zweig
+      // bleibt dann einfach aus, das ist keine Ausnahme, sondern dieselbe
+      // Absicht, die [_modulwurzel] schon für sich beansprucht.
+      final zeigtAufEigenesData =
+          (ownFeature != null &&
+              _pointsIntoOwnFeatureLayer(ownFeature, resolved, 'data')) ||
+          (presentationModul != null &&
+              resolved.startsWith(presentationModul) &&
+              _hasSegment(
+                resolved.substring(presentationModul.length),
+                'data',
+              ));
+      if (istPresentation && zeigtAufEigenesData) {
         found.add(
           Violation(
             file: posixPath,

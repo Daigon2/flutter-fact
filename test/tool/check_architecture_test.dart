@@ -644,6 +644,37 @@ import 'package:native_device_orientation/native_device_orientation.dart';
 
 class OrientierungFamilie {}
 ''',
+  // Lücke 1 geschlossen: die Cross-Feature-Prüfung griff nur die Schicht
+  // direkt unter dem fremden Feature. Ein fremdes presentation und ein
+  // fremdes data hinter einer Unterstruktur entkamen den Regeln 8 und 9,
+  // während dieselbe Verschachtelung für die eigenen Schichten längst
+  // geschlossen war (Ä1).
+  'lib/features/tours/presentation/pages/fremdes_feature_verschachtelt.dart':
+      r'''
+import 'package:fact_app/features/challenges/unterstruktur/presentation/challenge_page.dart';
+import 'package:fact_app/features/challenges/unterstruktur/data/challenge_dto.dart';
+
+class FremdSeiteVerschachtelt {}
+''',
+  // Lücke 2 geschlossen: Regel 17 hing an lib/features/ und _pointsIn-
+  // toOwnFeatureLayer. Ein Modul außerhalb davon, hier der Karten-Host,
+  // durfte sein eigenes data/ ungestraft lesen. Derselbe Fall, der bis eben
+  // unter "Offene Lücken" als gemessen und offen festgehalten war.
+  'lib/map/presentation/luecke_eigenes_data.dart': r'''
+import 'package:fact_app/map/data/tile_cache.dart';
+
+class LueckeEigenesData {}
+''',
+  // Lücke 2, Doppelmeldungs-Probe: derselbe Karten-Host, diesmal mit einem
+  // fremden Feature-data/ statt dem eigenen. Hier muss weiterhin nur Regel 9
+  // greifen, nicht zusätzlich die neue Regel-17-Prüfung, denn die
+  // Modulwurzel des Karten-Hosts (package:fact_app/map/) passt nicht auf
+  // einen Import unter package:fact_app/features/.
+  'lib/map/presentation/fremdes_feature_data_regel17.dart': r'''
+import 'package:fact_app/features/tours/data/tour_dto.dart';
+
+class FremdesFeatureDataRegel17 {}
+''',
 };
 
 /// Baum 2: alles, was still bleiben muss. Enthält die Gegenproben und die
@@ -845,12 +876,32 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 class AvatarView {}
 ''',
-  // Gemessene, noch nicht geschlossene Lücke: Regel 17 hängt weiter an
-  // lib/features/. Siehe die Gruppe unten.
-  'lib/map/presentation/luecke_eigenes_data.dart': r'''
+  // Lücke 1 Gegenprobe: ein Import in die eigene verschachtelte Schicht
+  // (features/tours/unterstruktur/data/ aus features/tours/) bleibt still,
+  // denn cross.group(1) == ownFeature. Bewusst außerhalb jeder Schicht
+  // (kein domain/, application/, presentation/ oder data/ im eigenen Pfad),
+  // damit keine andere Prüfung hineinspielt und nur die Cross-Feature-Prüfung
+  // selbst auf dem Prüfstand steht.
+  'lib/features/tours/orchestrierung/eigene_verschachtelung.dart': r'''
+import 'package:fact_app/features/tours/unterstruktur/data/tour_dto.dart';
+
+class EigeneVerschachtelung {}
+''',
+  // Lücke 2 Gegenprobe: im Karten-Host ist application erlaubt, nur data
+  // nicht. Sonst wäre die neue Prüfung ein Verbot der ganzen Modulwurzel und
+  // nicht nur der data-Schicht.
+  'lib/map/presentation/erlaubte_application.dart': r'''
+import 'package:fact_app/map/application/kamera_steuerung.dart';
+
+class ErlaubteApplication {}
+''',
+  // Lücke 2, zweite Falle: eine Schicht direkt unter lib/ liefert bei
+  // _modulwurzel bewusst null. Diese Datei prüft, dass der zweite Zweig der
+  // Regel-17-Prüfung dann ausbleibt, ohne Ausnahme und ohne Absturz.
+  'lib/presentation/schicht_direkt_unter_lib.dart': r'''
 import 'package:fact_app/map/data/tile_cache.dart';
 
-class LueckeEigenesData {}
+class SchichtDirektUnterLib {}
 ''',
 };
 
@@ -1046,6 +1097,9 @@ void main() {
         'lib/features/discovery/presentation/orientierung_versuch.dart',
         'lib/app/orientierung_daneben.dart',
         'lib/features/discovery/presentation/orientierung_familie.dart',
+        'lib/features/tours/presentation/pages/fremdes_feature_verschachtelt.dart',
+        'lib/map/presentation/luecke_eigenes_data.dart',
+        'lib/map/presentation/fremdes_feature_data_regel17.dart',
       }, reason: verstoss.bericht);
     });
   });
@@ -2011,16 +2065,98 @@ void main() {
     });
   });
 
+  // Die beiden Lücken, die REBUILD_STATUS.md unter "Drei verbleibende
+  // Asymmetrien im Architektur-Check" als erste und dritte führte. Jede
+  // bekommt beide Richtungen: die Positivprobe im verstoss-Baum und die
+  // Gegenprobe(n) im stillen Baum, sonst prüft der Test nur die Hälfte der
+  // Behauptung.
+  group('Geschlossene Lücken: Cross-Feature-Tiefe und Regel 17 im Modul', () {
+    test('Lücke 1: fremdes presentation und data hinter einer '
+        'Unterstruktur', () {
+      erwarteFunde(
+        verstoss,
+        'lib/features/tours/presentation/pages/'
+        'fremdes_feature_verschachtelt.dart',
+        <(int, String)>[
+          (1, 'Regel 8: presentation von "challenges" darf nur dieses Feature'),
+          (2, 'Regel 9: data von "challenges" darf nur dieses Feature'),
+        ],
+      );
+    });
+
+    test(
+      'Lücke 1 Gegenprobe: die eigene verschachtelte Schicht bleibt still',
+      () {
+        expect(
+          still.fuer(
+            'lib/features/tours/orchestrierung/eigene_verschachtelung.dart',
+          ),
+          isEmpty,
+          reason:
+              'cross.group(1) == ownFeature, also gilt hier weder Regel 8 '
+              'noch Regel 9. Wird hier etwas gemeldet, ist die '
+              'Eigen/Fremd-Unterscheidung nach der Tiefenerweiterung '
+              'kaputtgegangen.\n${still.bericht}',
+        );
+      },
+    );
+
+    test('Lücke 2: der Karten-Host darf sein eigenes data/ nicht lesen', () {
+      erwarteFunde(
+        verstoss,
+        'lib/map/presentation/luecke_eigenes_data.dart',
+        <(int, String)>[(1, 'Regel 17: presentation darf nicht auf data')],
+      );
+    });
+
+    test('Lücke 2 Gegenprobe: application bleibt im Karten-Host erlaubt', () {
+      expect(
+        still.fuer('lib/map/presentation/erlaubte_application.dart'),
+        isEmpty,
+        reason:
+            'Nur data ist verboten, nicht die ganze Modulwurzel. Wird hier '
+            'etwas gemeldet, prüft die neue Regel-17-Fassung die falsche '
+            'Schicht.\n${still.bericht}',
+      );
+    });
+
+    test('Lücke 2 Gegenprobe: fremdes Feature-data bleibt eine Meldung, '
+        'nicht zwei', () {
+      // Die Modulwurzel des Karten-Hosts (package:fact_app/map/) passt
+      // nicht auf einen Import unter package:fact_app/features/. Ohne
+      // diese Abgrenzung stünden hier Regel 9 und die neue Regel-17-Prüfung
+      // nebeneinander für denselben Import.
+      final funde = verstoss.fuer(
+        'lib/map/presentation/fremdes_feature_data_regel17.dart',
+      );
+      expect(funde, hasLength(1), reason: verstoss.bericht);
+      expect(
+        funde.single.regel,
+        contains('Regel 9: data von "tours" darf nur dieses Feature'),
+        reason: verstoss.bericht,
+      );
+    });
+
+    test('Lücke 2 Gegenprobe: eine Schicht direkt unter lib/ kennt keine '
+        'Modulwurzel', () {
+      // _modulwurzel liefert hier bewusst null (die Wurzel wäre sonst das
+      // ganze Paket). Dieser Test hält fest, dass der zweite Zweig der
+      // Regel-17-Prüfung diesen Fall ohne Ausnahme und ohne Absturz
+      // überspringt.
+      expect(
+        still.fuer('lib/presentation/schicht_direkt_unter_lib.dart'),
+        isEmpty,
+        reason: still.bericht,
+      );
+    });
+  });
+
   // Diese Gruppe hält den heutigen Zustand fest. Jeder Test hier ist grün,
   // weil das Skript nichts meldet.
   //
-  // Bei den vier Lücken 1 bis 4 ist das gewollt, die Begründung steht im
-  // Kopfkommentar von tool/check_architecture.dart unter "Bewusst offene
-  // Lücken". Wer eine davon schließen will, muss zuerst die dortige
-  // Begründung widerlegen.
-  //
-  // Der fünfte Test ist anders gelagert: dort ist nichts entschieden, die
-  // Lücke ist gemessen und offen. Er steht hier, damit sie sichtbar bleibt.
+  // Die Begründung für jede der vier Lücken steht im Kopfkommentar von
+  // tool/check_architecture.dart unter "Bewusst offene Lücken". Wer eine
+  // davon schließen will, muss zuerst die dortige Begründung widerlegen.
   group('Offene Lücken', () {
     test('Lücke 1: benannte Konstruktoren umgehen Regel 7', () {
       expect(
@@ -2059,20 +2195,6 @@ void main() {
             'context.go(ziel) ist genau die Form, die eine typisierte Route '
             'erzeugt. Ein Verbot würde überwiegend korrekten Code melden.\n'
             '${still.bericht}',
-      );
-    });
-
-    test('Gemessene, noch offene Lücke: Regel 17 gilt nur unter '
-        'lib/features/', () {
-      expect(
-        still.fuer('lib/map/presentation/luecke_eigenes_data.dart'),
-        isEmpty,
-        reason:
-            'Anders als die vier Lücken darüber ist das keine Entscheidung, '
-            'sondern der Rest der Asymmetrie, die bei den Schichtmustern und '
-            'bei Regel 8 und 9 geschlossen wurde. Regel 17 hängt weiter an '
-            '_pointsIntoOwnFeatureLayer. Wer sie über _modulwurzel ableitet, '
-            'dreht diesen Test um.\n${still.bericht}',
       );
     });
 

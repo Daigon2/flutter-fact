@@ -1284,7 +1284,7 @@ führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
 
 - [x] 33. Wizard · [x] 34. Solo-Setup · [x] 35. Hotspot-Picker
 - [x] 36. Phasen-Maschine · [x] 37. Active-UI (beide am 31.08.2026 im neuen Zuschnitt gebaut: Regeln, `HuntRun`, Zustandshalter, Jagd-Pille auf der Karte)
-  · [!] 38. Rätsel und Ökonomie
+  · [!] 38. Rätsel und Ökonomie (**der Grund stand bis zum 31.08.2026 nirgends**, als einziges Sperrzeichen im ganzen Dokument. Nachgetragen und nachgeprüft: die Sperre ist **E-08 über Schritt 28**, nicht die Ökonomie. Ohne Rätselkörper gibt es keine Antwort zu prüfen, und `puzzle_sheet.dart` sagt selbst, dass an dieser Stelle bewusst nichts steht. Die Ökonomie-Fragen E-06 und E-24 sind **nicht** der Blocker: dieselben Fragen sind bei den Schritten 31 und 32 am 31.08.2026 ausdrücklich als Restrisiko freigegeben worden)
 - [x] 39. Pause und Results (31.08.2026, dabei den seit Schritt 35 durchtrennten Jagdstart wieder angeschlossen) · [ ] 40. Gruppen-Flow (Realtime mit ADR-009 entschieden, seit dem 31.08.2026 frei; erbt E-21, E-54 und E-57 aus dem Backend)
 
 ## Phase 6, Tour
@@ -2635,21 +2635,39 @@ Nicht im REBUILD_PLAN, aber notwendig:
   veralteter `*.g.dart`-Stand fällt heute nur auf, wenn jemand zufällig
   `build_runner` startet. Am 27.08.2026 einmal von Hand geprüft: ein frischer
   Lauf erzeugt `app_routes.g.dart` byteidentisch.
-- [ ] **Drei verbleibende Asymmetrien im Architektur-Check.** Erstens ist die
-  Cross-Feature-Prüfung flach: ein fremdes `features/x/unterstruktur/data/`
-  entkommt den Regeln 8 und 9, während dieselbe Verschachtelung für die
-  eigenen Schichten geschlossen ist. Zweitens hat `application` weiter nur
-  eine Verbotsliste. Letzteres setzt eine Aussage voraus, was „narrowly
-  scoped Core" konkret bedeutet, und die fehlt in `dependency-rules.md`.
-  Drittens hängt **Regel 17** (`presentation` zeigt nicht auf `data`, auch
-  nicht auf das eigene) weiter an `_pointsIntoOwnFeatureLayer` und damit an
-  `lib/features/`: ein `lib/map/presentation/` auf `lib/map/data/` wird nicht
-  gemeldet, am 28.08.2026 mit einer Wegwerf-Probe gemessen. Heute nicht
-  auslösbar, weil es außerhalb von `lib/features/` kein `data/` gibt, und
-  spätestens fällig, wenn der Karten-Host eines bekommt. Die Behebung ist
-  dieselbe Ableitung über `_modulwurzel`, die für die Domäne schon dasteht;
-  bewusst nicht mitgemacht, weil der Auftrag vom 28.08.2026 vier benannte
-  Regeln umfasste und diese nicht.
+- [x] **Zwei der drei Asymmetrien im Architektur-Check geschlossen**
+  (31.08.2026), beide gemessen und beide mit Gegenprobe. Erstens war die
+  Cross-Feature-Prüfung flach: `_crossFeaturePattern` verlangte die Schicht
+  **direkt** unter dem Feature, ein fremdes `features/x/unterstruktur/data/`
+  entkam damit den Regeln 8 und 9, während dieselbe Verschachtelung für die
+  eigenen Schichten über `_hasSegment` längst geschlossen war. Das Muster
+  erlaubt jetzt dieselbe Tiefe, **nicht-gierig**, damit
+  `features/x/presentation/widgets/foo.dart` weiterhin `presentation` als
+  Schicht liefert und nicht `widgets`. Zweitens hing **Regel 17** an
+  `_pointsIntoOwnFeatureLayer` und damit an `lib/features/`: ein
+  `lib/map/presentation/` auf `lib/map/data/` wurde nicht gemeldet. Sie nutzt
+  jetzt zusätzlich `_modulwurzel`, dieselbe Ableitung, die für die Domäne
+  schon dastand.
+  **Ergänzt und nicht ersetzt, und das war eine Entscheidung des Bauenden, die
+  der Auftrag offen gelassen hatte:** ein reiner Ersatz hätte den Schutz für
+  eine Presentation-Datei in einer Feature-Unterstruktur verengt, weil die
+  Modulwurzel dort nur bis zum unmittelbaren Modul reicht und nicht bis zum
+  ganzen Feature. Beide Bedingungen stehen deshalb als Oder in **einem** `if`
+  mit **einem** `found.add`, damit aus zwei Prüfungen nie zwei Meldungen für
+  denselben Import werden. Dass fremdes `data/` weiter allein bei Regel 9
+  bleibt, ergibt sich von selbst und braucht keine Ausnahmeliste:
+  `_modulwurzel` kommt aus dem Pfad der geprüften Datei, ein fremder Import
+  beginnt nie mit diesem Präfix. Eine Zusicherung prüft ausdrücklich die
+  **Anzahl** der Meldungen und nicht nur ihr Vorhandensein.
+  85 → 90 Tests am Skript, sechs Mutationen (drei vom Bauenden, drei von der
+  prüfenden Seite), alle gefallen. Die verschärfte Prüfung findet im Bestand
+  **keinen** Verstoß, es gab also nichts nachzuziehen.
+- [ ] **Die dritte Asymmetrie bleibt offen, und sie ist keine Erkennungslücke.**
+  `application` hat weiter nur eine Verbotsliste, keine Erlaubnisliste wie
+  Domäne und Kern. Das setzt eine Aussage voraus, was „narrowly scoped Core"
+  in `dependency-rules.md` konkret bedeutet, und die fehlt dort. Wer das
+  schließen will, entscheidet zuerst die Architekturfrage; das Skript kann
+  nichts prüfen, was niemand geschrieben hat.
 - [x] **Zwei gemessene blinde Flecken im Architektur-Check geschlossen**
   (28.08.2026). `_domainPath`, `_applicationPath` und `_dataPath` verlangten
   das Literal `lib/features/`, nur `_presentationPath` war allgemein: eine
@@ -4292,6 +4310,7 @@ eine Fundstelle.
 | E-60 | **Die gestuften Hinweise der Jagd beschreiben die Station nach der aktuellen, nicht die aktuelle.** Gemessen und nicht vermutet, siehe „Ein Fund beim Zuschnitt von Schritt 36". Der Generator legt an Stopp `i` das Hinweis-Trio des Fakts von Stopp `i+1` ab (`hunt-generator.jsx:319-338`), und die Pille liest an der aktuellen Station genau dieses Feld (`screen-map.jsx:1035-1043`). Weil `currentStopIdx` beim Lösen sofort weiterspringt, sieht der Spieler nie einen Hinweis auf den Ort, den er gerade sucht. Zwei Lesarten: **Absicht** (der erste Hinweis heißt im Kommentar „atmospheric teaser", also eine Vorschau auf den nächsten Ort) oder **Defekt** (dann zahlt man 20 und 30 Münzen für Hinweise auf einen Ort, den man noch nicht sucht). Zu entscheiden ist, welche gilt; der Neubau kann beide, der Unterschied ist ein Index. **Und die letzte Station hat gar keine Hinweise**, denn dort setzt der Generator `nextHints = null`. | 2 | vor Schritt 37 |
 | E-61 | **Die Beschriftungen der Jagd-Pille gibt es nur auf Deutsch, und das ist Parität.** Geprüft: die Quelle hält „Station {n} / {total}", „Tipps", „Tipp freischalten (−20 🪙 vom Fakt-Lohn)", „Schließen" und den Rückfallsatz „Schau dich in der Umgebung aufmerksam um." als **hartcodiertes Deutsch** in `screen-map.jsx`, ohne einen einzigen i18n-Schlüssel. Englischsprachige Nutzer sehen dort also Deutsch. Der Neubau trägt sie über die Ergänzungs-Map aus E-39 ein, **nur auf Deutsch**, und der Rückfall auf die Fallback-Sprache erzeugt genau dasselbe Verhalten. **Erfundener englischer Nutzertext wäre die schlechtere Lösung**, dieselbe Linie wie bei E-28. Zu entscheiden ist, ob die Pille englische Texte bekommen soll; dann sind es fünf bis sechs Sätze, und die bessere Behebung wäre ein Schlüssel in der PWA, weil die Gegenprüfung des Generators den lokalen Eintrag dann von selbst wieder abräumt. Verwandt mit E-08, wo dieselbe Sorglosigkeit ein Rätsel auf Englisch unlösbar macht. | 2 | vor Auslieferung |
 | E-62 | **Der Pause- und der Ergebnisbildschirm der Jagd zeigen keine Zeit, sondern den Platzhalter `—`.** Die Quelle rechnet dort `Date.now() - hunt.startedAt` (`screen-challenge.jsx:2807-2808` und `:2954`) und lässt dafür einen Sekundentakt laufen. `HuntRun` trägt bewusst keine Zeitstempel, und der gespeicherte Vertrag `ActiveHunt` auch nicht: E-19 ist mit „der Server rechnet“ entschieden, und Dairens Satz dazu lautet „der baubare Teil ist alles, was den Ablauf anzeigt“. Angezeigt wird hier nichts, was der Client kennt, also steht der Platzhalter da, den die Quelle selbst für fehlende Werte benutzt (`:2828`). **Die Kachel und die Zeile bleiben stehen**, damit das Layout stimmt und der Tag, an dem ein Startzeitstempel vom Server kommt, eine Zeile kostet und keinen Umbau. Kein Sicherheitsbefund, sondern eine sichtbare Lücke mit bekannter Ursache und bekannter Behebung. | 2 | Schritt 39, Behebung mit dem Backend-Auftrag |
+| E-63 | **Der Beitritts-Dialog der Gruppe zeigt seinen eigenen Schlüsselnamen als Überschrift, und der dafür geschriebene Rückfall kann nie greifen.** Am 31.08.2026 gemessen, nicht vermutet. `screen-challenge.jsx:2025` schreibt `t('group.join.title', lang) || 'Session-Code eingeben'`. Den Schlüssel `group.join.title` gibt es in `translations.jsx` nicht, weder deutsch noch englisch; seine Geschwister `group.join.cta`, `.invalidCode` und `.submit` gibt es alle drei. **Der Rückfall ist toter Code:** `window.t` (`translations.jsx:1600-1605`) gibt bei fehlendem Schlüssel den **Schlüssel selbst** zurück, und der ist wahrheitswertig, also feuert `||` nie. Auf dem Bildschirm steht damit in beiden Sprachen die Zeichenkette `group.join.title`. Dieselbe Fehlerklasse wie E-28, gefunden mit derselben Messung, die auch die Prüfung im i18n-Generator begründet. Für den Neubau heißt das: Schritt 40 erfindet hier eine Überschrift oder übernimmt den hartcodierten deutschen Satz, den der Autor gemeint hat, und beides gehört entschieden statt stillschweigend gewählt. | 2 | Schritt 40 |
 
 ## Wie Tests hier blind werden
 

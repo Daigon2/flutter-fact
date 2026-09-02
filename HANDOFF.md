@@ -38,7 +38,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2287 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2292 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -303,6 +303,44 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Zwei Löcher im Architektur-Tor, und ein Fund nebenbei
+
+Das Skript hinter Gate 3 hatte zwei gemessene Lücken, beide seit dem 28.08.2026
+im Dokument benannt und beide seither offen. Jetzt zu: die Cross-Feature-Prüfung
+war flach (ein fremdes `features/x/unterstruktur/data/` entkam den Regeln 8 und
+9), und Regel 17 hing an `lib/features/` (ein `lib/map/presentation/` auf
+`lib/map/data/` wurde nicht gemeldet). 85 → 90 Tests am Skript, sechs
+Mutationen, alle gefallen, 2292 Tests insgesamt.
+
+**Überraschend war, dass die verschärfte Prüfung im Bestand nichts findet.** Bei
+den vorigen zwei Runden am selben Skript war das anders. Beide Lücken waren
+heute nicht auslösbar, weil es außerhalb von `lib/features/` schlicht kein
+`data/` gibt; sie waren Fallen für den Tag, an dem der Karten-Host eines bekommt,
+und genau als solche sind sie jetzt entschärft.
+
+**Eine Entscheidung hat der Bauende getroffen, weil mein Auftrag sie offen
+gelassen hatte**, und sie war richtig: die neue Modulwurzel-Prüfung **ergänzt**
+die alte, statt sie zu ersetzen. Ein Ersatz hätte den Schutz für eine
+Presentation-Datei in einer Feature-Unterstruktur verengt. Beide Bedingungen
+stehen als Oder in einem `if` mit einem `found.add`, und eine Zusicherung prüft
+die **Anzahl** der Meldungen, damit eine Doppelmeldung auffällt.
+
+**Nebenbei ein echter Fund in der PWA, und er kam aus einer Handmessung.** Die
+fehlende Quellprüfung des i18n-Generators habe ich erst einmal von Hand
+nachgestellt: 716 Wörterbuch-Schlüssel gegen 457 benutzte, sieben Treffer, davon
+vier dynamisch zusammengesetzte Präfixe und einer nur in einem Kommentar. Zwei
+sind echt: der bekannte E-28, und neu **E-63**, `group.join.title`. Dort steht
+`t('group.join.title', lang) || 'Session-Code eingeben'`, und **der Rückfall kann
+nie greifen**: `window.t` gibt bei fehlendem Schlüssel den Schlüssel selbst
+zurück, und der ist wahrheitswertig. Auf dem Bildschirm steht in beiden Sprachen
+die Zeichenkette `group.join.title`. Fällig in Schritt 40.
+
+**Schritt 38 trug als einziges Sperrzeichen im ganzen Dokument keinen Grund.**
+Nachgeprüft und nachgetragen: die Sperre ist berechtigt, liegt aber bei E-08 über
+Schritt 28 und **nicht** bei der Ökonomie. Dieselben Ökonomie-Fragen sind bei den
+Schritten 31 und 32 am selben Tag als Restrisiko freigegeben worden.
+
 
 ### 31.08.2026, Schritt 39, und die Kette war seit Schritt 35 durchtrennt
 
