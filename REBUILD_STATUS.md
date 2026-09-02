@@ -15,6 +15,23 @@ Plans und der Parity-Spec stehen unten unter „Korrekturen an den
 Quelldokumenten". Es sind inzwischen zwölf, und **auch Kommentare in der PWA
 selbst** sind darunter.
 
+> **Zu den Datumsangaben, und das betrifft fast alles unterhalb.** Diese
+> Arbeitssitzung lief über **drei** Kalendertage, und das Protokoll kennt nur
+> einen. Fast jeder Eintrag seit dem Fragenblock an Dairen trägt „31.08.2026",
+> auch wenn er am 1. oder 2. September entstanden ist; die Wörter „am selben
+> Tag" sind entsprechend oft falsch. Gemessen an den Commit-Zeitstempeln:
+> `574c305` und alles davor liegt am **31.08.2026** (bis 22:58), `e1dd722` bis
+> `6f955a8` am **01.09.2026** (14:53 bis 23:29), `add0394` bis `d559abe` am
+> **02.09.2026** (00:17 bis 03:58).
+>
+> **Ein Rundumschlag wäre schlimmer als der Fehler.** Von den 65 falsch
+> datierten Zeilen verweisen einige zu Recht auf den 31.08., etwa auf Dairens
+> Antworten oder auf die Backend-Aufnahme. Wer eine einzelne Angabe braucht,
+> holt sie mit `git log --format="%h %ad %s" --date=format:"%Y-%m-%d"` und
+> setzt **diese eine** richtig. Die Überschriften der Protokolleinträge vom
+> 2. September sind bereits nachgezogen.
+
+
 ## Legende
 
 `[x]` fertig und verifiziert · `[~]` in Arbeit · `[ ]` offen · `[!]` blockiert
@@ -1391,7 +1408,7 @@ logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
 
 
-## Schritt 39, Pause und Ergebnis, und die Kette schließt sich, 31.08.2026
+## Schritt 39, Pause und Ergebnis, und die Kette schließt sich, 02.09.2026
 
 2266 → 2287 Tests. Der Challenge-Reiter zeigt jetzt, was die Quelle dort zeigt,
 solange eine Jagd läuft: den Pausebildschirm mit Stationsliste, Kacheln und
@@ -1491,7 +1508,7 @@ nur als Zeilenhöhe und Rahmenstärke, im Jagd-Reduzierer gar nicht. **Der Neuba
 erbt diesen Widerspruch nicht.** Die Zeile im Register steht richtiggestellt da.
 
 
-## Schritt 37, die Jagd-Pille, 31.08.2026
+## Schritt 37, die Jagd-Pille, 02.09.2026
 
 2240 → 2266 Tests. Damit ist die laufende Solo-Jagd auf der Karte sichtbar:
 Stationszähler, Titel, Navigationshilfen nach Schwierigkeit, gestufte Hinweise

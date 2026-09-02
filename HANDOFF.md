@@ -15,7 +15,7 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 
 ---
 
-## Eine Sache liegt vor allem anderen, seit dem 31.08.2026
+## Eine Sache liegt vor allem anderen, seit dem 02.09.2026
 
 **Dieses Repository ist öffentlich.** Nachgesehen, nicht angenommen:
 `gh repo view` meldet für `Daigon2/flutter-fact` die Sichtbarkeit `PUBLIC`.
@@ -40,9 +40,26 @@ getroffen.** Steht als E-64 im Register, Stufe 4.
 ---
 
 
+> **Zu den Datumsangaben, und das betrifft fast alles unterhalb.** Diese
+> Arbeitssitzung lief über **drei** Kalendertage, und das Protokoll kennt nur
+> einen. Fast jeder Eintrag seit dem Fragenblock an Dairen trägt „31.08.2026",
+> auch wenn er am 1. oder 2. September entstanden ist; die Wörter „am selben
+> Tag" sind entsprechend oft falsch. Gemessen an den Commit-Zeitstempeln:
+> `574c305` und alles davor liegt am **31.08.2026** (bis 22:58), `e1dd722` bis
+> `6f955a8` am **01.09.2026** (14:53 bis 23:29), `add0394` bis `d559abe` am
+> **02.09.2026** (00:17 bis 03:58).
+>
+> **Ein Rundumschlag wäre schlimmer als der Fehler.** Von den 65 falsch
+> datierten Zeilen verweisen einige zu Recht auf den 31.08., etwa auf Dairens
+> Antworten oder auf die Backend-Aufnahme. Wer eine einzelne Angabe braucht,
+> holt sie mit `git log --format="%h %ad %s" --date=format:"%Y-%m-%d"` und
+> setzt **diese eine** richtig. Die Überschriften der Protokolleinträge vom
+> 2. September sind bereits nachgezogen.
+
+
 ## Stand
 
-**Zuletzt aktualisiert:** 31.08.2026
+**Zuletzt aktualisiert:** 02.09.2026
 
 Phase 0 und Phase 1 sind abgeschlossen. Aus Phase 2 sind laut Protokoll die
 Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
@@ -329,7 +346,7 @@ Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zw
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
 
-### 31.08.2026, Das Tor stand offen, aber nicht an diesem Zweig
+### 02.09.2026, Das Tor stand offen, aber nicht an diesem Zweig
 
 Beim Suchen nach dem nächsten Posten stellte sich heraus, dass gleich zwei
 Einträge im Statusdokument die Wirklichkeit falsch beschrieben.
@@ -356,7 +373,7 @@ lokales Tor sein darf: er verdoppelt die Laufzeit ungefähr, und ein Tor, das
 niemand mehr abwartet, ist keins.
 
 
-### 31.08.2026, Der i18n-Generator prüft jetzt auch die Aufrufstellen
+### 02.09.2026, Der i18n-Generator prüft jetzt auch die Aufrufstellen
 
 Die Lücke, die E-28 durchgelassen hat, ist zu. 2292 → 2308 Tests, sieben
 Mutationen, alle gefallen. Dazu hat das Werkzeug endlich eine Testdatei; es war
@@ -375,7 +392,7 @@ schärfste Mutation war deshalb ein **erfundener dritter Eintrag**: er wird als
 veraltet gemeldet, die Liste kann also nicht unbemerkt wachsen.
 
 
-### 31.08.2026, Zwei Löcher im Architektur-Tor, und ein Fund nebenbei
+### 02.09.2026, Zwei Löcher im Architektur-Tor, und ein Fund nebenbei
 
 Das Skript hinter Gate 3 hatte zwei gemessene Lücken, beide seit dem 28.08.2026
 im Dokument benannt und beide seither offen. Jetzt zu: die Cross-Feature-Prüfung
@@ -413,7 +430,7 @@ Schritt 28 und **nicht** bei der Ökonomie. Dieselben Ökonomie-Fragen sind bei 
 Schritten 31 und 32 am selben Tag als Restrisiko freigegeben worden.
 
 
-### 31.08.2026, Schritt 39, und die Kette war seit Schritt 35 durchtrennt
+### 02.09.2026, Schritt 39, und die Kette war seit Schritt 35 durchtrennt
 
 Pause- und Ergebnisbildschirm der Jagd stehen. 2266 → 2287 Tests, neun
 Mutationen, neun Treffer (fünf aus dem Auftrag, vier danach zur Gegenprobe).
@@ -448,7 +465,7 @@ zugeordnet, sitzt aber in der abgelösten Altansicht. Im neuen Ablauf kommt er
 nirgends vor, der Neubau erbt ihn also nicht.
 
 
-### 31.08.2026, Die Jagd-Pille, und zwei Korrekturen nach dem Bericht
+### 02.09.2026, Die Jagd-Pille, und zwei Korrekturen nach dem Bericht
 
 Schritt 37 steht: die laufende Jagd ist auf der Karte sichtbar. 2240 → 2266
 Tests, fünf Pflichtmutationen ohne Nachschärfen. Belege in `REBUILD_STATUS.md`.
