@@ -313,6 +313,71 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // **Beide Sprachen stehen in der Quelle**, hier ist nichts erfunden.
     'challenge.hotspot.noFacts':
         'Für diese Stadt sind noch keine klassifizierten Fakten verfügbar.',
+
+    // ── Jagd-Pille, `HuntPill` in `screen-map.jsx:1011-1135` ───────────
+    //
+    // Sechs sichtbare Texte der laufenden Solo-Jagd, keiner mit Schlüssel in
+    // der PWA. **Alle sechs stehen nur auf Deutsch da, und das ist Absicht,
+    // nicht ein vergessenes Englisch:** die Quelle zeigt diese Pille auch im
+    // englischen Modus deutsch, sie hat für keinen der sechs Texte einen
+    // zweiten Wortlaut. Übernommen ist deshalb genau das, was `fact.fileNumber`,
+    // `tour.step9.meta`, `puzzle.taskLabel` und `puzzle.photoCaption` schon
+    // vormachen: derselbe deutsche Wert steht in beiden Sprachkarten, damit
+    // `AppStrings` in beiden Sprachen dasselbe Ergebnis liefert wie die Quelle,
+    // ohne dass irgendwo eine erfundene englische Fassung stünde.
+    //
+    // Zum Präfix: nicht `challenge.pill.`, obwohl das dem Muster von
+    // `challenge.setup.` und `challenge.hotspot.` am nächsten läge. Die
+    // erzeugten Tabellen führen bereits `challenge.pills.*` (Mehrzahl, die vier
+    // Marketing-Kacheln des Startbildschirms, `screen-onboarding.jsx`), und ein
+    // fast gleich geschriebenes zweites Präfix wäre eine Falle für den nächsten
+    // Blick in die Tabelle. `challenge.huntPill.` trägt denselben Namen wie die
+    // Quellfunktion `HuntPill` und ist von `challenge.pills.` unverwechselbar.
+    //
+    // Zu den Emoji: wo die Quelle ein Zeichen als **eigenständiges Präfix**
+    // vor einen Text setzt (💡 vor „Tipps", 🔒 vor „Tipp freischalten…", ▲ vor
+    // „Schließen"), steht es hier **nicht** im Wert. Dasselbe Muster wie beim
+    // `icon`-Feld von `AuthField` (`signup_page.dart:352`) und wie es der
+    // Kopfkommentar dieser Datei für `audio.dialog.volumeHint` (E-28) vorführt:
+    // ein Icon ist Bildschmuck des Widgets, kein Bestandteil des Lesetexts.
+    // 🪙 dagegen steht **im** Wert von `hintLocked`, weil es mitten im Satz
+    // sitzt und zur Aussage „vom Fakt-Lohn" gehört, nicht davor.
+
+    // Die Stationszeile, `:1086`: `Station {activeHunt.currentStopIdx + 1} /
+    // {activeHunt.stops.length}`. Nicht `challenge.hotspot.stepCounter`
+    // („Schritt {step} von {total}"), das ist ein anderer Wortlaut für einen
+    // anderen Bildschirm, und nicht `puzzle.stationCounter` („Station
+    // {station}"), dem hier das zweite Zahlenfeld fehlt.
+    'challenge.huntPill.stationCounter': 'Station {station} / {total}',
+
+    // Die Beschriftung des Tipp-Knopfs, `:1103`. Das 💡 steht davor und wird
+    // vom Widget gezeichnet, siehe oben.
+    'challenge.huntPill.hintsLabel': 'Tipps',
+
+    // Der gesperrte Hinweis, `:1121`: `🔒 Tipp freischalten (−{HINT_COSTS[idx]}
+    // 🪙 vom Fakt-Lohn)`. Nachgeprüft, welches Zeichen wo steht: `−` ist U+2212
+    // (Minuszeichen, keine Ziffernsatz-Auszeichnung und kein Gedankenstrich),
+    // 🔒 ist das abtrennbare Präfix (siehe oben, außerhalb des Werts), 🪙 sitzt
+    // mitten im Satz und bleibt deshalb hier stehen.
+    'challenge.huntPill.hintLocked':
+        'Tipp freischalten (−{cost} 🪙 vom Fakt-Lohn)',
+
+    // Der Einklapp-Text, `:1130`: `▲ Schließen`. Das ▲ ist derselbe Fall wie
+    // 💡 und 🔒 oben.
+    'challenge.huntPill.close': 'Schließen',
+
+    // Der Rückfalltext ohne Hinweis aus der Datenbank, `:1036` und `:1040`
+    // wortgleich: `stop.nextHint || 'Schau dich in der Umgebung aufmerksam
+    // um.'`. Kein Emoji, keine Interpunktion außerhalb des Punkts am Ende.
+    'challenge.huntPill.hintFallback':
+        'Schau dich in der Umgebung aufmerksam um.',
+
+    // Der Platzhalter für einen fehlenden Stationstitel, `:1089`:
+    // `stop.factTitle || stop.title || '—'`. Das Zeichen ist U+2014
+    // (Gedankenstrich); er steht hier als **Abschrift** eines Platzhalters der
+    // Quelle und nicht als selbst gesetzte Pause in eigener Prosa, dieselbe
+    // Ausnahme wie bei `puzzle.photoCaption` weiter oben.
+    'challenge.huntPill.missingTitle': '—',
   },
   AppLanguage.en: <String, String>{
     'tour.stepCounter': 'STEP {step} OF {total}',
@@ -389,6 +454,19 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // hat, `:4349`. Abschrift, keine Herleitung.
     'challenge.hotspot.noFacts':
         'No classified facts available for this city yet.',
+
+    // ── Jagd-Pille ───────────────────────────────────────────────────────
+    // Bewusst derselbe deutsche Wert wie in der DE-Karte, siehe dort: die
+    // Quelle hat für diese Pille keinen englischen Wortlaut und zeigt sie auch
+    // im englischen Modus deutsch.
+    'challenge.huntPill.stationCounter': 'Station {station} / {total}',
+    'challenge.huntPill.hintsLabel': 'Tipps',
+    'challenge.huntPill.hintLocked':
+        'Tipp freischalten (−{cost} 🪙 vom Fakt-Lohn)',
+    'challenge.huntPill.close': 'Schließen',
+    'challenge.huntPill.hintFallback':
+        'Schau dich in der Umgebung aufmerksam um.',
+    'challenge.huntPill.missingTitle': '—',
   },
 };
 

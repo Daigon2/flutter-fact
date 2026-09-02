@@ -22,9 +22,9 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 Phase 0 und Phase 1 sind abgeschlossen. Aus Phase 2 sind laut Protokoll die
 Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
-den Schritten 33, 34 und 35.
+den Schritten 33 bis 37.
 
-**Fertig sind 23 von 50:** 1 bis 17, dazu 19, 21, 27, 33, 34 und 35. Schritt 14 ist
+**Fertig sind 25 von 50:** 1 bis 17, dazu 19, 21, 27 und 33 bis 37. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -38,7 +38,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2240 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2266 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -303,6 +303,29 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Die Jagd-Pille, und zwei Korrekturen nach dem Bericht
+
+Schritt 37 steht: die laufende Jagd ist auf der Karte sichtbar. 2240 → 2266
+Tests, fünf Pflichtmutationen ohne Nachschärfen. Belege in `REBUILD_STATUS.md`.
+
+**Überraschend war, dass beide wertvollen Korrekturen aus dem Bericht kamen und
+nicht aus den Tests.** Der Bauende hat gemeldet, dass `MapPosition` keine
+Peilung hat, und die Formel **nicht** im Widget nachgebaut, sondern die Lücke
+offen gelassen. Genau richtig: sie gehört in die Domäne, ist jetzt dort, und der
+Pfeil erscheint seither wirklich, statt geprüft und unverdrahtet dazustehen. Und
+er hat gemeldet, dass meine Vorgabe „die letzte Station bekommt keine Hinweise"
+von der Quelle abweicht. Sie tat es, die Quelle zeigt dort den Rückfallsatz.
+
+**Der Test dazu war grün, während das Verhalten falsch war**, und der Grund ist
+allgemein genug für Muster 25: er prüfte nur, dass bestimmte Texte **fehlen**,
+und die fehlen in beiden Fassungen. Wer prüft, dass etwas weg ist, prüft im
+selben Test, was stattdessen da ist.
+
+**Ein echter Bug kam vom Widget-Test selbst:** ohne `HitTestBehavior.opaque`
+reagiert die Pille nicht auf Tipps neben dem Text, obwohl in der Quelle die
+ganze Zeile klickbar ist. Das hätte auf dem Gerät genauso ausgesehen.
+
 
 ### 31.08.2026, Schritt 36 ist zu, und eine Wache hatte eine Lücke
 

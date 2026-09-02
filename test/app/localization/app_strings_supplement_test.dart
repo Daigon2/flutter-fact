@@ -35,7 +35,7 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die sechsunddreißig belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die zweiundvierzig belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
@@ -52,6 +52,10 @@ void main() {
       // `:3093` und `:4348-4350`. **Vierzehn davon sind auf Englisch
       // hergeleitet und warten auf Freigabe (E-46)**, nur
       // `challenge.hotspot.noFacts` steht in beiden Sprachen in der Quelle.
+      // Die sechs `challenge.huntPill.`-Schlüssel kamen am 02.09.2026 mit
+      // Schritt 37 dazu, `screen-map.jsx:1036-1130`; die Quelle zeigt die
+      // Jagd-Pille in beiden Sprachen deutsch, deshalb steht in beiden Karten
+      // hier derselbe Wert.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
         'tour.stepCounter',
         'tour.step1.meta',
@@ -89,6 +93,12 @@ void main() {
         'challenge.hotspot.startCta',
         'challenge.hotspot.empty',
         'challenge.hotspot.noFacts',
+        'challenge.huntPill.stationCounter',
+        'challenge.huntPill.hintsLabel',
+        'challenge.huntPill.hintLocked',
+        'challenge.huntPill.close',
+        'challenge.huntPill.hintFallback',
+        'challenge.huntPill.missingTitle',
       });
     });
 
@@ -492,6 +502,80 @@ void main() {
         for (final key in supplementTextsFor(
           language,
         ).keys.where((String key) => key.startsWith('challenge.'))) {
+          expect(AppStrings.of(language).hasText(key), isTrue, reason: key);
+          expect(
+            AppStrings.of(language).textKeys.contains(key),
+            isFalse,
+            reason: key,
+          );
+        }
+      }
+    });
+  });
+
+  group('Die Jagd-Pille', () {
+    // Sechs Schlüssel, und die Quelle zeigt jeden davon in beiden Sprachen
+    // deutsch. Geprüft wird deshalb der Wortlaut in beiden Sprachen und dass
+    // keiner davon zur PWA-Fläche gehört.
+
+    test('die Stationszeile füllt beide Platzhalter', () {
+      // `screen-map.jsx:1086`.
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(language).text(
+            'challenge.huntPill.stationCounter',
+            params: {'station': '3', 'total': '7'},
+          ),
+          'Station 3 / 7',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('Tipp-Knopf, gesperrter Hinweis und Einklapp-Text im Wortlaut der '
+        'Quelle', () {
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(language).text('challenge.huntPill.hintsLabel'),
+          'Tipps',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(
+            language,
+          ).text('challenge.huntPill.hintLocked', params: {'cost': '20'}),
+          // U+2212 (Minuszeichen), keine Ziffer und kein Gedankenstrich.
+          'Tipp freischalten (−20 🪙 vom Fakt-Lohn)',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntPill.close'),
+          'Schließen',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('Rückfalltext und Platzhaltertitel', () {
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(language).text('challenge.huntPill.hintFallback'),
+          'Schau dich in der Umgebung aufmerksam um.',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntPill.missingTitle'),
+          '—',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('die sechs Schlüssel bleiben aus der PWA-Fläche heraus', () {
+      for (final language in AppLanguage.values) {
+        for (final key in supplementTextsFor(
+          language,
+        ).keys.where((String key) => key.startsWith('challenge.huntPill.'))) {
           expect(AppStrings.of(language).hasText(key), isTrue, reason: key);
           expect(
             AppStrings.of(language).textKeys.contains(key),

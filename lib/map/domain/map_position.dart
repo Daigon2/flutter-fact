@@ -77,6 +77,38 @@ final class MapPosition {
     return 2 * earthRadiusInMeters * math.asin(math.sqrt(a));
   }
 
+  /// Anfangs-Peilung nach [other] in Grad, 0 ist Norden, im Uhrzeigersinn.
+  ///
+  /// Gleiche Rechnung wie `mapBearing` in `screen-map.jsx:647-653`, inklusive
+  /// des abschließenden `+ 360) % 360`, das negative Werte von `atan2` in
+  /// `[0, 360)` faltet.
+  ///
+  /// **Anfangs-Peilung, nicht konstante Richtung.** Auf einem Großkreis ändert
+  /// sich die Peilung unterwegs; dieser Wert gilt am Startpunkt. Für die
+  /// Entfernungen einer Stadtjagd ist der Unterschied bedeutungslos, und die
+  /// Quelle rechnet genauso.
+  ///
+  /// Sie existiert nicht auf Vorrat: die Jagd-Pille zeigt bei Schwierigkeit
+  /// `leicht` einen Richtungspfeil (`screen-map.jsx:1052`), und
+  /// `huntArrowIndexFor` braucht dafür eine Gradzahl. Ohne diese Methode wäre
+  /// der Pfeil strukturell da und stünde dauerhaft still.
+  ///
+  /// **Der Rückgabewert auf demselben Punkt ist 0.** `atan2(0, 0)` ist in Dart
+  /// `0`, und daraus folgt „Norden". Das ist keine Aussage über die Richtung,
+  /// sondern die einzige, die eine Peilung ohne Strecke haben kann; wer sie
+  /// anzeigt, prüft vorher den Abstand.
+  double bearingInDegreesTo(MapPosition other) {
+    final double deltaLongitude = _toRadians(other.longitude - longitude);
+    final double y =
+        math.sin(deltaLongitude) * math.cos(_toRadians(other.latitude));
+    final double x =
+        math.cos(_toRadians(latitude)) * math.sin(_toRadians(other.latitude)) -
+        math.sin(_toRadians(latitude)) *
+            math.cos(_toRadians(other.latitude)) *
+            math.cos(deltaLongitude);
+    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  }
+
   static double _toRadians(double degrees) => degrees * math.pi / 180;
 
   @override

@@ -1283,7 +1283,7 @@ führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
   Entfernung selbst.
 
 - [x] 33. Wizard · [x] 34. Solo-Setup · [x] 35. Hotspot-Picker
-- [ ] 36. Phasen-Maschine (E-43 und D-16 entschieden, seit dem 31.08.2026 frei) · [ ] 37. Active-UI (dito)
+- [x] 36. Phasen-Maschine · [x] 37. Active-UI (beide am 31.08.2026 im neuen Zuschnitt gebaut: Regeln, `HuntRun`, Zustandshalter, Jagd-Pille auf der Karte)
   · [!] 38. Rätsel und Ökonomie
 - [ ] 39. Pause und Results · [ ] 40. Gruppen-Flow (Realtime mit ADR-009 entschieden, seit dem 31.08.2026 frei; erbt E-21, E-54 und E-57 aus dem Backend)
 
@@ -1389,6 +1389,80 @@ Nachbesserung fallen alle sechs.
 logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 `map_screen_point.dart` und die Liste „Was bewusst fehlt" sagten alle drei noch
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
+
+
+## Schritt 37, die Jagd-Pille, 31.08.2026
+
+2240 → 2266 Tests. Damit ist die laufende Solo-Jagd auf der Karte sichtbar:
+Stationszähler, Titel, Navigationshilfen nach Schwierigkeit, gestufte Hinweise
+mit ihren Kosten, aufklappbar.
+
+**Der Weg ins Bild folgt der dokumentierten Bauform:** `challenges` liefert sein
+Overlay über die App-Komposition (`lib/features/README.md`). `MapPage` bekommt
+einen nullbaren Parameter dafür, `app_routes.dart` baut die Pille und versorgt
+sie mit der Nutzerposition. Das ist nötig und nicht bequem: `userLocationProvider`
+liegt in `discovery/presentation` und ist für `challenges` nach Regel 8 gesperrt,
+und ein eigenes Abonnement wäre der dritte Ortungsstrom im Projekt.
+
+**Fünf Pflichtmutationen, fünf Fälle**, ohne Nachschärfen.
+
+### Die Texte gibt es nur auf Deutsch, und das ist Parität
+
+Sechs Einträge in der Ergänzungs-Map aus E-39, Präfix `challenge.huntPill.`.
+Nicht `challenge.pill.`: die erzeugten Tabellen führen bereits `challenge.pills.*`
+für vier Marketing-Kacheln eines anderen Bildschirms, und zwei fast gleich
+geschriebene Präfixe wären eine Verwechslungsfalle.
+
+Warum nur Deutsch, steht als **E-61**: die Quelle hält diese Beschriftungen als
+hartcodiertes Deutsch ohne i18n-Schlüssel, englischsprachige Nutzer sehen dort
+also Deutsch. Erfundener englischer Text wäre die schlechtere Lösung, dieselbe
+Linie wie bei E-28.
+
+### Zwei Korrekturen nach dem Bericht, und die zweite war mein Fehler
+
+**1. `MapPosition` fehlte die Peilung, und der Pfeil stand deshalb still.** Der
+Bauende hat die Lücke gemeldet, statt die Formel im Widget nachzubauen, und das
+war richtig: eine Peilung ist domänenwertig und gehört neben
+`distanceInMetersTo`. Sie ist jetzt da, nach `screen-map.jsx:647-653`, mit sieben
+Tests gegen die **vier Himmelsrichtungen** statt gegen eine nachgerechnete Zahl.
+Der Fall „genau westlich" ist der, der ohne das abschließende `+ 360) % 360`
+falsch wäre: `atan2` liefert dort negativ.
+
+Damit fiel auch der Platzhalter-Parameter der Pille weg: sie rechnet die Peilung
+aus denselben zwei Punkten wie die Distanz, eine Zeile darunter. **Der Pfeil
+erscheint jetzt wirklich**, statt geprüft und unverdrahtet dazustehen.
+
+**2. „Die letzte Station bekommt keine Hinweise" war meine Vorgabe und falsch.**
+Der Bauende hat gemeldet, dass das von der Quelle abweicht, und die Quelle
+gewinnt: ihr Ausdruck fällt an der letzten Station in den `else`-Zweig, und der
+setzt den Rückfallsatz an Index 0. Ein Nutzer sieht dort also einen offenen
+ersten Hinweis mit „Schau dich in der Umgebung aufmerksam um.", keine leere
+Fläche. Behoben, und die Probe fällt.
+
+### Der Test, der grün war, während das Verhalten falsch war
+
+Der Test zur letzten Station prüfte nur, dass die Texte `Hinweis n.m` und
+`Tipp freischalten` **fehlen**. Beides fehlt auch bei der richtigen Fassung, er
+konnte den Unterschied also gar nicht sehen. Erst die zusätzliche Forderung, dass
+der Rückfallsatz **da** ist, macht ihn scharf. Als Muster **25** im Katalog.
+
+### Ein echter Bug, gefunden vom Widget-Test
+
+`GestureDetector` reagiert im Standardverhalten nicht auf Tipps in der leeren
+Fläche neben linksbündigem Text. In der Quelle ist die ganze Zeile klickbar
+(`cursor:pointer` am `div`, `:1080`). Ohne `HitTestBehavior.opaque` blieb die
+Pille unaufklappbar, und das war kein Testartefakt, sondern hätte auf dem Gerät
+genauso ausgesehen.
+
+### Zwei Kleinigkeiten, die dazugehören
+
+Der Platzhalter `—` hat in der Quelle **zwei** Fundstellen, nicht eine: auch ein
+freigeschalteter Hinweis ohne Text zeigt ihn (`:1115`). Mit unserer Domäne ist
+dieser Zweig unerreichbar, weil ein Freischalt-Knopf nur existiert, wo Text
+vorliegt; er ist trotzdem mit demselben Schlüssel abgesichert.
+
+Und der zweite Farbwert des Verlaufs (`#c02a05`) hat kein Token; nur der erste
+ist `FactColors.red`. Er steht als rohe Zahl mit Fundstelle daneben.
 
 
 ## Schritt 36, der Zustandshalter, und damit ist Schritt 36 zu
@@ -4299,6 +4373,15 @@ halben Tag.
     Allgemein: wer eine Rangfolge prüft, sorgt dafür, dass die verlierende
     Quelle etwas anderes sagt, sonst prüft er nur, dass irgendeine von beiden
     gelesen wird.
+25. **Ein Test, der nur Abwesenheit prüft, unterscheidet „nichts" nicht von
+    „etwas anderes".** Der Test „an der letzten Station gibt es keine
+    Hinweistexte" prüfte, dass die Texte `Hinweis n.m` und
+    `Tipp freischalten` **nicht** vorkommen. Beides fehlt sowohl bei einer
+    leeren Fläche als auch bei dem Rückfallsatz, den die Quelle dort in
+    Wahrheit zeigt. Der Test blieb deshalb grün, während das Verhalten falsch
+    war, und wurde erst rot, als er zusätzlich die **Anwesenheit** des
+    richtigen Satzes forderte. Belegt am 31.08.2026. Allgemein: wer prüft, dass
+    etwas weg ist, prüft im selben Test, was stattdessen da ist.
 
 ## Datenvertrag: die bekannten Fallen
 

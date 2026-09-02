@@ -175,6 +175,7 @@ void main() {
     required ProviderContainer container,
     bool branchIsActive = true,
     Duration Function()? now,
+    Widget? huntOverlay,
   }) {
     return tester.pumpWidget(
       UncontrolledProviderScope(
@@ -195,6 +196,7 @@ void main() {
                   // Kompositions-Adapter auf App-Ebene: `discovery` darf
                   // `map/presentation/` nicht selbst importieren (Regel 18).
                   mapSurface: mapSurfaceStandIn,
+                  huntOverlay: huntOverlay,
                   now: now,
                 ),
               ),
@@ -369,6 +371,53 @@ void main() {
       );
       expect(rotation.transform.getRotation().storage[1], closeTo(-1, 0.001));
     });
+
+    testWidgets('ohne Jagd-Overlay zeigt der Bildschirm dafür nichts an', (
+      tester,
+    ) async {
+      // `huntOverlay` ist nullbar, siehe `MapPage.huntOverlay`: der weit
+      // überwiegende Normalzustand ist, dass keine Jagd läuft.
+      await pumpPage(tester, container: newContainer());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey<String>('jagd-pille')), findsNothing);
+    });
+
+    testWidgets(
+      'das Jagd-Overlay liegt über der Karte und unter dem Top-Chrome',
+      (tester) async {
+        const Widget huntOverlayStandIn = SizedBox(
+          key: ValueKey<String>('jagd-pille'),
+        );
+        await pumpPage(
+          tester,
+          container: newContainer(),
+          huntOverlay: huntOverlayStandIn,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byWidget(huntOverlayStandIn), findsOneWidget);
+
+        final Stack stack = tester.widget<Stack>(
+          find
+              .ancestor(
+                of: find.byWidget(mapSurfaceStandIn),
+                matching: find.byType(Stack),
+              )
+              .first,
+        );
+        final int mapIndex = stack.children.indexOf(mapSurfaceStandIn);
+        final int chromeIndex = stack.children.lastIndexWhere(
+          (widget) => widget is MapTopChrome,
+        );
+        final int overlayIndex = stack.children.indexWhere(
+          (widget) =>
+              widget is Positioned && widget.child == huntOverlayStandIn,
+        );
+        expect(overlayIndex, greaterThan(mapIndex));
+        expect(overlayIndex, lessThan(chromeIndex));
+      },
+    );
 
     testWidgets('die dunkle Fassung bleibt unverdrahtet', (tester) async {
       // `mapDark` wird in der Quelle nie `true`, siehe `MapTopChrome.isDark`.

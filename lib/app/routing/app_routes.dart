@@ -45,6 +45,7 @@ import 'dart:async';
 import 'package:fact_app/app/onboarding/onboarding_host.dart';
 import 'package:fact_app/app/shell/app_shell.dart';
 import 'package:fact_app/features/challenges/presentation/pages/challenges_page.dart';
+import 'package:fact_app/features/challenges/presentation/widgets/hunt_pill.dart';
 import 'package:fact_app/features/collection/presentation/pages/collection_page.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
 import 'package:fact_app/features/discovery/presentation/pages/map_page.dart';
@@ -55,7 +56,9 @@ import 'package:fact_app/features/identity/presentation/pages/signup_page.dart';
 import 'package:fact_app/features/identity/presentation/pages/splash_page.dart';
 import 'package:fact_app/features/profile/presentation/pages/profile_page.dart';
 import 'package:fact_app/features/settings/presentation/widgets/audio_activation_dialog.dart';
+import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/map/presentation/map_surface.dart';
+import 'package:fact_app/services/location/device_position.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -151,17 +154,41 @@ class MapRoute extends GoRouteData with $MapRoute {
   const MapRoute();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) => const MapPage(
-    // Kompositions-Adapter auf App-Ebene, Regel 10 der `dependency-rules.md`,
-    // dasselbe Muster wie `onAudioGuidePressed` weiter unten.
-    //
-    // **Er ist hier nicht bequem, sondern notwendig:** Regel 18 verbietet
-    // jedem Feature den Import von `map/presentation/`, damit die Kamera beim
-    // Karten-Host bleibt. `discovery` bekommt die Kartenfläche deshalb
-    // hereingereicht und erfährt nicht, woraus sie besteht. Ein Feature, das
-    // diese Zeile bei sich nachbaut, bricht den Architektur-Check.
-    mapSurface: MapSurface(initialCamera: MapPage.placeholderCamera),
-  );
+  Widget build(BuildContext context, GoRouterState state) {
+    return Consumer(
+      builder: (BuildContext context, WidgetRef ref, Widget? child) {
+        // `select` und nicht der ganze Zustand, aus demselben Grund wie bei
+        // `FactRoute` weiter unten: ohne `select` baute dieser Adapter bei
+        // jeder Ortung neu, obwohl nur `HuntPill` (über sein eigenes `watch`
+        // auf `huntRunProvider`) überhaupt reagiert.
+        final DevicePosition? fix = ref.watch(
+          userLocationProvider.select((UserLocationState state) => state.fix),
+        );
+        return MapPage(
+          // Kompositions-Adapter auf App-Ebene, Regel 10 der
+          // `dependency-rules.md`, dasselbe Muster wie `onAudioGuidePressed`
+          // weiter unten.
+          //
+          // **Er ist hier nicht bequem, sondern notwendig:** Regel 18
+          // verbietet jedem Feature den Import von `map/presentation/`, damit
+          // die Kamera beim Karten-Host bleibt. `discovery` bekommt die
+          // Kartenfläche deshalb hereingereicht und erfährt nicht, woraus sie
+          // besteht. Ein Feature, das diese Zeile bei sich nachbaut, bricht
+          // den Architektur-Check.
+          mapSurface: MapSurface(initialCamera: MapPage.placeholderCamera),
+          // Derselbe Kompositions-Grund wie bei `mapSurface`, nur für Regel 8
+          // statt Regel 18: `challenges/presentation` ist für `discovery`
+          // unerreichbar. `HuntPill` bekommt die Nutzerposition hier
+          // hereingereicht, siehe seinen Kopfkommentar.
+          huntOverlay: HuntPill(
+            userPosition: fix == null
+                ? null
+                : MapPosition(latitude: fix.latitude, longitude: fix.longitude),
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// Die Fakt-Akte, `/map/fact/:factId`.

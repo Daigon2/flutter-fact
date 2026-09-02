@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:fact_app/core/async/detached_work.dart';
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
@@ -143,7 +144,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Kartenmitte (`screen-map.jsx:310-322`, `:2992-3008`) gehört `features/city`.
 class MapPage extends ConsumerStatefulWidget {
   /// Erzeugt den Karten-Bildschirm mit der Kartenfläche [mapSurface].
-  const MapPage({required this.mapSurface, this.now, super.key});
+  const MapPage({
+    required this.mapSurface,
+    this.huntOverlay,
+    this.now,
+    super.key,
+  });
 
   /// Die Kartenfläche, die unter dem Top-Chrome liegt.
   ///
@@ -151,6 +157,22 @@ class MapPage extends ConsumerStatefulWidget {
   /// und eine Karte, die aus Versehen fehlt, sähe dann genauso aus wie eine,
   /// die noch lädt.
   final Widget mapSurface;
+
+  /// Die Jagd-Pille der laufenden Solo-Jagd, `HuntPill` in
+  /// `screen-map.jsx:1011-1135`, Schritt 37.
+  ///
+  /// **Nullbar, und das ist der Gegensatz zu [mapSurface] und aus demselben
+  /// Grund bewusst.** [mapSurface] ist verpflichtend, weil ein Standard dafür
+  /// eine leere Fläche wäre und eine fehlende Karte optisch nicht von einer
+  /// ladenden zu unterscheiden ist. Für das Jagd-Overlay gilt das Gegenteil:
+  /// **kein** Overlay ist der weit überwiegende Normalzustand dieses
+  /// Bildschirms, denn die allermeiste Zeit läuft gar keine Jagd. `HuntPill`
+  /// zeigt sich in diesem Fall selbst nicht (siehe seinen Kopfkommentar), ein
+  /// `null` hier ist also keine Notlösung, sondern deckt sich mit dem, was das
+  /// Widget ohnehin täte. Ein Pflichtparameter zwänge jeden Aufrufer ohne
+  /// laufende Jagd, trotzdem ein Widget zu bauen (und via `challenges`
+  /// aufzulösen), nur um es sofort nichts zeichnen zu lassen.
+  final Widget? huntOverlay;
 
   /// Die Uhr des Kompass-Wachhunds, siehe `_MapPageState._now`.
   ///
@@ -976,6 +998,24 @@ class _MapPageState extends ConsumerState<MapPage> {
         // `FactBalloonOverlay`, damit beide dieselbe Kartenfläche als
         // Bezugspunkt für ihre Bildschirmlagen haben.
         const DiscoveryBalloonAnchor(),
+        // Die Jagd-Pille, `screen-map.jsx:1011-1135`: über der Tab-Leiste und
+        // unter dem Top-Chrome, wie die Quelle sie zeigt. **Vor**
+        // `MapTopChrome` im Baum, damit das Chrome bei einer zufälligen
+        // Überlappung sichtbar bleibt (Malreihenfolge = Reihenfolge im Baum,
+        // wie im Klassenkommentar von `MapTopChrome` begründet).
+        //
+        // `bottom: calc(max(24px, env(safe-area-inset-bottom, 0px)) + 70px)`,
+        // `left/right: 12`, `:1074`. Übernommen ist die Rechnung der Quelle
+        // wörtlich und nicht ein Bezug auf `FloatingTabBar`: die Pille kennt
+        // die Maße der schwebenden Tab-Leiste nicht, und beide sind
+        // unabhängig voneinander gegen die sichere Fläche bemessen.
+        if (widget.huntOverlay != null)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: math.max(24, MediaQuery.paddingOf(context).bottom) + 70,
+            child: widget.huntOverlay!,
+          ),
         MapTopChrome(
           cityName: MapPage.placeholderCityName,
           coins: MapPage.placeholderCoins,

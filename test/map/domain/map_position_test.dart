@@ -115,6 +115,102 @@ void main() {
     });
   });
 
+  group('Peilung, gegen die vier Himmelsrichtungen geprüft', () {
+    // Die Himmelsrichtungen sind hier die unabhängige Herleitung: eine
+    // Verschiebung nach Norden muss 0 ergeben, nach Osten 90, und das gilt
+    // ohne jede Kenntnis der Formel. Ein Test, der nur nachrechnet, was der
+    // Code rechnet, prüft nichts.
+    const MapPosition muenchen = MapPosition(
+      latitude: 48.1372,
+      longitude: 11.5755,
+    );
+
+    test('genau nördlich ergibt 0 Grad', () {
+      expect(
+        muenchen.bearingInDegreesTo(
+          const MapPosition(latitude: 48.2372, longitude: 11.5755),
+        ),
+        closeTo(0, 0.001),
+      );
+    });
+
+    test('genau östlich ergibt 90 Grad', () {
+      expect(
+        muenchen.bearingInDegreesTo(
+          const MapPosition(latitude: 48.1372, longitude: 11.7755),
+        ),
+        closeTo(90, 0.1),
+      );
+    });
+
+    test('genau südlich ergibt 180 Grad', () {
+      expect(
+        muenchen.bearingInDegreesTo(
+          const MapPosition(latitude: 48.0372, longitude: 11.5755),
+        ),
+        closeTo(180, 0.001),
+      );
+    });
+
+    test('genau westlich ergibt 270 Grad', () {
+      // **Der Fall, der ohne das abschließende `+ 360) % 360` falsch wäre.**
+      // `atan2` liefert hier einen negativen Wert, und ohne die Faltung stünde
+      // dort −90 statt 270. Die Quelle hat dieselbe Zeile, aus demselben
+      // Grund (`screen-map.jsx:652`).
+      expect(
+        muenchen.bearingInDegreesTo(
+          const MapPosition(latitude: 48.1372, longitude: 11.3755),
+        ),
+        closeTo(270, 0.1),
+      );
+    });
+
+    test('das Ergebnis liegt immer in [0, 360)', () {
+      // Über acht Richtungen geprüft, damit keine einzelne Himmelsrichtung
+      // zufällig durchkommt.
+      for (final MapPosition ziel in <MapPosition>[
+        const MapPosition(latitude: 48.2372, longitude: 11.6755),
+        const MapPosition(latitude: 48.0372, longitude: 11.6755),
+        const MapPosition(latitude: 48.0372, longitude: 11.4755),
+        const MapPosition(latitude: 48.2372, longitude: 11.4755),
+        const MapPosition(latitude: -33.8688, longitude: 151.2093),
+        const MapPosition(latitude: 64.1466, longitude: -21.9426),
+        const MapPosition(latitude: 0, longitude: 0),
+        const MapPosition(latitude: 48.1372, longitude: 11.5756),
+      ]) {
+        final double peilung = muenchen.bearingInDegreesTo(ziel);
+        expect(peilung, greaterThanOrEqualTo(0));
+        expect(peilung, lessThan(360));
+      }
+    });
+
+    test('auf demselben Punkt ist die Peilung 0 und wirft nicht', () {
+      // Keine Aussage über eine Richtung, sondern die einzige, die eine
+      // Peilung ohne Strecke haben kann. Wichtig ist, dass nichts wirft und
+      // kein `NaN` herauskommt: der Pfeil bekäme sonst einen Index, den
+      // `huntArrowIndexFor` nicht bilden kann.
+      final double peilung = muenchen.bearingInDegreesTo(muenchen);
+
+      expect(peilung, 0);
+      expect(peilung.isNaN, isFalse);
+    });
+
+    test('die Peilung ist nicht symmetrisch', () {
+      // Die Gegenprobe zur Verwechslung mit der Entfernung: hin und zurück
+      // sind bei einer Strecke gleich, bei einer Peilung nicht. Ohne sie käme
+      // eine Umsetzung durch, die Start und Ziel vertauscht.
+      const MapPosition ziel = MapPosition(
+        latitude: 48.2372,
+        longitude: 11.6755,
+      );
+
+      expect(
+        muenchen.bearingInDegreesTo(ziel),
+        isNot(closeTo(ziel.bearingInDegreesTo(muenchen), 1)),
+      );
+    });
+  });
+
   group('Wertgleichheit', () {
     test(
       'zwei zur Laufzeit gebaute Punkte mit gleichen Feldern sind gleich',
