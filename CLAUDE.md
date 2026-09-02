@@ -111,3 +111,23 @@ not.
 - This repository sits outside OneDrive on a pure ASCII path on purpose. Release
   builds fail from the OneDrive path because of the non-ASCII directory name.
 - The shell is PowerShell. Backslash is not a line continuation character.
+- **The shell cannot write UTF-8, and this bites every German string.** Measured
+  02.09.2026: a heredoc body and command-line arguments both pass through a
+  legacy codepage, so `python -c 'print("Übergabe: schließen")'` arrives as
+  `?bergabe: schlie?en`. Reading, `grep`, `sed` on ASCII patterns and launching
+  a script file all work fine; only text going **through** the command line is
+  mangled.
+
+  Consequences, both of which cost time in this session before the cause was
+  known: ASCII transliterations (`fuer`, `haengt`) appearing in documents that
+  require real umlauts, and Python `SyntaxError` on German quotation marks,
+  because `„…"` closes a `"`-delimited literal while the intended closer is `“`.
+
+  So: any script containing German text goes into a **file** via the write tool
+  and is then executed. Never a heredoc, never `python -c`. If a one-liner is
+  unavoidable, keep it ASCII-only and use `\uXXXX` escapes.
+- **`dart format` writes before it sets the exit code.** Use
+  `dart format --output=none --set-exit-if-changed lib test tool`, exactly as
+  `docs/engineering/quality-gates.md` spells it. Without `--output=none` the
+  gate reformats files as a side effect, which on 02.09.2026 rewrote six files
+  belonging to a concurrently running agent.

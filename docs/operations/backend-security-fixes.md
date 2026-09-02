@@ -35,24 +35,33 @@ Der technische Entscheider hat am 28.08.2026 auf die drei offenen Rückfragen
 geantwortet (D-6, D-7, D-8). Das Ergebnis steht hier oben, weil es die
 Ausführung bindet.
 
-> ### Migration 1 und Migration 2 laufen jetzt. Migration 3 läuft noch nicht.
+> ### Migration 1, 2 und 3 laufen. Die Sperre für Migration 3 ist am 02.09.2026 gefallen.
 
 | Schritt | Was | Wann |
 |---|---|---|
 | 1 | Migration 1, `profiles` spaltenweise sperren (E-24) | sofort |
 | 2 | Migration 2a **und** 2b, `increment_coins` (E-06) | sofort, direkt danach |
-| Zwischenschritt | **PWA-Release**, der `02_Frontend/app/api.jsx:145` auf `collect_fact_validated` umstellt | eigener Auftrag im PWA-Repository |
-| 3 | Migration 3, `collected_facts` (E-23) | **erst nach diesem Release** |
+| 3 | Migration 3, `collected_facts` (E-23) | **jetzt auch**, Aufhebung unten |
+| danach | **PWA-Release**, der `02_Frontend/app/api.jsx:145` auf `collect_fact_validated` umstellt | eigener Auftrag im PWA-Repository, damit die PWA wieder sammeln kann |
 
-**Wer Schritt 3 vorzieht, nimmt die Produktion vom Netz.** `api.jsx:145` ist der
-einzige Weg, auf dem in der laufenden PWA ein Fakt gesammelt wird, und der
-Fehler wird im Client verschluckt: der Nutzer sieht weiter „gesammelt", während
-nichts gespeichert wird. Begründung und Folgeschäden in Abschnitt 4.
+**Migration 3 war bis zum 02.09.2026 gesperrt, und die Sperre war richtig.**
+`api.jsx:145` ist der einzige Weg, auf dem in der PWA ein Fakt gesammelt wird,
+und der Fehler wird im Client verschluckt: der Nutzer sieht weiter „gesammelt",
+während nichts gespeichert wird. Solange die PWA in Produktion lief, hätte
+Schritt 3 sie vom Netz genommen. Begründung und Folgeschäden in Abschnitt 4.
+
+**Am 02.09.2026 hat der Eigentümer festgestellt, dass die PWA derzeit nicht live
+läuft und ein Ausfall dort in Kauf genommen ist.** Damit fällt die Sperre, und
+zwar nur sie: der Bruch selbst bleibt genau so, wie Abschnitt 4 ihn beschreibt,
+und er ist still. Wer Migration 3 ausführt, nimmt der PWA das Sammeln, bis der
+PWA-Release nachkommt. Das ist ab jetzt eine bewusste Inkaufnahme und kein
+Versehen.
 
 **Die drei Antworten im Wortlaut und was daraus folgt:**
 
 - **D-6, Reihenfolge:** „okay passt, gerne fixen." Migration 1 und 2 sind
-  freigegeben, Migration 3 bleibt liegen, bis die PWA umgestellt ist.
+  freigegeben, Migration 3 blieb liegen, bis die PWA umgestellt ist. **Diese
+  Auflage ist am 02.09.2026 entfallen**, Aufhebung oben.
 - **D-7, `increment_coins`:** „ja mit schließen und Betragsdeckel ja. Höhe selbst
   entscheiden, aber leicht anpassbar machen." Die Fremdkonten-Lücke wird
   mitgeschlossen (Block 2a), der Deckel kommt (Block 2b). **Gewählt: 500**, und
@@ -598,8 +607,11 @@ Konsolen-Warnung und meldet an Sentry, die Oberfläche zeigt weiter „gesammelt
 Der Nutzer sieht also **nicht**, dass nichts gespeichert wurde, bis er neu lädt.
 Ein stiller Datenverlust ist schlimmer als eine Fehlermeldung.
 
-**Deshalb ist Migration 3 nicht auszuführen, bevor die PWA umgestellt ist.** Die
-Umstellung ist keine Zeile. `collect_fact_validated` verlangt `p_user_lat` und
+**Deshalb war Migration 3 bis zum 02.09.2026 nicht auszuführen. Seit der
+Feststellung des Eigentümers, dass die PWA nicht live läuft, ist sie
+freigegeben, und der Ausfall der PWA ist in Kauf genommen** (Aufhebung im
+Entscheidungsstand oben). Die Umstellung der PWA bleibt nötig, und sie ist
+keine Zeile. `collect_fact_validated` verlangt `p_user_lat` und
 `p_user_lng`, gibt bei zu großer Entfernung `ok:false` zurück und bucht selbst
 `+10` Coins (`supabase-schema.sql:124-127`), während die PWA an derselben Stelle
 `50` bucht (`app.jsx:714`). Wer nur den Aufruf tauscht, verdoppelt entweder die
@@ -1105,8 +1117,10 @@ die Einstellung zurücksetzen. Andersherum gilt zwischenzeitlich der Ausfallwert
 
 Dateiname: `2026-08-28_e23_collected_facts.sql`
 
-> **Nicht ausführen, solange die PWA `api.jsx:145` benutzt.** Siehe Abschnitt 4.
-> Dieser Block ist fertig, damit er bereitliegt, nicht damit er heute läuft.
+> **Freigegeben am 02.09.2026.** Bis dahin galt: nicht ausführen, solange die
+> PWA `api.jsx:145` benutzt. Der Eigentümer hat an diesem Tag festgestellt, dass
+> die PWA nicht live läuft und ein Bruch dort in Kauf genommen ist. Der Bruch
+> bleibt bestehen und ist still, Beschreibung in Abschnitt 4.
 
 ```sql
 -- ============================================================================
@@ -1121,8 +1135,13 @@ Dateiname: `2026-08-28_e23_collected_facts.sql`
 -- SECURITY-DEFINER-Funktionen demselben Rollen-Eigentümer gehören wie die
 -- Tabelle und dass FORCE ROW LEVEL SECURITY nicht gesetzt ist.
 --
--- BRECHENDE ÄNDERUNG für 02_Frontend/app/api.jsx:145. Erst nach dem
--- PWA-Release ausführen, der dort auf die RPC umstellt.
+-- BRECHENDE ÄNDERUNG für 02_Frontend/app/api.jsx:145: danach sammelt die PWA
+-- nichts mehr, und der Fehler ist still (_apiCheck, api.jsx:139-146).
+-- Bis zum 02.09.2026 galt deshalb "erst nach dem PWA-Release ausführen".
+-- AUFGEHOBEN AM 02.09.2026: der Eigentümer hat festgestellt, dass die PWA
+-- nicht live läuft und ein Ausfall dort in Kauf genommen ist. Der PWA-Release,
+-- der auf collect_fact_validated umstellt, bleibt nötig, blockiert diesen
+-- Block aber nicht mehr.
 -- ============================================================================
 
 begin;
@@ -1540,10 +1559,11 @@ nicht blockiert.** E-52 nennt drei Funktionen. `increment_coins` erledigt
 mit derselben Konto-Bindung und demselben `revoke ... from public, anon`.
 Migration 4 fügt deshalb nur `unlock_trophy` hinzu und schließt die
 Ausführrechte des restlichen Funktionsbestands. **Wichtig, weil es leicht
-übersehen wird: Block 3b ist nicht durch den PWA-Release blockiert.** Blockiert
-ist Block 3**a**, der Insert-Weg. `collect_fact_validated` wird in der PWA von
-niemandem gerufen (Abschnitt 2, „Aufrufe von `collect_fact_validated`"), also
-kann 3b sofort laufen und E-52 für diese Funktion sofort schließen.
+übersehen wird: Block 3b war nie durch den PWA-Release blockiert.** Blockiert
+war Block 3**a**, der Insert-Weg, und das nur bis zum 02.09.2026.
+`collect_fact_validated` wird in der PWA von niemandem gerufen (Abschnitt 2,
+„Aufrufe von `collect_fact_validated`"), also kann 3b sofort laufen und E-52 für
+diese Funktion sofort schließen.
 
 **4. Ein pauschales Revoke gegen `anon` bricht die Registrierung, und zwar in
 beiden Clients.** `check_username` wird **vor** der Anmeldung gerufen, während
@@ -1756,8 +1776,8 @@ an. Der Angriff „schreib der Konkurrenz eine Trophäe" wäre dann nicht behobe
 sondern nur verlegt. Andersherum entsteht kein halber Zustand: nach 4 allein
 schreibt der Client noch direkt in die Tabelle, also genau wie heute.
 
-**Keine der drei hängt am PWA-Release**, der Migration 3a blockiert. Sie können
-alle drei heute laufen, in der Reihenfolge 4, 5, 6.
+**Keine der drei hängt am PWA-Release**, der Migration 3a bis zum 02.09.2026
+blockiert hat. Sie können alle drei heute laufen, in der Reihenfolge 4, 5, 6.
 
 **Was nach jeder Migration einmal passieren muss.** Migration 4 und der
 optionale Block 4c ändern Funktionsrümpfe und Ausführrechte. PostgREST hält
@@ -1771,6 +1791,16 @@ notify pgrst, 'reload schema';
 Kostet nichts, ist beliebig oft wiederholbar, und ohne sie antwortet die API im
 Zweifel mit `PGRST202` („could not find function") auf eine Funktion, die es
 gibt. Dasselbe gilt für die Blöcke 2a, 2b und 3b oben.
+
+**Erweiterung vom 02.09.2026: die Zeile gehört auch an die Migrationen 1, 5 und
+6.** Sie ändern keine Funktionssignatur, aber Tabellen- und Spaltenrechte, und
+PostgREST leitet daraus ab, welche Spalten eine Anfrage schreiben darf. Auch das
+steht im Schemacache. Ein `revoke`/`grant` ohne Erneuerung kann eine entzogene
+Spalte für die API weiter als schreibbar führen, und der Fehler zeigt sich dann
+nicht als Rechtefehler, sondern als Schreibvorgang, der durchgeht und nichts
+tut. Die Zeile ist billig und beliebig oft wiederholbar; ein veralteter Cache
+kostet eine halbe Stunde Fehlersuche an einer Stelle, die niemand verdächtigt.
+Vermerkt als Eintrag 9 in Abschnitt 13.
 
 ### 11.4 Migration 4: `unlock_trophy` und die Ausführrechte (E-52)
 
@@ -1798,7 +1828,7 @@ Begründung, in der Reihenfolge ihres Gewichts:
    Produktion die Trophäen weg, und zwar lautlos: `Api.unlockTrophy` hat kein
    `_apiCheck` und `app.jsx:551` fängt jeden Fehler mit `catch (e) { }` ab. Der
    Nutzer sieht die Konfetti-Animation, der Server hat nichts gespeichert. Das
-   ist derselbe Fehlermodus, der Migration 3a blockiert.
+   ist derselbe Fehlermodus, der Migration 3a bis zum 02.09.2026 blockiert hat.
 2. **Weg A schließt die Lücke vollständig, nicht teilweise.** Der Schaden von
    E-52 ist der Schreibzugriff auf ein fremdes Konto. Der ist mit dem Vergleich
    gegen `auth.uid()` weg, ganz unabhängig davon, ob der Parameter noch da
@@ -3040,6 +3070,7 @@ Zweck.
 | 6 | Negativtest „vorher gelingt, nachher scheitert" | zusätzlich Tests, die **vorher und nachher gelingen müssen** (42, 43, 44, 48, 49, 61, 62, 63) | Ein Negativtest allein beweist nur, dass etwas zu ist, nicht dass die App noch läuft. Die Nichtbruch-Tests sind hier die riskanteren. |
 | 7 | Prüfen, was in `lib/` bricht | zusätzlich gemeldet, dass das Suchmuster `.rpc(` aus Abschnitt 10 den einzigen RPC-Aufruf dieses Repositories nicht findet | `_client.rpc<Object?>(`, `supabase_auth_remote_data_source.dart:295`. Das Ergebnis von Abschnitt 10 bleibt richtig, die Methode nicht. |
 | 8 | E-58 auslassen | ausgelassen, aber zweimal als Grund genannt (Abfrage O, 11.10) | Ohne Protokoll ist nach einem Missbrauch von E-53 nicht feststellbar, wer freigegeben hat. Das ist keine Behandlung von E-58, sondern die Wirkung seines Fehlens auf E-53. |
+| 9 | `notify pgrst, 'reload schema';` nur bei geänderten Funktionsrümpfen und Ausführrechten genannt, also für 2a, 2b, 3b und Migration 4 | am 02.09.2026 auf die Migrationen 1, 5 und 6 erweitert, Begründung in 11.3 | PostgREST cacht auch Tabellen- und Spaltenrechte und leitet daraus ab, welche Spalten schreibbar sind. Ohne Erneuerung kann eine entzogene Spalte für die API weiter als schreibbar gelten. Die Zeile ist idempotent und kostet nichts, ein veralteter Cache kostet Fehlersuche an einer Stelle, die niemand verdächtigt. |
 
 ---
 
@@ -3159,7 +3190,8 @@ genauso still, dort steht dann nichts.
 
 **Deshalb ist der Zuschnitt zweigeteilt**, dieselbe Trennung wie bei Migration
 3a gegen 3b: 14.2 fasst die Rückgabe nicht an und kann heute laufen, 14.3
-verkleinert sie und wartet auf einen PWA-Release.
+verkleinert sie und hat bis zum 02.09.2026 auf einen PWA-Release gewartet.
+Seither ist auch sie freigegeben, weil die PWA nicht live läuft.
 
 #### Frage 3: Liest irgendwer die beiden Tabellen direkt?
 
@@ -3259,7 +3291,7 @@ widersprechbar ist.
 | Block | Was | Bricht die PWA? | Läuft |
 |---|---|---|---|
 | **7a** | die beiden `USING (true)`-Policies fallen; `get_leaderboard` gibt nur noch den Username aus; `get_my_rank` ist an das eigene Konto gebunden | **nein**, Nachweis in 14.2 | **heute** |
-| **7b** | die Rückgabe von `get_leaderboard` wird umgebaut: `user_id` raus, `is_me` rein, `city_count` dazu, `'Entdecker'` raus | **ja**, `screen-profil.jsx:88`, `:103`, `:117` | **nach einem PWA-Release** |
+| **7b** | die Rückgabe von `get_leaderboard` wird umgebaut: `user_id` raus, `is_me` rein, `city_count` dazu, `'Entdecker'` raus | **ja**, `screen-profil.jsx:88`, `:103`, `:117` | **heute**, Sperre am 02.09.2026 aufgehoben |
 
 **Was 7a leistet.** Eine Kontokennung schließt danach nichts mehr auf: die
 beiden Tabellen antworten nur noch auf die eigene Zeile, `profiles` tut das seit
@@ -3324,8 +3356,9 @@ derselbe Block mit zwei Zeilen weniger.
   voneinander. 7a wiederholt die Rechte-Anweisung aus 4b **nicht**: dieselbe
   Anweisung an zwei Stellen macht den Zustand nicht sicherer, sondern beim
   Rückabwickeln zu einem Halbzustand, Begründung in 6.1.
-- **Migration 3a ist gleichgültig.** 7a und 7b hängen nicht am PWA-Release, der
-  3a blockiert, und umgekehrt.
+- **Migration 3a ist gleichgültig.** 7a und 7b hingen nicht an dem PWA-Release,
+  der 3a bis zum 02.09.2026 blockiert hat, und umgekehrt. Seit diesem Tag ist
+  keine der beiden Sperren mehr in Kraft.
 
 ### 14.2 Migration 7a: die Leseseite der beiden Tabellen schließt (E-16)
 
@@ -3690,13 +3723,15 @@ Zeile, die die Anmeldepflicht für `get_leaderboard` aufhebt. Die erste Fassung
 dieses Blocks hatte eine, weil 7a eine Anmeldepflicht setzte. Mit der Rücknahme
 vom 02.09.2026 gibt es keine, und damit auch nichts zurückzunehmen.
 
-### 14.3 Migration 7b: die Rückgabe wird umgebaut. Läuft noch nicht
+### 14.3 Migration 7b: die Rückgabe wird umgebaut. Freigegeben am 02.09.2026
 
 Dateiname: `2026-09-02_e16_leaderboard_shape.sql`
 
-> **Nicht ausführen, solange die PWA `screen-profil.jsx` in der heutigen Fassung
-> ausliefert.** Der Block ist fertig, damit er bereitliegt, nicht damit er heute
-> läuft. Was in der PWA zu ändern ist, steht in 14.6.
+> **Freigegeben am 02.09.2026.** Bis dahin galt: nicht ausführen, solange die
+> PWA `screen-profil.jsx` in der heutigen Fassung ausliefert. Der Eigentümer hat
+> an diesem Tag festgestellt, dass die PWA nicht live läuft und ein Bruch dort in
+> Kauf genommen ist. Der Bruch bleibt bestehen, er trifft drei Stellen, und er
+> ist an allen drei still. Was in der PWA zu ändern ist, steht in 14.6.
 
 Drei Änderungen an der Rückgabe, jede mit ihrem eigenen Grund:
 
@@ -3716,8 +3751,12 @@ Drei Änderungen an der Rückgabe, jede mit ihrem eigenen Grund:
 -- ============================================================================
 -- FACT — E-16, zweiter Teil: die Rückgabe von get_leaderboard
 -- ----------------------------------------------------------------------------
--- BRECHENDE ÄNDERUNG für 02_Frontend/app/screen-profil.jsx:88, :103 und :117.
--- Erst nach dem PWA-Release ausführen, der dort auf is_me umstellt.
+-- BRECHENDE ÄNDERUNG für 02_Frontend/app/screen-profil.jsx:88, :103 und :117,
+-- und an allen drei Stellen still. Aufstellung in 14.6.
+-- Bis zum 02.09.2026 galt deshalb "erst nach dem PWA-Release ausführen".
+-- AUFGEHOBEN AM 02.09.2026: der Eigentümer hat festgestellt, dass die PWA
+-- nicht live läuft und ein Ausfall dort in Kauf genommen ist. Der PWA-Release,
+-- der auf is_me umstellt, bleibt nötig, blockiert diesen Block aber nicht mehr.
 --
 -- VORAUSSETZUNG: Block 7a ist gelaufen. Dieser Block ersetzt Schritt 1 aus 7a
 -- nicht: die beiden Policies sind dort gefallen, nicht hier.
@@ -4226,16 +4265,16 @@ Migration:
 | Zeile | Heute | Nach 7b | Änderung |
 |---|---|---|---|
 | 88 | `const isMe = String(row.user_id) === String(userId)` | immer `false`, keine Hervorhebung | `const isMe = row.is_me === true` |
+| 103 | `{row.display_name}` | leer bei Konten ohne Username | `{row.display_name || t('ranking.anonymous', lang)}`, und der Schlüssel muss erst existieren |
 | 117 | `!rows.some(r => String(r.user_id) === String(userId))` | immer `true`, der eigene Rang wird unten angehängt, obwohl er in der Liste steht | `!rows.some(r => r.is_me)` |
 
-Für einen Besucher ohne Konto sind beide Zeilen nach 7b richtig und ohne
-Sonderfall: `is_me` ist `false`, also gibt es keine Hervorhebung, und der
+Für einen Besucher ohne Konto sind Zeile 88 und Zeile 117 nach 7b richtig und
+ohne Sonderfall: `is_me` ist `false`, also gibt es keine Hervorhebung, und der
 angehängte eigene Rang erscheint nicht, weil `myRank` ohne Sitzung `null` bleibt
 (`app.jsx:267` ruft `getMyRank` nur innerhalb von `if (!session) return;`,
 `app.jsx:232`).
-| 103 | `{row.display_name}` | leer bei Konten ohne Username | `{row.display_name || t('ranking.anonymous', lang)}`, und der Schlüssel muss erst existieren |
 
-Die dritte Zeile ist der Grund, warum 7b nicht nur ein Suchen und Ersetzen ist:
+Zeile 103 ist der Grund, warum 7b nicht nur ein Suchen und Ersetzen ist:
 `t()` gibt in der PWA bei fehlendem Schlüssel den Schlüssel selbst zurück, ein
 `||`-Rückfall dahinter kann also nie feuern. Genau dieser Fehler ist in
 `CLAUDE.md` als E-63 vermerkt. Der Schlüssel muss vor dem Release in beiden
@@ -4297,8 +4336,12 @@ Abschnitt 2.
   liefert, ist das eine Frage, die man einmal beantworten sollte, statt sie
   anzunehmen. Sie gehört nicht in eine Migration.
 - **Der Wortlaut für ein Konto ohne Username.** Nach 7b liefert der Server
-  `null`, und der Client braucht einen Text. Inhaltsfrage. Bis sie beantwortet
-  ist, läuft 7b nicht, weil sonst eine leere Zeile in der Rangliste steht.
+  `null`, und der Client braucht einen Text. Inhaltsfrage, weiter offen. Bis zum
+  02.09.2026 war das der **zweite** Grund, 7b liegen zu lassen, neben dem
+  PWA-Release. Mit der Aufhebung ist er nicht verschwunden, sondern verschoben:
+  solange die PWA nicht live ist, erreicht die leere Zeile niemanden, und die
+  Frage blockiert nicht mehr die Migration, sondern den PWA-Release, der auf
+  `is_me` umstellt.
 - **`profiles.show_real_name` und `profiles.name` sind nach der Entscheidung
   ohne Zweck.** `show_real_name` liest nach 7a niemand mehr, und `name` trägt im
   Neubau bereits den Username (`signup_notifier.dart:174`). Beide Spalten zu
