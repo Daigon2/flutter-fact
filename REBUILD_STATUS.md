@@ -3672,9 +3672,38 @@ Dasselbe Muster wie bei E-28, nur zeitlich getrennt.
 > punkt... [...] ich würde fast sagen es gibt immer nur ein Username und sonst
 > nichts. Keinen echten namen etc. in Games ist das ja auch immer so.“
 
-**Entschieden ist damit:** ohne Anmeldung **nichts**. Mit Anmeldung **Rang,
+**Entschieden war zuerst:** ohne Anmeldung **nichts**. Mit Anmeldung **Rang,
 Punktestand und Anzahl der Städte**, keine Städtenamen. Und es gibt **nur einen
 Username**, keinen echten Namen.
+
+**Die erste Hälfte hat der Eigentümer am selben Tag zurückgenommen**, und der
+Auslöser war ein gemessener Nebenbefund aus dem Migrationsauftrag: nach der
+Migration hätten nicht angemeldete Besucher die Rangliste verloren, obwohl die
+PWA gar keine Anmeldeschranke davor hat. Es hätte also wie ein Fehler
+ausgesehen. Sein Wortlaut:
+
+> „achso, ja mei, dann sieht man halt doch die Rangfolge und die Coins etc.
+> passt schon auch wenn man nicht angemeldet ist. bevor das aussieht wie ein
+> Fehler. Kannst du schon machen und schafft ja vielleicht auch den reiz sich
+> anzumelden.“
+
+**Es gilt also:** die Rangliste ist **auch ohne Anmeldung** sichtbar, mit Rang
+und Punktestand. Alles andere der Antwort bleibt: keine Städtenamen, nur ein
+Username, kein echter Name.
+
+**Eine Lesart musste ich dabei festlegen.** Er schreibt „die Coins“, die
+Rangliste führt aber `score` und nicht `coins`; die Coins sind das persönliche
+Guthaben und stehen dort heute nicht. Gelesen als „das, was in der Rangliste
+steht“, also Rang und Punktestand. Coins kommen nicht in die Rückgabe.
+
+**Und die Rücknahme macht einen Teil der Behebung wichtiger, nicht
+unwichtiger.** Die Rückgabe enthält heute `user_id`, also Konto-Kennungen. Mit
+einem angemeldeten Aufrufer war das Nachklapp, weil Kennungen ohnehin über die
+für alle lesbaren Kommentare zu holen sind. Ohne Anmeldung ist eine Liste von
+Konto-UUIDs **ohne jede Hürde maschinell einsammelbar**. `user_id` durch ein
+`is_me` zu ersetzen ist damit die eigentliche Behebung von E-16 und nicht mehr
+Hygiene. Für einen nicht angemeldeten Aufrufer ist `is_me` immer `false`, das
+braucht keinen Sonderfall.
 
 **Zum Toggle, weil ausdrücklich gefragt: nicht bauen.** Rang, Punktestand und
 Städte**zahl** sind eine Rangliste. Städte**namen** sind ein Bewegungsprofil,
@@ -4592,7 +4621,7 @@ eine Fundstelle.
 | E-13 | **AI-Zugang.** Anthropic-Schlüssel niemals im Client, `ai_proxy` und Edge Function nutzen, Quota serverseitig. | **4** | Phase 7 |
 | E-14 | **OpenRouteService** für Fußweg-Routen: Konto, Kosten, Rate Limits, Fallback. | **4** | Phase 6 |
 | E-15 | **TTS-Weg.** Gerät (`flutter_tts`) oder Cloud. Cloud heißt laufende Kosten. | 4 bei Cloud, sonst 3 | Phase 3 |
-| E-16 | **Leaderboard-Sichtbarkeit.** `user_city_scores` und `user_trophies` haben `USING (true)` für SELECT. Alle Punktestände und Trophäen sind für jeden lesbar. Zusammenspiel mit dem Schalter „Echten Namen zeigen". **Am 31.08.2026 zur Schliessung beauftragt**, gemeinsam mit E-49. Haengt an E-55: dieselben zwei Tabellen sind nicht nur lesbar, sondern vom Client schreibbar, und eine Antwort nur zur Leseseite lässt die teurere Hälfte stehen. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“.  **Am 02.09.2026 beantwortet, damit ist die Leseseite entschieden.** Janek: ohne Anmeldung sieht niemand etwas; mit Anmeldung Rang, Punktestand und **Anzahl** der Städte, keine Städtenamen. Ein Schalter zum Teilen von Städtenamen ist erwogen und **nicht** gebaut: Städtenamen sind ein Bewegungsprofil, und ein Schalter macht das Riskante zur Entscheidung des Nutzers mit einem Standardwert, der für die Mehrheit falsch ist. Dazu die weiter reichende Entscheidung: **es gibt nur einen Username, keinen echten Namen.** Damit verschwindet der Schalter „Echten Namen zeigen“ als Begriff und mit ihm der Grund, `profiles.name` von `profiles.username` zu unterscheiden. Der Neubau macht die Username-Regel schon, nachgeprüft: kein Namensfeld in der Registrierung, `signup_notifier.dart:174` füllt `name` mit dem Username. Umzusetzen bleibt im Backend: `get_leaderboard` verlangt eine Sitzung, die zwei `USING (true)`-Leserechte fallen. Wortlaut im Abschnitt „Janeks Antworten auf den dritten Block“. | **4** | Phase 7 |
+| E-16 | **Leaderboard-Sichtbarkeit.** `user_city_scores` und `user_trophies` haben `USING (true)` für SELECT. Alle Punktestände und Trophäen sind für jeden lesbar. Zusammenspiel mit dem Schalter „Echten Namen zeigen". **Am 31.08.2026 zur Schliessung beauftragt**, gemeinsam mit E-49. Haengt an E-55: dieselben zwei Tabellen sind nicht nur lesbar, sondern vom Client schreibbar, und eine Antwort nur zur Leseseite lässt die teurere Hälfte stehen. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“.  **Am 02.09.2026 beantwortet, damit ist die Leseseite entschieden.** Janek: ohne Anmeldung sieht niemand etwas; mit Anmeldung Rang, Punktestand und **Anzahl** der Städte, keine Städtenamen. Ein Schalter zum Teilen von Städtenamen ist erwogen und **nicht** gebaut: Städtenamen sind ein Bewegungsprofil, und ein Schalter macht das Riskante zur Entscheidung des Nutzers mit einem Standardwert, der für die Mehrheit falsch ist. Dazu die weiter reichende Entscheidung: **es gibt nur einen Username, keinen echten Namen.** Damit verschwindet der Schalter „Echten Namen zeigen“ als Begriff und mit ihm der Grund, `profiles.name` von `profiles.username` zu unterscheiden. Der Neubau macht die Username-Regel schon, nachgeprüft: kein Namensfeld in der Registrierung, `signup_notifier.dart:174` füllt `name` mit dem Username. Umzusetzen bleibt im Backend: `get_leaderboard` verlangt eine Sitzung, die zwei `USING (true)`-Leserechte fallen. Wortlaut im Abschnitt „Janeks Antworten auf den dritten Block“.  **Am 02.09.2026 in einem Punkt zurückgenommen:** die Rangliste bleibt **auch ohne Anmeldung** sichtbar, mit Rang und Punktestand. Auslöser war ein gemessener Nebenbefund des Migrationsauftrags, dass die PWA keine Anmeldeschranke davor hat und der Verlust wie ein Fehler aussähe. Alles andere bleibt: keine Städtenamen, nur ein Username. **Dadurch wird 7b wichtiger, nicht unwichtiger:** eine Liste von Konto-UUIDs ohne jede Hürde ist schlechter als eine hinter einer Anmeldung, `user_id` durch `is_me` zu ersetzen ist damit die eigentliche Behebung. | **4** | Phase 7 |
 | E-17 | **Creator-Foto.** Storage-Bucket, Policy, Moderation vor `is_approved`. | 3, Bucket-Anlage 4 | Phase 8 |
 | E-19 | **Trusted Time.** Der 45-Minuten-Timer für das Session-Ende und die Finale-Punkte ×1.5 rechnen clientseitig. `security.md` §1 verbietet vertrauenswürdige Zeitstempel aus dem Client. **Am 31.08.2026 entschieden: der Server rechnet, keine Ausnahme von `security.md`.** Regel für den Neubau: der Client rechnet keine Zeit, an der eine Belohnung hängt. Die Umsetzung ist eine Backend-Änderung, damit ist das Sitzungsende in Phase 5 bis dahin nicht parität-treu baubar. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“. | 3 | Phase 5 |
 | E-20 | **Kamera-Permission** für Damals/Heute und Foto-Rätsel, mit Zweckbindung. | 3 | Phase 3 |
