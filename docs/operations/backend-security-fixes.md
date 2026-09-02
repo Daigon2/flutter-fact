@@ -4265,15 +4265,23 @@ Abschnitt 2.
   Konto. Die Verkleinerung bleibt echt, aber die Anmeldung ist keine Hürde mehr,
   die man dazurechnen darf.
 
-  **Das ist eine Produktfrage und bleibt offen:** entweder die Stadt-Ranglisten
-  fallen, oder sie verlangen als einzige eine Sitzung (technisch eine Zeile:
-  `if p_city <> 'global' and auth.uid() is null then raise ...`, und die globale
-  Liste bliebe offen), oder die Aussage lautet „keine Städtenamen, außer man
-  steht in den besten zehn einer Stadt". Drei vertretbare Antworten, und keine
-  ist die andere. **Nicht entschieden, nicht gebaut**, und ausdrücklich nicht
-  als Technik in 7a hineingeschrieben: die Rücknahme sagt „die Rangliste bleibt
-  sichtbar", nicht „die globale Rangliste bleibt sichtbar", und diesen
-  Unterschied darf ich nicht selbst festlegen.
+  **Am 02.09.2026 entschieden, und zwar die dritte der drei Antworten.** Der
+  Eigentümer, gefragt genau nach diesem Unterschied: „ja alle Ranglisten können
+  eingesehen werden. passt schon." Die Stadt-Ranglisten bleiben also offen, und
+  eine Sitzung wird auch für sie nicht verlangt. Der Einzeiler
+  `if p_city <> 'global' and auth.uid() is null then raise ...` **wird nicht
+  gebaut**; er steht hier nur noch als das, was verworfen wurde.
+
+  **Damit gilt die Aussage in ihrer engeren Form, und sie gehört so
+  hingeschrieben:** keine Städtenamen **außer** für die besten zehn je Stadt,
+  und für die auch ohne Konto. Das ist bewusst in Kauf genommen und kein
+  Versehen. Wer die Sichtbarkeitsregel später zitiert, zitiert diesen Satz und
+  nicht „keine Städtenamen".
+
+  Der verbleibende Personenbezug ist damit: ein Nutzername in den Top 10 einer
+  Stadt sagt, dass diese Person dort Fakten gesammelt hat. Kein Zeitpunkt, kein
+  Ort innerhalb der Stadt, keine Häufigkeit, und keine Kennung mehr, sobald 7b
+  gelaufen ist. Genau deshalb ist 7b der Teil, der jetzt zählt.
 - **Zwischen 7a und 7b sind Kontokennungen ohne Konto einsammelbar.** Das ist
   kein neuer Zustand, sondern der heutige, und er endet mit 7b. Er steht hier,
   weil die Rücknahme ihn verlängert: solange nur 7a gelaufen ist, liefert
