@@ -53,29 +53,33 @@ void main() {
       // hergeleitet und warten auf Freigabe (E-46)**, nur
       // `challenge.hotspot.noFacts` steht in beiden Sprachen in der Quelle.
       // Die sechs `challenge.huntPill.`-Schlüssel kamen am 02.09.2026 mit
-      // Schritt 37 dazu, `screen-map.jsx:1036-1130`; die Quelle zeigt die
-      // Jagd-Pille in beiden Sprachen deutsch, deshalb steht in beiden Karten
-      // hier derselbe Wert. Die zweiundzwanzig `challenge.huntPause.`- und
-      // `challenge.huntResult.`-Schlüssel kamen mit Schritt 39 dazu,
-      // `screen-challenge.jsx:2797-2980`, aus demselben Grund (E-61) wieder in
-      // beiden Sprachkarten mit demselben deutschen Wert.
+      // Schritt 37 dazu, `screen-map.jsx:1036-1130`. Die zweiundzwanzig
+      // `challenge.huntPause.`- und `challenge.huntResult.`-Schlüssel kamen
+      // mit Schritt 39 dazu, `screen-challenge.jsx:2797-2980`.
       //
       // **`audio.dialog.volumeHint` kam am 02.09.2026 dazu und ist von allen
       // anderen verschieden** (E-28, `screen-auth.jsx:251`). Alle übrigen
       // schreiben ab, was die PWA sichtbar anzeigt, ohne es als Schlüssel zu
       // führen. Dieser trägt einen Text, den die Quelle **überhaupt nicht
-      // hat**: sie zeigt dort den Schlüsselnamen. Und er ist der erste mit
-      // zwei verschiedenen Sprachwerten, weil es nichts Deutsches gibt, das
-      // man nachahmen könnte.
+      // hat**: sie zeigt dort den Schlüsselnamen. Und er war lange der
+      // einzige mit zwei wirklich verschiedenen Sprachwerten, weil alle
+      // anderen Blöcke aus demselben deutschen Wert in beiden Karten
+      // bestanden.
       //
-      // **Der Grund, aus dem in den übrigen Karten derselbe deutsche Wert
-      // steht, ist am 02.09.2026 aufgehoben.** E-61 ist entschieden:
-      // englischsprachige Nutzer sehen Englisch, hartcodiertes Deutsch in der
-      // Quelle ist ein Defekt und keine Parität. Damit sind die deutschen
-      // Werte in der englischen Karte **Arbeit und nicht Absicht**, ebenso wie
-      // die vierzehn englisch hergeleiteten `challenge.hotspot.`-Werte aus
-      // E-46. Wer sie übersetzt, ändert nur Werte und keinen Schlüssel; dieser
-      // Test bleibt davon unberührt und prüft weiter nur den Bestand.
+      // **Das ist seit dem 02.09.2026 nicht mehr so.** Bis dahin trugen die
+      // sechs `challenge.huntPill.`- und die zweiundzwanzig
+      // `challenge.huntPause.`-/`challenge.huntResult.`-Schlüssel in beiden
+      // Karten denselben deutschen Wert, mit der Begründung, die Quelle zeige
+      // diese Texte auch im englischen Modus deutsch (E-61). Der Eigentümer
+      // hat diese Begründung als Regel grundsätzlich aufgehoben: sie war ein
+      // gemessener Defekt der Quelle und keine Parität. Die englische Karte
+      // trägt jetzt für fast alle diese Schlüssel einen eigenen Wortlaut;
+      // welche wenigen weiterhin denselben Wert tragen und warum, steht
+      // begründet in der Ausnahmeliste des Tests „kein englischer Wert
+      // bleibt versehentlich deutsch" gleich im Anschluss. Die vierzehn
+      // englisch hergeleiteten `challenge.hotspot.`-Werte aus E-46 warten
+      // weiterhin auf Freigabe; diese Zählprobe prüft ohnehin nur den
+      // Bestand und keine Werte.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
         'audio.dialog.volumeHint',
         'tour.stepCounter',
@@ -143,6 +147,79 @@ void main() {
         'challenge.huntResult.timePlaceholder',
         'challenge.huntResult.close',
       });
+    });
+
+    test('kein englischer Wert bleibt versehentlich deutsch', () {
+      // **Die Wache zu E-61, seit dem 02.09.2026.** Vorher trugen die Blöcke
+      // `challenge.huntPill.`, `challenge.huntPause.` und
+      // `challenge.huntResult.` in **beiden** Sprachkarten denselben deutschen
+      // Wert, mit der Begründung, die Quelle halte diese Texte hartcodiert
+      // deutsch. Der Eigentümer hat das grundsätzlich aufgehoben:
+      // englischsprachige Nutzer sehen Englisch, ein hartcodierter deutscher
+      // Text in der Quelle ist ein Defekt und keine Parität.
+      //
+      // Der teure Fehler ist ab jetzt nicht der falsche Wortlaut, sondern der
+      // **vergessene**: ein neuer Schlüssel, den jemand in beide Karten mit
+      // demselben deutschen Satz schreibt, fällt sonst niemandem auf. Dieser
+      // Test macht daraus einen roten Lauf.
+      //
+      // Die Ausnahmen stehen namentlich da, jede mit ihrem Grund. Eine
+      // Ausnahmeliste ohne Begründung wird beim ersten Fehlalarm um einen
+      // Eintrag länger, und dann bewacht sie nichts mehr.
+      const Map<String, String> gleichMitGrund = <String, String>{
+        'challenge.bubbleTitle': 'das Wort "Challenge" ist englisch',
+        'challenge.setup.durationCard':
+            '"{minutes} min" gilt in beiden Sprachen',
+        'challenge.huntPause.stopsLabel': 'das Wort "Stops" ist englisch',
+        'challenge.huntPause.stopPending':
+            '"Station {station}" gilt in beiden Sprachen',
+        'challenge.huntPill.stationCounter':
+            '"Station {station} / {total}" gilt in beiden Sprachen',
+        'puzzle.stationCounter': '"Station {station}" gilt in beiden Sprachen',
+        'challenge.huntPause.timePlaceholder': 'ein Gedankenstrich, sprachfrei',
+        'challenge.huntPill.missingTitle': 'ein Gedankenstrich, sprachfrei',
+        'challenge.huntResult.timePlaceholder':
+            'ein Gedankenstrich, sprachfrei',
+        'tour.step1.meta': 'eine Namensnennung, Goethe heißt in beiden so',
+      };
+
+      final Map<String, String> deutsch = supplementTextsFor(AppLanguage.de);
+      final Map<String, String> englisch = supplementTextsFor(AppLanguage.en);
+
+      final List<String> unuebersetzt = <String>[];
+      for (final MapEntry<String, String> eintrag in englisch.entries) {
+        final String? de = deutsch[eintrag.key];
+        if (de == eintrag.value && !gleichMitGrund.containsKey(eintrag.key)) {
+          unuebersetzt.add('${eintrag.key} = "${eintrag.value}"');
+        }
+      }
+
+      expect(
+        unuebersetzt,
+        isEmpty,
+        reason:
+            'Diese Schlüssel tragen in beiden Sprachen denselben Wert und '
+            'stehen nicht auf der begründeten Ausnahmeliste. Entweder '
+            'übersetzen oder mit Grund eintragen.',
+      );
+
+      // **Die Gegenprobe, ohne die die Liste verrottet.** Ein Eintrag, dessen
+      // Werte inzwischen auseinanderlaufen, ist tot und gehört raus, sonst
+      // deckt die Liste irgendwann echte Versäumnisse.
+      final List<String> toteAusnahmen = <String>[];
+      for (final String key in gleichMitGrund.keys) {
+        if (!englisch.containsKey(key)) {
+          toteAusnahmen.add('$key steht nicht mehr in der Ergänzung');
+        } else if (deutsch[key] != englisch[key]) {
+          toteAusnahmen.add('$key ist inzwischen übersetzt');
+        }
+      }
+
+      expect(
+        toteAusnahmen,
+        isEmpty,
+        reason: 'Ausnahmen, die keine mehr sind, gehören aus der Liste',
+      );
     });
 
     test('kein Ergänzungs-Schlüssel steht in den erzeugten Tabellen', () {
@@ -219,26 +296,37 @@ void main() {
   });
 
   group('Die Fakt-Akte', () {
-    test('die Aktennummer steht in beiden Sprachen deutsch da', () {
+    test('die Aktennummer ist je Sprache übersetzt', () {
       // `screen-fact.jsx:367`: `Akte #{fact.nr || fact.id}` steht wörtlich
-      // im JSX und wird auch im englischen Modus so gezeigt. Derselbe Fall
-      // wie `tour.step9.meta`. Fiele der englische Eintrag weg, käme über
-      // den Rückfall zwar derselbe Text heraus; die Zusicherung gilt
-      // deshalb der Karte selbst und nicht nur dem Ergebnis von `text()`.
-      for (final language in AppLanguage.values) {
-        expect(
-          supplementTextsFor(language)['fact.fileNumber'],
-          'Akte #{nr}',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(
-            language,
-          ).text('fact.fileNumber', params: {'nr': 'MUC_004'}),
-          'Akte #MUC_004',
-          reason: language.code,
-        );
-      }
+      // im JSX und wurde bis zum 02.09.2026 auch im englischen Modus so
+      // gezeigt, mit der Begründung, die Quelle habe keine zweite Fassung.
+      // Der Eigentümer hat diese Begründung mit E-61 grundsätzlich
+      // aufgehoben: hartcodiertes Deutsch in der Quelle ist ein Defekt und
+      // keine Parität. Die englische Karte trägt jetzt einen eigenen
+      // Wortlaut. Die Zusicherung gilt der Karte selbst und nicht nur dem
+      // Ergebnis von `text()`, damit ein versehentlich zurückgebauter
+      // englischer Eintrag hier auffällt und nicht erst über den Rückfall
+      // verschwindet.
+      expect(
+        supplementTextsFor(AppLanguage.de)['fact.fileNumber'],
+        'Akte #{nr}',
+      );
+      expect(
+        supplementTextsFor(AppLanguage.en)['fact.fileNumber'],
+        'File #{nr}',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('fact.fileNumber', params: {'nr': 'MUC_004'}),
+        'Akte #MUC_004',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('fact.fileNumber', params: {'nr': 'MUC_004'}),
+        'File #MUC_004',
+      );
     });
 
     test('die Platzhalterzeile ist je Sprache eine andere', () {
@@ -313,23 +401,24 @@ void main() {
       );
     });
 
-    test('Aufgaben-Beschriftung und Foto-Leiste bleiben deutsch', () {
+    test('Aufgaben-Beschriftung und Foto-Leiste sind je Sprache übersetzt', () {
       // `:194` und `:176` sind nackte Textknoten ohne Ternär; die Quelle
-      // zeigt sie auch im englischen Modus deutsch.
-      for (final language in AppLanguage.values) {
-        expect(
-          AppStrings.of(language).text('puzzle.taskLabel'),
-          'Aufgabe',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(language).text('puzzle.photoCaption'),
-          // Der Gedankenstrich steht so in der Verhaltensquelle und wird
-          // wortgleich übernommen.
-          'Damals — was hat sich verändert?',
-          reason: language.code,
-        );
-      }
+      // zeigte sie bis zum 02.09.2026 auch im englischen Modus deutsch. Der
+      // Eigentümer hat das mit E-61 als gemessenen Defekt der Quelle
+      // eingestuft und aufgehoben: die englische Karte trägt jetzt einen
+      // eigenen Wortlaut.
+      expect(AppStrings.of(AppLanguage.de).text('puzzle.taskLabel'), 'Aufgabe');
+      expect(AppStrings.of(AppLanguage.en).text('puzzle.taskLabel'), 'Task');
+      expect(
+        AppStrings.of(AppLanguage.de).text('puzzle.photoCaption'),
+        // Der Gedankenstrich steht so in der Verhaltensquelle und wird für
+        // die deutsche Abschrift wortgleich übernommen.
+        'Damals — was hat sich verändert?',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('puzzle.photoCaption'),
+        'Back then: what has changed?',
+      );
     });
 
     test('die vier Schlüssel bleiben aus der PWA-Fläche heraus', () {
@@ -557,9 +646,14 @@ void main() {
   });
 
   group('Die Jagd-Pille', () {
-    // Sechs Schlüssel, und die Quelle zeigt jeden davon in beiden Sprachen
-    // deutsch. Geprüft wird deshalb der Wortlaut in beiden Sprachen und dass
-    // keiner davon zur PWA-Fläche gehört.
+    // Sechs Schlüssel. Die Quelle zeigt jeden davon in beiden Sprachen
+    // deutsch, das galt bis zum 02.09.2026 als Begründung dafür, auch hier
+    // in beiden Karten denselben deutschen Wert zu tragen (E-61). Der
+    // Eigentümer hat diese Begründung aufgehoben: hartcodiertes Deutsch in
+    // der Quelle ist ein Defekt und keine Parität. Geprüft wird deshalb der
+    // Wortlaut je Sprache, mit `challenge.huntPill.stationCounter` als
+    // begründeter Ausnahme (siehe die Ausnahmeliste weiter oben), und dass
+    // keiner der sechs Schlüssel zur PWA-Fläche gehört.
 
     test('die Stationszeile füllt beide Platzhalter', () {
       // `screen-map.jsx:1086`.
@@ -575,37 +669,54 @@ void main() {
       }
     });
 
-    test('Tipp-Knopf, gesperrter Hinweis und Einklapp-Text im Wortlaut der '
-        'Quelle', () {
-      for (final language in AppLanguage.values) {
-        expect(
-          AppStrings.of(language).text('challenge.huntPill.hintsLabel'),
-          'Tipps',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(
-            language,
-          ).text('challenge.huntPill.hintLocked', params: {'cost': '20'}),
-          // U+2212 (Minuszeichen), keine Ziffer und kein Gedankenstrich.
-          'Tipp freischalten (−20 🪙 vom Fakt-Lohn)',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(language).text('challenge.huntPill.close'),
-          'Schließen',
-          reason: language.code,
-        );
-      }
+    test('Tipp-Knopf, gesperrter Hinweis und Einklapp-Text sind je Sprache '
+        'übersetzt', () {
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntPill.hintsLabel'),
+        'Tipps',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntPill.hintsLabel'),
+        'Hints',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.huntPill.hintLocked', params: {'cost': '20'}),
+        // U+2212 (Minuszeichen), keine Ziffer und kein Gedankenstrich.
+        'Tipp freischalten (−20 🪙 vom Fakt-Lohn)',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.huntPill.hintLocked', params: {'cost': '20'}),
+        'Unlock hint (−20 🪙 off the fact reward)',
+      );
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntPill.close'),
+        'Schließen',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntPill.close'),
+        'Close',
+      );
     });
 
-    test('Rückfalltext und Platzhaltertitel', () {
+    test('Rückfalltext ist je Sprache übersetzt, Platzhaltertitel bleibt '
+        'sprachfrei', () {
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntPill.hintFallback'),
+        'Schau dich in der Umgebung aufmerksam um.',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntPill.hintFallback'),
+        'Take a careful look around you.',
+      );
+      // `missingTitle` trägt in beiden Sprachen denselben Gedankenstrich,
+      // siehe die begründete Ausnahmeliste in „kein englischer Wert bleibt
+      // versehentlich deutsch": ein Zeichen ohne Sprache braucht keine
+      // Übersetzung.
       for (final language in AppLanguage.values) {
-        expect(
-          AppStrings.of(language).text('challenge.huntPill.hintFallback'),
-          'Schau dich in der Umgebung aufmerksam um.',
-          reason: language.code,
-        );
         expect(
           AppStrings.of(language).text('challenge.huntPill.missingTitle'),
           '—',
@@ -632,26 +743,44 @@ void main() {
 
   group('Der Pause- und der Ergebnisbildschirm', () {
     // Zweiundzwanzig Schlüssel, Schritt 39, dieselbe Lage wie bei der
-    // Jagd-Pille: die Quelle zeigt jeden davon in beiden Sprachen deutsch.
+    // Jagd-Pille: die Quelle zeigt jeden davon in beiden Sprachen deutsch,
+    // und bis zum 02.09.2026 trugen deshalb beide Karten hier denselben
+    // deutschen Wert (E-61). Der Eigentümer hat diese Begründung
+    // aufgehoben: hartcodiertes Deutsch in der Quelle ist ein Defekt und
+    // keine Parität, die englische Karte trägt jetzt für fast alle diese
+    // Schlüssel einen eigenen Wortlaut. Die begründeten Ausnahmen
+    // (`stopsLabel`, `stopPending` und die Zeitplatzhalter) stehen in der
+    // Ausnahmeliste des Tests „kein englischer Wert bleibt versehentlich
+    // deutsch" weiter oben.
 
     test('die drei Kachel-Beschriftungen', () {
+      // `stopsLabel` bleibt in beiden Sprachen „Stops": das Wort ist im
+      // Englischen selbst schon zu Hause, siehe die Ausnahmeliste weiter
+      // oben. `pointsLabel` und `timeLabel` tragen dagegen seit dem
+      // 02.09.2026 einen eigenen englischen Wortlaut (E-61).
       for (final language in AppLanguage.values) {
         expect(
           AppStrings.of(language).text('challenge.huntPause.stopsLabel'),
           'Stops',
           reason: language.code,
         );
-        expect(
-          AppStrings.of(language).text('challenge.huntPause.pointsLabel'),
-          'Punkte',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(language).text('challenge.huntPause.timeLabel'),
-          'Zeit',
-          reason: language.code,
-        );
       }
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntPause.pointsLabel'),
+        'Punkte',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntPause.pointsLabel'),
+        'Points',
+      );
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntPause.timeLabel'),
+        'Zeit',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntPause.timeLabel'),
+        'Time',
+      );
     });
 
     test('der Zeit-Platzhalter ist ein eigener Schlüssel und kein Rohzeichen '
@@ -666,21 +795,35 @@ void main() {
     });
 
     test('die drei Ersatztexte einer Station füllen die Stationsnummer', () {
+      // `stopSkipped` und `stopCurrent` tragen seit dem 02.09.2026 einen
+      // eigenen englischen Wortlaut (E-61). `stopPending` bleibt in beiden
+      // Sprachen „Station {station}": das ist die Ausnahme, die auch
+      // `puzzle.stationCounter` trägt, siehe die Ausnahmeliste weiter oben.
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.huntPause.stopSkipped', params: {'station': '2'}),
+        'Station 2 · übersprungen',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.huntPause.stopSkipped', params: {'station': '2'}),
+        'Station 2 · skipped',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.huntPause.stopCurrent', params: {'station': '3'}),
+        'Station 3 · aktuell',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.huntPause.stopCurrent', params: {'station': '3'}),
+        'Station 3 · current',
+      );
       for (final language in AppLanguage.values) {
-        expect(
-          AppStrings.of(
-            language,
-          ).text('challenge.huntPause.stopSkipped', params: {'station': '2'}),
-          'Station 2 · übersprungen',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(
-            language,
-          ).text('challenge.huntPause.stopCurrent', params: {'station': '3'}),
-          'Station 3 · aktuell',
-          reason: language.code,
-        );
         expect(
           AppStrings.of(
             language,
@@ -693,87 +836,156 @@ void main() {
 
     test('die drei Schwierigkeitsstufen sind Datenwerte, keine Übersetzung '
         '(Entscheidung 3)', () {
-      // `puzzle_difficulty.dart` verlangt, dass eine Anzeige über
-      // `AppStrings` läuft; sichtbar bleibt trotzdem der rohe Datenwert.
-      for (final language in AppLanguage.values) {
-        expect(
-          AppStrings.of(language).text('challenge.huntPause.difficulty.leicht'),
-          'leicht',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(language).text('challenge.huntPause.difficulty.mittel'),
-          'mittel',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(language).text('challenge.huntPause.difficulty.schwer'),
-          'schwer',
-          reason: language.code,
-        );
-      }
+      // Entscheidung 3 aus Schritt 39 hatte zwei Teile, und nur der eine ist
+      // seit dem 02.09.2026 überholt. Überholt: die Quelle zeigt
+      // `hunt.difficulty` roh an (`leicht`/`mittel`/`schwer`), das galt
+      // vorher als Begründung dafür, auch die englische Karte mit denselben
+      // deutschen Rohwerten zu füllen. Diese Begründung ist mit E-61
+      // aufgehoben; die englische Karte trägt jetzt eine echte Übersetzung.
+      //
+      // Bewährt: `puzzle_difficulty.dart` verlangt ausdrücklich, dass eine
+      // Anzeige über `AppStrings` läuft und nicht über
+      // `PuzzleDifficulty.code`. Genau dieser Umweg zahlt sich hier aus:
+      // die Umstellung auf englische Wörter kostet zwei geänderte Werte in
+      // `app_strings_supplement.dart` und keine einzige Zeile Code.
+      //
+      // Deutsch bleibt deshalb der rohe Datenwert, weil er zugleich das
+      // deutsche Wort ist; Englisch ist jetzt eine eigene Übersetzung.
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.huntPause.difficulty.leicht'),
+        'leicht',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.huntPause.difficulty.leicht'),
+        'easy',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.huntPause.difficulty.mittel'),
+        'mittel',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.huntPause.difficulty.mittel'),
+        'medium',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.huntPause.difficulty.schwer'),
+        'schwer',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.huntPause.difficulty.schwer'),
+        'hard',
+      );
     });
 
-    test('Rückfrage und Knöpfe des Pausebildschirms', () {
-      for (final language in AppLanguage.values) {
-        expect(
-          AppStrings.of(
-            language,
-          ).text('challenge.huntPause.abortConfirmMessage'),
-          'Punkte gehen verloren. Wirklich abbrechen?',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(language).text('challenge.huntPause.backToMap'),
-          'Zurück zur Karte',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(language).text('challenge.huntPause.abort'),
-          'Hunt abbrechen',
-          reason: language.code,
-        );
-      }
+    test('Rückfrage und Knöpfe des Pausebildschirms sind je Sprache '
+        'übersetzt', () {
+      // Alle drei trugen bis zum 02.09.2026 in beiden Karten denselben
+      // deutschen Wert (E-61), jetzt je einen eigenen Wortlaut.
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.huntPause.abortConfirmMessage'),
+        'Punkte gehen verloren. Wirklich abbrechen?',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.huntPause.abortConfirmMessage'),
+        'You will lose your points. Abandon the hunt?',
+      );
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntPause.backToMap'),
+        'Zurück zur Karte',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntPause.backToMap'),
+        'Back to the map',
+      );
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntPause.abort'),
+        'Hunt abbrechen',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntPause.abort'),
+        'Abandon hunt',
+      );
     });
 
-    test('Überschrift, Punkte-Beschriftung und Zeitzeile des Ergebnisses', () {
+    test('Überschrift, Punkte-Beschriftung und Zeitzeile des Ergebnisses sind '
+        'je Sprache übersetzt', () {
+      // Alle außer `timePlaceholder` trugen bis zum 02.09.2026 in beiden
+      // Karten denselben deutschen Wert (E-61), jetzt je einen eigenen
+      // Wortlaut. `timePlaceholder` bleibt der sprachfreie Gedankenstrich,
+      // siehe die Ausnahmeliste weiter oben und E-19.
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntResult.title'),
+        'Hunt beendet!',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntResult.title'),
+        'Hunt complete!',
+      );
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntResult.pointsLabel'),
+        'Punkte erspielt',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntResult.pointsLabel'),
+        'Points earned',
+      );
+      expect(
+        AppStrings.of(AppLanguage.de).text(
+          'challenge.huntResult.solvedCount',
+          params: {'solved': '2', 'total': '5'},
+        ),
+        '2 von 5 Stationen gelöst',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text(
+          'challenge.huntResult.solvedCount',
+          params: {'solved': '2', 'total': '5'},
+        ),
+        '2 of 5 stations solved',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.de,
+        ).text('challenge.huntResult.timeLine', params: {'time': '—'}),
+        'Zeit: —',
+      );
+      expect(
+        AppStrings.of(
+          AppLanguage.en,
+        ).text('challenge.huntResult.timeLine', params: {'time': '—'}),
+        'Time: —',
+      );
       for (final language in AppLanguage.values) {
-        expect(
-          AppStrings.of(language).text('challenge.huntResult.title'),
-          'Hunt beendet!',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(language).text('challenge.huntResult.pointsLabel'),
-          'Punkte erspielt',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(language).text(
-            'challenge.huntResult.solvedCount',
-            params: {'solved': '2', 'total': '5'},
-          ),
-          '2 von 5 Stationen gelöst',
-          reason: language.code,
-        );
-        expect(
-          AppStrings.of(
-            language,
-          ).text('challenge.huntResult.timeLine', params: {'time': '—'}),
-          'Zeit: —',
-          reason: language.code,
-        );
         expect(
           AppStrings.of(language).text('challenge.huntResult.timePlaceholder'),
           '—',
           reason: language.code,
         );
-        expect(
-          AppStrings.of(language).text('challenge.huntResult.close'),
-          'Fertig',
-          reason: language.code,
-        );
       }
+      expect(
+        AppStrings.of(AppLanguage.de).text('challenge.huntResult.close'),
+        'Fertig',
+      );
+      expect(
+        AppStrings.of(AppLanguage.en).text('challenge.huntResult.close'),
+        'Done',
+      );
     });
 
     test('die zweiundzwanzig Schlüssel bleiben aus der PWA-Fläche heraus', () {

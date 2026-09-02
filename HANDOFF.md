@@ -80,7 +80,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2314 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2315 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -345,6 +345,72 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 02.09.2026, Englisch ist jetzt Englisch, und E-16 hat eine Migration
+
+Janeks Antwort auf E-61 hat 26 Werte fällig gemacht, dazu eine Wache und
+zwölf Tests. Und weil J-B die Sichtbarkeitsfrage beantwortet hat, ist die
+E-16-Migration schreibbar geworden. 2314 → 2315 Tests, alle Tore auf null.
+
+**Der teure Fehler ist ab jetzt nicht der falsche Wortlaut, sondern der
+vergessene.** Ein neuer Schlüssel, den jemand mit demselben deutschen Satz in
+beide Karten schreibt, fällt sonst niemandem auf. Dagegen steht jetzt eine
+Wache: kein englischer Wert darf seinem deutschen gleichen, es sei denn, er
+steht auf einer **begründeten** Ausnahmeliste. Zehn stehen drauf, jeder mit
+seinem Grund („Challenge" ist englisch, ein Gedankenstrich ist sprachfrei,
+Goethe heißt in beiden Sprachen so). Die Liste hat eine Gegenprobe gegen das
+eigene Verrotten: ein Eintrag, dessen Werte inzwischen auseinanderlaufen, wird
+gemeldet.
+
+**Ein Test hatte seinen eigenen Umbau vorhergesehen.** In
+`tour_overlay_test.dart` stand am Test „die Meta-Zeile bleibt auch auf Englisch
+deutsch" der Satz „Bricht dieser Test, ist die Freigabe erteilt worden". Genau
+das ist passiert. Dasselbe Muster wie beim durchtrennten Jagdstart: eine
+Zusicherung auf eine bekannte Lücke meldet sich selbst, eine Notiz muss gelesen
+werden.
+
+**Und der Umweg von Schritt 39 hat sich ausgezahlt.** Die drei
+Schwierigkeitsstufen im Pausebildschirm auf Englisch zu bringen kostete **zwei
+Werte und keine Zeile Code**, weil die Anzeige damals über `AppStrings` gelegt
+wurde statt über `PuzzleDifficulty.code`. Das war damals die Begründung, und
+jetzt ist sie eingelöst.
+
+**Beim Nachsuchen fanden sich drei weitere rote Tests** ausserhalb der Datei,
+die ich benannt hatte. Der Auftrag hatte ausdrücklich zum Nachsuchen
+aufgefordert, weil ich nicht erschöpfend gesucht hatte. Ohne diesen Satz wären
+sie später als rätselhafter Fehlschlag aufgetaucht.
+
+### E-16, zwei Teile, und zwei Dinge, die erst dabei sichtbar wurden
+
+**7a läuft heute**, 7b wartet auf einen PWA-Release, weil eine zusätzliche
+Spalte den Rückgabetyp ändert und `create or replace` das nicht kann.
+
+**Erstens: `get_leaderboard` gibt heute den echten Namen heraus**, wenn der
+Schalter an ist (`supabase-schema.sql:382`, nachgeprüft). Janeks
+Username-Entscheidung nimmt diesen Zweig weg. Folge, die niemand bestellt hat:
+der Schalter „Echten Namen zeigen“ schreibt danach ein Feld, das niemand
+liest. Ein Schalter, der lügt, ist schlechter als keiner, und das Entfernen
+liegt in der PWA.
+
+**Zweitens, und das ist unbequem: „keine Städtenamen“ ist nicht vollständig
+erreichbar**, solange es Städte-Ranglisten gibt. `get_leaderboard('münchen')`
+sagt dem Aufrufer, dass diese zehn Nutzer messbar in München waren. Heute für
+jeden ohne Konto, danach für zehn je Stadt mit Konto. Besser, aber nicht zu.
+Vollständig wäre es nur ohne Städte-Ranglisten, und das ist eine Produktfrage.
+
+**Neuer Fund beim Städtezählen, als E-66 aufgenommen und selbst nachgemessen:**
+ein Fakt, dessen Stadt sich weder aus `facts.city` noch aus dem `nr`-Präfix
+ergibt, bekommt den Schlüssel `'unknown'` (`:247`), und zwei Zeilen weiter zählt
+`count(distinct city_key)` ihn als Stadt (`:288`). `weltenbummler` ist damit mit
+zwei echten Städten plus einem nicht zuordenbaren Fakt zu haben. Dritte Folge
+derselben Wurzel wie E-11 und E-56: die Stadt wird geraten statt gepflegt.
+
+**Und eine Korrektur an meinem eigenen Auftrag, die die halbe Testliste
+gerettet hat:** ich hatte Negativtests so beschrieben, dass sie nach der
+Migration mit einem Fehler scheitern. Das gilt nur für ein fehlendes
+**Recht** (`42501`). Eine **Policy** weist nicht ab, sie liefert **null Zeilen
+ohne Fehler**. Wer das verwechselt, schreibt drei Tests, die immer grün sind.
+
 
 ### 02.09.2026, Drei Backend-Löcher haben Migrationen, und zwölf Meldungen zurück
 

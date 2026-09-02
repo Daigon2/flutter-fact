@@ -92,9 +92,18 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // PWA. Freigegeben am 28.08.2026, wortwörtlich übernommen, nichts
     // erfunden.
     'tour.step1.meta': '— GOETHE',
-    // Auch im englischen Modus deutsch: das `STEPS`-Array existiert nur
-    // einmal und wird nicht pro Sprache gebaut. Deshalb derselbe Wert in
-    // beiden Sprachkarten, keine Übersetzung.
+    // In der Quelle auch im englischen Modus deutsch: das `STEPS`-Array
+    // existiert nur einmal und wird nicht pro Sprache gebaut.
+    //
+    // **Der Neubau übersetzt es trotzdem**, seit dem 02.09.2026. Bis dahin
+    // stand hier derselbe deutsche Wert in beiden Karten, mit genau dieser
+    // Beobachtung als Begründung. Der Eigentümer hat das aufgehoben:
+    // englischsprachige Nutzer sehen Englisch, und ein hartcodierter
+    // deutscher Text in der Quelle ist ein Defekt und keine Parität. Siehe
+    // `CLAUDE.md`, „The PWA is a reference, not a gold standard".
+    //
+    // Der Nachbar `tour.step1.meta` bleibt in beiden Karten gleich, und das
+    // ist kein Versäumnis: „— GOETHE" ist eine Namensnennung.
     'tour.step9.meta': 'PUSH AUS DER HOSENTASCHE',
 
     // Die Aktennummer im Kopfbereich der Fakt-Akte,
@@ -102,14 +111,18 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // dort wörtlich im JSX und nicht in `translations.jsx`, also kein
     // `t()`-Aufruf und kein Schlüssel.
     //
-    // Derselbe Wert in beiden Sprachkarten, genau wie `tour.step9.meta`
-    // eine Zeile darüber: die Quelle hat nur diese eine Fassung und zeigt
-    // sie auch im englischen Modus deutsch. Das ist exakte Parität und
-    // keine vergessene Übersetzung.
+    // Die Quelle hat nur diese eine Fassung und zeigt sie auch im
+    // englischen Modus deutsch. **Der Neubau nicht mehr, seit dem
+    // 02.09.2026:** die englische Karte trägt „File #{nr}". Bis dahin stand
+    // hier derselbe deutsche Wert mit dem Hinweis, das sei „exakte Parität
+    // und keine vergessene Übersetzung". Genau diese Lesart hat der
+    // Eigentümer aufgehoben, ein hartcodierter deutscher Text der Quelle ist
+    // ein Defekt und keine Vorlage.
     //
-    // **Der englische Wortlaut ist offen.** Kommt er, wird hier eine
-    // einzige Zeichenkette ausgetauscht; weder der Schlüsselname noch die
-    // Aufrufstelle in `fact_page.dart` ändern sich dabei. Bekommt die PWA
+    // **Der englische Wortlaut war offen und ist es nicht mehr.** Er kostete
+    // genau das, was hier vorhergesagt war: eine einzige Zeichenkette, weder
+    // der Schlüsselname noch die Aufrufstelle in `fact_page.dart` haben sich
+    // geändert. Bekommt die PWA
     // den Schlüssel selbst, meldet `tool/generate_i18n.dart` es und beide
     // Einträge fallen ersatzlos weg.
     //
@@ -158,14 +171,20 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'puzzle.riddleCounter': 'Rätsel {number}',
 
     // Die Beschriftung in der Aufgaben-Karte, `puzzle-sheet.jsx:194`:
-    // ein nackter Textknoten `Aufgabe`, ohne Ternär und ohne `t()`. Wird
-    // deshalb auch im englischen Modus deutsch gezeigt, derselbe Fall wie
-    // `fact.fileNumber` und `tour.step9.meta`.
+    // ein nackter Textknoten `Aufgabe`, ohne Ternär und ohne `t()`. Die
+    // Quelle zeigt ihn deshalb auch im englischen Modus deutsch.
+    //
+    // **Der Neubau übersetzt, seit dem 02.09.2026** („Task"), derselbe Fall
+    // wie `fact.fileNumber` und `tour.step9.meta` und aus demselben Grund.
+    // Das Widget schreibt die Beschriftung groß, auf Englisch steht dort also
+    // `TASK`.
     'puzzle.taskLabel': 'Aufgabe',
 
     // Die Leiste unter dem historischen Foto, `puzzle-sheet.jsx:176`,
-    // ebenfalls ein nackter Textknoten und ebenfalls in beiden Sprachen
-    // deutsch.
+    // ebenfalls ein nackter Textknoten. In der Quelle in beiden Sprachen
+    // deutsch, im Neubau seit dem 02.09.2026 übersetzt. Der Gedankenstrich
+    // der Quelle wird dabei nicht mitgenommen, die englische Fassung setzt
+    // einen Doppelpunkt.
     //
     // **Der Gedankenstrich bleibt.** Er steht so in der
     // Verhaltensquelle; die Schreibregel gegen Gedankenstriche gilt für
@@ -275,6 +294,12 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // `HotspotPickView` und wird über `view === 'hotspot'` eingeblendet
     // (`:4441`). Die Schlüssel sitzen damit sichtbar bei
     // `challenge.setup.*` und sind trotzdem vom Assistenten getrennt.
+    // **Nachtrag vom 02.09.2026: diese Begründung ist aufgehoben.** Der
+    // Eigentümer hat E-61 grundsätzlich entschieden: englischsprachige Nutzer
+    // sehen Englisch, und hartcodiertes Deutsch in der Quelle ist ein Defekt
+    // und keine Parität. Die englischen Werte stehen deshalb übersetzt da.
+    // Was noch in beiden Karten gleich ist, steht auf der Ausnahmeliste im
+    // Test und ist dort je einzeln begründet.
 
     // Die erste Zeile der Auswahl, `:3025`. Sie erscheint nur, wenn eine
     // Nutzerposition vorliegt.
@@ -366,6 +391,12 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // ein Icon ist Bildschmuck des Widgets, kein Bestandteil des Lesetexts.
     // 🪙 dagegen steht **im** Wert von `hintLocked`, weil es mitten im Satz
     // sitzt und zur Aussage „vom Fakt-Lohn" gehört, nicht davor.
+    // **Nachtrag vom 02.09.2026: diese Begründung ist aufgehoben.** Der
+    // Eigentümer hat E-61 grundsätzlich entschieden: englischsprachige Nutzer
+    // sehen Englisch, und hartcodiertes Deutsch in der Quelle ist ein Defekt
+    // und keine Parität. Die englischen Werte stehen deshalb übersetzt da.
+    // Was noch in beiden Karten gleich ist, steht auf der Ausnahmeliste im
+    // Test und ist dort je einzeln begründet.
 
     // Die Stationszeile, `:1086`: `Station {activeHunt.currentStopIdx + 1} /
     // {activeHunt.stops.length}`. Nicht `challenge.hotspot.stepCounter`
@@ -419,6 +450,12 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // jeweilige Quellfunktion, nicht `challenge.pause.` oder
     // `challenge.result.`, die zu leicht mit anderen Bildschirmen
     // verwechselt würden.
+    // **Nachtrag vom 02.09.2026: diese Begründung ist aufgehoben.** Der
+    // Eigentümer hat E-61 grundsätzlich entschieden: englischsprachige Nutzer
+    // sehen Englisch, und hartcodiertes Deutsch in der Quelle ist ein Defekt
+    // und keine Parität. Die englischen Werte stehen deshalb übersetzt da.
+    // Was noch in beiden Karten gleich ist, steht auf der Ausnahmeliste im
+    // Test und ist dort je einzeln begründet.
 
     // Die drei Kachel-Beschriftungen, `:2832-2834`.
     'challenge.huntPause.stopsLabel': 'Stops',
@@ -488,9 +525,15 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
         'Turn up your device volume first. From here on, everything is spoken.',
     'tour.stepCounter': 'STEP {step} OF {total}',
     'tour.step1.meta': '— GOETHE',
-    'tour.step9.meta': 'PUSH AUS DER HOSENTASCHE',
+    'tour.step9.meta': 'A PUSH FROM YOUR POCKET',
     // Bewusst derselbe deutsche Wert wie in der DE-Karte, siehe dort.
-    'fact.fileNumber': 'Akte #{nr}',
+    // **Nachtrag vom 02.09.2026: diese Begründung ist aufgehoben.** Der
+    // Eigentümer hat E-61 grundsätzlich entschieden: englischsprachige Nutzer
+    // sehen Englisch, und hartcodiertes Deutsch in der Quelle ist ein Defekt
+    // und keine Parität. Die englischen Werte stehen deshalb übersetzt da.
+    // Was noch in beiden Karten gleich ist, steht auf der Ausnahmeliste im
+    // Test und ist dort je einzeln begründet.
+    'fact.fileNumber': 'File #{nr}',
     'fact.sourceMissing': 'Source missing',
     // Derselbe deutsche Wert wie in der DE-Karte: der Ternär in
     // `puzzle-sheet.jsx:150` schreibt in beiden Zweigen „Station".
@@ -498,9 +541,9 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // Der einzige der vier, den die Quelle wirklich übersetzt, `:165`.
     'puzzle.riddleCounter': 'Riddle {number}',
     // Nackter Textknoten, `:194`, auch auf Englisch deutsch.
-    'puzzle.taskLabel': 'Aufgabe',
+    'puzzle.taskLabel': 'Task',
     // Nackter Textknoten, `:176`, auch auf Englisch deutsch.
-    'puzzle.photoCaption': 'Damals — was hat sich verändert?',
+    'puzzle.photoCaption': 'Back then: what has changed?',
 
     // ── Schnitzeljagd-Assistent ────────────────────────────────────────
     // Begründungen stehen in der DE-Karte. Bis auf den Titel der Blase
@@ -527,7 +570,10 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
 
     // ── Startpunkt-Picker ──────────────────────────────────────────────
     //
-    // **Alles hier außer `noFacts` wartet auf Janeks Bestätigung (E-46).**
+    // **E-46 ist am 02.09.2026 geschlossen, diese Werte sind entschieden.**
+    // Janek hat kurze Oberflächentexte ausdrücklich delegiert; vierzehn
+    // hergeleitete Beschriftungen sind genau das. Der Vermerk, sie warteten
+    // auf Bestätigung, ist damit weg.
     // Die Quelle hat für diesen Bildschirm keine englische Fassung, sie
     // zeigt ihn auch im englischen Modus deutsch. Diese Werte sind
     // hergeleitet, nicht abgeschrieben, und dürfen ersetzt werden, ohne
@@ -565,42 +611,53 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // Bewusst derselbe deutsche Wert wie in der DE-Karte, siehe dort: die
     // Quelle hat für diese Pille keinen englischen Wortlaut und zeigt sie auch
     // im englischen Modus deutsch.
+    // **Nachtrag vom 02.09.2026: diese Begründung ist aufgehoben.** Der
+    // Eigentümer hat E-61 grundsätzlich entschieden: englischsprachige Nutzer
+    // sehen Englisch, und hartcodiertes Deutsch in der Quelle ist ein Defekt
+    // und keine Parität. Die englischen Werte stehen deshalb übersetzt da.
+    // Was noch in beiden Karten gleich ist, steht auf der Ausnahmeliste im
+    // Test und ist dort je einzeln begründet.
     'challenge.huntPill.stationCounter': 'Station {station} / {total}',
-    'challenge.huntPill.hintsLabel': 'Tipps',
+    'challenge.huntPill.hintsLabel': 'Hints',
     'challenge.huntPill.hintLocked':
-        'Tipp freischalten (−{cost} 🪙 vom Fakt-Lohn)',
-    'challenge.huntPill.close': 'Schließen',
-    'challenge.huntPill.hintFallback':
-        'Schau dich in der Umgebung aufmerksam um.',
+        'Unlock hint (−{cost} 🪙 off the fact reward)',
+    'challenge.huntPill.close': 'Close',
+    'challenge.huntPill.hintFallback': 'Take a careful look around you.',
     'challenge.huntPill.missingTitle': '—',
 
     // ── Pause- und Ergebnisbildschirm der Jagd ────────────────────────────
     // Bewusst derselbe deutsche Wert wie in der DE-Karte, siehe dort: die
     // Quelle hat für diese beiden Bildschirme keinen englischen Wortlaut und
     // zeigt sie auch im englischen Modus deutsch (E-61).
+    // **Nachtrag vom 02.09.2026: diese Begründung ist aufgehoben.** Der
+    // Eigentümer hat E-61 grundsätzlich entschieden: englischsprachige Nutzer
+    // sehen Englisch, und hartcodiertes Deutsch in der Quelle ist ein Defekt
+    // und keine Parität. Die englischen Werte stehen deshalb übersetzt da.
+    // Was noch in beiden Karten gleich ist, steht auf der Ausnahmeliste im
+    // Test und ist dort je einzeln begründet.
     'challenge.huntPause.stopsLabel': 'Stops',
-    'challenge.huntPause.pointsLabel': 'Punkte',
-    'challenge.huntPause.timeLabel': 'Zeit',
+    'challenge.huntPause.pointsLabel': 'Points',
+    'challenge.huntPause.timeLabel': 'Time',
     'challenge.huntPause.timePlaceholder': '—',
-    'challenge.huntPause.stationsHeading': 'Stationen',
-    'challenge.huntPause.backToMap': 'Zurück zur Karte',
-    'challenge.huntPause.abort': 'Hunt abbrechen',
+    'challenge.huntPause.stationsHeading': 'Stations',
+    'challenge.huntPause.backToMap': 'Back to the map',
+    'challenge.huntPause.abort': 'Abandon hunt',
     'challenge.huntPause.abortConfirmMessage':
-        'Punkte gehen verloren. Wirklich abbrechen?',
-    'challenge.huntPause.abortConfirmYes': 'Ja, abbrechen',
-    'challenge.huntPause.abortConfirmNo': 'Doch weiterspielen',
-    'challenge.huntPause.stopSkipped': 'Station {station} · übersprungen',
-    'challenge.huntPause.stopCurrent': 'Station {station} · aktuell',
+        'You will lose your points. Abandon the hunt?',
+    'challenge.huntPause.abortConfirmYes': 'Yes, abandon',
+    'challenge.huntPause.abortConfirmNo': 'Keep playing',
+    'challenge.huntPause.stopSkipped': 'Station {station} · skipped',
+    'challenge.huntPause.stopCurrent': 'Station {station} · current',
     'challenge.huntPause.stopPending': 'Station {station}',
-    'challenge.huntPause.difficulty.leicht': 'leicht',
-    'challenge.huntPause.difficulty.mittel': 'mittel',
-    'challenge.huntPause.difficulty.schwer': 'schwer',
-    'challenge.huntResult.title': 'Hunt beendet!',
-    'challenge.huntResult.pointsLabel': 'Punkte erspielt',
-    'challenge.huntResult.solvedCount': '{solved} von {total} Stationen gelöst',
-    'challenge.huntResult.timeLine': 'Zeit: {time}',
+    'challenge.huntPause.difficulty.leicht': 'easy',
+    'challenge.huntPause.difficulty.mittel': 'medium',
+    'challenge.huntPause.difficulty.schwer': 'hard',
+    'challenge.huntResult.title': 'Hunt complete!',
+    'challenge.huntResult.pointsLabel': 'Points earned',
+    'challenge.huntResult.solvedCount': '{solved} of {total} stations solved',
+    'challenge.huntResult.timeLine': 'Time: {time}',
     'challenge.huntResult.timePlaceholder': '—',
-    'challenge.huntResult.close': 'Fertig',
+    'challenge.huntResult.close': 'Done',
   },
 };
 

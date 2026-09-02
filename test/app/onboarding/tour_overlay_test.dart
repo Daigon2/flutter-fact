@@ -563,18 +563,20 @@ void main() {
       expect(find.text('Your travel journal.'), findsOneWidget);
     });
 
-    testWidgets('die Meta-Zeile bleibt auch auf Englisch deutsch, wie in der '
-        'Quelle', (tester) async {
-      // Offener Punkt, absichtlich festgenagelt statt stillschweigend
-      // repariert: die Quelle schreibt beide Meta-Zeilen hart in das
-      // `STEPS`-Array und übersetzt sie nicht. Ein Eintrag in
-      // `app_strings_supplement.dart` wäre nach E-39 der richtige Weg und
-      // braucht eine Freigabe. Bricht dieser Test, ist die Freigabe erteilt
-      // worden und der Test gehört umgeschrieben.
+    testWidgets('die Meta-Zeile ist auf Englisch übersetzt', (tester) async {
+      // Die Quelle schreibt beide Meta-Zeilen hart in das `STEPS`-Array und
+      // übersetzt sie nicht; bis zum 02.09.2026 zeigte die Karte deshalb
+      // auch im englischen Modus `PUSH AUS DER HOSENTASCHE` (E-61). Der
+      // Eigentümer hat diese Begründung als gemessenen Defekt der Quelle
+      // aufgehoben, `tour.step9.meta` trägt seither einen eigenen
+      // englischen Wortlaut. `tour.step1.meta` bleibt dagegen bewusst
+      // gleich: „— GOETHE" ist eine Namensnennung, kein zu übersetzender
+      // Satz.
       await pumpApp(tester, language: AppLanguage.en);
       await goToStep(tester, TourSteps.count);
 
-      expect(find.text('PUSH AUS DER HOSENTASCHE'), findsOneWidget);
+      expect(find.text('A PUSH FROM YOUR POCKET'), findsOneWidget);
+      expect(find.text('PUSH AUS DER HOSENTASCHE'), findsNothing);
     });
 
     testWidgets('ein Zeilenumbruch im Titel bricht wirklich um', (

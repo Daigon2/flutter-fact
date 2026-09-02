@@ -2847,6 +2847,15 @@ und erleben soll), **Ökonomie** (was etwas kostet und was es wert ist),
 
 ### E-16: Rangliste und Trophäen sind für jeden lesbar
 
+> **Überholt am 02.09.2026. Die Entscheidung ist gefallen, die Migration steht
+> in Abschnitt 14.** Was hier unten steht, ist die Begründung, warum es eine
+> Entscheidung brauchte, und sie bleibt lesbar, weil Migration 6 im
+> SQL-Kommentar darauf verweist. Der Zuschnitt der Umsetzung weicht in zwei
+> Punkten von dem ab, was dieser Abschnitt erwartet hat: die Rangliste bricht
+> **nicht** vollständig ohne Rückgabeänderung ab, und `show_real_name` ist nach
+> der Entscheidung kein Schalter mehr, sondern eine Spalte ohne Leser. Beides in
+> 14.0 und 14.8.
+
 **Warum keine Migration reicht.** Die Migration wäre eine Zeile:
 `drop policy "public read trophies"`, dazu dieselbe für `user_city_scores`, und
 die beiden Policies aus Migration 6 tragen den eigenen Zugriff schon. Danach
@@ -3031,3 +3040,1132 @@ Zweck.
 | 6 | Negativtest „vorher gelingt, nachher scheitert" | zusätzlich Tests, die **vorher und nachher gelingen müssen** (42, 43, 44, 48, 49, 61, 62, 63) | Ein Negativtest allein beweist nur, dass etwas zu ist, nicht dass die App noch läuft. Die Nichtbruch-Tests sind hier die riskanteren. |
 | 7 | Prüfen, was in `lib/` bricht | zusätzlich gemeldet, dass das Suchmuster `.rpc(` aus Abschnitt 10 den einzigen RPC-Aufruf dieses Repositories nicht findet | `_client.rpc<Object?>(`, `supabase_auth_remote_data_source.dart:295`. Das Ergebnis von Abschnitt 10 bleibt richtig, die Methode nicht. |
 | 8 | E-58 auslassen | ausgelassen, aber zweimal als Grund genannt (Abfrage O, 11.10) | Ohne Protokoll ist nach einem Missbrauch von E-53 nicht feststellbar, wer freigegeben hat. Das ist keine Behandlung von E-58, sondern die Wirkung seines Fehlens auf E-53. |
+
+---
+
+## 14. Nachtrag 02.09.2026: E-16 ist entschieden, und daraus wird Migration 7
+
+Abschnitt 12 ordnet E-16 als Produktfrage ein und schreibt bewusst keine
+Migration. Die Frage ist am 02.09.2026 beantwortet, `REBUILD_STATUS.md`,
+Abschnitt „Janeks Antworten auf den dritten Block", Unterabschnitt J-B:
+
+> ohne Anmeldung **nichts**. Mit Anmeldung **Rang, Punktestand und Anzahl der
+> Städte**, keine Städtenamen. Und es gibt **nur einen Username**, keinen echten
+> Namen.
+
+Damit steht die Aussage, die in Abschnitt 12 gefehlt hat. Was jetzt folgt, ist
+die Umsetzung. Format und Bedingungen wie in Abschnitt 11: die Buchstaben der
+Diagnoseabfragen laufen hinter T weiter, die Negativtests hinter 63, und
+**nichts davon wurde gegen eine Datenbank laufen gelassen**, auch nicht lesend.
+
+### 14.0 Die Messung vor dem SQL, vier Fragen
+
+Der Befund E-16 lautet: `user_city_scores` und `user_trophies` haben
+`USING (true)` beim SELECT, und `get_leaderboard` gibt Nutzerkennungen ohne
+Konto heraus. Beides ist bestätigt. Der Zuschnitt der Migration hängt aber an
+Fragen, die der Befund nicht beantwortet.
+
+#### Frage 1: Was gibt `get_leaderboard` heute tatsächlich zurück?
+
+`03_Backend/supabase-schema.sql:365-441`. Vier Spalten, in dieser Reihenfolge
+(`:369-374`):
+
+| # | Spalte | Typ | Inhalt |
+|---|---|---|---|
+| 1 | `rank` | `bigint` | `row_number()` über der Sortierung, 1 bis 10 |
+| 2 | `user_id` | `uuid` | `p.id`, die **Kontokennung**, in allen vier Zweigen (`:381`, `:394`, `:419`, `:430`) |
+| 3 | `display_name` | `text` | `case when p.show_real_name then p.name else coalesce(p.username, 'Entdecker') end`, in allen vier Zweigen (`:382`, `:395`, `:420`, `:431`) |
+| 4 | `score` | `bigint` | Wochenzweig `count(*)` über `collected_facts`, Gesamtzweig `p.score_total` bzw. `ucs.score` (`:421`, `:432`) |
+
+**Die Antwort ist damit: sie liefert mehr als Rang, Punktestand und eine
+Kennung.** Sie liefert eine Kennung **und** einen Namen, und der Name ist bei
+gesetztem `show_real_name` der **echte Name** aus `profiles.name`. Das ist genau
+die Unterscheidung, die J-B abschafft.
+
+**Und sie liefert keine Städtezahl.** Der Wert existiert im ganzen Backend an
+keiner Stelle als Rückgabe. Er ist neu, dazu Frage 4.
+
+Ausführrechte: im gesamten `03_Backend/` gibt es fünf `grant`/`revoke`-Zeilen,
+alle in `2026-06-20_ai_proxy.sql:51-54,61`, keine davon betrifft
+`get_leaderboard`. PostgreSQL vergibt `EXECUTE` bei einer neuen Funktion per
+Standard an `PUBLIC`, und `PUBLIC` schließt `anon` ein. **Der Teil des Befundes
+„ohne Konto" ist damit aus den Dateien belegt** und mit Abfrage V in einer
+Sekunde zu bestätigen. Migration 4 hat `get_leaderboard` ausdrücklich
+ausgelassen und auf E-16 verwiesen (11.2 und Block 4b, „ABSICHTLICH NICHT IN
+DIESER MIGRATION").
+
+#### Frage 2: Wer ruft sie, und mit welchen Spalten rechnet der Aufrufer?
+
+Vollständige Erhebung über `get_leaderboard`, `get_my_rank`, `getLeaderboard`
+und `getMyRank` in `02_Frontend/app/`, `02_Frontend/admin/`,
+`02_Frontend/landing/`, `fact-website/`, `04_Datenpipeline/`,
+`supabase/functions/`, `08_Flutter/lib/` und `lib/`.
+
+| Wo | Zeile | Was |
+|---|---|---|
+| PWA `api.jsx` | 220-224 (`getLeaderboard`) | `rpc('get_leaderboard', { p_city, p_period })`, gibt die Zeilen unverändert weiter |
+| PWA `screen-profil.jsx` | 20 | der **einzige** Aufrufer in der PWA, in `RnkLeaderboard`, gerendert in `:472` |
+| PWA `api.jsx` | 226-231 (`getMyRank`) | `rpc('get_my_rank', { p_user_id, p_city, p_period })` |
+| PWA `app.jsx` | 267 | `getMyRank(session.user.id, 'global', 'weekly')`, also **die eigene Kennung** |
+| alter Port `08_Flutter/lib/services/supabase_service.dart` | 229-234 | Definition ohne Aufrufer, wie `addCoins` in Abschnitt 2 |
+| dieses Repo `lib/` | keine | keine |
+
+**Welche Spalten `screen-profil.jsx` liest, einzeln:**
+
+| Spalte | Zeile | Wofür |
+|---|---|---|
+| `rank` | 87, 101 | Schlüssel des Listenelements und die Medaille für 1 bis 3 |
+| `user_id` | 88, 117 | `isMe`: die eigene Zeile wird hervorgehoben (`:88`), und der eigene Rang wird unten angehängt, **wenn** er nicht in den Top 10 steht (`:117`) |
+| `display_name` | 103 | die Beschriftung der Zeile, direkt gerendert |
+| `score` | 106 | die Zahl rechts |
+
+**Alle vier Spalten werden gelesen. Das ist die teure Antwort dieser Aufgabe.**
+Wer `user_id` aus der Rückgabe nimmt, bricht `screen-profil.jsx:88` und `:117`,
+und zwar **still**: `String(undefined) === String(userId)` ist `false`, also
+verschwindet die Hervorhebung, und der eigene Rang wird zusätzlich unten
+angehängt, obwohl er in den Top 10 steht. Keine Fehlermeldung, kein Absturz, nur
+eine Liste, die falsch aussieht. Wer `display_name` verkleinert, bricht `:103`
+genauso still, dort steht dann nichts.
+
+**Deshalb ist der Zuschnitt zweigeteilt**, dieselbe Trennung wie bei Migration
+3a gegen 3b: 14.2 fasst die Rückgabe nicht an und kann heute laufen, 14.3
+verkleinert sie und wartet auf einen PWA-Release.
+
+#### Frage 3: Liest irgendwer die beiden Tabellen direkt?
+
+| Wo | Zeile | Tabelle | Wessen Zeilen |
+|---|---|---|---|
+| PWA `api.jsx` | 80, in `loadUserData` | `user_trophies` | `.eq('user_id', userId)`, und `userId` ist `session.user.id` (`app.jsx:235`) |
+| PWA `api.jsx` | 234-240 (`getTrophies`) | `user_trophies` | `.eq('user_id', userId)`, Aufrufer `app.jsx:573` in `refreshDbTrophies`, `userId` aus der Sitzung |
+| alter Port `supabase_service.dart` | 66, 236-243 | `user_trophies` | eigene Kennung, `getTrophies` ohne Aufrufer |
+| dieses Repo `lib/` | keine | keine | keine |
+| **irgendwo** | keine | `user_city_scores` | **kein Client liest die Tabelle direkt** |
+
+**Ergebnis: kein Client liest fremde Zeilen aus einer der beiden Tabellen.**
+Beide PWA-Lesestellen filtern auf die eigene Kennung, und `user_city_scores`
+wird ausschließlich innerhalb von `get_leaderboard` (`:434`) und
+`handle_fact_collected` (`:288`) gelesen. Das `USING (true)` ist damit ein Recht,
+das kein Ablauf braucht: es fällt, ohne dass etwas ausfällt.
+
+Der Weg vom Recht zum Schaden ist trotzdem kurz und steht in Abschnitt 12: aus
+`get_leaderboard` fällt die Kennung, mit der Kennung liest man beide Tabellen
+aus, und dann steht da, in welchen Städten diese Person unterwegs war und zu
+welchen Tageszeiten. Der Ist-Zustand braucht dafür **kein Konto**.
+
+**Nebenbefund, der die Kennung entzaubert.** Sie ist heute auch ohne Rangliste
+zu bekommen: `read comments` ist `USING (true)`
+(`supabase-schema.sql:159-160`), und `comments.user_id` ist eine
+`uuid`-Referenz auf `profiles` (`:51-57`). Wer einen Kommentar liest, hat eine
+Kontokennung. Was die Rangliste zusätzlich liefert, ist die **Auswahl**: sie
+sagt, welche zehn Kennungen die interessanten sind, und nennt ihren Punktestand
+dazu. Das ist der Grund, warum das Entfernen von `user_id` aus der Rückgabe
+(14.3) Hygiene ist und **nicht** das Loch schließt. Geschlossen wird es dadurch,
+dass eine Kennung nichts mehr aufschließt, und das ist 14.2.
+
+#### Frage 4: Geht die Städtezahl ohne Leserechte auf fremde Zeilen?
+
+**Ja, und nur so.** Eine Policy kann es nicht: sie entscheidet je Zeile sichtbar
+oder nicht, sie kann nicht „du darfst zählen, aber nicht lesen" sagen. Eine
+`SECURITY DEFINER`-Funktion kann es, weil sie mit den Rechten ihres Eigentümers
+läuft und für den Tabelleneigentümer keine Policy greift, solange
+`FORCE ROW LEVEL SECURITY` aus ist. Genau darauf beruhen `get_leaderboard` schon
+heute und die Migrationen 3, 4 und 6; bestätigt wird die Voraussetzung mit
+Abfrage N (11.7), nicht geglaubt.
+
+Der Wert ist aus `user_city_scores` zählbar, und `handle_fact_collected:288`
+rechnet ihn bereits, für die Trophäen `weltenbummler` und `grand_tour`:
+
+```sql
+select count(distinct city_key) into v_city_count
+  from public.user_city_scores where user_id = new.user_id and score > 0;
+```
+
+**Diese Zählung ist falsch, und wer sie abschreibt, übernimmt den Fehler.**
+`handle_fact_collected:241-252` bildet den Schlüssel als
+`lower(coalesce(f.city, <Präfix-Fall>))`, und der `else`-Zweig des Präfix-Falls
+ist der Text **`'unknown'`**. Ein Fakt ohne `city` und ohne bekanntes
+`nr`-Präfix legt damit eine Zeile `user_city_scores(user, 'unknown', n)` an, und
+`count(distinct city_key)` zählt sie als Stadt mit. Zwei Folgen:
+
+- Die Trophäe `weltenbummler` ist heute mit **zwei** echten Städten plus einem
+  unzuordenbaren Fakt erreichbar. Das ist ein Befund an der Quelle, nicht Teil
+  von E-16, und es gehört zu E-56.
+- Der Trophäenschlüssel `v_city_key || '_first'` (`:279`) heißt bei diesen
+  Fakten `unknown_first`. `wallet-colors.jsx` kennt ihn nicht, also ist das eine
+  Trophäe ohne Namen.
+
+**Migration 7 schließt `'unknown'` aus.** Damit weicht die angezeigte
+Städtezahl von der Trophäenschwelle ab, und die Abweichung liegt richtig herum:
+die Anzeige stimmt, die Trophäe nicht. `handle_fact_collected` mitzuändern wäre
+eine Änderung an einer **Spielregel** (wann fällt `weltenbummler`) und keine
+Sicherheitsbehebung. Der Punkt steht in 14.7 als offen.
+
+**Die zweite Ungenauigkeit ist E-56 und bleibt.** Solange `münchen`,
+`muenchen`, `rom` und `Rome` als verschiedene `city_key` in derselben Tabelle
+liegen können (Abschnitt 12, E-56), zählt `count(distinct city_key)` dieselbe
+Stadt unter zwei Schlüsseln zweimal. Migration 7 rechnet auf dem Bestand, wie er
+ist, und **normalisiert nichts**: eine vierte Normalisierung neben den drei
+bestehenden wäre die falsche Antwort. Wie groß die Abweichung wirklich ist, sagt
+Abfrage X, und die läuft vor der Migration.
+
+#### Was aus der Entscheidung ausdrücklich **nicht** folgt
+
+**Der Username bleibt sichtbar.** J-B sagt „nur Rang und Punktestand und Anzahl
+an Städten" und nennt den Username in dieser Aufzählung nicht. Der Satz danach
+löst es auf: „es gibt immer nur ein Username und sonst nichts. Keinen echten
+namen." Eine Rangliste ohne jede Beschriftung wäre keine Rangliste, und dieses
+Repository sagt es selbst: der Schlüssel `username.hint` lautet „Sichtbar in der
+Rangliste, später änderbar"
+(`lib/app/localization/generated/app_strings_de.g.dart:509`). Der Username
+**ist** die in der Rangliste sichtbare Identität, und er ist ein Pseudonym.
+`display_name` bleibt deshalb in der Rückgabe, gespeist ausschließlich aus
+`profiles.username`.
+
+Das ist eine Auslegung und keine wörtliche Umsetzung. Sie steht hier, damit sie
+widersprechbar ist.
+
+### 14.1 Der Zuschnitt, und warum er zweigeteilt ist
+
+| Block | Was | Bricht die PWA? | Läuft |
+|---|---|---|---|
+| **7a** | die beiden `USING (true)`-Policies fallen; `get_leaderboard` verlangt eine Sitzung, gibt nur noch den Username aus und ist nur noch für `authenticated` ausführbar; `get_my_rank` ist an das eigene Konto gebunden | **nein**, Nachweis in 14.2 | **heute** |
+| **7b** | die Rückgabe von `get_leaderboard` wird umgebaut: `user_id` raus, `is_me` rein, `city_count` dazu, `'Entdecker'` raus | **ja**, `screen-profil.jsx:88`, `:103`, `:117` | **nach einem PWA-Release** |
+
+**Die Sicherheitswirkung steckt vollständig in 7a.** Nach 7a schließt eine
+Kontokennung nichts mehr auf: die beiden Tabellen antworten nur noch auf die
+eigene Zeile, `profiles` tut das seit Migration 1, und schreibend war der Weg
+seit den Migrationen 1, 2a, 4a und 6 schon zu. 7b nimmt die Kennung zusätzlich
+aus der Rückgabe, weil sie dort nichts zu suchen hat, aber es schließt keine
+Lücke mehr, siehe den Nebenbefund zu Frage 3. **Wer 7b für dringend hält,
+priorisiert falsch.**
+
+**Warum die Städtezahl in 7b liegt und nicht in 7a.** Sie ist für die PWA
+harmlos: eine zusätzliche Spalte kommt als zusätzlicher Schlüssel im JSON an und
+wird von niemandem gelesen. Sie steht trotzdem in 7b, weil eine neue Spalte in
+`returns table(...)` den **Rückgabetyp** ändert, und `create or replace
+function` kann den Rückgabetyp nicht ändern (`42P13`, „cannot change return type
+of existing function"). Es braucht ein `drop function` mit anschließendem
+`create`, und dabei fallen alle Ausführrechte weg und werden neu vergeben. Diese
+Form gehört in den Block, der ohnehin ein abgestimmtes Zeitfenster braucht, und
+nicht in den, der heute läuft. 7a ist deshalb ein reines
+`create or replace`.
+
+**Wenn ein Client die Städtezahl vor dem PWA-Release braucht**, etwa weil dieses
+Repository eine Rangliste baut, dann wird aus 7b eine rein additive Fassung: in
+der `returns table`-Liste `user_id uuid` stehen lassen, `is_me` weglassen, bei
+`display_name` das `coalesce(..., 'Entdecker')` behalten und nur `city_count`
+ergänzen. Das bricht die PWA nicht und kann sofort laufen. Der Rest von 7b
+bleibt dann liegen. Es ist ausdrücklich **keine** dritte Migration, sondern
+derselbe Block mit zwei Zeilen weniger.
+
+**Reihenfolge zu den sechs bestehenden Migrationen.**
+
+- **Migration 6 gehört vor 7a**, aber 7a hängt nicht daran. 7a braucht auf
+  beiden Tabellen eine Policy für den eigenen Zugriff, und die gibt es in beiden
+  Zuständen: vor Migration 6 als `own city scores` und `own trophies`
+  (`FOR ALL`, deckt `SELECT` mit ab, `supabase-schema.sql:214`, `:224`), nach
+  Migration 6 als die beiden `... select`-Policies. Der Block prüft das selbst,
+  siehe die Wächter-Anweisung unten. Läuft 7a ohne 6, ist die Leseseite dicht
+  und die Schreibseite offen, also E-55 weiter unbehoben.
+- **Migration 4 gehört nicht davor und nicht danach.** Block 4b hat
+  `get_my_rank` das Ausführrecht für `anon` und `PUBLIC` entzogen (11.2), 7a
+  bindet den **Rumpf** an `auth.uid()`. Zwei verschiedene Grenzen, unabhängig
+  voneinander. 7a wiederholt die Rechte-Anweisung aus 4b **nicht**: dieselbe
+  Anweisung an zwei Stellen macht den Zustand nicht sicherer, sondern beim
+  Rückabwickeln zu einem Halbzustand, Begründung in 6.1.
+- **Migration 3a ist gleichgültig.** 7a und 7b hängen nicht am PWA-Release, der
+  3a blockiert, und umgekehrt.
+
+### 14.2 Migration 7a: die Leseseite schließt (E-16)
+
+Dateiname im Backend-Repo: `2026-09-02_e16_read_side.sql`
+
+**Vorher laufen lassen und die Ausgabe sichern: Abfrage U, V, W und X** (14.4).
+U ist die Voraussetzung und nicht die Nachkontrolle: sie sagt, ob es auf beiden
+Tabellen eine Policy für den eigenen Zugriff gibt. W sagt, wie viele Konten
+ihren angezeigten Namen ändern. N aus 11.7 gilt weiter.
+
+```sql
+-- ============================================================================
+-- FACT — E-16: Rangliste und Trophäen sind für jeden lesbar
+-- ----------------------------------------------------------------------------
+-- Ist-Zustand: supabase-schema.sql:213 und :223 (USING (true) beim SELECT),
+-- dazu get_leaderboard (:365-441) ohne Sitzungsprüfung und mit EXECUTE für
+-- PUBLIC, weil im ganzen 03_Backend/ keine Rechtezeile für sie existiert.
+--
+-- Entscheidung vom 02.09.2026 (REBUILD_STATUS.md, J-B): ohne Anmeldung nichts.
+-- Mit Anmeldung Rang, Punktestand und Anzahl der Städte, keine Städtenamen.
+-- Es gibt nur einen Username, keinen echten Namen.
+--
+-- Bricht heute nichts. Erhebung in 14.0, Frage 2 und 3:
+--   kein Client liest fremde Zeilen aus einer der beiden Tabellen;
+--   api.jsx:80 und :234-240 filtern auf die eigene Kennung;
+--   user_city_scores liest überhaupt kein Client direkt;
+--   die Rückgabe von get_leaderboard behält alle vier Spalten.
+--
+-- SICHTBARE VERHALTENSÄNDERUNG, und sie ist die Entscheidung, kein Fehler:
+--   Die PWA hat keine Anmeldeschranke. route === 'profil' wird ohne Sitzung
+--   gerendert (app.jsx:1059), requireAuth (app.jsx:541) sichert nur
+--   schreibende Aktionen. Ein Besucher ohne Konto sieht heute auf dem
+--   Profilbildschirm die vollständige Rangliste; danach sieht er
+--   t('ranking.noData'), weil screen-profil.jsx:22 den Fehler abfängt.
+--   Das ist "ohne Anmeldung nichts" und wird als Fehler gemeldet werden, wenn
+--   es niemand vorher sagt.
+--
+-- WAS DIESER BLOCK NICHT ANFASST:
+--   die Rückgabespalten von get_leaderboard -> Block 7b, weil
+--     screen-profil.jsx:88, :103 und :117 alle vier Spalten lesen;
+--   die Städtezahl -> Block 7b, weil eine neue Spalte den Rückgabetyp ändert;
+--   die drei Stadtschlüssel-Normalisierungen -> E-56, Abschnitt 12;
+--   handle_fact_collected -> die dortige Zählung ist falsch (14.0, Frage 4),
+--     aber sie entscheidet über eine Trophäe und damit über eine Spielregel;
+--   das SELECT-Recht der Rolle anon auf den beiden Tabellen, Begründung unten.
+-- ============================================================================
+
+begin;
+
+-- 0. Wächter. Ohne eine Policy für den eigenen Zugriff nimmt Schritt 1 jedem
+--    Nutzer den Blick auf seine eigenen Trophäen, und die PWA zeigt danach eine
+--    leere Trophäenreihe (api.jsx:80, :234-240). Der Wächter bricht die
+--    Transaktion ab, statt das zu tun. Er akzeptiert beide Zustände: die
+--    FOR-ALL-Policy aus supabase-schema.sql:214/:224 und die
+--    SELECT-Policy aus Migration 6.
+do $guard$
+declare
+  v_missing text;
+begin
+  select string_agg(t.tab, ', ')
+    into v_missing
+    from (values ('user_city_scores', 'public read city scores'),
+                 ('user_trophies',    'public read trophies')) as t(tab, pub)
+   where not exists (
+     select 1
+       from pg_policies pol
+      where pol.schemaname = 'public'
+        and pol.tablename  = t.tab
+        and pol.policyname <> t.pub
+        and pol.cmd in ('ALL', 'SELECT')
+        and pol.qual like '%auth.uid()%');
+
+  if v_missing is not null then
+    raise exception
+      'Migration 7a abgebrochen: auf % fehlt eine Policy für den eigenen Zugriff. Erst Migration 6 laufen lassen, dann Abfrage U prüfen.',
+      v_missing
+      using errcode = '42501';
+  end if;
+end
+$guard$;
+
+-- 1. Die beiden USING-(true)-Policies fallen. Das ist der Kern von E-16.
+--    Danach greift nur noch die Policy für die eigene Zeile, und mehrere
+--    Policies für dieselbe Operation werden mit ODER verknüpft: es bleibt genau
+--    der eigene Zugriff übrig.
+drop policy if exists "public read city scores" on public.user_city_scores;
+drop policy if exists "public read trophies"    on public.user_trophies;
+
+-- Kein "revoke select ... from anon" dazu, und das ist eine Entscheidung.
+-- anon hält das SELECT-Recht auf der Tabelle weiter, bekommt aber keine Zeile,
+-- weil auth.uid() null ist und damit jede Policy-Bedingung falsch. Ein Revoke
+-- würde aus einem leeren Ergebnis einen Fehler machen, also eine andere
+-- Fehlerklasse für einen Aufrufer, den dieses Dokument nicht kennt. Dieselbe
+-- Begründung wie bei _is_group_member in 11.2.
+
+-- 2. get_leaderboard: Sitzung verlangen, echten Namen entfernen, search_path
+--    setzen. Reines create or replace, der Rückgabetyp bleibt Wort für Wort
+--    gleich (rank, user_id, display_name, score). Die vier Zweige und die
+--    Sortierung sind unverändert aus supabase-schema.sql:365-441 übernommen,
+--    einschließlich der Stadt-Normalisierung: E-56 ist hier nicht Gegenstand.
+create or replace function public.get_leaderboard(
+  p_city   text default 'global',
+  p_period text default 'weekly'
+)
+returns table(
+  rank         bigint,
+  user_id      uuid,
+  display_name text,
+  score        bigint
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  -- Ohne Konto nichts. Die äußere Grenze ist das entzogene Ausführrecht in
+  -- Schritt 3; diese Prüfung liegt im Rumpf und fängt den Fall, dass eine
+  -- Rolle mit EXECUTE ohne "sub"-Claim ankommt.
+  if auth.uid() is null then
+    raise exception 'get_leaderboard: not authenticated' using errcode = '42501';
+  end if;
+
+  if p_period = 'weekly' then
+    if p_city = 'global' then
+      return query
+        select
+          row_number() over (order by count(*) desc)::bigint,
+          p.id,
+          -- Nur der Username. p.name und p.show_real_name kommen nicht mehr
+          -- vor: J-B, "es gibt immer nur ein Username".
+          coalesce(p.username, 'Entdecker'),
+          count(*)::bigint
+        from public.profiles p
+        join public.collected_facts cf on cf.user_id = p.id
+        where cf.collected_at >= date_trunc('week', now())
+        group by p.id, p.username
+        order by 4 desc
+        limit 10;
+    else
+      return query
+        select
+          row_number() over (order by count(*) desc)::bigint,
+          p.id,
+          coalesce(p.username, 'Entdecker'),
+          count(*)::bigint
+        from public.profiles p
+        join public.collected_facts cf on cf.user_id = p.id
+        join public.facts f on f.id = cf.fact_id
+        where cf.collected_at >= date_trunc('week', now())
+          and lower(coalesce(f.city,
+            case
+              when f.nr like 'MUC%' then 'München'
+              when f.nr like 'REG%' then 'Regensburg'
+              when f.nr like 'ROM%' then 'Rom'
+              when f.nr like 'PAU%' then 'Passau'
+              else 'unknown'
+            end
+          )) = p_city
+        group by p.id, p.username
+        order by 4 desc
+        limit 10;
+    end if;
+  else
+    if p_city = 'global' then
+      return query
+        select
+          row_number() over (order by p.score_total desc)::bigint,
+          p.id,
+          coalesce(p.username, 'Entdecker'),
+          p.score_total::bigint
+        from public.profiles p
+        where p.score_total > 0
+        order by p.score_total desc
+        limit 10;
+    else
+      return query
+        select
+          row_number() over (order by ucs.score desc)::bigint,
+          p.id,
+          coalesce(p.username, 'Entdecker'),
+          ucs.score::bigint
+        from public.profiles p
+        join public.user_city_scores ucs on ucs.user_id = p.id
+        where ucs.city_key = p_city and ucs.score > 0
+        order by ucs.score desc
+        limit 10;
+    end if;
+  end if;
+end;
+$$;
+
+-- 3. Ausführrechte. EXECUTE steht bei einer Funktion per PostgreSQL-Standard
+--    an PUBLIC, und PUBLIC schließt anon ein. Genau das ist der Teil "ohne
+--    Konto" des Befundes. Ein create or replace ändert bestehende Rechte
+--    nicht, diese zwei Zeilen sind also die eigentliche Änderung.
+revoke all    on function public.get_leaderboard(text, text) from public, anon;
+grant  execute on function public.get_leaderboard(text, text) to authenticated;
+
+-- 4. get_my_rank an das eigene Konto binden. Die Funktion nimmt heute eine
+--    fremde Kennung und liefert deren Rang (supabase-schema.sql:443-512); das
+--    ist derselbe Defekt wie E-06 Punkt 2 und E-52. Block 4b hat ihr das
+--    Ausführrecht für anon und PUBLIC entzogen, den Rumpf aber nicht angefasst.
+--    Die Signatur bleibt, damit api.jsx:227 unverändert weiterläuft; der Wert
+--    von p_user_id wird nicht mehr geglaubt. Gleiche Bauform wie Block 2a.
+--    Rumpf sonst unverändert, nur qualifiziert und mit v_uid statt p_user_id.
+create or replace function public.get_my_rank(
+  p_user_id uuid,
+  p_city    text default 'global',
+  p_period  text default 'weekly'
+)
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_my_score bigint;
+  v_rank     int;
+  v_uid      uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'get_my_rank: not authenticated' using errcode = '42501';
+  end if;
+  -- null ist zulässig und heißt "ich selbst", wie in Block 4a. Eine fremde
+  -- Kennung ist ein Fehler und keine stille Umleitung: wer sie schickt, soll
+  -- es merken.
+  if p_user_id is not null and p_user_id <> v_uid then
+    raise exception 'get_my_rank: foreign account' using errcode = '42501';
+  end if;
+
+  if p_period = 'weekly' then
+    if p_city = 'global' then
+      select count(*) into v_my_score
+        from public.collected_facts cf
+       where cf.user_id = v_uid
+         and cf.collected_at >= date_trunc('week', now());
+    else
+      select count(*) into v_my_score
+        from public.collected_facts cf
+        join public.facts f on f.id = cf.fact_id
+       where cf.user_id = v_uid
+         and cf.collected_at >= date_trunc('week', now())
+         and lower(coalesce(f.city,
+           case when f.nr like 'MUC%' then 'München'
+                when f.nr like 'REG%' then 'Regensburg'
+                when f.nr like 'ROM%' then 'Rom'
+                when f.nr like 'PAU%' then 'Passau'
+                else 'unknown' end)) = p_city;
+    end if;
+  else
+    if p_city = 'global' then
+      select p.score_total into v_my_score
+        from public.profiles p where p.id = v_uid;
+    else
+      select coalesce(ucs.score, 0) into v_my_score
+        from public.user_city_scores ucs
+       where ucs.user_id = v_uid and ucs.city_key = p_city;
+    end if;
+  end if;
+
+  v_my_score := coalesce(v_my_score, 0);
+
+  if p_period = 'weekly' then
+    if p_city = 'global' then
+      select count(*) + 1 into v_rank from (
+        select cf.user_id
+          from public.collected_facts cf
+         where cf.collected_at >= date_trunc('week', now())
+         group by cf.user_id having count(*) > v_my_score
+      ) sub;
+    else
+      select count(*) + 1 into v_rank from (
+        select cf.user_id
+          from public.collected_facts cf
+          join public.facts f on f.id = cf.fact_id
+         where cf.collected_at >= date_trunc('week', now())
+           and lower(coalesce(f.city,
+             case when f.nr like 'MUC%' then 'München'
+                  when f.nr like 'REG%' then 'Regensburg'
+                  when f.nr like 'ROM%' then 'Rom'
+                  when f.nr like 'PAU%' then 'Passau'
+                  else 'unknown' end)) = p_city
+         group by cf.user_id having count(*) > v_my_score
+      ) sub;
+    end if;
+  else
+    if p_city = 'global' then
+      select count(*) + 1 into v_rank
+        from public.profiles p where p.score_total > v_my_score;
+    else
+      select count(*) + 1 into v_rank
+        from public.user_city_scores ucs
+       where ucs.city_key = p_city and ucs.score > v_my_score;
+    end if;
+  end if;
+
+  return coalesce(v_rank, 1);
+end;
+$$;
+
+commit;
+
+-- 5. PostgREST-Schemacache erneuern. Ausführrechte und zwei Funktionsrümpfe
+--    haben sich geändert. Kostet nichts, ist beliebig oft wiederholbar.
+notify pgrst, 'reload schema';
+```
+
+#### Rückabwicklung 7a
+
+Dateiname: `2026-09-02_e16_read_side_down.sql`
+
+Sie stellt den offenen Zustand her, und zwar vollständig. **Vorher Abfrage U und
+V laufen lassen und die Ausgabe sichern**, sonst ist nach dem Rückrollen nicht
+mehr feststellbar, ob die Rechte danach so stehen wie vorher.
+
+```sql
+-- ACHTUNG: danach ist jede Trophäe und jeder Stadtpunktestand jedes Nutzers
+-- wieder ohne Konto lesbar, zusammen mit den Kontokennungen der Top 10. Das
+-- ist der Zustand, den Abschnitt 12 als "offen zugunsten der weitesten
+-- Auslegung" beschreibt.
+begin;
+
+create policy "public read city scores" on public.user_city_scores
+  for select using (true);
+create policy "public read trophies" on public.user_trophies
+  for select using (true);
+
+grant execute on function public.get_leaderboard(text, text) to public, anon, authenticated;
+
+commit;
+
+notify pgrst, 'reload schema';
+```
+
+Die beiden Funktionsrümpfe stehen damit **nicht** wieder auf dem Stand von
+`supabase-schema.sql`. Das ist Absicht: die Sitzungsprüfung in
+`get_leaderboard` und die Kontobindung in `get_my_rank` sind kein Teil der
+Produktentscheidung, sondern Behebungen derselben Klasse wie E-06 und E-52. Wer
+sie wirklich zurückdrehen will, nimmt die Rümpfe aus
+`supabase-schema.sql:365-441` und `:443-512` wörtlich. Ohne diesen Schritt ist
+der Zustand nach dem Rückrollen sicherer als vorher, und das ist der richtige
+Ausgang.
+
+### 14.3 Migration 7b: die Rückgabe wird umgebaut. Läuft noch nicht
+
+Dateiname: `2026-09-02_e16_leaderboard_shape.sql`
+
+> **Nicht ausführen, solange die PWA `screen-profil.jsx` in der heutigen Fassung
+> ausliefert.** Der Block ist fertig, damit er bereitliegt, nicht damit er heute
+> läuft. Was in der PWA zu ändern ist, steht in 14.6.
+
+Drei Änderungen an der Rückgabe, jede mit ihrem eigenen Grund:
+
+1. **`user_id` fällt, `is_me boolean` kommt.** Die Kennung ist in der Rangliste
+   kein Anzeigewert, sie war nur der Weg zu `isMe`. `is_me` liefert genau die
+   Aussage, die der Client braucht, und nichts darüber hinaus.
+2. **`city_count bigint` kommt.** Der dritte Wert aus J-B, ohne Städtenamen.
+   `'unknown'` ist ausgeschlossen, Begründung in 14.0, Frage 4.
+3. **`'Entdecker'` fällt weg, `display_name` wird `null`.** Ein deutscher
+   Anzeigetext in einer Datenbankfunktion erreicht jeden englischsprachigen
+   Nutzer als deutsches Wort; es gibt keinen i18n-Schlüssel dafür. Derselbe
+   Fehler wie E-63 in `CLAUDE.md`. Der Server liefert die Tatsache „kein
+   Username gesetzt" als `null`, der Client übersetzt sie. **Der Wortlaut des
+   Ersatztexts ist eine Inhaltsfrage** und steht in 14.7.
+
+```sql
+-- ============================================================================
+-- FACT — E-16, zweiter Teil: die Rückgabe von get_leaderboard
+-- ----------------------------------------------------------------------------
+-- BRECHENDE ÄNDERUNG für 02_Frontend/app/screen-profil.jsx:88, :103 und :117.
+-- Erst nach dem PWA-Release ausführen, der dort auf is_me umstellt.
+--
+-- VORAUSSETZUNG: Block 7a ist gelaufen. Dieser Block wiederholt die
+-- Sitzungsprüfung, weil er den Rumpf ohnehin neu schreibt, aber er ersetzt
+-- Schritt 1 aus 7a nicht: die beiden Policies sind dort gefallen, nicht hier.
+--
+-- WARUM DROP UND NICHT CREATE OR REPLACE: eine neue Spalte in returns table
+-- ändert den Rückgabetyp, und den kann create or replace nicht ändern (42P13).
+-- Ein drop function nimmt alle Ausführrechte mit, und ein frisch angelegtes
+-- Funktionsobjekt trägt wieder EXECUTE für PUBLIC. Schritt 3 unten ist deshalb
+-- nicht Wiederholung, sondern Pflicht.
+-- ============================================================================
+
+begin;
+
+-- 1. Die alte Signatur weg. Ohne cascade: sollte die Funktion in einer View
+--    oder einer anderen Funktion stecken, die dieses Dokument nicht kennt,
+--    bricht der Block ab statt die Abhängigkeit mitzunehmen. Das ist der
+--    gewünschte Ausgang.
+drop function if exists public.get_leaderboard(text, text);
+
+-- 2. Neu anlegen. Fünf Spalten, und user_id ist keine davon.
+create function public.get_leaderboard(
+  p_city   text default 'global',
+  p_period text default 'weekly'
+)
+returns table(
+  rank         bigint,
+  is_me        boolean,
+  display_name text,
+  score        bigint,
+  city_count   bigint
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'get_leaderboard: not authenticated' using errcode = '42501';
+  end if;
+
+  if p_period = 'weekly' then
+    if p_city = 'global' then
+      return query
+        select
+          row_number() over (order by count(*) desc)::bigint,
+          (p.id = v_uid),
+          p.username,
+          count(*)::bigint,
+          public._city_count(p.id)
+        from public.profiles p
+        join public.collected_facts cf on cf.user_id = p.id
+        where cf.collected_at >= date_trunc('week', now())
+        group by p.id, p.username
+        order by 4 desc
+        limit 10;
+    else
+      return query
+        select
+          row_number() over (order by count(*) desc)::bigint,
+          (p.id = v_uid),
+          p.username,
+          count(*)::bigint,
+          public._city_count(p.id)
+        from public.profiles p
+        join public.collected_facts cf on cf.user_id = p.id
+        join public.facts f on f.id = cf.fact_id
+        where cf.collected_at >= date_trunc('week', now())
+          and lower(coalesce(f.city,
+            case
+              when f.nr like 'MUC%' then 'München'
+              when f.nr like 'REG%' then 'Regensburg'
+              when f.nr like 'ROM%' then 'Rom'
+              when f.nr like 'PAU%' then 'Passau'
+              else 'unknown'
+            end
+          )) = p_city
+        group by p.id, p.username
+        order by 4 desc
+        limit 10;
+    end if;
+  else
+    if p_city = 'global' then
+      return query
+        select
+          row_number() over (order by p.score_total desc)::bigint,
+          (p.id = v_uid),
+          p.username,
+          p.score_total::bigint,
+          public._city_count(p.id)
+        from public.profiles p
+        where p.score_total > 0
+        order by p.score_total desc
+        limit 10;
+    else
+      return query
+        select
+          row_number() over (order by ucs.score desc)::bigint,
+          (p.id = v_uid),
+          p.username,
+          ucs.score::bigint,
+          public._city_count(p.id)
+        from public.profiles p
+        join public.user_city_scores ucs on ucs.user_id = p.id
+        where ucs.city_key = p_city and ucs.score > 0
+        order by ucs.score desc
+        limit 10;
+    end if;
+  end if;
+end;
+$$;
+
+-- 3. Ausführrechte neu setzen. Der drop hat sie mitgenommen, und das create
+--    hat EXECUTE wieder an PUBLIC vergeben. Ohne diese zwei Zeilen ist der
+--    Befund "ohne Konto" wieder offen, obwohl 7a ihn geschlossen hatte. Das
+--    ist die gefährlichste Stelle dieses Blocks, weil sie nichts bricht,
+--    wenn man sie vergisst.
+revoke all    on function public.get_leaderboard(text, text) from public, anon;
+grant  execute on function public.get_leaderboard(text, text) to authenticated;
+
+commit;
+
+notify pgrst, 'reload schema';
+```
+
+**Die Städtezahl steckt in einem Helfer, und zwar aus einem Grund.**
+`_city_count` wird in allen vier Zweigen gebraucht. Vierfach kopiert wäre sie
+vierfach zu ändern, sobald E-56 beantwortet ist, und genau solche Kopien sind
+der Grund, warum es heute drei Normalisierungen gibt. Der Helfer gehört in
+denselben Block, **vor** die Funktion:
+
+```sql
+-- Vor Schritt 1 einfügen. stable, weil das Ergebnis innerhalb einer Anweisung
+-- gleich bleibt; das erlaubt dem Planer, den Aufruf je Zeile einmal zu machen.
+-- security invoker (der Standard, hier ausdrücklich), weil der einzige
+-- Aufrufer get_leaderboard ist und der schon als Definer läuft: der Helfer
+-- braucht keine eigenen Rechte, er erbt die des Aufrufers.
+create or replace function public._city_count(p_user_id uuid)
+returns bigint
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select count(distinct ucs.city_key)::bigint
+    from public.user_city_scores ucs
+   where ucs.user_id = p_user_id
+     and ucs.score > 0
+     -- 'unknown' ist keine Stadt, sondern der else-Zweig der
+     -- Präfix-Zuordnung in handle_fact_collected:246-250. Ein Fakt ohne city
+     -- und ohne bekanntes nr-Präfix darf die Städtezahl nicht erhöhen.
+     and ucs.city_key <> 'unknown';
+$$;
+
+-- Kein Client ruft den Helfer. Gleiche Behandlung wie _haversine_m und
+-- _slugify in Block 4b.
+revoke all on function public._city_count(uuid) from public, anon, authenticated;
+```
+
+**Warum `security invoker` und nicht `definer`.** Der Helfer liest
+`user_city_scores`, und auf der Tabelle steht nach 7a nur noch die Policy für
+die eigene Zeile. Aufgerufen wird er ausschließlich aus `get_leaderboard`, und
+die läuft als Eigentümer, für den keine Policy greift; der Helfer erbt diesen
+Kontext. Ein `security definer` am Helfer wäre eine zweite, selbständig
+aufrufbare Umgehung der Policy, und die will man nicht anlegen, wenn man sie
+nicht braucht. Das entzogene Ausführrecht ist die zweite Grenze darum. **Wenn
+Abfrage Z zeigt, dass `city_count` immer `0` liefert, ist die Eigentümerannahme
+aus Abfrage N falsch**, und dann ist nicht der Helfer das Problem, sondern
+Migration 6 und 3 stehen auf derselben falschen Annahme.
+
+#### Rückabwicklung 7b
+
+Dateiname: `2026-09-02_e16_leaderboard_shape_down.sql`
+
+```sql
+-- Stellt die Rückgabe von Block 7a her, nicht die von supabase-schema.sql.
+begin;
+
+drop function if exists public.get_leaderboard(text, text);
+
+-- Hier den vollständigen Funktionsrumpf aus Block 7a, Schritt 2, einsetzen.
+-- Er ist absichtlich nicht ein zweites Mal abgedruckt: zwei Kopien desselben
+-- Rumpfes in einem Dokument driften auseinander, und beim Rückabwickeln
+-- entsteht genau daraus ein Halbzustand.
+
+revoke all    on function public.get_leaderboard(text, text) from public, anon;
+grant  execute on function public.get_leaderboard(text, text) to authenticated;
+
+drop function if exists public._city_count(uuid);
+
+commit;
+
+notify pgrst, 'reload schema';
+```
+
+### 14.4 Diagnoseabfragen U bis Z
+
+Alle rein lesend, alle unausgeführt. **U bis X vor Block 7a laufen lassen und
+die Ausgabe sichern**, Y danach, Z nach 7b. Die Buchstaben laufen hinter 11.7
+weiter, A bis J stehen in Abschnitt 7, K bis T in 11.7. Abfrage N aus 11.7 gilt
+für diesen Nachtrag unverändert und ist die Voraussetzung, nicht die
+Nachkontrolle.
+
+```sql
+-- U) Voraussetzung für Block 7a, dieselbe Frage, die der Wächter im Block
+--    stellt, nur lesbar. Erwartet: je Tabelle zwei Zeilen, eine mit
+--    USING (true) und eine mit auth.uid(). Fehlt die zweite, NICHT ausführen:
+--    Schritt 1 würde jedem Nutzer den Blick auf die eigenen Trophäen nehmen.
+select tablename,
+       policyname,
+       cmd,
+       qual,
+       (qual like '%auth.uid()%') as ist_eigener_zugriff
+  from pg_policies
+ where schemaname = 'public'
+   and tablename in ('user_trophies', 'user_city_scores')
+ order by tablename, policyname;
+
+-- V) Wer darf die beiden Leserfunktionen heute rufen, und welche Fassung steht
+--    in der Datenbank? pg_get_function_result ist der Punkt: daran ist
+--    ablesbar, ob 7a oder 7b schon gelaufen ist, ohne dass man es glauben muss.
+--    Erwartet vor 7a: anon_darf = true für get_leaderboard.
+--    Erwartet vor 7a: anon_darf = false für get_my_rank, WENN Migration 4
+--    gelaufen ist. Steht dort true, ist Block 4b nie gelaufen, und das ist ein
+--    eigener Befund.
+select p.oid::regprocedure                                     as funktion,
+       has_function_privilege('anon',          p.oid, 'EXECUTE') as anon_darf,
+       has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_darf,
+       pg_get_function_result(p.oid)                            as rueckgabe,
+       p.prosecdef                                              as security_definer,
+       pg_get_userbyid(p.proowner)                              as owner,
+       p.proconfig                                              as settings
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.proname in ('get_leaderboard', 'get_my_rank', '_city_count')
+ order by 1;
+
+-- W) Wie viele Konten ändern ihren angezeigten Namen? Das ist die einzige
+--    Zahl in diesem Nachtrag, die einen Nutzer sichtbar betrifft, ohne dass er
+--    etwas getan hat. Wer sie nicht kennt, kann die Support-Anfrage nicht
+--    beantworten.
+--      mit_echtem_namen: sieht ab 7a den Username statt seines Namens.
+--      wird_zu_entdecker: hat KEINEN Username und war bisher mit Namen
+--        sichtbar. Diese Konten heißen ab 7a "Entdecker" (und ab 7b null),
+--        und das ist der unangenehme Fall: ein Name verschwindet und es
+--        kommt kein Pseudonym nach, weil keins existiert.
+select count(*) filter (where show_real_name)                              as mit_echtem_namen,
+       count(*) filter (where show_real_name and username is null)         as wird_zu_entdecker,
+       count(*) filter (where username is null and score_total > 0)        as ohne_username_aber_im_ranking,
+       count(*)                                                            as konten_gesamt
+  from public.profiles;
+
+-- X) Die Städtezahl, bevor sie eine Spalte wird. Drei Fragen in einer Abfrage:
+--    wie viele Zeilen tragen 'unknown' (also keinen zuordenbaren Fakt),
+--    welche Schlüssel gibt es überhaupt, und wie stark schlägt E-56 zu.
+--    Zwei Schlüssel, die offensichtlich dieselbe Stadt meinen (muenchen und
+--    münchen, rom und rome), sind der Beleg für E-56 in den Daten und nicht
+--    nur im Code.
+select ucs.city_key,
+       count(*)                       as zeilen,
+       count(distinct ucs.user_id)    as nutzer,
+       sum(ucs.score)                 as punkte_gesamt
+  from public.user_city_scores ucs
+ where ucs.score > 0
+ group by ucs.city_key
+ order by 2 desc;
+
+--    Und die Auswirkung auf die neue Spalte, je Nutzer, für die zehn mit den
+--    meisten Städten. mit_unknown ist der Wert, den
+--    handle_fact_collected:288 heute für weltenbummler benutzt,
+--    ohne_unknown der Wert, den _city_count aus Block 7b liefern wird.
+select ucs.user_id,
+       count(distinct ucs.city_key)                                        as mit_unknown,
+       count(distinct ucs.city_key) filter (where ucs.city_key <> 'unknown') as ohne_unknown
+  from public.user_city_scores ucs
+ where ucs.score > 0
+ group by ucs.user_id
+ order by 2 desc
+ limit 10;
+
+-- Y) nach Block 7a.
+--    Erwartet: keine Zeile mit ist_public = true, und anon_darf = false für
+--    beide Funktionen. Das ist zugleich die Regressionsprobe: ein späteres,
+--    gut gemeintes "create policy ... using (true)" oder ein
+--    "grant execute on all functions in schema public to anon" macht in einer
+--    Zeile alles wieder auf.
+select tablename, policyname, cmd, (qual = 'true') as ist_public
+  from pg_policies
+ where schemaname = 'public'
+   and tablename in ('user_trophies', 'user_city_scores')
+ order by tablename, policyname;
+
+select p.oid::regprocedure                                     as funktion,
+       has_function_privilege('anon',          p.oid, 'EXECUTE') as anon_darf,
+       has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_darf
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.proname in ('get_leaderboard', 'get_my_rank');
+
+-- Z) nach Block 7b. Stimmt die Städtezahl, und läuft der Helfer überhaupt?
+--    Im SQL-Editor läuft die Abfrage als Eigentümer, also ohne Policy-Grenze:
+--    hier steht der wahre Wert. Liefert get_leaderboard dagegen überall 0,
+--    dann greift für den Funktionseigentümer doch eine Policy, und dann ist
+--    die Annahme aus Abfrage N falsch. In dem Fall stehen Migration 3 und 6
+--    auf derselben falschen Annahme, und das ist der größere Befund.
+select l.rank, l.display_name, l.score, l.city_count
+  from public.get_leaderboard('global', 'all') l;
+
+select ucs.user_id,
+       count(distinct ucs.city_key) filter (where ucs.city_key <> 'unknown') as erwartet
+  from public.user_city_scores ucs
+ where ucs.score > 0
+ group by ucs.user_id
+ order by 2 desc
+ limit 10;
+```
+
+### 14.5 Negativtests 64 bis 82
+
+Gleiche Bedingungen wie Abschnitt 8 und 11.8: **formuliert, nicht ausgeführt**,
+weil aus diesem Repository keine Verbindung zu einem Supabase-Projekt aufgebaut
+wird. Sie gehören in eine Testdatenbank. Zwei Testkonten `A` und `B`, Aufrufe
+mit deren Session-Token, `anon`-Fälle mit dem öffentlichen Schlüssel und ohne
+Token. Die Nummerierung läuft hinter 11.8 weiter.
+
+**Eine Warnung vorweg, sonst wird die halbe Liste falsch gelesen.** Ein
+Zugriff, den eine **Policy** abweist, liefert **null Zeilen und keinen Fehler**.
+Nur ein fehlendes **Recht** liefert `42501`. Die Tests 66, 68 und 70 sind
+deshalb erfolgreich, wenn nichts kommt, und nicht, wenn etwas fehlschlägt. Wer
+dort eine Fehlermeldung erwartet, hält eine bestandene Prüfung für einen
+Fehlschlag.
+
+Block 7a:
+
+| # | Handlung | Vor der Migration | Danach erwartet | Prüft |
+|---|---|---|---|---|
+| 64 | `anon` ruft `get_leaderboard('global','weekly')` | **erlaubt, zehn Zeilen mit Kennung und Namen** | Fehler, kein `EXECUTE` (`42501`, über PostgREST je nach Fassung auch `PGRST202`) | Kernfall „ohne Anmeldung nichts". **Ersetzt Test 48** |
+| 65 | `A` ruft `get_leaderboard('global','weekly')` | erlaubt | **erlaubt, vier Spalten wie bisher** | Nichtbruch, `screen-profil.jsx:20` |
+| 66 | `A` liest `user_trophies` von `B` | **erlaubt, alle Zeilen** | **null Zeilen, kein Fehler** | Kernfall E-16. **Ersetzt Test 63** |
+| 67 | `A` liest die eigenen `user_trophies` genau wie `api.jsx:80` | erlaubt | **erlaubt** | **der riskanteste Nichtbruch-Test** |
+| 68 | `A` liest `user_city_scores` von `B` | **erlaubt** | **null Zeilen, kein Fehler** | Kernfall E-16, Aufenthaltsdaten |
+| 69 | `A` liest die eigenen `user_city_scores` | erlaubt | **erlaubt** | Nichtbruch, und die Grundlage dafür, dass ein Client seine eigene Städtezahl selbst zählen kann |
+| 70 | `anon` liest `user_trophies` ohne Filter | **erlaubt, die ganze Tabelle** | **null Zeilen, kein Fehler** | ohne Konto nichts, und die Begründung dafür, dass `SELECT` für `anon` nicht entzogen wird |
+| 71 | `A` ruft `get_my_rank(B, 'global', 'weekly')` | **liefert den Rang von `B`** | Fehler `42501`, `foreign account` | fremder Rang, derselbe Defekt wie E-06 Punkt 2 |
+| 72 | `A` ruft `get_my_rank(A, 'global', 'weekly')` | erlaubt | **erlaubt** | Nichtbruch, `app.jsx:267` |
+| 73 | `A` ruft `get_my_rank(null, 'global', 'weekly')` | liefert einen Rang, gerechnet auf Punktestand 0 | **erlaubt, liefert den Rang von `A`** | Nullfall, wie Test 39 |
+| 74 | `B` setzt `show_real_name = true`, dann ruft `A` `get_leaderboard` | `A` sieht den **echten Namen** von `B` | `A` sieht den Username von `B` | „nur ein Username, keinen echten Namen" |
+| 75 | `B` hat `show_real_name = true` und **keinen** Username, `A` ruft `get_leaderboard` | `A` sieht den echten Namen von `B` | `A` sieht `Entdecker` | der unangenehme Fall aus Abfrage W |
+| 76 | `A` sammelt einen Fakt und die Trophäen wachsen | ja | **ja** | der Trigger schreibt weiter; Policies begrenzen den Client, nicht den Eigentümer |
+
+Block 7b:
+
+| # | Handlung | Vor 7b | Danach erwartet | Prüft |
+|---|---|---|---|---|
+| 77 | `A` ruft `get_leaderboard('global','weekly')` und sieht sich in den Top 10 | `row.user_id` ist die eigene Kennung | `row.user_id` **fehlt**, `row.is_me` ist `true` | Kernfall 7b |
+| 78 | `A` ruft `get_leaderboard` und `B` steht darin | `row.user_id` ist die Kennung von `B` | `row.is_me` ist `false`, keine Kennung | die Kennung ist aus der Rückgabe |
+| 79 | `A` hat Fakten in München, Regensburg und einen ohne `city` | Städtezahl gibt es nicht | `city_count` ist **2**, nicht 3 | `'unknown'` ist keine Stadt |
+| 80 | `B` hat keinen Username und steht in den Top 10 | `display_name` ist `Entdecker` | `display_name` ist `null` | der deutsche Text fällt aus der Datenbank |
+| 81 | `anon` ruft `get_leaderboard` | Fehler, kein `EXECUTE` (Zustand nach 7a) | **weiterhin Fehler** | das `drop function` hat die Rechte mitgenommen, Schritt 3 hat sie wieder gesetzt |
+| 82 | `A` ruft `_city_count(B)` direkt | die Funktion existiert nicht | Fehler, kein `EXECUTE` | der Helfer ist keine API |
+
+**Die vier Tests, an denen es hängt.** Test 67, weil ein Fehlschlag bedeutet,
+dass jeder Nutzer in der PWA eine leere Trophäenreihe sieht und die
+Trophäen-Nachprüfung in `app.jsx:573` stumm nichts mehr findet. Test 76, weil
+ein Fehlschlag bedeutet, dass die Eigentümerannahme aus Abfrage N falsch ist und
+dann auch Migration 3 und 6 zurückzurollen sind. Test 65, weil er die eine
+Zusicherung von 7a prüft, nämlich dass die Rückgabe unangetastet bleibt. Test
+81, weil das vergessene Schritt 3 in 7b nichts bricht und deshalb nicht
+auffällt: der Befund wäre wieder offen, und alles würde weiter funktionieren.
+Die eigentlichen Sicherheitstests 64, 66, 68 und 71 sind die einfachen.
+
+### 14.6 Auswirkung auf diese App und auf die PWA
+
+#### Auf `lib/`: keine, und das ist nachgesehen
+
+Vollständige Liste der Supabase-Berührungen dieses Repositories, ermittelt über
+das Muster aus 11.9, weil das naheliegende `\.rpc\(` den einzigen RPC-Aufruf
+dieses Repositories nicht findet:
+
+```
+grep -rnE "\.(from|rpc)\s*(<[^>]*>)?\s*\(" lib/
+```
+
+| Stelle | Was | Von Migration 7 betroffen |
+|---|---|---|
+| `lib/features/facts/data/datasources/remote/supabase_fact_remote_data_source.dart:46` | `from('facts').select()` | nein |
+| `.../supabase_fact_remote_data_source.dart:57` | `from('facts').select().eq('id', id)` | nein |
+| `lib/features/identity/data/datasources/remote/supabase_auth_remote_data_source.dart:295` | `rpc<Object?>('check_username')` | nein, Migration 4 gibt sie ausdrücklich an `anon` |
+| `.../supabase_auth_remote_data_source.dart:330` | `from('profiles').update({username})` | nein |
+
+**Es gibt in `lib/` keinen Leseweg auf `user_trophies`, `user_city_scores`,
+`get_leaderboard` oder `get_my_rank`.** Die Treffer auf „Trophäe", „Rangliste"
+und „leaderboard" in `lib/` liegen ausschließlich in den generierten
+i18n-Dateien und in `lib/features/progression/`, und dieser Block hat
+ausdrücklich keine Datenschicht (11.9). Der Text
+`lib/app/localization/generated/app_strings_de.g.dart:619` („Trophäen, Reise-Karte
+und Ranking schaltest du mit einem kostenlosen Konto frei") sagt schon heute das,
+was Migration 7a im Backend erzwingt.
+
+**Was künftige Schritte beachten müssen:**
+
+- **Eine Rangliste in diesem Repository liest `get_leaderboard` und rechnet
+  nichts nach.** Nach 7b sind die Spalten `rank`, `is_me`, `display_name`,
+  `score`, `city_count`. `display_name` ist `nullable`, und der Rückfalltext
+  gehört in die i18n-Ergänzung, nicht in ein `?? 'Entdecker'` im Dart-Code. Wer
+  dort ein deutsches Wort hinschreibt, wiederholt E-63.
+- **Läuft nur 7a, heißt die Kennungsspalte weiter `user_id` und `city_count`
+  fehlt.** Ein Datenmodell, das gegen 7b gebaut ist, bricht dann still: der
+  fehlende Schlüssel kommt als `null` an. Die Datenschicht muss den Fall zu
+  einem Fehlschlag machen und nicht zu einem `0`, gleiche Begründung wie beim
+  Username-Check in `supabase_auth_remote_data_source.dart:288-291`.
+- **Die eigene Städtezahl braucht keine RPC.** `user_city_scores` ist nach 7a
+  für die eigene Zeile lesbar (Test 69). Wer nur den eigenen Wert zeigen will,
+  zählt ihn selbst und muss `'unknown'` dabei ausschließen.
+- **Fremde Trophäen sind nicht mehr lesbar.** Ein Profil eines anderen Nutzers
+  kann seine Trophäen nicht anzeigen. Das ist die Entscheidung und keine Lücke
+  im Backend, die man umgehen darf.
+
+#### Auf die PWA: 7a nein, 7b ja
+
+**7a bricht nichts**, aber es ändert für Besucher ohne Konto sichtbar das
+Verhalten, siehe den Kommentarblock in 14.2. Dazu zwei Punkte, die in ein
+PWA-Auftragspaket gehören und **nicht** in diese Migration:
+
+1. **Der Schalter „Echten Namen zeigen" wird zu einer Lüge.**
+   `screen-profil.jsx:693` schreibt weiter `show_real_name`, und die Spalte ist
+   in Migration 1 ausdrücklich freigegeben. Nach 7a liest sie niemand mehr. Der
+   Schalter speichert also einen Wert, der nichts bewirkt, und behauptet dem
+   Nutzer gegenüber das Gegenteil. Das ist schlimmer als ein fehlender Schalter.
+   **Er gehört aus der Oberfläche entfernt**, im PWA-Repository.
+2. **Die Spalte `profiles.show_real_name` selbst bleibt stehen.** Sie zu
+   löschen wäre eine Schemaänderung mit Datenverlust und laut Auftrag zu melden.
+   Sie steht in 14.7.
+
+**7b bricht `screen-profil.jsx` an drei Stellen**, und alle drei still:
+
+| Zeile | Heute | Nach 7b | Änderung |
+|---|---|---|---|
+| 88 | `const isMe = String(row.user_id) === String(userId)` | immer `false`, keine Hervorhebung | `const isMe = row.is_me === true` |
+| 117 | `!rows.some(r => String(r.user_id) === String(userId))` | immer `true`, der eigene Rang wird unten angehängt, obwohl er in der Liste steht | `!rows.some(r => r.is_me)` |
+| 103 | `{row.display_name}` | leer bei Konten ohne Username | `{row.display_name || t('ranking.anonymous', lang)}`, und der Schlüssel muss erst existieren |
+
+Die dritte Zeile ist der Grund, warum 7b nicht nur ein Suchen und Ersetzen ist:
+`t()` gibt in der PWA bei fehlendem Schlüssel den Schlüssel selbst zurück, ein
+`||`-Rückfall dahinter kann also nie feuern. Genau dieser Fehler ist in
+`CLAUDE.md` als E-63 vermerkt. Der Schlüssel muss vor dem Release in beiden
+Sprachen existieren, und **der Wortlaut ist eine Inhaltsfrage**, siehe 14.7.
+
+`08_Flutter/lib/services/supabase_service.dart:229-234` ruft `get_leaderboard`
+in einer Methode ohne Aufrufer. Der eingefrorene Port bricht durch 7b nicht,
+weil er die Rückgabe nirgends auswertet. Gleiches Ergebnis wie bei `addCoins` in
+Abschnitt 2.
+
+### 14.7 Was nach Migration 7 offen bleibt
+
+- **Die Städte-Ranglisten verraten Städtenamen, und zwar zwangsläufig.** Das ist
+  der Punkt, an dem die Entscheidung nicht ganz durchträgt.
+  `get_leaderboard('münchen', 'all')` liefert die Top 10 dieser Stadt. Wer in
+  dieser Liste steht, war messbar in München, und der Aufrufer weiß es. Die
+  Stadtfilter sind ein bestehendes Produktmerkmal
+  (`screen-profil.jsx:9`, fünf Pillen), also ist „keine Städtenamen" für die
+  Top 10 je Stadt nicht einhaltbar, solange es Stadt-Ranglisten gibt. Der
+  Unterschied zum Ist-Zustand ist erheblich: heute geht es für **jeden** Nutzer
+  und **ohne Konto**, danach für zehn je Stadt und nur mit Konto. **Das ist eine
+  Produktfrage und bleibt offen:** entweder die Stadt-Ranglisten fallen, oder
+  die Aussage lautet „keine Städtenamen, außer man steht in den besten zehn
+  einer Stadt". Beides ist vertretbar, das eine ist nicht das andere. Nicht
+  entschieden, nicht gebaut.
+- **Der Wortlaut für ein Konto ohne Username.** Nach 7b liefert der Server
+  `null`, und der Client braucht einen Text. Inhaltsfrage. Bis sie beantwortet
+  ist, läuft 7b nicht, weil sonst eine leere Zeile in der Rangliste steht.
+- **`profiles.show_real_name` und `profiles.name` sind nach der Entscheidung
+  ohne Zweck.** `show_real_name` liest nach 7a niemand mehr, und `name` trägt im
+  Neubau bereits den Username (`signup_notifier.dart:174`). Beide Spalten zu
+  entfernen ist eine Schemaänderung mit Datenverlust und ein Bruch für
+  `api.jsx:105` und `loadUserData`. **Melden, nicht bauen.** Der harmlose
+  Zwischenschritt wäre, `show_real_name` das Schreibrecht zu nehmen, also die
+  Spalte aus der `grant update`-Liste von Migration 1 zu streichen. Das ist eine
+  Änderung an Migration 1 und deshalb nicht Teil dieses Nachtrags.
+- **Die Trophäe `weltenbummler` zählt `'unknown'` als Stadt.**
+  `handle_fact_collected:288`. Die Behebung ist eine Zeile, aber sie ändert,
+  wann eine Trophäe fällt, also eine Spielregel. Dazu kommt: bereits vergebene
+  Trophäen bleiben vergeben, ein Rückrechnen wäre ein eigener Auftrag mit
+  Datenmigration. Gehört zu E-56 und zu Janek.
+- **`unknown_first` ist eine Trophäe ohne Namen.** `handle_fact_collected:279`
+  baut den Schlüssel als `v_city_key || '_first'`. `wallet-colors.jsx:103` kennt
+  ihn nicht. Derselbe Befund wie `unknown` oben, nur an anderer Stelle sichtbar.
+- **`_city_count` ist ein neues Funktionsobjekt.** Kein neue Tabelle, aber ein
+  Objekt, das es vorher nicht gab. Wer das nicht will, setzt den
+  `count(distinct ...)` als korrelierte Unterabfrage viermal in die vier Zweige
+  von 7b ein; das Ergebnis ist identisch, und die vier Kopien sind dann bei der
+  Beantwortung von E-56 viermal zu ändern. Der Helfer ist die Empfehlung, nicht
+  die Vorgabe.
+- **Der Client bestimmt weiter, welche Trophäe er bekommt.** `unlock_trophy` ist
+  seit Migration 4 kontogebunden und nimmt jeden Schlüssel. E-16 ändert daran
+  nichts: fremde Trophäen sind nicht mehr lesbar, die eigenen sind weiter
+  erfindbar. Das ist E-49.
+- **Alles hier steht unter dem Vorbehalt aus `backend-inventory.md`,
+  Abschnitt 2.** Ohne Schema-Dump der laufenden Datenbank ist nicht bekannt, was
+  von den Migrationen tatsächlich gelaufen ist. Die Abfragen U bis Z sind die
+  kleine Fassung dieses Dumps für den Ausschnitt, den dieser Nachtrag anfasst.
+
+### 14.8 Wo dieser Nachtrag von seinem Auftrag abweicht
+
+Vollständig, weil eine stillschweigende Abweichung schlimmer ist als eine
+gemeldete.
+
+| # | Auftrag | Was daraus geworden ist | Warum |
+|---|---|---|---|
+| 1 | „Mit Anmeldung: Rang, Punktestand und die Anzahl der Städte" | `display_name` bleibt in der Rückgabe, gespeist aus `profiles.username` | Eine Rangliste ohne Beschriftung ist keine Rangliste, und J-B nennt den Username im Satz danach als **die** Identität. `app_strings_de.g.dart:509` sagt es aus diesem Repository heraus: „Sichtbar in der Rangliste". Auslegung, deshalb ausdrücklich in 14.0 als solche markiert |
+| 2 | „Wenn sie mehr liefert, schreib zwei Blöcke" | zwei Blöcke, aber die Städtezahl liegt im **zweiten** | Eine neue Spalte in `returns table` ändert den Rückgabetyp, und `create or replace` kann das nicht (`42P13`). Das nötige `drop function` nimmt alle Ausführrechte mit; diese Form gehört in den Block mit Zeitfenster. Der Auftrag hätte sie in 7a erwartet. Wie 7b rein additiv wird, steht in 14.1 |
+| 3 | Policies verschärfen | zusätzlich `get_my_rank` an das Konto gebunden | Die Funktion nimmt eine fremde Kennung und liefert deren Rang (`:443`). Nach dem Policy-Drop wäre sie der letzte Weg, der über eine fremde Kennung eine Auskunft gibt. Nicht Teil von E-16, aber dieselbe Klasse wie E-06 Punkt 2 und im selben Block kostenlos |
+| 4 | „Prüfe, ob sich die Städtezahl aus `user_city_scores` zählen lässt" | ja, aber **nicht** so wie `handle_fact_collected:288` es tut | `'unknown'` ist ein `city_key` wie jeder andere. Der bestehende Zähler ist falsch, und die naheliegende Umsetzung hätte den Fehler übernommen. Ergebnis: die Anzeige weicht bewusst von der Trophäenschwelle ab |
+| 5 | „Ein Direktzugriff auf fremde Zeilen fällt weg, sobald die Policy fällt" | er fällt weg, aber es gab **keinen** | Kein Client liest fremde Zeilen aus einer der beiden Tabellen (14.0, Frage 3). Das `USING (true)` war ein Recht ohne Aufrufer. Die Migration bricht deshalb weniger, als der Befund vermuten lässt |
+| 6 | die Kennung aus der Rangliste nehmen schließt das Loch | es schließt es **nicht** | `read comments` ist `USING (true)` und `comments.user_id` verweist auf `profiles` (`:51-57`, `:159-160`). Kontokennungen sind ohne Rangliste zu bekommen. Was E-16 schließt, ist, dass eine Kennung etwas aufschließt, und das leistet 7a. 7b ist Hygiene, und in 14.1 steht ausdrücklich, dass wer sie für dringend hält, falsch priorisiert |
+| 7 | Negativtest „vorher gelingt, nachher scheitert" | zusätzlich der Hinweis, dass eine Policy **null Zeilen** liefert und keinen Fehler | Ohne diesen Absatz werden die Tests 66, 68 und 70 als Fehlschlag gelesen, obwohl sie bestanden sind. Dazu Nichtbruch-Tests (65, 67, 69, 72, 73, 76, 81), und die sind hier wieder die riskanteren |
+| 8 | „Keine neue Tabelle" | keine Tabelle, aber ein neues **Funktionsobjekt** `_city_count` in 7b | Es ist keine Tabelle und kein Datenvertrag nach außen, sondern ein interner Helfer ohne Ausführrecht für jeden Client, wie `_haversine_m` in Block 4b. Die Alternative ohne neues Objekt steht in 14.7, damit die Wahl beim Eigentümer liegt |
+| 9 | E-16 ist eine Policy-Frage | die Stadt-Ranglisten verraten Städtenamen und können es nicht nicht tun | „Keine Städtenamen" und „es gibt Stadt-Ranglisten" sind nicht beide vollständig erfüllbar. Das ist eine offene Produktfrage und steht in 14.7, statt in der Migration entschieden zu werden |
+| 10 | nur Migration schreiben | zusätzlich zwei PWA-Aufträge benannt (Schalter entfernen, i18n-Schlüssel anlegen) | Der Schalter „Echten Namen zeigen" speichert nach 7a einen Wert, den niemand liest. Ein Schalter, der lügt, ist schlechter als keiner, und die Migration allein erzeugt genau diesen Zustand |

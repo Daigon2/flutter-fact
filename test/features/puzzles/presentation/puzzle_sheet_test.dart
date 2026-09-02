@@ -138,7 +138,10 @@ void main() {
       tester,
     ) async {
       // `:150`: der Ternär hat in beiden Zweigen dasselbe Wort. Das sieht nach
-      // einem Fehler aus und ist der Zustand der Verhaltensquelle.
+      // einem Fehler aus und ist der Zustand der Verhaltensquelle;
+      // `puzzle.stationCounter` bleibt deshalb bewusst in beiden Sprachen
+      // gleich, siehe die Ausnahmeliste in
+      // `app_strings_supplement_test.dart`.
       await pumpSheet(
         tester,
         puzzle: puzzleFixture(),
@@ -147,8 +150,11 @@ void main() {
 
       expect(find.text('STATION 1'), findsOneWidget);
       expect(find.text('Riddle 1'), findsOneWidget);
-      // `Aufgabe` steht als nackter Textknoten in `:194`, ohne Ternär.
-      expect(find.text('AUFGABE'), findsOneWidget);
+      // `Aufgabe` steht als nackter Textknoten in `:194`, ohne Ternär. Bis
+      // zum 02.09.2026 zeigte die Karte hier auch auf Englisch `AUFGABE`
+      // (E-61); der Eigentümer hat das als gemessenen Defekt der Quelle
+      // aufgehoben, `puzzle.taskLabel` trägt seither `Task`.
+      expect(find.text('TASK'), findsOneWidget);
     });
 
     testWidgets('Symbol und Beschriftung kommen aus der Typtabelle', (
