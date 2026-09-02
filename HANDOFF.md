@@ -109,7 +109,7 @@ Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
 den Schritten 33 bis 37 und 39.
 
-**Fertig sind 30 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 33 bis 37 und 39. Schritt 14 ist
+**Fertig sind 31 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 31, 33 bis 37 und 39. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -410,6 +410,27 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 03.09.2026, Schritt 31 war schon gebaut, Schritt 32 ist gesperrt
+
+Beim Suchen nach dem nächsten freien Schritt nachgemessen. **31 von 50.**
+
+**Die Hinweis-Ökonomie steht vollständig**, mitgekommen mit den Schritten 36
+und 37: `huntHintCosts` hält `[0, 20, 30]`, `unlockHint` addiert den Betrag auf
+die Station statt ihn vom Konto abzuziehen, `solveStop` rechnet
+`max(0, punkte - kosten)`, und der Knopf in der Jagd-Pille hängt daran.
+Fünfter Fall, in dem Kästchen und Wirklichkeit auseinanderliegen.
+
+**Schritt 32 ist an einer Antwort gefallen, die es beim Zuschnitt noch nicht
+gab.** Er besteht in der Quelle aus drei Zeilen, und alle drei bestimmen im
+Client einen gutgeschriebenen Betrag: der Umtauschkurs am Jagdende
+(`Math.floor(score / 8)`), die Münzen nach einem gelösten Rätsel und eine
+negative Gutschrift beim Ausgeben. **Genau das verwirft E-19.** Am 31.08.2026
+stand der Schritt als frei in der Liste; die Antwort kam am selben Abend.
+
+Baubar wird er mit einem serverseitigen Jagdabschluss, der den Umtauschkurs
+kennt und selbst bucht, also mit demselben Buchungsjournal, das J-C für das
+Sammeln verlangt. **Das ist eine Entscheidung und keine Umsetzungsfrage.**
 
 ### 03.09.2026, Schritt 26, der Audio-Beacon, und die Hysterese ist der Kern
 

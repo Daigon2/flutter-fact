@@ -1119,6 +1119,46 @@ plus 19 Mutationen, alle gefallen.
 - [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [x] 25. Audio-Service (02.09.2026; „normal“ heißt im Paket 0,5 und nicht 1,0, und die Quelle hat einen echten API-Schlüssel ausgeliefert)
 - [x] 26. Map-Audio-Kopplung (03.09.2026; der Hinweiston mit Hysterese, und die Ansage geht **nicht** über den Fakt-Vorleser)
 
+### Schritt 31 war schon gebaut, und Schritt 32 ist an E-19 gefallen
+
+Am 03.09.2026 nachgemessen, beim Suchen nach dem nächsten freien Schritt.
+
+**Schritt 31, die Hinweis-Ökonomie, steht vollständig.** Sie ist mit den
+Schritten 36 und 37 mitgekommen, ohne dass jemand das Kästchen gesetzt hat.
+Nachgewiesen an vier Stellen: `huntHintCosts` in
+`challenges/domain/hunt_hints.dart` hält `[0, 20, 30]` wie
+`screen-map.jsx:1031`, `HuntRun.unlockHint` addiert den Betrag auf
+`hintCostSpent` der Station statt ihn vom Konto abzuziehen (wie
+`app.jsx:927-935`), `HuntRun.solveStop` rechnet
+`max(0, pointsAwarded - hintCostSpent)` (wie `app.jsx:908-909`), und
+`hunt_pill.dart:443` hängt den Knopf „Tipp freischalten" daran. **Fünfter
+Fall**, in dem Kästchen und Wirklichkeit auseinanderliegen, nach 19, 15, 23
+und 22.
+
+**Schritt 32, Punkte gegen Coins, ist dagegen gesperrt, und zwar durch eine
+Antwort, die es damals noch nicht gab.** Der Schritt besteht in der Quelle aus
+drei Zeilen, und alle drei bestimmen im Client einen gutgeschriebenen Betrag:
+
+* `screen-challenge.jsx:4364`: `onAwardCoins(Math.floor(score / 8))`, also der
+  Umtauschkurs 8 Punkte je Münze am Ende einer Jagd.
+* `puzzle-sheet.jsx:585`: `onAwardCoins(netCoins)` nach einem gelösten Rätsel.
+* `screen-map.jsx:3542`: `onAwardCoins(-cost)`, eine **negative** Gutschrift.
+
+`onAwardCoins` selbst ruft `Storage.addCoins(n)` und `Api.addCoins(userId, n)`
+(`app.jsx:766-773`). **Genau diese Bauform hat Dairen mit E-19 verworfen:** „der
+Client rechnet keine Zeit, an der eine Belohnung hängt", Zwillingsregel zu „der
+Client bestimmt nie einen gutgeschriebenen Betrag". Am 31.08.2026 stand der
+Schritt als frei in der Liste, weil die Antwort noch nicht vorlag; sie kam am
+selben Abend.
+
+**Was der Schritt bräuchte, um baubar zu werden**, steht damit fest und ist
+eine Entscheidung des Eigentümers, nicht eine Frage der Umsetzung: ein
+serverseitiger Abschluss der Jagd, der den Umtauschkurs kennt und die Münzen
+selbst bucht. Das ist dasselbe Buchungsjournal, das J-C für das Sammeln
+verlangt (`coin_ledger`), und dieselbe Stufe 3. Bis dahin kann der Neubau die
+Punkte **anzeigen** und nichts verbuchen, genau wie bei E-19 für das
+Sitzungsende festgehalten.
+
 ### Schritt 26, der Audio-Beacon, und die Hysterese ist der Kern
 
 2593 Tests, vierzehn Mutationen, alle gefallen. Wer im Fakt-Finder-Modus mit
@@ -1474,7 +1514,7 @@ Sheets, **ohne jeden Einstieg**, wie die Fakt-Akte in Schritt 21.
 
 - [x] 27. Puzzle-Sheet mit vollem Mapping · [!] 28. Alle Rätseltypen
   (sprachneutrale Auswertung) · [ ] 29. In-Puzzle-Hint · [ ] 30. Reveal-Screen
-- [ ] 31. Hinweis-Ökonomie · [ ] 32. Punkte gegen Coins (beide am 31.08.2026 frei, Restrisiko E-06 und E-24 im Backend, siehe Antwortblock)
+- [x] 31. Hinweis-Ökonomie (**war mit Schritt 36/37 bereits gebaut**, am 03.09.2026 nachgemessen) · [!] 32. Punkte gegen Coins (**gesperrt, seit E-19 beantwortet ist**: der Schritt besteht genau darin, dass der Client einen Betrag bestimmt)
 
 ## Phase 5, Challenge
 
