@@ -80,8 +80,13 @@ jobs:
       - name: Gate 1, Format
         run: dart format --output=none --set-exit-if-changed lib test tool
 
+      # `--fatal-infos`, seit dem 02.09.2026. Ohne die Flagge kippt ein
+      # `info` das Tor nicht, und genau daran standen hier über Wochen 24
+      # Hinweise, die niemanden mehr erreicht haben: wo 24 Meldungen stehen,
+      # fällt die 25. nicht auf. Seit sie weg sind, kostet die Flagge nichts
+      # und hält den Stand.
       - name: Gate 2, Analyzer
-        run: dart analyze
+        run: dart analyze --fatal-infos
 
       - name: Gate 3, Architektur
         run: dart run tool/check_architecture.dart

@@ -110,10 +110,9 @@ class MapCameraHost implements MapHost {
   /// an das Gate weiter.
   MapCameraHost({
     DiagnosticSink diagnostics = const SilentDiagnosticSink(),
-    MapCameraThresholds thresholds = const MapCameraThresholds(),
+    this._thresholds = const MapCameraThresholds(),
     Duration Function()? now,
   }) : _diagnostics = diagnostics,
-       _thresholds = thresholds,
        _now = now ?? _stopwatchClock(),
        _overlays = MapOverlayHost(diagnostics: diagnostics);
 

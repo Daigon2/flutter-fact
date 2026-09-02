@@ -80,9 +80,7 @@ class ConsoleDiagnosticSink implements DiagnosticSink {
   ///
   /// [write] ist der Ausgabekanal und existiert, damit ein Test die erzeugte
   /// Zeile lesen kann, ohne die Konsole abzufangen.
-  const ConsoleDiagnosticSink({
-    void Function(String line) write = writeDiagnosticLineToConsole,
-  }) : _write = write;
+  const ConsoleDiagnosticSink({this._write = writeDiagnosticLineToConsole});
 
   final void Function(String line) _write;
 

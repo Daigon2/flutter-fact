@@ -119,7 +119,7 @@ abstract interface class ActiveHuntStore {
 /// Vorgabe für Tests.
 final class InMemoryActiveHuntStore implements ActiveHuntStore {
   /// [hunt] setzt eine bereits laufende Jagd, etwa in einem Test.
-  InMemoryActiveHuntStore({ActiveHunt? hunt}) : _hunt = hunt;
+  InMemoryActiveHuntStore({this._hunt});
 
   ActiveHunt? _hunt;
 

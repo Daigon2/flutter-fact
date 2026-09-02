@@ -69,8 +69,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///    der Strom wäre einfach still.
 final class MapHostRegistry implements MapHost {
   /// Erzeugt eine leere Registry. [diagnostics] bekommt jede verlorene Absicht.
-  MapHostRegistry({required DiagnosticSink diagnostics})
-    : _diagnostics = diagnostics;
+  MapHostRegistry({required this._diagnostics});
 
   /// Gemeldet, wenn etwas den Host braucht und keiner eingeklinkt ist.
   ///

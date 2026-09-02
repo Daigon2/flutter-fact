@@ -75,8 +75,8 @@ final class SharedPreferencesKeyValueStore implements KeyValueStore {
   /// Umsetzung prüfen kann statt nur gegen den Rückfall.
   SharedPreferencesKeyValueStore(
     this._preferences, {
-    DiagnosticSink sink = const SilentDiagnosticSink(),
-  }) : _sink = sink;
+    this._sink = const SilentDiagnosticSink(),
+  });
 
   final SharedPreferences _preferences;
   final DiagnosticSink _sink;

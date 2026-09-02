@@ -25,12 +25,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class SupabaseFactRepository implements FactRepository {
   /// [dataSource] liest, [mapper] übersetzt, [diagnostics] nimmt den Bericht.
   SupabaseFactRepository({
-    required FactRemoteDataSource dataSource,
-    FactMapper mapper = const FactMapper(),
-    DiagnosticSink diagnostics = const SilentDiagnosticSink(),
-  }) : _dataSource = dataSource,
-       _mapper = mapper,
-       _diagnostics = diagnostics;
+    required this._dataSource,
+    this._mapper = const FactMapper(),
+    this._diagnostics = const SilentDiagnosticSink(),
+  });
 
   /// Zeilen pro Anfrage.
   ///

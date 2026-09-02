@@ -19,7 +19,12 @@ Required baseline:
 
 - Dart analyzer with strict language options;
 - Flutter lint baseline;
-- no ignored analyzer warnings without reason.
+- no ignored analyzer warnings without reason;
+- **zero analyzer output, not merely exit code 0.** Since 02.09.2026 the
+  analyzer gate runs with `--fatal-infos`. It became affordable only that
+  day: before it, 24 standing `prefer_initializing_formals` infos meant the
+  gate printed noise nobody read, and a 25th finding would have hidden in
+  it. The infos are gone, so the flag costs nothing and holds the state.
 
 ### Accepted deviation: no Riverpod lint
 
@@ -134,7 +139,7 @@ Every pull request:
 
 ```text
 dart format --output=none --set-exit-if-changed lib test tool
-flutter analyze
+flutter analyze --fatal-infos
 flutter test
 dart run tool/check_architecture.dart
 ```
@@ -200,7 +205,7 @@ Minimum pull-request pipeline:
 
 ```bash
 dart format --output=none --set-exit-if-changed lib test tool
-flutter analyze
+flutter analyze --fatal-infos
 flutter test --coverage
 dart run tool/check_architecture.dart
 # Still missing, do not add before it exists or resolves:

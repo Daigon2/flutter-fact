@@ -83,7 +83,7 @@ abstract interface class AudioModeStore {
 class InMemoryAudioModeStore implements AudioModeStore {
   /// [enabled] setzt einen bereits eingeschalteten Audio-Modus, etwa in einem
   /// Test.
-  InMemoryAudioModeStore({bool enabled = false}) : _enabled = enabled;
+  InMemoryAudioModeStore({this._enabled = false});
 
   bool _enabled;
 

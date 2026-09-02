@@ -80,7 +80,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2308 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2308 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -346,6 +346,42 @@ Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zw
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
 
+### 02.09.2026, Der Analysator steht auf null, und bleibt jetzt dort
+
+24 Hinweise `prefer_initializing_formals` standen wochenlang, Gate 2 blieb
+trotzdem grün, weil ein `info` es nicht kippt. Alle 24 sind weg, in 15 Dateien,
+als Initialisierungs-Kurzform. **Die Testzahl blieb bei 2308**, und das war die
+Bedingung: wer bei so einer Umstellung Tests anfassen muss, hat mehr getan als
+umgestellt.
+
+**Meine Vermutung war falsch, und das Nachmessen war das Wertvolle daran.** Ich
+hatte angenommen, der Lint sei hier gar nicht befolgbar, weil Dart keine
+privaten benannten Parameter erlaubt. An einer Wegwerf-Datei gemessen: `required
+this._x` ist erlaubt, und der Aufrufer schreibt weiter den öffentlichen Namen
+`x:`. Deshalb hat sich **keine einzige Aufrufstelle** geändert. Hätte ich der
+Vermutung geglaubt, stünde jetzt eine falsche Begründung im Dokument und die 24
+Hinweise stünden weiter da.
+
+**Ein Zwischenfund des Bauenden, der die Sache fast gedreht hätte:** eine
+Kurzform **mit** Typ (`bool this._x = false`) ist gültig, löst aber sofort einen
+anderen Hinweis aus (`type_init_formals`). Wer die 24 Stellen ohne diese
+Messung umgestellt hätte, hätte 24 Meldungen gegen 24 andere getauscht. Er hat
+es an einer Datei geprüft, bevor er die übrigen 23 angefasst hat.
+
+**Eine Stelle blieb bewusst stehen**, und der Analysator hatte sie auch nie
+gemeldet: in `map_camera_host.dart` wird `diagnostics` in derselben
+Initialisierungsliste ein zweites Mal gebraucht. Als Kurzform gäbe es den
+lokalen Namen nicht mehr.
+
+**Seit demselben Tag läuft Gate 2 mit `--fatal-infos`.** Vorher kippte ein
+`info` das Tor nicht, und genau daran konnten 24 Meldungen so lange stehen: wo
+24 stehen, fällt die 25. nicht auf. Jetzt kostet die Flagge nichts und hält den
+Stand. Damit ist auch der Widerspruch erledigt, den `HANDOFF.md` als offen
+führte („24 Hinweise" gegen „No issues found!"): die 24 waren echt und sind weg.
+Warum irgendein Lauf grün gemeldet hat, bleibt unerklärt, und dieser Unterschied
+zwischen verschwunden und aufgelöst steht auch so da.
+
+
 ### 02.09.2026, Das Tor stand offen, aber nicht an diesem Zweig
 
 Beim Suchen nach dem nächsten Posten stellte sich heraus, dass gleich zwei
@@ -596,14 +632,19 @@ zusätzlicher Regel-4-Eintrag hätte zwei Meldungen für denselben Import erzeug
 Wer das nächste Heimatverzeichnis baut, prüft zuerst, ob sein Paket schon unter
 Regel 1 fällt.
 
-**Ein Befund bleibt offen, und ich sage es lieber selbst.** `dart analyze` meldet
-24 Hinweise (`prefer_initializing_formals`), Gate 2 bleibt trotzdem auf 0, weil
-ein `info` es nicht kippt. Vier mögliche Ursachen habe ich einzeln gemessen und
-ausgeschlossen: die SDK-Anhebung, die Sprachfassung, `analysis_options.yaml` und
-die Lint-Fassungen. Zugleich hat `dart analyze` in dieser Sitzung mehrfach
-wörtlich „No issues found!" ausgegeben. **Beides kann nicht stimmen, und welche
-Beobachtung falsch ist, habe ich nicht aufgelöst.** Belege in
-`REBUILD_STATUS.md`.
+**Dieser Befund ist am 02.09.2026 erledigt, aber nicht erklärt.** Er lautete:
+`dart analyze` meldet 24 Hinweise (`prefer_initializing_formals`), und zugleich
+hat dasselbe Werkzeug in derselben Sitzung mehrfach wörtlich „No issues found!"
+ausgegeben; beides kann nicht stimmen. **Die 24 waren echt**, sie standen mit
+Datei und Zeile da und ließen sich einzeln aufzählen. Sie sind jetzt weg, alle
+24 als Initialisierungs-Kurzform. **Warum irgendein Lauf grün gemeldet hat,
+bleibt unerklärt**; der wahrscheinlichste Grund steht weiter unten in dieser
+Datei, zwei Läufe auf demselben Arbeitsbaum. Der Widerspruch ist damit
+verschwunden, nicht aufgelöst, und der Unterschied gehört hierher.
+
+Damit er nicht zurückkommt, läuft Gate 2 seit demselben Tag mit
+`--fatal-infos`. Vorher kippte ein `info` das Tor nicht, und genau daran konnten
+24 Meldungen wochenlang stehen bleiben: wo 24 stehen, fällt die 25. nicht auf.
 
 ### 31.08.2026, Zwei nachgeholte Reviews, und beide Befunde lagen in meinen Dokumenten
 
@@ -1350,7 +1391,7 @@ Müssen alle vier auf Exit-Code 0 stehen, bevor etwas committet wird:
 
 ```
 dart format --output=none --set-exit-if-changed lib test tool
-dart analyze
+dart analyze --fatal-infos
 dart run tool/check_architecture.dart
 flutter test
 ```

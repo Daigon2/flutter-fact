@@ -31,18 +31,13 @@ import 'package:flutter/foundation.dart';
 class AppStrings {
   const AppStrings._({
     required this.language,
-    required Map<String, String> texts,
-    required Map<String, String> supplement,
-    required Map<String, String> fallbackTexts,
-    required Map<String, String> fallbackSupplement,
-    required Map<String, List<String>> lists,
-    required Map<String, List<String>> fallbackLists,
-  }) : _texts = texts,
-       _supplement = supplement,
-       _fallbackTexts = fallbackTexts,
-       _fallbackSupplement = fallbackSupplement,
-       _lists = lists,
-       _fallbackLists = fallbackLists;
+    required this._texts,
+    required this._supplement,
+    required this._fallbackTexts,
+    required this._fallbackSupplement,
+    required this._lists,
+    required this._fallbackLists,
+  });
 
   /// Texte für [language], mit der Fallback-Sprache im Rücken.
   factory AppStrings.of(AppLanguage language) {

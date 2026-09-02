@@ -30,10 +30,9 @@ class AnchorRegistry {
   /// [knownMissingAnchors] listet Kennungen, deren Fehlen **erwartet** ist. Die
   /// Menge wirkt ausschließlich in `assert`s, siehe [rectOf].
   AnchorRegistry({
-    required RenderBox? Function() frameOf,
-    Set<AnchorId> knownMissingAnchors = const <AnchorId>{},
-  }) : _frameOf = frameOf,
-       _knownMissingAnchors = knownMissingAnchors;
+    required this._frameOf,
+    this._knownMissingAnchors = const <AnchorId>{},
+  });
 
   final RenderBox? Function() _frameOf;
   final Set<AnchorId> _knownMissingAnchors;

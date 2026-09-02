@@ -49,7 +49,7 @@ abstract interface class TourStore {
 /// flüchtige bleibt die Vorgabe für Tests.
 class InMemoryTourStore implements TourStore {
   /// [hasSeenTour] setzt eine bereits gezeigte Tour, etwa in einem Test.
-  InMemoryTourStore({bool hasSeenTour = false}) : _hasSeenTour = hasSeenTour;
+  InMemoryTourStore({this._hasSeenTour = false});
 
   bool _hasSeenTour;
 

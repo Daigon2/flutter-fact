@@ -42,8 +42,8 @@ final class KeyValueActiveHuntStore implements ActiveHuntStore {
   /// eine verworfene Nutzlast auf.
   const KeyValueActiveHuntStore(
     this._store, {
-    DiagnosticSink sink = const SilentDiagnosticSink(),
-  }) : _sink = sink;
+    this._sink = const SilentDiagnosticSink(),
+  });
 
   /// Schlüssel im Gerätespeicher, wie in der Quelle.
   static const String storageKey = 'fact_active_challenge';

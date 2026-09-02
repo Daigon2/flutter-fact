@@ -48,8 +48,7 @@ abstract interface class FirstLaunchStore {
 /// und der flüchtige bleibt die Vorgabe für Tests.
 class InMemoryFirstLaunchStore implements FirstLaunchStore {
   /// [hasLaunched] setzt einen bereits erfolgten Start, etwa in einem Test.
-  InMemoryFirstLaunchStore({bool hasLaunched = false})
-    : _hasLaunched = hasLaunched;
+  InMemoryFirstLaunchStore({this._hasLaunched = false});
 
   bool _hasLaunched;
 

@@ -41,14 +41,9 @@ class GeolocatorLocationService implements LocationService {
   /// Feld, weil es an einem Feld nur das Lesen bewacht: ein Konstruktoraufruf
   /// aus `lib/` liefe sonst anstandslos durch, gemessen in Schritt 12.
   const GeolocatorLocationService({
-    @visibleForTesting
-    Future<LocationPermission> Function() checkPermission =
-        Geolocator.checkPermission,
-    @visibleForTesting
-    Future<LocationPermission> Function() requestPermission =
-        Geolocator.requestPermission,
-  }) : _checkPermission = checkPermission,
-       _requestPermission = requestPermission;
+    @visibleForTesting this._checkPermission = Geolocator.checkPermission,
+    @visibleForTesting this._requestPermission = Geolocator.requestPermission,
+  });
 
   final Future<LocationPermission> Function() _checkPermission;
   final Future<LocationPermission> Function() _requestPermission;

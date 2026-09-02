@@ -50,8 +50,7 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 /// Führt Bilder und Überlagerungen einer Karte.
 class MapOverlayHost {
   /// Erzeugt einen Führer ohne Karte.
-  MapOverlayHost({DiagnosticSink diagnostics = const SilentDiagnosticSink()})
-    : _diagnostics = diagnostics;
+  MapOverlayHost({this._diagnostics = const SilentDiagnosticSink()});
 
   /// Gemeldet, wenn ein Punkt auf ein Bild zeigt, das niemand registriert hat.
   ///
