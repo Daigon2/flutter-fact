@@ -552,7 +552,12 @@ bool _isDictionaryFile(String name) =>
 /// Jeder weitere Eintrag braucht eine eigene E-Nummer, siehe
 /// REBUILD_STATUS.md, und Rücksprache, bevor er hier landet.
 const _knownMissingSourceKeys = <String>{
-  'audio.dialog.volumeHint', // E-28
+  // `audio.dialog.volumeHint` (E-28) stand hier bis zum 02.09.2026 und ist an
+  // diesem Tag herausgefallen, **weil diese Prüfung ihn selbst gemeldet hat**.
+  // Der Wortlaut wurde freigegeben, der Schlüssel steht seither in
+  // `app_strings_supplement.dart`, damit ist er keine Lücke mehr und der
+  // Eintrag war tot. Genau dafür gibt es die Veraltungsmeldung: eine Liste,
+  // die niemand zwingt, aktuell zu bleiben, bewacht irgendwann nichts mehr.
   'group.join.title', // E-63
 };
 

@@ -23,11 +23,11 @@
 //
 // **Die Liste bekannter Lücken bleibt echt.** `_knownMissingSourceKeys` im
 // Werkzeug ist eine feste Konstante mit den beiden echten Einträgen
-// `audio.dialog.volumeHint` (E-28) und `group.join.title` (E-63) und wird von
+// `group.join.title` (E-63) und wird von
 // hier aus nicht parametrisiert. Jeder Testfall, der ohne Fund durchlaufen
 // soll, braucht deshalb einen Aufruf für **beide** Schlüssel irgendwo im
 // JSX, sonst meldet das Werkzeug die Liste selbst als veraltet. `setUp`
-// schreibt dafür `known-gaps.jsx` mit genau diesen zwei Aufrufen; einzelne
+// schreibt dafür `known-gaps.jsx` mit genau diesem Aufruf; einzelne
 // Tests lassen die Datei unverändert, außer der Test, der die
 // Veraltungs-Meldung selbst prüft.
 //
@@ -87,7 +87,6 @@ const Map<AppLanguage, Map<String, String>> supplementTextsByLanguage =
   // an der Veraltungsprüfung scheitern.
   const knownGapsSource = '''
 function irrelevant(lang) {
-  t('audio.dialog.volumeHint', lang);
   t('group.join.title', lang);
 }
 ''';

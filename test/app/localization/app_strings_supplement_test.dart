@@ -35,7 +35,7 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die vierundsechzig belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die fünfundsechzig belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
@@ -59,7 +59,25 @@ void main() {
       // `challenge.huntResult.`-Schlüssel kamen mit Schritt 39 dazu,
       // `screen-challenge.jsx:2797-2980`, aus demselben Grund (E-61) wieder in
       // beiden Sprachkarten mit demselben deutschen Wert.
+      //
+      // **`audio.dialog.volumeHint` kam am 02.09.2026 dazu und ist von allen
+      // anderen verschieden** (E-28, `screen-auth.jsx:251`). Alle übrigen
+      // schreiben ab, was die PWA sichtbar anzeigt, ohne es als Schlüssel zu
+      // führen. Dieser trägt einen Text, den die Quelle **überhaupt nicht
+      // hat**: sie zeigt dort den Schlüsselnamen. Und er ist der erste mit
+      // zwei verschiedenen Sprachwerten, weil es nichts Deutsches gibt, das
+      // man nachahmen könnte.
+      //
+      // **Der Grund, aus dem in den übrigen Karten derselbe deutsche Wert
+      // steht, ist am 02.09.2026 aufgehoben.** E-61 ist entschieden:
+      // englischsprachige Nutzer sehen Englisch, hartcodiertes Deutsch in der
+      // Quelle ist ein Defekt und keine Parität. Damit sind die deutschen
+      // Werte in der englischen Karte **Arbeit und nicht Absicht**, ebenso wie
+      // die vierzehn englisch hergeleiteten `challenge.hotspot.`-Werte aus
+      // E-46. Wer sie übersetzt, ändert nur Werte und keinen Schlüssel; dieser
+      // Test bleibt davon unberührt und prüft weiter nur den Bestand.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
+        'audio.dialog.volumeHint',
         'tour.stepCounter',
         'tour.step1.meta',
         'tour.step9.meta',

@@ -40,6 +40,30 @@ import 'package:fact_app/app/localization/app_language.dart';
 const Map<AppLanguage, Map<String, String>>
 supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
   AppLanguage.de: <String, String>{
+    // Der Lautstärke-Hinweis im Audio-Guide-Dialog, `screen-auth.jsx:251`.
+    //
+    // **Der erste Eintrag dieser Map, der einen Text trägt, den die Quelle
+    // nicht hat.** Alle anderen schreiben ab, was die PWA anzeigt, ohne es
+    // als Schlüssel zu führen. Hier zeigt die PWA gar keinen Text, sondern
+    // wörtlich `🔊 audio.dialog.volumeHint`, weil `window.t` bei einem
+    // fehlenden Schlüssel den Schlüsselnamen zurückgibt. Das ist E-28, und es
+    // ist ein Defekt der Quelle und keine Vorlage.
+    //
+    // Der Wortlaut ist am 02.09.2026 vom Eigentümer freigegeben. Er sagt, was
+    // der Kommentar an der Fundstelle als Absicht nennt
+    // (`// A2 (Daniel-Feedback): expliziter Lautstaerke-Hinweis vor
+    // Aktivierung`) und was der Dialog braucht: er schaltet den Modus für
+    // blinde und sehbehinderte Nutzer ein, ab dem alles gesprochen wird.
+    //
+    // **Englisch ist hier echtes Englisch und nicht derselbe deutsche Satz.**
+    // Das unterscheidet diesen Eintrag von den Blöcken `challenge.huntPill.*`
+    // und Verwandten, die den deutschen Wert doppelt tragen. Der Grund steht
+    // in `CLAUDE.md` unter „The PWA is a reference, not a gold standard":
+    // hartcodiertes Deutsch ist ein Defekt und keine Parität, und wo die
+    // Quelle überhaupt keinen Text hat, gibt es auch nichts nachzuahmen.
+    'audio.dialog.volumeHint':
+        'Stell vorher die Lautstärke deines Geräts ein. Ab der Aktivierung '
+        'wird alles gesprochen.',
     // Schrittanzeige des Tutorials, `screen-tour.jsx:483`. Die Quelle baut
     // sie als hartcodierten Ternär
     // (`lang === 'en' ? `STEP ${step + 1} OF ${STEPS.length}` : ...`) und
@@ -457,6 +481,11 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'challenge.huntResult.close': 'Fertig',
   },
   AppLanguage.en: <String, String>{
+    // Siehe den deutschen Eintrag: dieser Schlüssel trägt als einziger einen
+    // echt übersetzten Wert und nicht denselben deutschen Satz, weil die
+    // Quelle hier keinen Text hat, den man nachahmen könnte.
+    'audio.dialog.volumeHint':
+        'Turn up your device volume first. From here on, everything is spoken.',
     'tour.stepCounter': 'STEP {step} OF {total}',
     'tour.step1.meta': '— GOETHE',
     'tour.step9.meta': 'PUSH AUS DER HOSENTASCHE',
