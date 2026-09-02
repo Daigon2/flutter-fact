@@ -2,7 +2,7 @@ import 'package:fact_app/app/localization/app_strings.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/theme/fact_typography.dart';
 import 'package:fact_app/core/async/detached_work.dart';
-import 'package:fact_app/features/settings/presentation/notifiers/audio_mode_providers.dart';
+import 'package:fact_app/features/settings/application/audio_mode_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';

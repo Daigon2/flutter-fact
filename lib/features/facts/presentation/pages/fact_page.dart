@@ -5,10 +5,13 @@ import 'package:fact_app/app/localization/app_language.dart';
 import 'package:fact_app/app/localization/app_strings.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/theme/fact_typography.dart';
+import 'package:fact_app/core/async/detached_work.dart';
 import 'package:fact_app/core/widgets/css_gradient_geometry.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
+import 'package:fact_app/features/facts/application/fact_speech_providers.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/entities/fact_media.dart';
+import 'package:fact_app/features/facts/domain/spoken_fact_text.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_coordinates.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
@@ -16,6 +19,7 @@ import 'package:fact_app/features/facts/presentation/cited_text.dart';
 import 'package:fact_app/features/facts/presentation/fact_category_look.dart';
 import 'package:fact_app/features/facts/presentation/fact_detail_palette.dart';
 import 'package:fact_app/features/facts/presentation/fact_sources.dart';
+import 'package:fact_app/features/settings/application/audio_mode_providers.dart';
 import 'package:fact_app/map/domain/map_position.dart';
 import 'package:fact_app/services/location/device_position.dart';
 import 'package:flutter/material.dart';
@@ -183,6 +187,13 @@ class FactPage extends ConsumerStatefulWidget {
   @visibleForTesting
   static const Key bodyKey = Key('fact-body');
 
+  /// Der Kopfhörer-Knopf neben dem Titel, `screen-fact.jsx:373-388`.
+  ///
+  /// Ein Schlüssel und nicht die Suche über das Emoji: das `⏸` wechselt mit
+  /// dem Zustand, und ein Test, der über den Text sucht, prüfte dann die
+  /// Beschriftung statt den Knopf.
+  static const Key headphoneKey = Key('fact-headphone');
+
   /// Welcher Fakt angezeigt wird.
   final FactId factId;
 
@@ -201,6 +212,42 @@ class _FactPageState extends ConsumerState<FactPage> {
 
   final GlobalKey _sourcesAnchor = GlobalKey();
 
+  /// Für welchen Fakt und welche Sprache schon von selbst vorgelesen wurde.
+  ///
+  /// Das Gegenstück zur Abhängigkeitsliste `[fact && fact.id, lang]` der
+  /// Quelle (`screen-fact.jsx:123`). Ohne das Merken läse die Seite bei jeder
+  /// Meldung des Fakt-Providers erneut vor, und Riverpod meldet ihn beim
+  /// Wiederholen eines Fehlschlags bis zu zehnmal.
+  String? _autoSpokenFor;
+
+  /// Das Abonnement auf den Fakt dieser Seite.
+  ///
+  /// **Gehalten, damit es beim Wechsel der Kennung geschlossen werden kann.**
+  /// `listenManual` räumt sich beim Entsorgen des Widgets selbst auf, aber
+  /// nicht dazwischen: `didUpdateWidget` legte hier bei jedem Wechsel ein
+  /// weiteres an, und nach drei Fakten hingen drei Abonnements am selben
+  /// Zustandsobjekt. Aufgefallen beim Nachsehen, warum eine Mutation
+  /// überlebt hat.
+  ProviderSubscription<AsyncValue<Fact?>>? _factSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // **`listenManual` mit `fireImmediately` und nicht `ref.listen` im
+    // `build`**, dieselbe Begründung wie in `map_page.dart` und
+    // `fact_collect_overlay.dart`: `ref.listen` kennt den Schalter in
+    // `flutter_riverpod 3.4.2` nicht und meldet nur Änderungen. Diese Seite
+    // wird beim zweiten Besuch desselben Fakts mit einem längst geladenen
+    // Provider gebaut, und dann käme nie eine Ausgabe.
+    _listenToFact();
+    // Die Sprache ist die zweite Abhängigkeit der Quelle. Ein Wechsel während
+    // der geöffneten Akte liest neu vor, weil der Text ein anderer ist.
+    ref.listenManual(
+      appLanguageProvider,
+      (AppLanguage? previous, AppLanguage next) => _maybeSpeakOnOpen(),
+    );
+  }
+
   @override
   void didUpdateWidget(FactPage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -209,7 +256,119 @@ class _FactPageState extends ConsumerState<FactPage> {
     // dieselbe Seite mit einer anderen Kennung neu baut.
     if (oldWidget.factId != widget.factId) {
       _showMore = false;
+      // Sonst gilt der Vermerk des vorigen Fakts weiter, und der neue würde
+      // nicht vorgelesen. Derselbe Fall, den `didUpdateWidget` für
+      // `_showMore` schon abfängt: go_router baut dieselbe Seite mit einer
+      // anderen Kennung neu.
+      _autoSpokenFor = null;
+      _listenToFact();
     }
+  }
+
+  @override
+  void dispose() {
+    _factSubscription?.close();
+    _factSubscription = null;
+    super.dispose();
+  }
+
+  /// Meldet sich am Fakt dieser Seite an und schließt eine alte Anmeldung.
+  ///
+  /// Das Abonnement hängt am Familienargument `widget.factId`; bei einem
+  /// Wechsel der Kennung muss es ein neues sein, und das alte gehört zu.
+  void _listenToFact() {
+    _factSubscription?.close();
+    _factSubscription = ref.listenManual(
+      factByIdProvider(widget.factId),
+      (AsyncValue<Fact?>? previous, AsyncValue<Fact?> next) =>
+          _maybeSpeakOnOpen(),
+      fireImmediately: true,
+    );
+  }
+
+  /// Liest den Fakt beim Öffnen von selbst vor, wenn der Audio-Modus an ist.
+  ///
+  /// `screen-fact.jsx:119-123`. Drei Bedingungen der Quelle sind übernommen
+  /// (Modus an, Fakt geladen, und nicht zweimal für dasselbe), **eine
+  /// bewusst nicht.**
+  ///
+  /// ## Die iOS-Gestensperre der Quelle wird nicht nachgebaut
+  ///
+  /// Dort steht davor `if (!window.__factAudioGestureOk) return;`, mit einem
+  /// eigenen Kommentar als Begründung: „speechSynthesis.speak() ohne
+  /// vorherige User-Geste wird auf iOS Safari stillschweigend verworfen".
+  /// Deshalb hängt `audio-player.jsx:41-50` zwei globale Lauscher auf
+  /// `touchend` und `click`, nur um zu wissen, ob überhaupt gesprochen werden
+  /// darf.
+  ///
+  /// **Das ist eine Regel des Browsers und keine der Plattform.**
+  /// `AVSpeechSynthesizer` auf iOS und `TextToSpeech` auf Android verlangen
+  /// keine Geste. Die Sperre nachzubauen hieße, das Vorlesen beim ersten
+  /// Öffnen ohne Grund ausfallen zu lassen, und genau dieses erste Öffnen ist
+  /// der Fall, für den der Audio-Modus gebaut ist: wer ihn einschaltet, hat
+  /// die Geste längst gemacht.
+  /// ## Warum das erst nach dem Bild passiert, und das ist gemessen
+  ///
+  /// Riverpod verbietet, einen Provider im Lebenszyklus eines Widgets zu
+  /// ändern, und nennt `initState` in seiner Fehlermeldung ausdrücklich:
+  /// „Tried to modify a provider while the widget tree was building." Genau
+  /// dort landet der erste Aufruf, weil `fireImmediately` den Hörer synchron
+  /// in `initState` ruft. Der erste Testlauf ist daran gescheitert, und zwar
+  /// **sichtbar**: der Fehler ging in die abgekoppelte Arbeit und der Vortrag
+  /// blieb aus.
+  ///
+  /// Der Umweg über das nächste Bild löst beides: er liegt außerhalb jeder
+  /// Bauphase, und er ist derselbe Weg für den späteren Fall, in dem der Fakt
+  /// erst aus dem Netz eintrifft. **Ein Bild kommt dann verlässlich**, weil
+  /// diese Seite `factByIdProvider` selbst beobachtet und die Ankunft einen
+  /// Neuaufbau auslöst.
+  ///
+  /// Zwei Anfragen im selben Bild sind harmlos: die Rückrufe laufen der Reihe
+  /// nach, der erste setzt den Vermerk, der zweite sieht ihn.
+  void _maybeSpeakOnOpen() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _speakOnOpenNow());
+  }
+
+  void _speakOnOpenNow() {
+    if (!mounted) {
+      return;
+    }
+    if (!ref.read(audioModeProvider)) {
+      return;
+    }
+    final Fact? fact = ref.read(factByIdProvider(widget.factId)).value;
+    if (fact == null) {
+      return;
+    }
+    final AppLanguage language = ref.read(appLanguageProvider);
+    final String key = '${fact.id.value}|${language.code}';
+    if (_autoSpokenFor == key) {
+      return;
+    }
+    _autoSpokenFor = key;
+    _speak(fact, language);
+  }
+
+  /// Schickt die Vorlesefassung an den Sprachdienst.
+  ///
+  /// Der Text kommt aus `spokenFactText` und nicht aus den Widgets: die
+  /// gleiche Sprachfassung wie auf dem Bildschirm, aber ohne die
+  /// Zitat-Hochziffern, siehe die Begründung dort.
+  void _speak(Fact fact, AppLanguage language) {
+    final FactText content = fact.contentFor(
+      language.code,
+      fallbackLanguageCode: AppLanguage.fallback.code,
+    );
+    reportDetached(
+      ref
+          .read(factSpeechProvider.notifier)
+          .speak(
+            factId: fact.id,
+            text: spokenFactText(content),
+            languageTag: speechLanguageTagFor(language.code),
+          ),
+      origin: 'facts.speech.speak',
+    );
   }
 
   @override
@@ -348,6 +507,7 @@ class _FactPageState extends ConsumerState<FactPage> {
                     look,
                     palette,
                     strings,
+                    language,
                     sources,
                   ),
                 ],
@@ -623,6 +783,7 @@ class _FactPageState extends ConsumerState<FactPage> {
     FactCategoryLook look,
     FactDetailPalette palette,
     AppStrings strings,
+    AppLanguage language,
     List<FactSource> sources,
   ) {
     return DecoratedBox(
@@ -649,7 +810,7 @@ class _FactPageState extends ConsumerState<FactPage> {
             _pullHandle(palette),
             _categoryRow(fact, content, look, palette, strings),
             const SizedBox(height: 12),
-            _title(content, palette),
+            _title(fact, content, palette, strings, language),
             const SizedBox(height: 12),
             _pills(fact, content, palette, strings),
             const SizedBox(height: 16),
@@ -851,15 +1012,87 @@ class _FactPageState extends ConsumerState<FactPage> {
     );
   }
 
-  /// `:372-389`, ohne den Kopfhörer-Knopf daneben.
-  Widget _title(FactText content, FactDetailPalette palette) => Text(
-    content.title ?? '',
-    style: FactTypography.emphasis.copyWith(
-      fontSize: 24,
-      height: 1.2,
-      color: palette.ink,
-    ),
+  /// `:372-389`, Titel und Kopfhörer-Knopf in einer Zeile.
+  ///
+  /// `alignItems: 'flex-start'` der Quelle, also der Knopf oben am ersten
+  /// Zeilenumbruch und nicht in der Mitte eines dreizeiligen Titels.
+  Widget _title(
+    Fact fact,
+    FactText content,
+    FactDetailPalette palette,
+    AppStrings strings,
+    AppLanguage language,
+  ) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      Expanded(
+        child: Text(
+          content.title ?? '',
+          style: FactTypography.emphasis.copyWith(
+            fontSize: 24,
+            height: 1.2,
+            color: palette.ink,
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      _headphoneButton(fact, content, palette, strings, language),
+    ],
   );
+
+  /// Der Kopfhörer-Knopf, `:373-388`.
+  ///
+  /// ## Drei Zweige, und der Vergleich läuft über die Kennung
+  ///
+  /// Anhalten, fortsetzen oder von vorn, genau wie in `:376-378`. **Die
+  /// Quelle vergleicht dabei den Titel** (`audioState.fact.titel ===
+  /// fact.titel`, `:136`), und das ist ein Defekt mit zwei Gesichtern: zwei
+  /// Fakten mit gleichem Titel gelten als derselbe, und die drei
+  /// Ansage-Aufrufe der Quelle schieben Attrappen mit **leerem** Titel in den
+  /// Zustand, die dann zu jedem titellosen Fakt passen. Hier vergleicht
+  /// `FactSpeechStatus` die `FactId`.
+  Widget _headphoneButton(
+    Fact fact,
+    FactText content,
+    FactDetailPalette palette,
+    AppStrings strings,
+    AppLanguage language,
+  ) {
+    final FactSpeechStatus speech = ref.watch(factSpeechProvider);
+    final bool showPause = speech.isSpeaking(fact.id);
+    return IconButton(
+      key: FactPage.headphoneKey,
+      onPressed: () {
+        final FactSpeechNotifier notifier = ref.read(
+          factSpeechProvider.notifier,
+        );
+        if (showPause) {
+          reportDetached(notifier.pause(), origin: 'facts.speech.pause');
+          return;
+        }
+        if (speech.isPaused(fact.id)) {
+          reportDetached(notifier.resume(), origin: 'facts.speech.resume');
+          return;
+        }
+        _speak(fact, language);
+      },
+      // Die Beschriftung folgt dem Zweig, wie das `aria-label` in `:380`.
+      tooltip: strings.text(
+        showPause ? 'audio.miniplayer.pause' : 'audio.miniplayer.play',
+      ),
+      icon: Text(
+        // `⏸` und `🎧`, `:387`. Emoji und kein `Icons`-Symbol: die Quelle
+        // zeichnet den Knopf so, und ein Materialsymbol daneben wäre der
+        // einzige nicht gezeichnete Knopf dieses Bildschirms.
+        showPause ? '⏸' : '🎧',
+        // `var(--stamp, #B83A2E)`, `:384`. Die Palette führt denselben
+        // Wert schon als `citation`, mit derselben Herkunft (`var(--stamp)`
+        // an der Zitat-Hochziffer). Ein zweites Feld mit demselben Wert wäre
+        // eine zweite Wahrheit über dieselbe Farbe.
+        style: const TextStyle(fontSize: 22, color: FactDetailPalette.citation),
+      ),
+    );
+  }
 
   /// `:392-404`, die beiden Pillen unter dem Titel.
   Widget _pills(

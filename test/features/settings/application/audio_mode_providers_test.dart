@@ -1,5 +1,5 @@
+import 'package:fact_app/features/settings/application/audio_mode_providers.dart';
 import 'package:fact_app/features/settings/domain/audio_mode_store.dart';
-import 'package:fact_app/features/settings/presentation/notifiers/audio_mode_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

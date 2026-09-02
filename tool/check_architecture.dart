@@ -193,8 +193,9 @@ const _domainBans = <Ban>[
     r'^package:geolocator',
     'Regel 4: Domain darf keine Geräte-SDK importieren',
   ),
-  // Kein eigener Eintrag für flutter_rotation_sensor: der Paketname beginnt
-  // selbst mit `flutter_` und fällt damit bereits unter das Flutter-Verbot
+  // Kein eigener Eintrag für flutter_rotation_sensor und flutter_tts: beide
+  // Paketnamen beginnen
+  // selbst mit `flutter_` und fallen damit bereits unter das Flutter-Verbot
   // zwei Zeilen weiter oben, dieselbe Lage wie bei flutter_riverpod im Test
   // „Ä2". Ein zweiter, engerer Eintrag träfe denselben Import ein zweites
   // Mal. native_device_orientation trägt dieses Präfix nicht und bekommt
@@ -475,6 +476,36 @@ const _orientationSdkBans = <Ban>[
   ),
 ];
 
+/// Regel 25: die Sprachausgabe des Geräts kennt nur der Sprachdienst.
+///
+/// Dieselbe Bauart wie die Regeln 21, 22 und 24, und dieselbe Begründung:
+/// `lib/features/README.md` gibt `services/` als Ort für „Vendor-Adapter ohne
+/// Oberfläche“, und `flutter_tts` ist genau das für die Sprachausgabe.
+///
+/// **Ein Eintrag genügt hier**, anders als bei Regel 24. Geprüft am
+/// 02.09.2026 im `pubspec.yaml` des Pakets: `flutter_tts 4.2.5` hängt allein
+/// an `flutter` und `flutter_web_plugins` aus der SDK und bringt keine
+/// fremdnamige transitive Abhängigkeit mit. Es gibt also keinen Umweg mit
+/// eigenem Paketnamen, wie `native_device_orientation` einer ist.
+///
+/// Und wie dort bekommt [_domainBans] keinen eigenen Eintrag: `flutter_tts`
+/// beginnt selbst mit `flutter_` und fällt in einer Domäne schon unter das
+/// allgemeine Flutter-Verbot.
+///
+/// Die Regel gilt wie 19 bis 24 nur unterhalb von `lib/`. Ein Test darf das
+/// Paket importieren, und
+/// `test/services/speech/flutter_tts_speech_service_test.dart` tut es: der
+/// Adapter nimmt ein `FlutterTts` von außen, genau damit er ohne
+/// Plattformkanal prüfbar ist.
+const _speechSdkBans = <Ban>[
+  Ban(
+    r'^package:flutter_tts',
+    'Regel 25: die Sprachausgabe gehört dem Sprachdienst unter '
+        '$_speechHome. Der Rest der App kennt nur den Vertrag des Dienstes, '
+        'nicht das Vendor-Paket',
+  ),
+];
+
 /// Gate 7: ADR-005 verbietet ein zweites DI-System, projektweit.
 const _globalBans = <Ban>[
   Ban(r'^package:get_it', 'ADR-005: GetIt ist ausgeschlossen'),
@@ -558,6 +589,11 @@ final _layers = <LayerRule>[
     name: 'orientierungs-sdk',
     pathMatch: _ausserhalbOrientationHome,
     bans: _orientationSdkBans,
+  ),
+  LayerRule(
+    name: 'sprach-sdk',
+    pathMatch: _ausserhalbSpeechHome,
+    bans: _speechSdkBans,
   ),
   // Gate 7 gilt projektweit, nicht nur im Produktionscode. Ein GetIt-Container
   // in einem Test, einem Integrationstest oder einem Werkzeugskript ist
@@ -645,6 +681,12 @@ const _preferencesHome = 'lib/services/preferences/';
 /// siehe den Kopfkommentar von `lib/services/orientation/orientation_service.dart`.
 const _orientationHome = 'lib/services/orientation/';
 
+/// Der Sprachdienst, der einzige Ort, an dem `flutter_tts` vorkommen darf.
+///
+/// Wie [_locationHome] eine unterstützende Technik und keine Geschäftsdomäne,
+/// siehe den Kopfkommentar von `lib/services/speech/speech_service.dart`.
+const _speechHome = 'lib/services/speech/';
+
 /// Alles unterhalb von `lib/`, außer [_mapHome] und außer jeder Domäne.
 ///
 /// Die erste Ausnahme ist der Zweck der Regel: der Host darf das SDK.
@@ -695,6 +737,15 @@ final _ausserhalbPreferencesHome = RegExp(
 /// einer Domäne ist die Meldung von Regel 4 die genauere.
 final _ausserhalbOrientationHome = RegExp(
   '^lib/(?!${_orientationHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
+);
+
+/// Alles unterhalb von `lib/`, außer [_speechHome] und außer jeder Domäne.
+///
+/// Wortgleich zu den drei darüber aufgebaut und aus denselben zwei Gründen:
+/// der Dienst darf sein SDK, und in einer Domäne ist die Meldung von Regel 4
+/// die genauere.
+final _ausserhalbSpeechHome = RegExp(
+  '^lib/(?!${_speechHome.substring('lib/'.length)})(?!(?:[^/]+/)*domain/)',
 );
 
 /// Alles unterhalb von `lib/`, außer [_avatarHome] und außer jeder Domäne.

@@ -83,6 +83,7 @@ dependencies:
   # als Regel 22 in `docs/architecture/dependency-rules.md`.
   shared_preferences: ^2.5.5
   supabase_flutter: ^2.17.2
+  flutter_tts: ^4.2.5
 
 dev_dependencies:
   build_runner: ^2.15.1

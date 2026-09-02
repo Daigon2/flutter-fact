@@ -109,7 +109,7 @@ Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
 den Schritten 33 bis 37 und 39.
 
-**Fertig sind 28 von 50:** 1 bis 17, dazu 19 bis 22, 27, 33 bis 37 und 39. Schritt 14 ist
+**Fertig sind 29 von 50:** 1 bis 17, dazu 19 bis 22, 25, 27, 33 bis 37 und 39. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -123,7 +123,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2468 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2539 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -215,11 +215,12 @@ siehe „Rechner einrichten".
 **Am 02.09.2026 sind drei Schritte auf einmal frei geworden, und zwar durch
 zwei Sätze.** Janek: „ja 1. passt und dann mach webview gern".
 
-- **`flutter_tts` ist freigegeben.** Damit sind **Schritt 25** (Audio-Dienst)
-  und **26** (Kopplung an die Karte) baubar. Der Vertrag bleibt
-  anbieterneutral, die drei Anforderungen dazu stehen bei E-15. Nebenwirkung,
-  die dabei verschwindet: der Audio-Modus hat heute keinen einzigen Abnehmer,
-  man schaltet ihn ein und niemand hört zu.
+- **`flutter_tts` ist freigegeben, und Schritt 25 ist damit gebaut.** Offen
+  bleibt **Schritt 26**, die Kopplung an die Karte: dort hängen der
+  Audio-Beacon mit Stereo-Panning, die Ansagen zu Richtung und Entfernung und
+  die Auslösung bei Nähe. Der Dienst dafür steht, samt Zustandsstrom für mehr
+  als einen Zuhörer. Die Nebenwirkung ist weg: der Audio-Modus hat seit
+  Schritt 25 einen Abnehmer.
 - **`webview_flutter` ist wieder freigegeben, und die 3D-Laufzeit ist
   entschieden: WebView mit Three.js.** Damit ist **Schritt 18** (Avatar) frei.
   Der Grund für diese Wahl steht in `REBUILD_STATUS.md`: in `08_Flutter/` ist
@@ -411,6 +412,59 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 02.09.2026, Schritt 25, und die Zahl der Quelle wäre die schnellste Stufe
+
+2539 Tests, vierzehn Mutationen. **29 von 50.** Der Audio-Modus hat nach vier
+Tagen seinen ersten Abnehmer: die Fakt-Akte hat einen Kopfhörer-Knopf, und wer
+den Modus eingeschaltet hat, bekommt den Fakt beim Öffnen vorgelesen.
+
+**Der teuerste Fund steckt im Paket, nicht in der Quelle.** „Normal" ist bei
+`flutter_tts` **0,5** und nicht 1,0: die Doku sagt „0.0 (slowest) to 1.0
+(fastest)", der Android-Teil rechnet `rate * 2.0f` mit dem eigenen Kommentar
+„Android 1.0 is mapped to flutter 0.5", und auf iOS ist der Normalwert von
+`AVSpeechUtterance.rate` ebenfalls 0,5. Die Quelle rechnet umgekehrt, dort ist
+1,0 normal. **Wer die Zahl unbesehen übernimmt, lässt die App in der
+schnellsten Stufe vorlesen.** Der Vertrag trägt deshalb die menschliche
+Einheit, der Adapter rechnet um.
+
+Drei weitere Eigenheiten des Pakets stehen im Kopf von
+`flutter_tts_speech_service.dart`, alle im Quelltext nachgelesen: es gibt kein
+`resume()` (fortgesetzt wird durch ein erneutes `speak`, auf Android nur mit
+**demselben** Text), Anhalten ist auf Android nachgebaut und erst ab SDK 26
+zuverlässig, und `awaitSpeakCompletion` bleibt aus.
+
+**Zwei Defekte der Quelle sind nicht mitgebaut.** Der Vorlesetext enthält dort
+die Zitat-Hochziffern als `[3]`, und die Sprachausgabe macht daraus „Der Turm
+drei wurde". `audio.dialog.body` sagt, für wen der Modus gebaut ist: für
+blinde und sehbehinderte Nutzer, für die der Vortrag der Text ist und nicht
+die Beigabe. Und ein fehlender Titel wird mitgesprochen, wörtlich als
+„undefined". Dazu ein dritter: die Akte vergleicht „läuft dieser Fakt gerade"
+über den **Titel** statt über die Kennung.
+
+**Die iOS-Gestensperre der Quelle wird nicht nachgebaut.** Sie hängt zwei
+globale Lauscher auf, nur um zu wissen, ob sie sprechen darf, weil iOS Safari
+`speechSynthesis.speak()` ohne Nutzergeste verwirft. Das ist eine Regel des
+Browsers; `AVSpeechSynthesizer` und `TextToSpeech` verlangen keine Geste.
+
+**Zwei Mutationen haben überlebt, und beide lagen an blinden Tests von mir.**
+Die zweite ist die lehrreichere und steht als Muster 27 im Blindheitskatalog:
+ein Provider, der mit einem **festen** Wert überschrieben ist, meldet genau
+einmal, und damit kann eine Zusicherung über die zweite Meldung nicht falsch
+werden. Der Test „liest genau einmal vor" blieb grün, als der Vermerk dagegen
+entfernt wurde. Erst ein Override mit einem echten `Future` plus `invalidate`
+stellt den Fall her.
+
+Beim Nachsehen, warum diese Mutation überlebte, fiel noch ein Abonnement-Leck
+auf: `didUpdateWidget` legte bei jedem Wechsel der Kennung ein weiteres
+`listenManual` an, ohne das vorige zu schließen.
+
+**Zwei Umzüge gehören dazu.** Der Audio-Modus ist von
+`settings/presentation/notifiers/` nach `settings/application/` gewandert, weil
+sein erster Verbraucher in einem anderen Feature sitzt und Regel 8 den Import
+aus fremdem `presentation` verbietet. Und `flutter_tts` hat mit **Regel 25**
+ein Heimatverzeichnis bekommen, wie das Karten-, Geo-, Speicher- und
+Sensor-SDK vor ihm.
 
 ### 02.09.2026, Schritt 22 war schon fertig, und dafür fehlte das Gedächtnis
 

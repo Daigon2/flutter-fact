@@ -1116,8 +1116,116 @@ plus 19 Mutationen, alle gefallen.
   diese Bedingung.
 
 - [x] 21. Fact-Detail-Sheet · [x] 22. Collect-Reveal-Overlay (**war mit Schritt 20 bereits gebaut**, am 02.09.2026 nachgemessen, siehe unten)
-- [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [ ] 25. Audio-Service (Gerät zuerst am 31.08.2026 entschieden, `flutter_tts` am 02.09.2026 freigegeben, damit frei)
-- [ ] 26. Map-Audio-Kopplung
+- [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [x] 25. Audio-Service (02.09.2026; „normal“ heißt im Paket 0,5 und nicht 1,0, und die Quelle hat einen echten API-Schlüssel ausgeliefert)
+- [ ] 26. Map-Audio-Kopplung (frei, der Dienst steht seit Schritt 25)
+
+### Schritt 25, der Audio-Dienst, und die Zahl 1,0 wäre die schnellste Stufe
+
+2539 Tests, vierzehn Mutationen. Der Audio-Modus hat nach vier Tagen seinen
+ersten Abnehmer: die Fakt-Akte hat einen Kopfhörer-Knopf, und wer den Modus
+eingeschaltet hat, bekommt den Fakt beim Öffnen von selbst vorgelesen.
+
+Gebaut sind `lib/services/speech/` mit Vertrag, Geräte-Adapter und Provider,
+`spokenFactText` in der Fakt-Domäne, `factSpeechProvider` als Naht zwischen
+„welcher Fakt" und „was tut die Sprachausgabe", und **Regel 25**, die
+`flutter_tts` auf sein Heimatverzeichnis festnagelt, mit zwei Verstoß- und
+einer Gegenprobe wie die Regeln 21, 22 und 24.
+
+#### Vier Eigenheiten des Pakets, alle im Quelltext nachgelesen
+
+Sie sind der Grund, warum es den Adapter gibt und nicht einen direkten Aufruf.
+Jede einzelne wäre am Gerät ein Fehler, den kein Widget-Test zeigt.
+
+1. **„Normal" ist im Paket `0.5` und nicht `1.0`.** Die Doku am
+   `setSpeechRate` sagt „0.0 (slowest) to 1.0 (fastest)", der Android-Teil
+   rechnet `rate * 2.0f` mit dem eigenen Kommentar „Android 1.0 is mapped to
+   flutter 0.5" (`FlutterTtsPlugin.kt:390-396`), und auf iOS geht der Wert
+   unverändert an `AVSpeechUtterance.rate`, dessen Normalwert ebenfalls `0.5`
+   ist. **Die Quelle rechnet umgekehrt**, dort ist `1.0` normal
+   (`audio-player.jsx:262`, Rückfall `1.0` in `storage.jsx:168`). Wer die Zahl
+   unbesehen übernimmt, bekommt die schnellste Stufe. Der Vertrag trägt
+   deshalb die menschliche Einheit, der Adapter rechnet um.
+2. **Es gibt kein `resume()`.** Fortgesetzt wird durch ein erneutes `speak`:
+   iOS ruft dann `continueSpeaking()` und ignoriert den Text, Android setzt an
+   der gemerkten Stelle fort, **aber nur wenn derselbe Text kommt** („Ensure
+   the text hasn't changed"). Der Adapter merkt sich den Text; ohne das wäre
+   `resume` auf Android ein Neustart des Vortrags.
+3. **Anhalten ist auf Android nachgebaut**, über `onRangeStart()`, und
+   deshalb erst ab SDK 26. Auf älteren Geräten setzt es von vorn fort. Eine
+   Eigenschaft der Plattform, nicht zu reparieren, aber zu wissen.
+4. **`awaitSpeakCompletion` bleibt aus**, damit `speak` zurückkehrt, sobald
+   der Text übergeben ist. Nebenwirkung: der Android-Teil setzt sein internes
+   `speaking` dann nie auf `true`, und die Sperre, die einen zweiten `speak`
+   verwerfen würde, greift nie. Wer die Einstellung einschaltet, muss sie
+   mitbedenken.
+
+#### Zwei Defekte der Quelle, die nicht mitgebaut sind
+
+**Der Vorlesetext enthält die Zitat-Hochziffern.** `buildFullText` schickt den
+Rohtext an den Sprecher, und der Bestand trägt sie als `[3]`. Was die
+Sprachausgabe daraus macht, ist in jeder Variante unbrauchbar: „Der Turm
+**drei** wurde" oder „Der Turm **Klammer auf drei Klammer zu** wurde".
+`audio.dialog.body` sagt, für wen dieser Modus gebaut ist: für blinde und
+sehbehinderte Nutzer. Für sie ist der Vortrag nicht die Beigabe zum Text,
+sondern der Text. `spokenFactText` entfernt sie samt dem Leerraum davor; es
+wird nichts erfunden, sondern etwas weggelassen, das nicht zum Sprechen
+gedacht war.
+
+**Ein fehlender Titel wird mitgesprochen.** Die Quelle legt `fact.titel`
+bedingungslos in die Liste (`const parts = [fact.titel]`), und bei einem Fakt
+ohne Titel liest die Sprachausgabe wörtlich „undefined" vor, danach einen
+Punkt.
+
+**Und die Akte vergleicht den falschen Schlüssel.** `isCurrent` in
+`screen-fact.jsx:136` prüft `audioState.fact.titel === fact.titel`, also den
+**Titel**. Zwei Fakten mit gleichem Titel gelten damit als derselbe, und die
+drei Ansage-Aufrufe der Quelle schieben Attrappen mit leerem Titel in den
+Zustand, die zu jedem titellosen Fakt passen. `FactSpeechStatus` vergleicht
+die `FactId`.
+
+#### Die iOS-Gestensperre wird nicht nachgebaut
+
+Die Quelle hängt zwei globale Lauscher auf `touchend` und `click`, nur um zu
+wissen, ob sie überhaupt sprechen darf, und überspringt das Vorlesen sonst
+(`audio-player.jsx:41-50`, `screen-fact.jsx:120-121`). Der Kommentar nennt den
+Grund: „speechSynthesis.speak() ohne vorherige User-Geste wird auf iOS Safari
+stillschweigend verworfen". **Das ist eine Regel des Browsers und keine der
+Plattform.** `AVSpeechSynthesizer` und `TextToSpeech` verlangen keine Geste.
+Die Sperre nachzubauen hieße, das Vorlesen beim ersten Öffnen ohne Grund
+ausfallen zu lassen, und genau dieses erste Öffnen ist der Fall, für den der
+Modus gebaut ist.
+
+#### Drei Dinge, die erst beim Bauen aufgefallen sind
+
+1. **Riverpod verbietet, einen Provider im Lebenszyklus eines Widgets zu
+   ändern**, und `fireImmediately` ruft den Hörer synchron in `initState`. Die
+   Fehlermeldung nennt `initState` ausdrücklich. Das Vorlesen läuft deshalb
+   über `addPostFrameCallback`, und der erste Testlauf hat es gezeigt: der
+   Fehler ging in die abgekoppelte Arbeit, und der Vortrag blieb aus.
+2. **Der Audio-Modus musste umziehen**, von
+   `features/settings/presentation/notifiers/` nach
+   `features/settings/application/`. Sein erster Verbraucher sitzt in einem
+   anderen Feature, und Regel 8 verbietet den Import aus fremdem
+   `presentation`. Derselbe Zwang wie bei `fact_providers.dart`, eine
+   Verschiebung ohne Verhaltensänderung.
+3. **`didUpdateWidget` legte bei jedem Wechsel der Kennung ein weiteres
+   Abonnement an**, ohne das vorige zu schließen. Aufgefallen beim Nachsehen,
+   warum eine Mutation überlebt hat.
+
+#### Zwei überlebende Mutationen, und beide waren blinde Tests von mir
+
+**Die erste:** `_guard` von `on Object` auf `on Exception` zu ändern brach
+nichts. Der Test dazu setzte `failWith`, aber nicht `failEverything`, und der
+Doppelgänger wirft nur, wenn das zweite Feld gesetzt ist. Es warf also gar
+nichts. Muster 5 des Blindheitskatalogs.
+
+**Die zweite ist die lehrreichere:** den Vermerk gegen doppeltes Vorlesen zu
+entfernen brach nichts, weil der Fakt-Provider im Test mit einem **festen
+Wert** überschrieben war. Ein fester Wert meldet genau einmal, und dann liest
+die Seite mit und ohne Vermerk einmal vor. Zwei zusätzliche `pump()` helfen
+nicht, sie erzeugen keine Meldung. Erst ein Override mit einem echten
+`Future`, also `AsyncLoading` und danach Daten, plus ein `invalidate`, stellt
+den Fall her. Steht als Muster 27.
 
 ### Schritt 22 war mit Schritt 20 schon fertig, und dafür fehlt etwas anderes
 
@@ -4776,7 +4884,7 @@ eine Fundstelle.
 | E-11 | **City-Identität.** Die Datenbank speichert `facts.city` als Anzeigename, das Frontend nutzt Slugs, die Brücke ist eine SQL-Funktion `_slugify`, welche die JS-Normalisierung nachbaut. Dieser Mismatch hat schon einmal `create_team_session` scheitern lassen. Domain-Map fordert `CityId` als Wertobjekt. | 3 | Phase 0 Schritt 5 |
 | E-13 | **AI-Zugang.** Anthropic-Schlüssel niemals im Client, `ai_proxy` und Edge Function nutzen, Quota serverseitig. | **4** | Phase 7 |
 | E-14 | **OpenRouteService** für Fußweg-Routen: Konto, Kosten, Rate Limits, Fallback. | **4** | Phase 6 |
-| E-15 | **TTS-Weg.** Gerät (`flutter_tts`) oder Cloud. Cloud heißt laufende Kosten. | 4 bei Cloud, sonst 3 | Phase 3 |
+| E-15 | **TTS-Weg.** Gerät (`flutter_tts`) oder Cloud. Cloud heißt laufende Kosten. **Am 02.09.2026 mit Schritt 25 eingelöst, soweit es das Gerät betrifft.** `flutter_tts` ist freigegeben und aufgenommen, der Vertrag `SpeechService` ist anbieterneutral, und der „eine Klick" aus Janeks Vorgabe ist `speechServiceProvider`: eine Cloud-Fassung wird dort eingesetzt und nicht in die Aufrufer eingebaut. **Der zweite Halbsatz der Vorgabe ist unverändert offen und wichtiger geworden:** „soll aber nirgends rumliegen, ist ja schließlich ein api key". Die Quelle hat genau das getan, siehe E-70. Offen bleiben damit die Cloud-Entscheidung selbst (laufende Kosten, Stufe 4) und die Stimmenwahl. | 4 bei Cloud, sonst 3 | Cloud offen, Gerät gebaut |
 | E-16 | **Leaderboard-Sichtbarkeit.** `user_city_scores` und `user_trophies` haben `USING (true)` für SELECT. Alle Punktestände und Trophäen sind für jeden lesbar. Zusammenspiel mit dem Schalter „Echten Namen zeigen". **Am 31.08.2026 zur Schliessung beauftragt**, gemeinsam mit E-49. Haengt an E-55: dieselben zwei Tabellen sind nicht nur lesbar, sondern vom Client schreibbar, und eine Antwort nur zur Leseseite lässt die teurere Hälfte stehen. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“.  **Am 02.09.2026 beantwortet, damit ist die Leseseite entschieden.** Janek: ohne Anmeldung sieht niemand etwas; mit Anmeldung Rang, Punktestand und **Anzahl** der Städte, keine Städtenamen. Ein Schalter zum Teilen von Städtenamen ist erwogen und **nicht** gebaut: Städtenamen sind ein Bewegungsprofil, und ein Schalter macht das Riskante zur Entscheidung des Nutzers mit einem Standardwert, der für die Mehrheit falsch ist. Dazu die weiter reichende Entscheidung: **es gibt nur einen Username, keinen echten Namen.** Damit verschwindet der Schalter „Echten Namen zeigen“ als Begriff und mit ihm der Grund, `profiles.name` von `profiles.username` zu unterscheiden. Der Neubau macht die Username-Regel schon, nachgeprüft: kein Namensfeld in der Registrierung, `signup_notifier.dart:174` füllt `name` mit dem Username. Umzusetzen bleibt im Backend: `get_leaderboard` verlangt eine Sitzung, die zwei `USING (true)`-Leserechte fallen. Wortlaut im Abschnitt „Janeks Antworten auf den dritten Block“.  **Am 02.09.2026 in einem Punkt zurückgenommen:** die Rangliste bleibt **auch ohne Anmeldung** sichtbar, mit Rang und Punktestand. Auslöser war ein gemessener Nebenbefund des Migrationsauftrags, dass die PWA keine Anmeldeschranke davor hat und der Verlust wie ein Fehler aussähe. Alles andere bleibt: keine Städtenamen, nur ein Username. **Dadurch wird 7b wichtiger, nicht unwichtiger:** eine Liste von Konto-UUIDs ohne jede Hürde ist schlechter als eine hinter einer Anmeldung, `user_id` durch `is_me` zu ersetzen ist damit die eigentliche Behebung.  **Am 02.09.2026 auch für die Städte-Ranglisten entschieden:** sie bleiben offen, ohne Konto. Die Regel lautet damit in ihrer engeren Form **keine Städtenamen außer für die besten zehn je Stadt**, und so gehört sie zitiert. Der verbleibende Personenbezug ist ein Nutzername in einer Stadt-Top-10, also „hat dort gesammelt“: kein Zeitpunkt, kein Ort innerhalb der Stadt, keine Häufigkeit, und nach 7b keine Kennung. | **4** | Phase 7 |
 | E-17 | **Creator-Foto.** Storage-Bucket, Policy, Moderation vor `is_approved`. | 3, Bucket-Anlage 4 | Phase 8 |
 | E-19 | **Trusted Time.** Der 45-Minuten-Timer für das Session-Ende und die Finale-Punkte ×1.5 rechnen clientseitig. `security.md` §1 verbietet vertrauenswürdige Zeitstempel aus dem Client. **Am 31.08.2026 entschieden: der Server rechnet, keine Ausnahme von `security.md`.** Regel für den Neubau: der Client rechnet keine Zeit, an der eine Belohnung hängt. Die Umsetzung ist eine Backend-Änderung, damit ist das Sitzungsende in Phase 5 bis dahin nicht parität-treu baubar. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“. | 3 | Phase 5 |
@@ -4816,6 +4924,8 @@ eine Fundstelle.
 | E-68 | **Man sammelt in der Quelle auch ohne jeden Tipp, und dabei springt einem eine Anmeldeaufforderung entgegen.** Am 02.09.2026 beim Zuschnitt von Schritt 22 gefunden, und im Neubau gab es davon bis dahin keine Zeile. `scanAutoOpenRef` (`screen-map.jsx:1471-1489`) läuft bei jeder Ortung und löst innerhalb von 18 Metern von selbst `triggerCollect` aus. Das ist **eine Buchung, keine Anzeige**, auch wenn der Kommentar darüber „pop a fact's full sheet" sagt und „30m" nennt, wo der Code 18 prüft. Und `onCollectFact` beginnt mit `if (!requireAuth()) return;` (`app.jsx:681`): wer nicht angemeldet ist, bekommt die Aufforderung **beim Vorbeigehen**, ohne etwas angetippt zu haben. **Der Neubau baut die 18 Meter, weil das das gemessene Verhalten ist, und die Anmeldesperre nicht.** Sie hängt an einer Frage, die noch offen ist: der Neubau hat für das Sammeln überhaupt keine Anmeldeschranke, und E-19 legt fest, dass der Client keinen Betrag bestimmt. Zu entscheiden ist, ob das automatische Sammeln für Gäste stumm mitlaufen und erst bei der Anmeldung nachbuchen soll, oder ob es für Gäste gar nicht stattfindet. Der Vorbeigeh-Prompt der Quelle ist jedenfalls die schlechteste der drei Möglichkeiten. | 2 | vor Auslieferung |
 | E-69 | **Denselben Fakt zweimal anzutippen bringt zweimal 50 Münzen, und zwar unbegrenzt oft.** Am 02.09.2026 beim Bau des Sammel-Speichers gefunden und dreifach nachgemessen. `onCollectFact` (`app.jsx:680-716`) hat **keine** Prüfung auf „schon gesammelt": `Storage.collectFact(id)` entdoppelt zwar die Liste (`storage.jsx:49-52`), aber `Storage.addCoins(50)` und `Api.addCoins(userId, 50)` laufen **bei jedem Aufruf** (`:712`, `:714`). Und der zweite Aufruf ist erreichbar: die Tipp-Regel (`screen-map.jsx:2129-2145`) fragt den Sammelzustand nicht, ein gesammelter Fakt verhält sich wie jeder andere. Wer innerhalb von 150 Metern eines Fakts steht und ihn wiederholt antippt, erzeugt 50 Münzen je Tipp, lokal **und** auf dem Server. Die Erfahrungspunkte sind nicht betroffen, `computeXP` rechnet aus `collected.length`. **Das ist die scharfe Fassung von E-06:** dort geht es darum, dass `increment_coins` den Betrag nicht prüft, hier um unbegrenzte Wiederholung desselben Betrags. Es widerspricht Janeks Regel vom 02.09.2026 („jeder Fakt gibt nur einmal Coins") direkt. **Der Neubau ist davon durch Bauweise frei**, und das ist keine Nachlässigkeit, sondern das Ergebnis von E-19: er bucht überhaupt keine Münzen im Client, und `CollectedFactsNotifier.collect` ist idempotent. Zu tun ist es im anderen Repository, zusammen mit E-06 und E-24. | 3 | vor dem PWA-Release |
 | E-70 | **In der Quelle liegt ein vollständiger OpenAI-API-Schlüssel im Klartext, in einer Datei, die jeder Browser ausgeliefert bekommt.** Am 02.09.2026 beim Zuschnitt von Schritt 25 gefunden. Fundstelle: `02_Frontend/app/audio-player.jsx:12`, eine Konstante `OPENAI_KEY` mit einem echten `sk-proj-…`-Schlüssel, direkt darunter Stimme und Modell. **Die Datei wird ausgeliefert, nicht gebündelt:** `index.html:180` lädt sie als `<script type="text/babel" src="audio-player.jsx?v=5">`, also im Quelltext und ohne jede Verarbeitung. Wer die Seite offen hatte, konnte den Schlüssel lesen. **Vier Fundstellen, und meine erste Zählung war falsch:** sie stand kurz als „genau eine", weil die Suche auf `02_Frontend` begrenzt war und gebaute Artefakte übersprungen hat. Tatsächlich sind es `02_Frontend/app/audio-player.jsx:12` (die Quelle), `02_Frontend/dist/assets/index-4JDjuKco.js` (das gebaute Web-Bündel), `02_Frontend/android/app/src/main/assets/public/assets/index-4JDjuKco.js` (dasselbe Bündel in den Android-Assets, also im Paket, wenn es je verteilt wurde) und `06_Planung/plans/2026-05-14-openai-tts.md:275`. Nicht im Backend, nicht im eingefrorenen Flutter-Port. **Der Schlüssel selbst steht bewusst nirgends in diesem Repository**, auch nicht hier; dieses Repository ist öffentlich (E-64). **Es war eine bewusste Abwägung und kein Versehen:** das Planungsdokument sagt, der Schlüssel werde im Quelltext sichtbar sein, das sei „acceptable for a personal project at this scale", und man solle rotieren, falls unerwartete Kosten auftauchen. Das war der 14.05.2026; seither gibt es `DACH_Rollout_Plan.md` und den Weg in die App Stores. **Ob die Abwägung heute noch gilt, entscheidet der Eigentümer, nicht dieses Repository.** **Die Behebung ist nicht Code:** den Schlüssel bei OpenAI zurückziehen und neu ausstellen. Ihn nur aus den Dateien zu löschen genügt nicht, er steht in der Versionsgeschichte des anderen Repositories und war ausgeliefert. Für den Neubau ändert sich dadurch nichts, er bestätigt die Entscheidung: E-15 legt „Gerät zuerst" fest, und Janek hat am 31.08.2026 dazu gesagt „soll aber nirgends rumliegen, ist ja schließlich ein api key". Die Cloud-Variante läuft über Edge Function und Proxy, nie über einen Schlüssel im Client. | 4 | sofort |
+| E-71 | **Für die Sprechgeschwindigkeit und die Stimme gibt es im Neubau keine Einstellung, und die Zahl dahinter ist eine Falle.** Am 02.09.2026 mit Schritt 25 aufgenommen. Die Quelle hat im Profil einen Schieber (`Storage.getAudioRate`, Rückfall `1.0`, `storage.jsx:168`) und eine Stimmenwahl (`Storage.getAudioVoice`, `:171`). Beide fehlen, weil es den Einstellungs-Bildschirm noch nicht gibt; der Neubau benutzt `defaultSpeechRate` als Konstante und die Standardstimme des Geräts. **Wer den Schieber baut, muss die Umrechnung kennen:** der Vertrag trägt die menschliche Einheit (1,0 ist normal), `flutter_tts` nicht (dort ist 0,5 normal), und die Umrechnung sitzt in `FlutterTtsSpeechService._pluginRate`. Ein Schieber, der seinen Wert direkt an das Paket gibt, verdoppelt jede Einstellung. Die Stimmenwahl hängt zusätzlich an E-15. Wird zu einem siebten Speicher am `KeyValueStore`, wenn er kommt. | 2 | mit dem Einstellungs-Bildschirm |
+| E-72 | **Die iOS-Audio-Kategorie des Vortrags ist ungeprüft, und sie entscheidet, ob der Stummschalter ihn abschaltet.** Am 02.09.2026 offen gelassen. `flutter_tts` bietet `setIosAudioCategory` und `setSharedInstance`; der Neubau ruft beides **nicht** und nimmt damit die Voreinstellung. Ob der Vortrag dann über den Medienkanal läuft, ob er sich mit anderer Wiedergabe mischt und was bei aktivem Stummschalter passiert, ist am Gerät zu messen und nicht zu raten. **Es hängt an derselben Frage wie E-28:** dort ist begründet, dass der Stummschalter auf keiner der beiden Plattformen die Medienlautstärke steuert, und genau das gilt nur, wenn die Kategorie stimmt. Die Quelle kann dazu nichts sagen, sie läuft im Browser. Zu tun: eine Messung auf einem iPhone, danach eine Zeile im Adapter oder eine begründete Zeile, warum keine nötig ist. | 2 | vor Auslieferung |
 
 ## Wie Tests hier blind werden
 
@@ -5026,6 +5136,22 @@ halben Tag.
     hier gefunden hat: nachsehen, welche Testdaten in den Wirkungsbereich der
     neuen Regel fallen (`grep` auf die Entfernungen), und die betroffenen
     bewusst daraus herausschieben.
+
+27. **Ein Provider, der mit einem festen Wert überschrieben ist, meldet
+    genau einmal, und damit ist jede Zusicherung über die zweite Meldung
+    blind.** Am 02.09.2026 belegt. Der Test „und zwar genau einmal" sollte
+    zeigen, dass die Fakt-Akte nicht zweimal vorliest. Er blieb grün, als der
+    Vermerk dagegen entfernt wurde, und der Grund war der Aufbau:
+    `factByIdProvider` war mit `(ref) => fact` überschrieben, also synchron.
+    Ein synchroner Override liefert **eine** Ausgabe; ohne eine zweite kann
+    „nicht zweimal" nicht falsch werden. Auch `pumpAndSettle` und zusätzliche
+    `pump()` ändern das nicht, sie erzeugen keine Meldung.
+
+    Der Griff, der es herstellt: den Override auf ein echtes `Future` legen,
+    damit der Provider `AsyncLoading` und danach Daten meldet, und dann
+    `invalidate` aufrufen. Allgemein: **wer eine Zusicherung über die
+    Wiederholung schreibt, muss die Wiederholung im Aufbau erzeugen**, und
+    eine Mutation ist der einzige verlässliche Weg, das zu merken.
 
 ## Datenvertrag: die bekannten Fallen
 

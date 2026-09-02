@@ -27,14 +27,17 @@ import 'package:fact_app/features/identity/domain/first_launch_store.dart';
 import 'package:fact_app/features/identity/domain/repositories/auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
+import 'package:fact_app/features/settings/application/audio_mode_providers.dart';
 import 'package:fact_app/features/settings/data/key_value_audio_mode_store.dart';
 import 'package:fact_app/features/settings/data/key_value_language_preference_store.dart';
 import 'package:fact_app/features/settings/domain/audio_mode_store.dart';
-import 'package:fact_app/features/settings/presentation/notifiers/audio_mode_providers.dart';
 import 'package:fact_app/services/diagnostics/console_diagnostic_sink.dart';
 import 'package:fact_app/services/location/geolocator_location_service.dart';
 import 'package:fact_app/services/location/location_providers.dart';
 import 'package:fact_app/services/location/location_service.dart';
+import 'package:fact_app/services/speech/flutter_tts_speech_service.dart';
+import 'package:fact_app/services/speech/speech_providers.dart';
+import 'package:fact_app/services/speech/speech_service.dart';
 import 'package:fact_app/services/supabase/supabase_config.dart';
 import 'package:fact_app/services/supabase/supabase_providers.dart';
 import 'package:flutter/widgets.dart';
@@ -62,6 +65,17 @@ ProviderScope _scope({
 /// kein Log, ein Bildschirm, der einfach "Fehler beim Anmelden" sagt. Fehlt der
 /// Override in `bootstrap.dart`, fällt genau das erst auf einem Gerät auf.
 void main() {
+  // **Der Sprachdienst baut im Konstruktor einen Methodenkanal-Handler**,
+  // und der verlangt eine initialisierte Bindung. Ohne diese Zeile
+  // scheitert allein der Test, der ihn liest, mit "Cannot set the method
+  // call handler before the binary messenger has been initialized".
+  //
+  // **Im Betrieb entsteht das Problem nicht**, und zwar aus zwei Gründen:
+  // `bootstrap()` ruft `WidgetsFlutterBinding.ensureInitialized()` als erste
+  // Zeile, und der Provider ist faul, der Adapter entsteht also erst beim
+  // ersten Lesen und damit lange danach.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('productionProviderScope', () {
     test('bindet authRepositoryProvider an die Supabase-Umsetzung', () {
       // Nachgewiesen über die Wirkung statt über die Identität des
@@ -330,6 +344,33 @@ void main() {
       addTearDown(container.dispose);
 
       expect(container.read(activeHuntStoreProvider).readActiveHunt(), hunt);
+    });
+
+    test('bindet speechServiceProvider an die Sprachausgabe des Geräts', () {
+      // Ohne diesen Override ist der Audio-Modus wieder ein Schalter ohne
+      // Wirkung: `unavailableSpeechService` schweigt, ohne Fehler und ohne
+      // Meldung. Geprüft wird der Typ und nicht die Wirkung, denn sprechen
+      // kann er hier nicht: `flutter test` hat keinen Plattformkanal.
+      final container = ProviderContainer(overrides: _scope().overrides);
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(speechServiceProvider),
+        isA<FlutterTtsSpeechService>(),
+      );
+    });
+
+    test('ohne den Override schweigt die Sprachausgabe', () {
+      // Die Gegenprobe. Ohne sie könnte der Test darüber auch grün sein, wenn
+      // der Standard selbst schon der Geräte-Adapter wäre, und dann fiele
+      // jeder Widget-Test über eine `MissingPluginException`.
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(speechServiceProvider),
+        same(unavailableSpeechService),
+      );
     });
 
     test('bindet collectedFactsStoreProvider an den übergebenen Speicher', () {

@@ -97,8 +97,9 @@ independent business domain.
     ADR-008.
 24. `flutter_rotation_sensor` and `native_device_orientation` may only be
     imported below `lib/services/orientation/`.
+25. `flutter_tts` may only be imported below `lib/services/speech/`.
 
-Rules 19 to 22 and rule 24 give a vendor SDK one home directory. They are not a ban, they
+Rules 19 to 22 and rules 24 to 25 give a vendor SDK one home directory. They are not a ban, they
 are an assignment: the map SDK belongs to the map host, the geolocation SDK
 belongs to the location service, and the WebView belongs to the avatar. Rule 4
 already keeps the map and geolocation SDKs out of every `domain` directory, but
@@ -120,6 +121,20 @@ home under `services/` and appears nowhere else. It bans the family by prefix fo
 the reason rule 21 gives: `native_device_orientation` is the transitive
 dependency of `flutter_rotation_sensor`, and reaching for the transitive package
 is the obvious way around the adapter.
+
+Rule 25 was added on 2026-09-02 with step 25, and it is the fourth
+application of the same shape. One entry is enough for it, unlike rule 24:
+`flutter_tts 4.2.5` depends only on `flutter` and `flutter_web_plugins` from
+the SDK and brings no third-party transitive package, so there is no way around
+the adapter under a different package name. Checked in the package's own
+`pubspec.yaml`, not assumed.
+
+The rule is worth more here than the shape alone suggests. The adapter it
+protects hides four measured quirks of the package, and the first of them is a
+number: "normal" speech rate is `0.5` in `flutter_tts` and `1.0` in the
+reference PWA. A caller that reaches past the adapter and sets the rate itself
+gets the fastest setting while believing it set the normal one. See the library
+comment of `flutter_tts_speech_service.dart`.
 
 Rule 22 was added on 2026-08-31, together with the package itself.
 `tool/check_architecture.dart` had until then carried `shared_preferences` as a

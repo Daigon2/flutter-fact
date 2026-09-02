@@ -16,13 +16,15 @@ import 'package:fact_app/features/identity/data/key_value_first_launch_store.dar
 import 'package:fact_app/features/identity/data/repositories/supabase_auth_repository.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/auth_providers.dart';
 import 'package:fact_app/features/identity/presentation/notifiers/first_launch_providers.dart';
+import 'package:fact_app/features/settings/application/audio_mode_providers.dart';
 import 'package:fact_app/features/settings/data/key_value_audio_mode_store.dart';
 import 'package:fact_app/features/settings/data/key_value_language_preference_store.dart';
-import 'package:fact_app/features/settings/presentation/notifiers/audio_mode_providers.dart';
 import 'package:fact_app/services/diagnostics/console_diagnostic_sink.dart';
 import 'package:fact_app/services/location/geolocator_location_service.dart';
 import 'package:fact_app/services/location/location_providers.dart';
 import 'package:fact_app/services/preferences/shared_preferences_key_value_store.dart';
+import 'package:fact_app/services/speech/flutter_tts_speech_service.dart';
+import 'package:fact_app/services/speech/speech_providers.dart';
 import 'package:fact_app/services/supabase/supabase_config.dart';
 import 'package:fact_app/services/supabase/supabase_initializer.dart';
 import 'package:fact_app/services/supabase/supabase_providers.dart';
@@ -166,6 +168,21 @@ ProviderScope productionProviderScope({
       locationServiceProvider.overrideWith(
         (ref) => const GeolocatorLocationService(),
       ),
+      // Der Sprachdienst, und ohne diesen Override ist der Audio-Modus
+      // wieder ein Schalter ohne Wirkung: `unavailableSpeechService`
+      // schweigt, ohne Fehler und ohne Meldung. Dasselbe Muster wie beim
+      // Ortungsdienst zwei Zeilen darüber, deshalb steht auch dieser Eintrag
+      // in `test/app/bootstrap_test.dart`.
+      //
+      // **Mit `ref.onDispose`**, anders als die Dienste davor. Die beiden
+      // anderen halten nichts, was aufzuräumen wäre; dieser hält einen
+      // Ereignisstrom und die laufende Sprachausgabe. Ohne das Aufräumen
+      // spricht die App nach dem Entsorgen ihrer Scope weiter.
+      speechServiceProvider.overrideWith((ref) {
+        final FlutterTtsSpeechService service = FlutterTtsSpeechService();
+        ref.onDispose(service.dispose);
+        return service;
+      }),
       // Der Standard `unavailableFactRepository` wirft, statt eine leere Liste
       // zu liefern, und genau deshalb ist dieser Override kein stiller Ausfall
       // mehr, sondern ein sichtbarer. Er steht trotzdem im Test, weil ohne ihn

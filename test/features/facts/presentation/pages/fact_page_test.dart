@@ -14,7 +14,11 @@ import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
 import 'package:fact_app/features/facts/presentation/fact_category_look.dart';
 import 'package:fact_app/features/facts/presentation/fact_detail_palette.dart';
 import 'package:fact_app/features/facts/presentation/pages/fact_page.dart';
+import 'package:fact_app/features/settings/application/audio_mode_providers.dart';
+import 'package:fact_app/features/settings/domain/audio_mode_store.dart';
 import 'package:fact_app/services/location/device_position.dart';
+import 'package:fact_app/services/speech/speech_providers.dart';
+import 'package:fact_app/services/speech/speech_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -121,6 +125,9 @@ void main() {
     Size size = const Size(390, 844),
     AppLanguage language = AppLanguage.de,
     bool settle = true,
+    RecordingSpeechService? speech,
+    bool audioMode = false,
+    bool asyncFact = false,
   }) async {
     useSurface(tester, size: size);
     final GoRouter router = GoRouter(
@@ -149,8 +156,23 @@ void main() {
           languagePreferenceStoreProvider.overrideWithValue(
             InMemoryLanguagePreferenceStore(language),
           ),
-          factByIdProvider(factId).overrideWith(
-            (Ref ref) => loading ? Completer<Fact?>().future : fact,
+          factByIdProvider(factId).overrideWith((Ref ref) {
+            if (loading) {
+              return Completer<Fact?>().future;
+            }
+            // **Mit `asyncFact` kommt der Fakt wie am Gerät**, also
+            // erst `AsyncLoading` und dann Daten. Ohne den Schalter
+            // liefert der Override synchron, und dann gibt es genau
+            // eine Meldung; ein Test, der das Verhalten bei einer
+            // **zweiten** Meldung prüfen will, kann es damit nicht.
+            return asyncFact ? Future<Fact?>.value(fact) : fact;
+          }),
+          // **Ohne diesen Override spricht der untätige Standard**, und der
+          // sagt nichts. Für den Knopf reicht das nicht: geprüft wird, dass
+          // er den Befehl **abgibt**.
+          if (speech != null) speechServiceProvider.overrideWithValue(speech),
+          audioModeStoreProvider.overrideWithValue(
+            InMemoryAudioModeStore(enabled: audioMode),
           ),
         ],
         child: MaterialApp.router(
@@ -1130,9 +1152,10 @@ void main() {
   });
 
   group('Was hier nicht steht', () {
-    testWidgets('kein Sammeln, kein Audio, keine Kommentare, kein Teilen', (
-      tester,
-    ) async {
+    testWidgets('kein Sammeln, keine Kommentare, kein Teilen', (tester) async {
+      // **Audio ist am 02.09.2026 aus diesem Test herausgefallen**, und zwar
+      // richtig: Schritt 25 hat den Kopfhörer-Knopf gebaut. Die Zusicherung
+      // dazu steht jetzt in der Gruppe „Der Kopfhörer-Knopf" weiter unten.
       await pumpFact(
         tester,
         fact: factFixture(
@@ -1173,10 +1196,231 @@ void main() {
         ),
         findsNothing,
       );
-      expect(find.text('🎧'), findsNothing);
       expect(find.text('📤'), findsNothing);
       expect(find.text('🔖'), findsNothing);
       expect(find.text('🏷️'), findsNothing);
+    });
+  });
+
+  group('Der Kopfhörer-Knopf', () {
+    // `screen-fact.jsx:373-388`. Drei Zweige: anhalten, fortsetzen, von vorn.
+
+    testWidgets('steht neben dem Titel', (tester) async {
+      await pumpFact(tester, fact: factFixture());
+
+      expect(find.byKey(FactPage.headphoneKey), findsOneWidget);
+      expect(find.text('🎧'), findsOneWidget);
+    });
+
+    testWidgets('ein Tipp schickt die Vorlesefassung an den Dienst', (
+      tester,
+    ) async {
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+      await pumpFact(
+        tester,
+        fact: factFixture(
+          title: 'Die Glyptothek',
+          body: 'Ein Satz [1] mit Quelle.',
+        ),
+        speech: speech,
+      );
+
+      await tester.tap(find.byKey(FactPage.headphoneKey));
+      await tester.pump();
+
+      // Titel und Text mit '. ' verbunden, und **ohne** die Hochziffer.
+      expect(speech.spoken, <String>[
+        'Die Glyptothek. Ein Satz mit Quelle.|de-DE',
+      ]);
+    });
+
+    testWidgets('auf Englisch geht das englische Kennzeichen mit', (
+      tester,
+    ) async {
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+      await pumpFact(
+        tester,
+        fact: factFixture(title: 'Titel', body: null),
+        language: AppLanguage.en,
+        speech: speech,
+      );
+
+      await tester.tap(find.byKey(FactPage.headphoneKey));
+      await tester.pump();
+
+      expect(speech.spoken.single, endsWith('|en-US'));
+    });
+
+    testWidgets('während des Vortrags zeigt er die Pause', (tester) async {
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+      await pumpFact(tester, fact: factFixture(), speech: speech);
+
+      await tester.tap(find.byKey(FactPage.headphoneKey));
+      await tester.pump();
+
+      expect(find.text('⏸'), findsOneWidget);
+      expect(find.text('🎧'), findsNothing);
+    });
+
+    testWidgets('ein zweiter Tipp hält an', (tester) async {
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+      await pumpFact(tester, fact: factFixture(), speech: speech);
+      await tester.tap(find.byKey(FactPage.headphoneKey));
+      await tester.pump();
+
+      await tester.tap(find.byKey(FactPage.headphoneKey));
+      await tester.pump();
+
+      expect(speech.commands, <String>['pause']);
+    });
+
+    testWidgets('nach dem Anhalten setzt der dritte Tipp fort', (tester) async {
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+      await pumpFact(tester, fact: factFixture(), speech: speech);
+      await tester.tap(find.byKey(FactPage.headphoneKey));
+      await tester.pump();
+      speech.emit(SpeechState.paused);
+      // **Zweimal gepumpt**, und das ist gemessen: ein
+      // Broadcast-Strom liefert sein Ereignis in einem Mikrotask,
+      // `pump()` leert die Mikrotasks vor dem Bild, und der
+      // Neuaufbau braucht deshalb ein zweites. Dieselbe Falle
+      // steht in `fact_collect_overlay_test.dart` beschrieben.
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.byKey(FactPage.headphoneKey));
+      await tester.pump();
+
+      // **Fortsetzen und nicht von vorn**, das ist der mittlere Zweig der
+      // Quelle. Ohne ihn begänne der Vortrag nach jeder Pause neu.
+      expect(speech.commands, <String>['resume']);
+      expect(speech.spoken, hasLength(1));
+    });
+
+    testWidgets('nach dem Ende beginnt der nächste Tipp von vorn', (
+      tester,
+    ) async {
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+      await pumpFact(tester, fact: factFixture(), speech: speech);
+      await tester.tap(find.byKey(FactPage.headphoneKey));
+      await tester.pump();
+      speech.emit(SpeechState.idle);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('🎧'), findsOneWidget);
+      await tester.tap(find.byKey(FactPage.headphoneKey));
+      await tester.pump();
+
+      expect(speech.spoken, hasLength(2));
+      expect(speech.commands, isEmpty);
+    });
+  });
+
+  group('Vorlesen von selbst, wenn der Audio-Modus an ist', () {
+    // `screen-fact.jsx:119-123`.
+
+    testWidgets('mit Audio-Modus liest die Akte beim Öffnen vor', (
+      tester,
+    ) async {
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+
+      await pumpFact(
+        tester,
+        fact: factFixture(title: 'Die Glyptothek', body: null),
+        speech: speech,
+        audioMode: true,
+      );
+
+      expect(speech.spoken, <String>['Die Glyptothek|de-DE']);
+    });
+
+    testWidgets('ohne Audio-Modus bleibt es still', (tester) async {
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+
+      await pumpFact(tester, fact: factFixture(), speech: speech);
+
+      expect(speech.spoken, isEmpty);
+    });
+
+    testWidgets('und zwar genau einmal, auch wenn der Fakt neu kommt', (
+      tester,
+    ) async {
+      // **Dieser Test hat den Fall zuerst nie ausgelöst**, und eine Mutation
+      // hat es gezeigt: den Vermerk `_autoSpokenFor` zu entfernen brach ihn
+      // nicht. Der Grund war der Aufbau. Der Fakt-Provider ist im Test mit
+      // einem festen Wert überschrieben, meldet also **einmal**, und dann
+      // liest die Seite mit und ohne Vermerk genau einmal vor. Zwei zusätzliche
+      // `pump()` ändern daran nichts, sie erzeugen keine neue Meldung.
+      //
+      // Der echte Fall ist eine **zweite** Meldung desselben Providers, und
+      // die gibt es: jedes `invalidate` und jeder Wiederholversuch nach einem
+      // Fehlschlag setzt ihn zurück auf `AsyncLoading` und danach wieder auf
+      // Daten. Ohne Vermerk läse die Akte dann jedes Mal von vorn los,
+      // mitten im Satz.
+      //
+      // Muster 5 aus dem Blindheitskatalog, in seiner teuersten Form: der
+      // Test behauptete „genau einmal" und stellte die Bedingung nicht her,
+      // unter der „mehrmals" überhaupt möglich ist.
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+      await pumpFact(
+        tester,
+        fact: factFixture(),
+        speech: speech,
+        audioMode: true,
+        asyncFact: true,
+      );
+      expect(speech.spoken, hasLength(1));
+
+      ProviderScope.containerOf(
+        tester.element(find.byType(FactPage)),
+      ).invalidate(factByIdProvider(factId));
+      await tester.pumpAndSettle();
+
+      expect(speech.spoken, hasLength(1));
+    });
+
+    testWidgets('ohne geladenen Fakt passiert nichts', (tester) async {
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+
+      await pumpFact(
+        tester,
+        loading: true,
+        speech: speech,
+        audioMode: true,
+        settle: false,
+      );
+
+      expect(speech.spoken, isEmpty);
+    });
+
+    testWidgets('ohne jeden Text bleibt es still', (tester) async {
+      // Der Fakt ist geladen, hat aber weder Titel noch Text. Die Quelle
+      // schickt in diesem Fall `undefined` an den Sprecher.
+      final RecordingSpeechService speech = RecordingSpeechService();
+      addTearDown(speech.close);
+
+      await pumpFact(
+        tester,
+        fact: factFixture(title: '', body: null),
+        speech: speech,
+        audioMode: true,
+      );
+
+      expect(speech.spoken, <String>['|de-DE']);
+      // Der Dienst selbst verwirft den leeren Text, geprüft in
+      // `flutter_tts_speech_service_test.dart`. Hier steht nur, dass die
+      // Seite keinen erfundenen Text daraus macht.
     });
   });
 
@@ -1384,4 +1628,41 @@ void main() {
       );
     });
   });
+}
+
+/// Eine Sprachausgabe, die mitschreibt statt zu sprechen.
+class RecordingSpeechService implements SpeechService {
+  final StreamController<SpeechState> _states =
+      StreamController<SpeechState>.broadcast();
+
+  /// Jeder Vortrag als `Text|Sprache`.
+  final List<String> spoken = <String>[];
+
+  /// Jeder Befehl außer dem Sprechen.
+  final List<String> commands = <String>[];
+
+  /// Schiebt eine Zustandsmeldung in den Strom.
+  void emit(SpeechState state) => _states.add(state);
+
+  /// Schließt den Strom.
+  void close() => _states.close();
+
+  @override
+  Stream<SpeechState> stateUpdates() => _states.stream;
+
+  @override
+  Future<void> speak({
+    required String text,
+    required String languageTag,
+    double rate = defaultSpeechRate,
+  }) async => spoken.add('$text|$languageTag');
+
+  @override
+  Future<void> pause() async => commands.add('pause');
+
+  @override
+  Future<void> resume() async => commands.add('resume');
+
+  @override
+  Future<void> stop() async => commands.add('stop');
 }

@@ -644,6 +644,22 @@ import 'package:native_device_orientation/native_device_orientation.dart';
 
 class OrientierungFamilie {}
 ''',
+  // Ä16: die Sprachausgabe gehört dem Sprachdienst. Wie bei den Regeln 21,
+  // 22 und 24 verbietet Regel 4 sie nur in einer Domäne; jedes andere
+  // Verzeichnis unterhalb von lib/ durfte sie vor Regel 25 holen.
+  'lib/features/facts/presentation/sprach_versuch.dart': r'''
+import 'package:flutter_tts/flutter_tts.dart';
+
+class SprachVersuch {}
+''',
+  // Ä16: auch die App-Komposition bekommt sie nicht, obwohl sie den Dienst
+  // per Override einsetzt. Sie holt ihn über den Provider und sieht das Paket
+  // nie. Genau diese Zeile wäre der bequeme Weg gewesen.
+  'lib/app/sprache_daneben.dart': r'''
+import 'package:flutter_tts/flutter_tts.dart';
+
+class SpracheDaneben {}
+''',
   // Lücke 1 geschlossen: die Cross-Feature-Prüfung griff nur die Schicht
   // direkt unter dem fremden Feature. Ein fremdes presentation und ein
   // fremdes data hinter einer Unterstruktur entkamen den Regeln 8 und 9,
@@ -693,6 +709,13 @@ class PraeferenzAdapter {}
 import 'package:flutter_rotation_sensor/flutter_rotation_sensor.dart';
 
 class OrientierungsAdapter {}
+''',
+  // Ä16 Gegenprobe: im Sprachdienst ist flutter_tts erlaubt. Sonst hätte
+  // Regel 25 kein Ziel, sondern wäre ein Verbot ohne Ort.
+  'lib/services/speech/sprach_adapter.dart': r'''
+import 'package:flutter_tts/flutter_tts.dart';
+
+class SprachAdapter {}
 ''',
   // Ä14 Gegenprobe: eine Feature-Domäne darf den Kern importieren. Das ist die
   // Gegenprobe, um die es Dairen mit D-18 ging: ohne sie ist Regel 23 nur eine
@@ -1097,6 +1120,8 @@ void main() {
         'lib/features/discovery/presentation/orientierung_versuch.dart',
         'lib/app/orientierung_daneben.dart',
         'lib/features/discovery/presentation/orientierung_familie.dart',
+        'lib/features/facts/presentation/sprach_versuch.dart',
+        'lib/app/sprache_daneben.dart',
         'lib/features/tours/presentation/pages/fremdes_feature_verschachtelt.dart',
         'lib/map/presentation/luecke_eigenes_data.dart',
         'lib/map/presentation/fremdes_feature_data_regel17.dart',
@@ -1956,6 +1981,23 @@ void main() {
         );
       },
     );
+
+    test('Ä16: die Sprachausgabe außerhalb des Sprachdienstes', () {
+      // Vor Regel 25 lief dieser Import überall unterhalb von lib/ durch,
+      // außer in einem domain/-Segment. Die Sprachausgabe ist eine
+      // unterstützende Technik wie die Ortung und der Kompass, damit ist
+      // lib/services/speech/ ihr Ort und kein anderer.
+      erwarteFunde(
+        verstoss,
+        'lib/features/facts/presentation/sprach_versuch.dart',
+        <(int, String)>[
+          (1, 'Regel 25: die Sprachausgabe gehört dem Sprachdienst'),
+        ],
+      );
+      erwarteFunde(verstoss, 'lib/app/sprache_daneben.dart', <(int, String)>[
+        (1, 'Regel 25: die Sprachausgabe gehört dem Sprachdienst'),
+      ]);
+    });
 
     test('Ä15: der Kompass-Sensor außerhalb des Orientierungsdienstes', () {
       // Vor Regel 24 lief dieser Import überall unterhalb von lib/ durch,
