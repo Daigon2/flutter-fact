@@ -210,7 +210,10 @@ flutter test --coverage
 dart run tool/check_architecture.dart
 # Still missing, do not add before it exists or resolves:
 #   dart run custom_lint              (see the accepted deviation above)
-#   dart run tool/check_generated_code.dart  (script not written yet)
+#   dart run tool/check_generated_code.dart  (not needed: of the six
+#     generated files only app_routes.g.dart comes from build_runner,
+#     and CI regenerates it and diffs it; the other five have their own
+#     --check drift tools)
 ```
 
 Conditional jobs:

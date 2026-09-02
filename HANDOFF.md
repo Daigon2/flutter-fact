@@ -400,13 +400,19 @@ wurden. Ein Tor, das erst beim Zusammenführen zuschlägt, meldet den Fehler ein
 Tagesarbeit zu spät. Der Auslöser nimmt jetzt `claude/**` mit, und der Push
 dieses Eintrags ist zugleich seine eigene Gegenprobe.
 
-**Der Posten `check_generated_code.dart` ist kleiner als gedacht.**
-`quality-gates.md` sagt inzwischen selbst, dass es das Skript nicht gibt und
-die drei Drift-Werkzeuge dieselbe Fläche abdecken. Wirklich offen bleibt nur
-der `build_runner`-Teil, also `app_routes.g.dart`, einmal von Hand geprüft und
-seither nie wieder. Wer das schließt, entscheidet zuerst, ob so ein Lauf ein
-lokales Tor sein darf: er verdoppelt die Laufzeit ungefähr, und ein Tor, das
-niemand mehr abwartet, ist keins.
+**Der Posten `check_generated_code.dart` war viel kleiner als sein Eintrag, und
+er ist erledigt.** Nachgezählt: von den sechs `*.g.dart` im Baum stammt genau
+**eine** von `build_runner`, `app_routes.g.dart`. Die anderen fünf erzeugen die
+drei eigenen Werkzeuge, und die haben ihre `--check`-Prüfung längst. Diese eine
+prüft jetzt der CI-Lauf: `build_runner` läuft, danach muss `git diff
+--exit-code` still bleiben.
+
+**Nicht lokal, und das ist gemessen.** Der Lauf dauert 40 Sekunden für eine
+Datei; die vier lokalen Tore zusammen liegen darunter. Ein Tor, das niemand
+mehr abwartet, ist keins. Dazu schlägt `git diff` auf Windows an genau dieser
+Datei allein durch die Zeilenenden an, obwohl der Inhalt gleich ist. Das ist
+beim Einbau aufgefallen und war zuerst ein Schreck: `git status` meldete die
+Datei als geändert, `git diff` zeigte nichts. Der Stand ist aktuell.
 
 
 ### 02.09.2026, Der i18n-Generator prüft jetzt auch die Aufrufstellen

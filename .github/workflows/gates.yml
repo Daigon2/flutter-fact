@@ -93,3 +93,21 @@ jobs:
 
       - name: Gate 4, Tests
         run: flutter test
+
+      # Der erzeugte Code, und der Posten ist viel kleiner, als er im
+      # Statusdokument aussah. Von den sechs `*.g.dart` im Baum stammt genau
+      # **eine** von `build_runner`, `lib/app/routing/app_routes.g.dart` aus
+      # `go_router_builder`. Die anderen fünf erzeugen die drei eigenen
+      # Werkzeuge, und die haben ihre Drift-Prüfung mit `--check` längst.
+      #
+      # **Warum nur hier und nicht lokal.** Der Lauf dauert gemessen 40
+      # Sekunden, und das für eine einzige Datei; die vier lokalen Tore
+      # zusammen liegen darunter. Ein Tor, das niemand mehr abwartet, ist
+      # keins. Dazu kommt, dass `git diff` auf Windows an dieser Datei durch
+      # die Zeilenenden-Umschreibung anschlägt, obwohl der Inhalt gleich ist,
+      # am 02.09.2026 gemessen. Hier läuft Linux, dort gibt es das Problem
+      # nicht.
+      - name: Erzeugter Code, go_router_builder
+        run: |
+          dart run build_runner build --delete-conflicting-outputs
+          git diff --exit-code -- lib/app/routing/app_routes.g.dart

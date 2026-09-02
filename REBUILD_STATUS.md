@@ -2789,17 +2789,26 @@ Nicht im REBUILD_PLAN, aber notwendig:
   Gates liefen nur, weil sie hier von Hand gestartet wurden. Der Auslöser nimmt
   jetzt zusätzlich `claude/**`. Ein Tor, das erst beim Zusammenführen
   zuschlägt, meldet den Fehler eine Tagesarbeit zu spät.
-- [ ] **`tool/check_generated_code.dart` gibt es weiterhin nicht**, und der
-  Posten ist kleiner, als er aussieht. `quality-gates.md` sagt inzwischen
-  selbst, dass es das Skript nicht gibt und die drei Drift-Werkzeuge dieselbe
-  Fläche Datei für Datei abdecken. Was **wirklich** offen bleibt, ist enger:
-  die drei Werkzeuge decken die Sprachtabellen, den Kartenstil und die
-  kuratierten Daten ab, aber **nicht** die von `build_runner` erzeugten Dateien
-  wie `app_routes.g.dart`. Deren Stand ist einmal von Hand geprüft worden
-  (27.08.2026, ein frischer Lauf war byteidentisch) und seither nie wieder.
-  Wer das schließt, entscheidet zuerst, ob ein `build_runner`-Lauf ein lokales
-  Tor sein darf: er verdoppelt die Laufzeit der vier Gates ungefähr, und ein
-  Tor, das niemand mehr abwartet, ist keins.
+- [x] **Der erzeugte Code wird geprüft, und der Posten war viel kleiner als
+  sein Eintrag** (02.09.2026). Er stand hier als „Gate für generierten Code
+  fehlt, `quality-gates.md` nennt `tool/check_generated_code.dart`, das Skript
+  existiert nicht". Nachgezählt: von den sechs `*.g.dart` im Baum stammt genau
+  **eine** von `build_runner`, nämlich `lib/app/routing/app_routes.g.dart` aus
+  `go_router_builder`. Die anderen fünf erzeugen die drei eigenen Werkzeuge,
+  und die haben ihre Drift-Prüfung mit `--check` längst. `quality-gates.md`
+  sagt inzwischen selbst, dass es das Skript nicht gibt und die drei Werkzeuge
+  dieselbe Fläche Datei für Datei abdecken; nur diese eine Datei fiel durch.
+  Sie wird jetzt im CI-Lauf geprüft: `build_runner` läuft, danach muss
+  `git diff --exit-code` auf dieser Datei still bleiben. **Nicht lokal**, und
+  das ist gemessen und keine Bequemlichkeit: der Lauf dauert 40 Sekunden für
+  eine Datei, die vier lokalen Tore zusammen liegen darunter, und ein Tor, das
+  niemand mehr abwartet, ist keins. Dazu schlägt `git diff` auf Windows an
+  dieser Datei allein durch die Zeilenenden-Umschreibung an, obwohl der Inhalt
+  gleich ist; auf dem Linux-Läufer gibt es das nicht.
+  **Der Stand war beim Einbau aktuell**, nachgeprüft: ein frischer Lauf ergab
+  denselben Inhalt. Ein `tool/check_generated_code.dart` bleibt damit
+  gegenstandslos, und der Eintrag in `quality-gates.md`, der es als „not
+  written yet" führt, sagt jetzt dasselbe.
 - [x] **Standort-Permissions.** `ACCESS_FINE_LOCATION`,
   `ACCESS_COARSE_LOCATION` und `INTERNET` in `AndroidManifest.xml`,
   `NSLocationWhenInUseUsageDescription` in `Info.plist`, Texte aus dem alten
