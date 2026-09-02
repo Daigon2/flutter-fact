@@ -1119,6 +1119,49 @@ plus 19 Mutationen, alle gefallen.
 - [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [x] 25. Audio-Service (02.09.2026; „normal“ heißt im Paket 0,5 und nicht 1,0, und die Quelle hat einen echten API-Schlüssel ausgeliefert)
 - [x] 26. Map-Audio-Kopplung (03.09.2026; der Hinweiston mit Hysterese, und die Ansage geht **nicht** über den Fakt-Vorleser)
 
+### Der goldene Ballon, 03.09.2026
+
+Nicht Teil der 50 Schritte, aber er schließt eine Lücke, die Schritt 22
+aufgemacht hat: seit dem Sammel-Speicher weiß die App, welcher Fakt gesammelt
+ist, und auf der Karte sah man es nicht. 2594 → 2599 Tests, fünf Mutationen.
+
+**Der Auslöser stand seit Schritt 16 in `fact_balloon_images.dart`** und lautete
+„das erste Feature, das den Sammelzustand kennt". Er ist am 02.09.2026
+eingetreten, die Zeichenarbeit kam einen Tag später.
+
+Der goldene Ballon der Quelle ist vollständig belegt (`screen-map.jsx:2147-2181`)
+und musste nicht erfunden werden: Radialverlauf `#EAD58E → #B0974A → #6E5826`
+mit Mitte bei 35/28 Prozent, `saturate(0.62)`, Rahmen `rgba(240,220,150,0.55)`,
+drei Schatten, ein grüner Haken oben rechts, das Emoji auf 0,8 Deckkraft und
+`grayscale(0.38)`, dazu ein bräunlicher Bodenschatten mit **kräftigeren**
+Deckkraftstufen als der ungesammelte.
+
+**Zwei Stellen, an denen die Übersetzung von CSS nach Canvas nicht wörtlich
+ist:**
+
+* `filter: saturate(0.62)` am Kopf ist ein `Paint.colorFilter` und keine eigene
+  Ebene. Der Filter wirkt auf die Farben genau eines Zeichenbefehls, und mehr
+  braucht ein Kreis nicht. Beim **Emoji** geht das nicht: ein `TextPainter`
+  malt mehrere Befehle, dort ist eine `saveLayer` nötig, und sie trägt
+  gleichzeitig die Deckkraft.
+* Der Haken ist 17 und nicht 14 Pixel breit. CSS rechnet mit
+  `box-sizing: content-box`, die 14 sind der Inhalt, der 1,5 Pixel breite
+  weiße Rahmen kommt darauf.
+
+**Der Sammelzustand entscheidet über zwei Dinge, und sie müssen zusammenpassen:**
+das Bild (über die Stil-Kennung) und das Feld `MapOverlayPoint.state`. Das Feld
+liest `factProximityOf`, um gesammelte Fakten von der Näherungsanimation
+auszunehmen, und das ist genau das Verhalten der Quelle: „gold coins animate
+via CSS only" (`screen-map.jsx:2245-2246`). Ein Test hält beide Richtungen
+zusammen, weil ein halber Umbau einen goldenen Ballon ergäbe, der trotzdem
+wächst.
+
+**`factOverlayProvider` beobachtet die Sammlung jetzt mit `watch`.** Ein
+Sammelvorgang lässt die Überlagerung damit neu entstehen, und der
+Kartenbildschirm schickt sie über den Plattformkanal. Das ist derselbe Preis,
+den die Quelle mit ihrem Neuzeichnen zahlt, und er fällt höchstens so oft an,
+wie jemand sammelt.
+
 ### Schritt 31 war schon gebaut, und Schritt 32 ist an E-19 gefallen
 
 Am 03.09.2026 nachgemessen, beim Suchen nach dem nächsten freien Schritt.

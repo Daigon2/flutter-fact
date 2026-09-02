@@ -31,8 +31,10 @@ library;
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
+import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -76,5 +78,19 @@ final FutureProvider<MapOverlay> factOverlayProvider =
       // nichts: dieselbe Abfrage, dasselbe Ergebnis, ein Abruf statt zweien.
       final Future<List<Fact>> facts = ref.watch(allFactsProvider.future);
       final DiagnosticSink diagnostics = ref.watch(diagnosticSinkProvider);
-      return factOverlayOf(await facts, diagnostics: diagnostics);
+      // **`watch` und nicht `read`.** Ein Sammelvorgang muss den Ballon
+      // golden machen, und dafür muss diese Überlagerung neu entstehen. Der
+      // Preis ist ein `setOverlay` je gesammeltem Fakt, also ein GeoJSON über
+      // den Plattformkanal; das ist derselbe Preis, den die Quelle mit ihrem
+      // Neuzeichnen zahlt, und er fällt höchstens so oft an, wie jemand
+      // sammelt.
+      final Set<int> collected = ref
+          .watch(collectedFactsProvider)
+          .map((FactId id) => id.value)
+          .toSet();
+      return factOverlayOf(
+        await facts,
+        diagnostics: diagnostics,
+        collected: collected,
+      );
     });

@@ -123,7 +123,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2593 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2599 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -410,6 +410,27 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 03.09.2026, der goldene Ballon, und damit sieht man das Sammeln
+
+Nicht Teil der 50 Schritte, aber er schließt die Lücke, die Schritt 22
+aufgemacht hat: die App wusste seit dem Sammel-Speicher, welcher Fakt
+gesammelt ist, und auf der Karte sah man es nicht. Der Auslöser stand seit
+Schritt 16 in `fact_balloon_images.dart` und ist am 02.09.2026 eingetreten.
+
+Die Vorlage war vollständig belegt und musste nicht erfunden werden.
+**Zwei Stellen sind bei der Übersetzung von CSS nach Canvas nicht wörtlich:**
+`saturate(0.62)` am Kopf ist ein `Paint.colorFilter` und keine eigene Ebene,
+weil ein Kreis genau ein Zeichenbefehl ist; beim Emoji geht das nicht, ein
+`TextPainter` malt mehrere, dort ist eine `saveLayer` nötig. Und der grüne
+Haken ist 17 statt 14 Pixel breit, weil CSS mit `box-sizing: content-box`
+rechnet und der weiße Rahmen obendrauf kommt.
+
+**Der Zustand entscheidet über zwei Dinge, und sie müssen zusammenpassen:** das
+Bild über die Stil-Kennung und das Feld `state`, das `factProximityOf` liest,
+um gesammelte Fakten von der Näherungsanimation auszunehmen. Genau so macht es
+die Quelle („gold coins animate via CSS only"). Ein halber Umbau ergäbe einen
+goldenen Ballon, der trotzdem wächst; ein Test hält beide Richtungen zusammen.
 
 ### 03.09.2026, Schritt 31 war schon gebaut, Schritt 32 ist gesperrt
 

@@ -86,12 +86,10 @@ const double factOverlayMinZoom = 11;
 ///    tut es `_team_generate_orders` auch.
 /// 2. **Die Kategorie wird über die Aliastabelle abgebildet**, mit Rückfall auf
 ///    `hist` und einer Meldung, siehe [unknownFactCategoryEvent].
-/// 3. **Der Sammelzustand ist hier immer „nicht gesammelt", obwohl es seit
-///    dem 02.09.2026 eine Quelle dafür gibt.** `CollectedFactsStore` weiß es,
-///    und diese Funktion fragt ihn nicht: es fehlt der zweite Bildsatz, siehe
-///    [factNotCollectedState]. Wer ihn zeichnet, gibt dieser Funktion die
-///    Sammlung als Parameter und **nicht** einen Provider; sie ist rein und
-///    soll es bleiben.
+/// 3. **Der Sammelzustand kommt als Parameter herein, nicht aus einem
+///    Provider.** [collected] hält die Kennungen der gesammelten Fakten;
+///    diese Funktion bleibt rein und ohne Riverpod. Wer den Zustand liest,
+///    ist `factOverlayProvider`.
 ///
 /// ## Keine Deckelung
 ///
@@ -104,6 +102,7 @@ const double factOverlayMinZoom = 11;
 MapOverlay factOverlayOf(
   Iterable<Fact> facts, {
   required DiagnosticSink diagnostics,
+  Set<int> collected = const <int>{},
 }) {
   final List<MapOverlayPoint> points = <MapOverlayPoint>[];
   final Set<String> unknownCategories = <String>{};
@@ -118,6 +117,14 @@ MapOverlay factOverlayOf(
     if (key == null) {
       unknownCategories.add(category);
     }
+    // Der Sammelzustand entscheidet über Bild **und** über das Feld `state`,
+    // und beide müssen zusammenpassen: `factProximityOf` liest das Feld, um
+    // gesammelte Fakten von der Näherungsanimation auszunehmen, und die
+    // Quelle tut dasselbe („gold coins animate via CSS only",
+    // `screen-map.jsx:2245-2246`).
+    final String state = collected.contains(fact.id.value)
+        ? factCollectedState
+        : factNotCollectedState;
     points.add(
       MapOverlayPoint(
         id: fact.id.value.toString(),
@@ -125,11 +132,8 @@ MapOverlay factOverlayOf(
           latitude: coordinates.latitude,
           longitude: coordinates.longitude,
         ),
-        styleId: factBalloonStyleId(
-          key ?? fallbackFactCategoryKey,
-          factNotCollectedState,
-        ),
-        state: factNotCollectedState,
+        styleId: factBalloonStyleId(key ?? fallbackFactCategoryKey, state),
+        state: state,
       ),
     );
   }

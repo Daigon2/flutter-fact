@@ -448,21 +448,44 @@ void main() {
       expect(differing, greaterThan(0), reason: 'im Kopf steht ein Zeichen');
     });
 
-    test(
-      'es entsteht ein Bild je Kategorie, mit eindeutiger Kennung',
-      () async {
-        final List<MapOverlayImage> images = await buildFactBalloonImages(
-          pixelRatio: 1,
-        );
+    test('es entsteht ein Bild je Kategorie und Sammelzustand, mit '
+        'eindeutiger Kennung', () async {
+      // **Seit dem 03.09.2026 zwei Achsen.** Vorher stand hier „ein Bild je
+      // Kategorie"; der zweite Bildsatz ist der goldene Ballon.
+      final List<MapOverlayImage> images = await buildFactBalloonImages(
+        pixelRatio: 1,
+      );
 
-        expect(images, hasLength(factCategoryStyles.length));
-        expect(
-          images.map((MapOverlayImage image) => image.styleId).toSet(),
-          hasLength(factCategoryStyles.length),
-        );
-        expect(images.first.styleId, 'fact.hist.uncollected');
-      },
-    );
+      final int expected = factCategoryStyles.length * factBalloonStates.length;
+      expect(images, hasLength(expected));
+      expect(
+        images.map((MapOverlayImage image) => image.styleId).toSet(),
+        hasLength(expected),
+      );
+      expect(images.first.styleId, 'fact.hist.uncollected');
+      expect(
+        images.map((MapOverlayImage image) => image.styleId),
+        contains('fact.hist.collected'),
+      );
+    });
+
+    test('der goldene Ballon sieht anders aus als der ungesammelte', () async {
+      // Ohne diese Prüfung wäre eine Fabrik, die den Zustand durchreicht und
+      // ignoriert, grün: die Kennungen wären verschieden, die Bilder nicht.
+      // Genau dieser Fall ist bei den Kategorien schon einmal aufgetreten.
+      final MapOverlayImage offen = await buildFactBalloonImage(
+        factCategoryStylesByKey['hist']!,
+        pixelRatio: 1,
+      );
+      final MapOverlayImage gold = await buildFactBalloonImage(
+        factCategoryStylesByKey['hist']!,
+        pixelRatio: 1,
+        state: factCollectedState,
+      );
+
+      expect(gold.styleId, 'fact.hist.collected');
+      expect(gold.bytes, isNot(offen.bytes));
+    });
 
     test('zwei Kategorien ergeben zwei verschiedene Bilder', () async {
       // Ohne diese Prüfung wäre eine Fabrik, die zwölfmal dasselbe zeichnet,

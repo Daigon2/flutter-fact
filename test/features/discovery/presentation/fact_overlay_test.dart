@@ -240,6 +240,71 @@ void main() {
     });
   });
 
+  group('Der Sammelzustand', () {
+    // Seit dem 03.09.2026. Vorher trug jeder Punkt `uncollected`, weil es den
+    // zweiten Bildsatz nicht gab.
+
+    test('ein gesammelter Fakt bekommt das goldene Bild', () {
+      final MapOverlay overlay = factOverlayOf(
+        <Fact>[factWith(id: 7)],
+        diagnostics: const SilentDiagnosticSink(),
+        collected: <int>{7},
+      );
+
+      final MapOverlayPoint point = overlay.points.single;
+      expect(point.styleId, 'fact.hist.collected');
+      expect(point.state, factCollectedState);
+    });
+
+    test('Kennung und Feld sagen dasselbe', () {
+      // **Sie müssen zusammenpassen**, und zwar in beide Richtungen:
+      // `factProximityOf` liest das Feld, um gesammelte Fakten von der
+      // Näherungsanimation auszunehmen, das Bild kommt aus der Kennung. Wer
+      // nur eines von beiden umstellt, bekommt einen goldenen Ballon, der
+      // trotzdem wächst, oder einen bunten, der stehen bleibt.
+      final MapOverlay overlay = factOverlayOf(
+        <Fact>[factWith(id: 7), factWith(id: 3)],
+        diagnostics: const SilentDiagnosticSink(),
+        collected: <int>{7},
+      );
+
+      for (final MapOverlayPoint point in overlay.points) {
+        expect(point.styleId, endsWith('.${point.state}'));
+      }
+    });
+
+    test('ein nicht gesammelter Fakt bleibt bunt', () {
+      final MapOverlay overlay = factOverlayOf(
+        <Fact>[factWith(id: 7)],
+        diagnostics: const SilentDiagnosticSink(),
+        collected: <int>{3},
+      );
+
+      expect(overlay.points.single.state, factNotCollectedState);
+    });
+
+    test('ohne Angabe ist nichts gesammelt', () {
+      expect(
+        factOverlayOf(<Fact>[
+          factWith(id: 7),
+        ], diagnostics: const SilentDiagnosticSink()).points.single.state,
+        factNotCollectedState,
+      );
+    });
+
+    test('die Kategorie bleibt in der Kennung erhalten', () {
+      // Der naheliegende Fehler wäre, den Zustand an die Stelle der Kategorie
+      // zu schreiben.
+      final MapOverlay overlay = factOverlayOf(
+        <Fact>[factWith(id: 7, category: 'Natur')],
+        diagnostics: const SilentDiagnosticSink(),
+        collected: <int>{7},
+      );
+
+      expect(overlay.points.single.styleId, 'fact.nat.collected');
+    });
+  });
+
   group('Die Zoomkurve gilt für beide Seiten', () {
     /// Wertet den `interpolate`-Ausdruck des Karten-Hosts von Hand aus.
     ///

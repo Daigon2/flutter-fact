@@ -9,6 +9,7 @@ import 'package:fact_app/core/anchors/anchor_target.dart';
 import 'package:fact_app/core/diagnostics/diagnostic_sink.dart';
 import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/features/discovery/presentation/discovery_anchors.dart';
+import 'package:fact_app/features/discovery/presentation/fact_balloon_images.dart';
 import 'package:fact_app/features/discovery/presentation/fact_categories.dart';
 import 'package:fact_app/features/discovery/presentation/fact_group_expand.dart';
 import 'package:fact_app/features/discovery/presentation/fact_overlay.dart';
@@ -1082,7 +1083,8 @@ void main() {
       tester,
     ) async {
       // Geprüft wird die **Verdrahtung**: dass der Bildschirm zeichnen lässt,
-      // je Kategorie ein Bild, und mit dem Bildverhältnis des Bildschirms.
+      // je Kategorie **und Sammelzustand** ein Bild, und mit dem
+      // Bildverhältnis des Bildschirms.
       // Was dabei gezeichnet wird, steht in `fact_balloon_images_test.dart`.
       await tester.runAsync(() async {
         await pumpPage(tester, container: newContainer());
@@ -1090,7 +1092,10 @@ void main() {
         await awaitBalloons(tester);
       });
 
-      expect(host.registeredImages, hasLength(factCategoryStyles.length));
+      expect(
+        host.registeredImages,
+        hasLength(factCategoryStyles.length * factBalloonStates.length),
+      );
       expect(host.registeredImages.first.styleId, 'fact.hist.uncollected');
       // 3 ist das Bildverhältnis, mit dem `flutter test` rechnet. Wer hier
       // stumpf 1 liefert, bekommt auf jedem heutigen Telefon matschige
@@ -1133,7 +1138,10 @@ void main() {
         await awaitBalloons(tester);
       });
 
-      expect(host.registeredImages, hasLength(factCategoryStyles.length));
+      expect(
+        host.registeredImages,
+        hasLength(factCategoryStyles.length * factBalloonStates.length),
+      );
       expect(host.overlays, isEmpty);
     });
 
@@ -1157,7 +1165,10 @@ void main() {
         await tester.pump();
       });
 
-      expect(host.registeredImages, hasLength(factCategoryStyles.length));
+      expect(
+        host.registeredImages,
+        hasLength(factCategoryStyles.length * factBalloonStates.length),
+      );
     });
   });
 

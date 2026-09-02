@@ -51,29 +51,112 @@ import 'package:flutter/rendering.dart' show Matrix4;
 
 /// Der Sammelzustand „noch nicht gesammelt".
 ///
-/// **Heute noch der einzige, aber der Auslöser ist seit dem 02.09.2026
-/// eingetreten.** Der Satz hier lautete „es gibt keine Quelle für einen
-/// zweiten"; es gibt sie: `CollectedFactsStore` weiß seit diesem Tag, welcher
-/// Fakt gesammelt ist, und `fact_auto_collect.dart` liest ihn schon.
-///
-/// Was noch fehlt, ist damit nur die **Zeichenarbeit**, und sie ist
-/// vollständig belegt, siehe unten. Zwei Dinge hängen daran: dieser zweite
-/// Bildsatz und die Achse in [buildFactBalloonImages], die ihn ausrollt.
-/// Solange er fehlt, sieht ein gesammelter Fakt aus wie ein neuer. Falsch
-/// wird dadurch nichts, `factProximityOf` und die Sammelregel arbeiten
-/// unabhängig von der Farbe, und ein zweiter Tipp bucht nichts doppelt
-/// (anders als in der Quelle, E-69). Aber es fehlt die einzige Rückmeldung,
-/// die dem Nutzer auf der Karte zeigt, wo er schon war.
-///
-/// **Der Auslöser war:** das erste Feature, das den Sammelzustand kennt. Der
-/// goldene Ballon der Quelle ist vollständig belegt und muss nicht erfunden
-/// werden (`screen-map.jsx:2147-2181`): Kopf als Radialverlauf
-/// `#EAD58E → #B0974A → #6E5826`, Rahmen `rgba(240,220,150,0.55)`,
-/// Sättigung 0,62, ein grüner Haken oben rechts, das Emoji auf 0,8 Deckkraft
-/// und mit 0,38 Graustufe, dazu ein bräunlicher Bodenschatten. Dann kommt eine
-/// zweite Zeile in diese Datei und eine zweite Achse in
-/// [buildFactBalloonImages].
+/// **Seit dem 03.09.2026 nicht mehr der einzige**, siehe
+/// [factCollectedState]. Hier stand lange, dass es für einen zweiten keine
+/// Quelle gebe; die kam mit Schritt 22, und die Zeichenarbeit mit diesem
+/// Datum.
 const String factNotCollectedState = 'uncollected';
+
+/// Der Sammelzustand „schon gesammelt", `screen-map.jsx:2147-2181`.
+///
+/// **Seit dem 03.09.2026 gezeichnet.** Der Auslöser dafür war das erste
+/// Feature, das den Sammelzustand kennt, und das ist seit Schritt 22 da.
+/// Solange dieser Zustand fehlte, sah ein gesammelter Fakt aus wie ein neuer,
+/// und damit fehlte die einzige Rückmeldung, die dem Nutzer auf der Karte
+/// zeigt, wo er schon war.
+const String factCollectedState = 'collected';
+
+/// Alle Sammelzustände, in der Reihenfolge, in der die Bilder entstehen.
+const List<String> factBalloonStates = <String>[
+  factNotCollectedState,
+  factCollectedState,
+];
+
+/// Die drei Farbstufen des goldenen Kopfes,
+/// `radial-gradient(circle at 35% 28%,#EAD58E 0%,#B0974A 45%,#6E5826 100%)`.
+const List<Color> factGoldHeadColors = <Color>[
+  Color(0xFFEAD58E),
+  Color(0xFFB0974A),
+  Color(0xFF6E5826),
+];
+
+/// Die Haltepunkte dazu.
+const List<double> factGoldHeadStops = <double>[0, 0.45, 1];
+
+/// Wo die Mitte des Verlaufs liegt, als Anteil des Kopfdurchmessers.
+///
+/// `circle at 35% 28%`. Der Ursprung ist die linke obere Ecke des Kopfkastens,
+/// die Kreismitte liegt bei 50/50; die Verschiebung ist also die Differenz.
+const Offset factGoldHeadGradientCenter = Offset(0.35 - 0.5, 0.28 - 0.5);
+
+/// Der Radius des Verlaufs, als Anteil des Kopfdurchmessers.
+///
+/// CSS ohne Größenangabe heißt `farthest-corner`. Vom Punkt (0,35 | 0,28) ist
+/// die entfernteste Ecke des Kopfkastens (1 | 1), und
+/// `sqrt(0,65² + 0,72²) = 0,9702`.
+const double factGoldHeadGradientRadius = 0.9702;
+
+/// Die Sättigung des goldenen Kopfes, `filter: saturate(0.62)`.
+const double factGoldHeadSaturation = 0.62;
+
+/// Der Rahmen des goldenen Kopfes, `2px solid rgba(240,220,150,0.55)`.
+///
+/// 0,55 · 255 = 140,25, also `0x8C`.
+const Color factGoldBorderColor = Color(0x8CF0DC96);
+
+/// Die harte Kante unter dem goldenen Kopf, `0 3px 0 rgba(85,65,20,0.65)`.
+///
+/// 0,65 · 255 = 165,75, also `0xA6`.
+const Color factGoldEdgeColor = Color(0xA6554114);
+
+/// Der Ring um den goldenen Kopf, `0 0 0 4px rgba(205,180,105,0.2)`.
+///
+/// Ein `box-shadow` mit Streuung und ohne Versatz und Weichzeichnung ist ein
+/// gleichmäßiger Ring; 0,2 · 255 = 51, also `0x33`.
+const Color factGoldRingColor = Color(0x33CDB469);
+
+/// Wie breit dieser Ring ist.
+const double factGoldRingWidth = 4;
+
+/// Der schwarze Schlagschatten des goldenen Kopfes,
+/// `0 3px 10px rgba(0,0,0,0.2)`.
+const double factGoldShadowAlpha = 0.2;
+
+/// Die Farbe des goldenen Bodenschattens, `rgba(110,90,40,…)`.
+const Color factGoldGroundShadowColor = Color(0xFF6E5A28);
+
+/// Die beiden Deckkraftstufen des goldenen Bodenschattens, 0,4 und 0,1.
+///
+/// Der ungesammelte Ballon nimmt an denselben Haltepunkten `0x44` und `0x11`,
+/// der goldene ist also **kräftiger**. Das ist gemessen und keine
+/// Angleichung.
+const int factGoldGroundShadowNearAlpha = 0x66;
+
+/// Siehe [factGoldGroundShadowNearAlpha].
+const int factGoldGroundShadowFarAlpha = 0x1A;
+
+/// Die Deckkraft des Emojis auf einem goldenen Ballon, `opacity: 0.8`.
+const double factGoldEmojiOpacity = 0.8;
+
+/// Wie stark das Emoji entfärbt wird, `filter: grayscale(0.38)`.
+const double factGoldEmojiGrayscale = 0.38;
+
+/// Der Durchmesser des grünen Hakens, `width:14px;height:14px`.
+const double factGoldCheckDiameter = 14;
+
+/// Die Breite seines weißen Rahmens, `border:1.5px solid #fff`.
+///
+/// **Außen und nicht innen.** CSS rechnet mit `box-sizing: content-box`, die
+/// 14 Pixel sind also der Inhalt und der Rahmen kommt darauf; der Kreis ist
+/// damit 17 Pixel breit.
+const double factGoldCheckBorderWidth = 1.5;
+
+/// Das Grün des Hakens, `#1f8a3a`.
+const Color factGoldCheckColor = Color(0xFF1F8A3A);
+
+/// Wie weit der Haken über die rechte obere Ecke des Kopfkastens hinausragt,
+/// `top:-5px;right:-6px`.
+const Offset factGoldCheckOverhang = Offset(6, -5);
 
 /// Die Stil-Kennung eines Ballons.
 ///
@@ -466,7 +549,15 @@ Future<List<MapOverlayImage>> buildFactBalloonImages({
 }) async {
   final List<MapOverlayImage> images = <MapOverlayImage>[];
   for (final FactCategoryStyle style in factCategoryStyles) {
-    images.add(await buildFactBalloonImage(style, pixelRatio: pixelRatio));
+    for (final String state in factBalloonStates) {
+      images.add(
+        await buildFactBalloonImage(
+          style,
+          pixelRatio: pixelRatio,
+          state: state,
+        ),
+      );
+    }
   }
   return images;
 }
@@ -481,11 +572,12 @@ Future<List<MapOverlayImage>> buildFactBalloonImages({
 Future<MapOverlayImage> buildFactBalloonImage(
   FactCategoryStyle style, {
   required double pixelRatio,
+  String state = factNotCollectedState,
 }) async {
   final ui.PictureRecorder recorder = ui.PictureRecorder();
   final Canvas canvas = Canvas(recorder);
   canvas.scale(pixelRatio);
-  paintFactBalloon(canvas, style);
+  paintFactBalloon(canvas, style, state: state);
 
   final ui.Picture picture = recorder.endRecording();
   final ui.Image image = await picture.toImage(
@@ -501,11 +593,13 @@ Future<MapOverlayImage> buildFactBalloonImage(
     // konnte. Ein leeres Bild wäre ein Symbol-Layer, der lautlos nichts
     // zeichnet, also genau der Ausfall, gegen den dieser ganze Schritt gebaut
     // ist.
-    throw StateError('Ballonbild für ${style.key} ließ sich nicht kodieren');
+    throw StateError(
+      'Ballonbild für ${style.key}/$state ließ sich nicht kodieren',
+    );
   }
 
   return MapOverlayImage(
-    styleId: factBalloonStyleId(style.key, factNotCollectedState),
+    styleId: factBalloonStyleId(style.key, state),
     bytes: data.buffer.asUint8List(),
     pixelRatio: pixelRatio,
   );
@@ -549,7 +643,9 @@ void paintFactBalloon(
   FactBalloonMetrics metrics = FactBalloonMetrics.resting,
   double spinDegrees = 0,
   double floatProgress = 0,
+  String state = factNotCollectedState,
 }) {
+  final bool collected = state == factCollectedState;
   final double headRadius = metrics.headDiameter / 2;
   final Offset headCenter = metrics.headCenter.translate(
     0,
@@ -558,19 +654,39 @@ void paintFactBalloon(
 
   canvas.save();
   _applySpin(canvas, headCenter, spinDegrees);
-  _paintHeadShadows(canvas, style, metrics, headCenter);
-  canvas.drawCircle(headCenter, headRadius, Paint()..color = style.color);
-  // `border: 2px solid rgba(255,255,255,0.3)`, innen liegend: die Strichmitte
+  if (collected) {
+    _paintGoldHeadShadows(canvas, metrics, headCenter);
+  } else {
+    _paintHeadShadows(canvas, style, metrics, headCenter);
+  }
+  canvas.drawCircle(
+    headCenter,
+    headRadius,
+    collected
+        ? _goldHeadPaint(headCenter, metrics.headDiameter)
+        : (Paint()..color = style.color),
+  );
+  // `border: 2px solid rgba(255,255,255,0.3)` beim ungesammelten,
+  // `rgba(240,220,150,0.55)` beim goldenen. Innen liegend: die Strichmitte
   // liegt deshalb eine halbe Strichbreite innerhalb des Außenrandes.
   canvas.drawCircle(
     headCenter,
     headRadius - factBalloonBorderWidth / 2,
     Paint()
-      ..color = const Color(0x4DFFFFFF)
+      ..color = collected ? factGoldBorderColor : const Color(0x4DFFFFFF)
       ..style = PaintingStyle.stroke
       ..strokeWidth = factBalloonBorderWidth,
   );
-  _paintEmoji(canvas, style.emoji, headCenter, metrics.emojiSize);
+  _paintEmoji(
+    canvas,
+    style.emoji,
+    headCenter,
+    metrics.emojiSize,
+    collected: collected,
+  );
+  if (collected) {
+    _paintCollectedCheck(canvas, headCenter, headRadius);
+  }
   canvas.restore();
 
   // `linear-gradient(180deg, {color}CC, {color}11)`. Der Stiel hängt an der
@@ -593,12 +709,133 @@ void paintFactBalloon(
 
   _paintGroundShadow(
     canvas,
-    style.color,
+    collected ? factGoldGroundShadowColor : style.color,
     metrics,
     stem.bottom,
     floatProgress: floatProgress,
+    nearAlpha: collected ? factGoldGroundShadowNearAlpha : 0x44,
+    farAlpha: collected ? factGoldGroundShadowFarAlpha : 0x11,
   );
 }
+
+/// Der Pinsel des goldenen Kopfes.
+///
+/// **Der Verlauf und die Sättigung in einem Zug.** CSS legt beides
+/// übereinander (`background: radial-gradient(...)` plus
+/// `filter: saturate(0.62)`), und `Paint.colorFilter` tut genau das: er wirkt
+/// auf die Farben dieses einen Zeichenbefehls, ohne eine eigene Ebene. Wer
+/// stattdessen die drei Farbstufen vorab entsättigt, bekommt dasselbe
+/// Ergebnis, weil die Sättigungsmatrix linear ist; er verliert aber die
+/// Ähnlichkeit zur Quelle, und beim nächsten Lesen ist nicht mehr zu sehen,
+/// woher die Zahlen kommen.
+Paint _goldHeadPaint(Offset headCenter, double headDiameter) => Paint()
+  ..shader = ui.Gradient.radial(
+    headCenter + factGoldHeadGradientCenter * headDiameter,
+    factGoldHeadGradientRadius * headDiameter,
+    factGoldHeadColors,
+    factGoldHeadStops,
+  )
+  ..colorFilter = _saturationFilter(factGoldHeadSaturation);
+
+/// Die drei Schatten des goldenen Kopfes,
+/// `0 3px 0 rgba(85,65,20,0.65), 0 0 0 4px rgba(205,180,105,0.2),
+/// 0 3px 10px rgba(0,0,0,0.2)`.
+///
+/// Gezeichnet wird von hinten nach vorn, also in der umgekehrten Reihenfolge
+/// der CSS-Liste: dort liegt der erste Schatten obenauf.
+void _paintGoldHeadShadows(
+  Canvas canvas,
+  FactBalloonMetrics metrics,
+  Offset headCenter,
+) {
+  final double headRadius = metrics.headDiameter / 2;
+  canvas
+    // `0 3px 10px rgba(0,0,0,0.2)`. Blur-Radius 10 heißt Standardabweichung 5.
+    ..drawCircle(
+      headCenter.translate(0, factBalloonRestingShadowOffsetY),
+      headRadius,
+      Paint()
+        ..color = const Color(0xFF000000).withValues(alpha: factGoldShadowAlpha)
+        ..maskFilter = MaskFilter.blur(
+          BlurStyle.normal,
+          factBalloonRestingShadowBlur / 2,
+        ),
+    )
+    // `0 0 0 4px rgba(205,180,105,0.2)`: kein Versatz, keine Weichzeichnung,
+    // nur Streuung. Das ist ein gleichmäßiger Ring um den Kopf.
+    ..drawCircle(
+      headCenter,
+      headRadius + factGoldRingWidth,
+      Paint()..color = factGoldRingColor,
+    )
+    // `0 3px 0 rgba(85,65,20,0.65)`: die harte Kante, wie beim ungesammelten
+    // Ballon, nur in Braun statt in der Kategoriefarbe.
+    ..drawCircle(
+      headCenter.translate(0, factBalloonRestingEdgeOffsetY),
+      headRadius,
+      Paint()..color = factGoldEdgeColor,
+    );
+}
+
+/// Der grüne Haken oben rechts am goldenen Kopf.
+///
+/// CSS setzt ihn mit `top:-5px;right:-6px` an die **rechte obere Ecke des
+/// Kopfkastens**, nicht an den Kreis. Der Kasten ist das Quadrat um den Kopf,
+/// seine rechte obere Ecke liegt also bei `(mitte + radius, mitte - radius)`.
+void _paintCollectedCheck(Canvas canvas, Offset headCenter, double headRadius) {
+  final double inner = factGoldCheckDiameter / 2;
+  final double outer = inner + factGoldCheckBorderWidth;
+  final Offset boxTopRight = Offset(
+    headCenter.dx + headRadius,
+    headCenter.dy - headRadius,
+  );
+  final Offset center = Offset(
+    boxTopRight.dx + factGoldCheckOverhang.dx - inner,
+    boxTopRight.dy + factGoldCheckOverhang.dy + inner,
+  );
+
+  canvas
+    // `box-shadow: 0 1px 3px rgba(0,0,0,0.35)`.
+    ..drawCircle(
+      center.translate(0, 1),
+      outer,
+      Paint()
+        ..color = const Color(0x59000000)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
+    )
+    ..drawCircle(center, outer, Paint()..color = const Color(0xFFFFFFFF))
+    ..drawCircle(center, inner, Paint()..color = factGoldCheckColor);
+
+  final TextPainter painter = TextPainter(
+    text: const TextSpan(
+      text: '✓',
+      style: TextStyle(
+        fontSize: 9,
+        height: 1,
+        fontWeight: FontWeight.w900,
+        color: Color(0xFFFFFFFF),
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+}
+
+/// Die Sättigungsmatrix von CSS, `filter: saturate(s)`.
+///
+/// Die Gewichte sind die der Filter-Spezifikation (0,213 | 0,715 | 0,072).
+/// Bei `s = 1` ist das die Einheitsmatrix, bei `s = 0` bleibt die Helligkeit.
+ColorFilter _saturationFilter(double s) => ColorFilter.matrix(<double>[
+  0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s, 0, 0, //
+  0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s, 0, 0, //
+  0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s, 0, 0, //
+  0, 0, 0, 1, 0, //
+]);
+
+/// Die Entfärbungsmatrix von CSS, `filter: grayscale(g)`.
+///
+/// `grayscale(g)` ist in der Spezifikation dasselbe wie `saturate(1 - g)`.
+ColorFilter _grayscaleFilter(double g) => _saturationFilter(1 - g);
 
 /// Dreht die Leinwand so, wie CSS den Kopf dreht.
 ///
@@ -724,7 +961,30 @@ void _paintHeadShadows(
 /// ist ohne Wirkung, weil ein Emoji seine eigenen Farben mitbringt; sie steht
 /// trotzdem da, weil ein `TextStyle` ohne Farbe je nach Umgebung eine geerbte
 /// bekäme, und dieser Pinsel hat keine Umgebung.
-void _paintEmoji(Canvas canvas, String emoji, Offset center, double fontSize) {
+void _paintEmoji(
+  Canvas canvas,
+  String emoji,
+  Offset center,
+  double fontSize, {
+  bool collected = false,
+}) {
+  if (collected) {
+    // `opacity: 0.8` und `filter: grayscale(0.38)` auf dem inneren Element.
+    // **Eine eigene Ebene ist hier nötig und beim Kopf nicht:** ein
+    // `colorFilter` am `Paint` wirkt nur auf einen Zeichenbefehl, und ein
+    // `TextPainter` malt mehrere. Die Deckkraft trägt die Ebene selbst.
+    canvas.saveLayer(
+      Rect.fromCircle(center: center, radius: fontSize),
+      Paint()
+        ..colorFilter = _grayscaleFilter(factGoldEmojiGrayscale)
+        ..color = const Color(
+          0xFF000000,
+        ).withValues(alpha: factGoldEmojiOpacity),
+    );
+    _paintEmoji(canvas, emoji, center, fontSize);
+    canvas.restore();
+    return;
+  }
   final TextPainter painter = TextPainter(
     text: TextSpan(
       text: emoji,
@@ -772,6 +1032,8 @@ void _paintGroundShadow(
   FactBalloonMetrics metrics,
   double top, {
   required double floatProgress,
+  int nearAlpha = 0x44,
+  int farAlpha = 0x11,
 }) {
   final double radius = metrics.groundShadowWidth / 2;
   final Offset center = Offset(
@@ -797,8 +1059,8 @@ void _paintGroundShadow(
           Offset.zero,
           radius,
           <Color>[
-            color.withAlpha((0x44 * opacity).round()),
-            color.withAlpha((0x11 * opacity).round()),
+            color.withAlpha((nearAlpha * opacity).round()),
+            color.withAlpha((farAlpha * opacity).round()),
             color.withAlpha(0),
           ],
           <double>[0, 0.55, 0.75],
