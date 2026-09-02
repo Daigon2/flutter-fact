@@ -15,6 +15,31 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 
 ---
 
+## Eine Sache liegt vor allem anderen, seit dem 31.08.2026
+
+**Dieses Repository ist öffentlich.** Nachgesehen, nicht angenommen:
+`gh repo view` meldet für `Daigon2/flutter-fact` die Sichtbarkeit `PUBLIC`.
+
+In ihm liegt `REBUILD_STATUS.md` mit dem geprüften Verzeichnis der
+Backend-Lücken, und `docs/operations/backend-inventory.md` nennt die Projekt-URL
+der laufenden Supabase-Instanz. Der Schlüssel selbst liegt nicht im Repository,
+aber der öffentliche Schlüssel der PWA ist aus jedem Browser zu holen, er ist
+dafür gedacht. Öffentlich steht damit, **welche Tür offen ist und wo sie sitzt**.
+
+Zwei Dinge, die auseinandergehalten gehören:
+
+- Die Sichtbarkeit umzustellen behebt **nichts rückwirkend**. Was einmal
+  öffentlich war, kann kopiert und indiziert sein.
+- Die eigentliche Behebung ist, die Lücken zu schließen. Laut
+  `docs/operations/backend-inventory.md` sind sechs der sieben Befunde wenige
+  Zeilen SQL; nur E-58 verlangt, etwas Neues zu bauen.
+
+**Beides ist eine Entscheidung des Eigentümers und wurde von hier aus nicht
+getroffen.** Steht als E-64 im Register, Stufe 4.
+
+---
+
+
 ## Stand
 
 **Zuletzt aktualisiert:** 31.08.2026
