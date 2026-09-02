@@ -378,6 +378,83 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // Quelle und nicht als selbst gesetzte Pause in eigener Prosa, dieselbe
     // Ausnahme wie bei `puzzle.photoCaption` weiter oben.
     'challenge.huntPill.missingTitle': '—',
+
+    // ── Pause- und Ergebnisbildschirm der Jagd, `screen-challenge.jsx:2797-
+    // 2980` ───────────────────────────────────────────────────────────────
+    //
+    // Zweiundzwanzig sichtbare Texte, keiner mit Schlüssel in der PWA, aus
+    // `HuntPauseScreen` (`:2797-2895`), `HuntStatTile` (`:2896-2909`),
+    // `HuntStopRow` (`:2911-2950`) und `HuntResultScreen` (`:2952-2980`).
+    // **E-61 wie bei der Jagd-Pille**: die Quelle zeigt jeden dieser Texte
+    // auch im englischen Modus deutsch, für keinen gibt es eine zweite
+    // Fassung. Deshalb steht in beiden Sprachkarten derselbe deutsche Wert.
+    //
+    // Zum Präfix: `challenge.huntPause.` für den Pausebildschirm,
+    // `challenge.huntResult.` für den Ergebnisbildschirm, nach demselben
+    // Muster wie `challenge.huntPill.` weiter oben: eigene Namen für die
+    // jeweilige Quellfunktion, nicht `challenge.pause.` oder
+    // `challenge.result.`, die zu leicht mit anderen Bildschirmen
+    // verwechselt würden.
+
+    // Die drei Kachel-Beschriftungen, `:2832-2834`.
+    'challenge.huntPause.stopsLabel': 'Stops',
+    'challenge.huntPause.pointsLabel': 'Punkte',
+    'challenge.huntPause.timeLabel': 'Zeit',
+
+    // Der Platzhalter der Zeit-Kachel. **Kein `DateTime.now()`, kein
+    // `Timer`**: E-19 verbietet dem Client, eine Dauer zu rechnen, an der
+    // eine Belohnung hängt, siehe den Kopfkommentar von `hunt_run.dart` und
+    // von `hunt_pause_view.dart`. Dasselbe Zeichen wie
+    // `challenge.huntPill.missingTitle` (U+2014), hier aber ein eigener
+    // Schlüssel: er steht für eine fehlende Zeit und nicht für einen
+    // fehlenden Titel, und ein Test soll das benennen können.
+    'challenge.huntPause.timePlaceholder': '—',
+
+    // Der Abschnittstitel über der Stationsliste, `:2838`.
+    'challenge.huntPause.stationsHeading': 'Stationen',
+
+    // Die beiden Knöpfe unten, `:2849-2863`.
+    'challenge.huntPause.backToMap': 'Zurück zur Karte',
+    'challenge.huntPause.abort': 'Hunt abbrechen',
+
+    // Die Rückfrage, `:2877-2889`.
+    'challenge.huntPause.abortConfirmMessage':
+        'Punkte gehen verloren. Wirklich abbrechen?',
+    'challenge.huntPause.abortConfirmYes': 'Ja, abbrechen',
+    'challenge.huntPause.abortConfirmNo': 'Doch weiterspielen',
+
+    // Die drei Ersatztexte einer Station ohne enthüllten Titel,
+    // `:2930-2933`. Der Kommentar der Quelle nennt den Grund, `:2925-2926`:
+    // ein Titel vorab würde verraten, wohin die Jagd führt. Eins-basiert wie
+    // in der Quelle (`idx + 1`).
+    'challenge.huntPause.stopSkipped': 'Station {station} · übersprungen',
+    'challenge.huntPause.stopCurrent': 'Station {station} · aktuell',
+    'challenge.huntPause.stopPending': 'Station {station}',
+
+    // Die drei Schwierigkeitsstufen, Entscheidung 3 von Schritt 39:
+    // `hunt.difficulty` steht in der Quelle als roher Datenwert da (`:2828`),
+    // und `puzzle_difficulty.dart` verlangt ausdrücklich, dass eine Anzeige
+    // über `AppStrings` läuft und nicht über `PuzzleDifficulty.code`. Die
+    // Werte sind deshalb hier hinterlegt und sichtbar identisch mit der
+    // Quelle; wer künftig englische Wörter will, ändert zwei Zeilen in
+    // dieser Datei und keine im Code.
+    'challenge.huntPause.difficulty.leicht': 'leicht',
+    'challenge.huntPause.difficulty.mittel': 'mittel',
+    'challenge.huntPause.difficulty.schwer': 'schwer',
+
+    // ── Ergebnisbildschirm, `HuntResultScreen`, `:2952-2977` ──────────────
+    'challenge.huntResult.title': 'Hunt beendet!',
+    'challenge.huntResult.pointsLabel': 'Punkte erspielt',
+    'challenge.huntResult.solvedCount': '{solved} von {total} Stationen gelöst',
+
+    // Die Zeitzeile, `:2967`. Derselbe Platzhaltergrund wie bei
+    // `challenge.huntPause.timePlaceholder`, siehe dort und E-19; eigener
+    // Schlüssel, weil dieser Bildschirm eine eigene Ergänzungs-Familie
+    // trägt.
+    'challenge.huntResult.timeLine': 'Zeit: {time}',
+    'challenge.huntResult.timePlaceholder': '—',
+
+    'challenge.huntResult.close': 'Fertig',
   },
   AppLanguage.en: <String, String>{
     'tour.stepCounter': 'STEP {step} OF {total}',
@@ -467,6 +544,34 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'challenge.huntPill.hintFallback':
         'Schau dich in der Umgebung aufmerksam um.',
     'challenge.huntPill.missingTitle': '—',
+
+    // ── Pause- und Ergebnisbildschirm der Jagd ────────────────────────────
+    // Bewusst derselbe deutsche Wert wie in der DE-Karte, siehe dort: die
+    // Quelle hat für diese beiden Bildschirme keinen englischen Wortlaut und
+    // zeigt sie auch im englischen Modus deutsch (E-61).
+    'challenge.huntPause.stopsLabel': 'Stops',
+    'challenge.huntPause.pointsLabel': 'Punkte',
+    'challenge.huntPause.timeLabel': 'Zeit',
+    'challenge.huntPause.timePlaceholder': '—',
+    'challenge.huntPause.stationsHeading': 'Stationen',
+    'challenge.huntPause.backToMap': 'Zurück zur Karte',
+    'challenge.huntPause.abort': 'Hunt abbrechen',
+    'challenge.huntPause.abortConfirmMessage':
+        'Punkte gehen verloren. Wirklich abbrechen?',
+    'challenge.huntPause.abortConfirmYes': 'Ja, abbrechen',
+    'challenge.huntPause.abortConfirmNo': 'Doch weiterspielen',
+    'challenge.huntPause.stopSkipped': 'Station {station} · übersprungen',
+    'challenge.huntPause.stopCurrent': 'Station {station} · aktuell',
+    'challenge.huntPause.stopPending': 'Station {station}',
+    'challenge.huntPause.difficulty.leicht': 'leicht',
+    'challenge.huntPause.difficulty.mittel': 'mittel',
+    'challenge.huntPause.difficulty.schwer': 'schwer',
+    'challenge.huntResult.title': 'Hunt beendet!',
+    'challenge.huntResult.pointsLabel': 'Punkte erspielt',
+    'challenge.huntResult.solvedCount': '{solved} von {total} Stationen gelöst',
+    'challenge.huntResult.timeLine': 'Zeit: {time}',
+    'challenge.huntResult.timePlaceholder': '—',
+    'challenge.huntResult.close': 'Fertig',
   },
 };
 

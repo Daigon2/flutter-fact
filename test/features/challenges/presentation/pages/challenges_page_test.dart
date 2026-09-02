@@ -7,6 +7,9 @@ import 'package:fact_app/app/localization/language_preference_store.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/theme/fact_theme.dart';
 import 'package:fact_app/core/widgets/primary_button.dart';
+import 'package:fact_app/features/challenges/application/active_hunt_providers.dart';
+import 'package:fact_app/features/challenges/application/hunt_plan.dart';
+import 'package:fact_app/features/challenges/application/hunt_run.dart';
 import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
 import 'package:fact_app/features/challenges/presentation/challenge_genre.dart';
 import 'package:fact_app/features/challenges/presentation/pages/challenges_page.dart';
@@ -14,6 +17,8 @@ import 'package:fact_app/features/challenges/presentation/widgets/challenge_bubb
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_genre_filter.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_player_badge.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/challenge_setup_view.dart';
+import 'package:fact_app/features/challenges/presentation/widgets/hunt_pause_view.dart';
+import 'package:fact_app/features/challenges/presentation/widgets/hunt_result_view.dart';
 import 'package:fact_app/features/challenges/presentation/widgets/hunt_start_point_view.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
@@ -53,6 +58,12 @@ void main() {
     double textScale = 1,
     AppLanguage language = AppLanguage.de,
     List<Fact> facts = const <Fact>[],
+    // `null` heißt: der echte `HuntRunNotifier` startet ohne laufende Jagd,
+    // wie er es auch außerhalb von Tests tut. Ein Wert seedet nur den
+    // Startzustand, der Schreibweg (`start`, `end`, …) bleibt der echte, siehe
+    // `_SeededHuntRunNotifier` und `hunt_pill_test.dart`, das dasselbe Muster
+    // vormacht.
+    HuntRun? seededRun,
   }) async {
     tester.view
       ..physicalSize = size * 3
@@ -74,6 +85,7 @@ void main() {
           // und der Test endet mit „A Timer is still pending". Derselbe Grund,
           // aus dem `map_page_test.dart` `factOverlayProvider` überschreibt.
           allFactsProvider.overrideWith((ref) async => facts),
+          huntRunProvider.overrideWith(() => _SeededHuntRunNotifier(seededRun)),
         ],
         child: MaterialApp(
           theme: FactTheme.light(),
@@ -924,22 +936,26 @@ void main() {
       expect(toast.top - page.top, closeTo(64, 0.5));
     });
 
-    testWidgets('mit genug Fakten erscheint keine Meldung', (
-      WidgetTester tester,
-    ) async {
-      // Der Gegenbeweis zur Meldung: derselbe Weg mit einem Bestand, aus dem
-      // der Generator eine Jagd bauen kann. Sichtbar passiert danach
-      // **nichts**, und das ist kein Versehen: wohin die fertige Jagd geht,
-      // ist D-16 und liegt bei Dairen. Diese Zusicherung ist die Stelle, die
-      // auffällt, sobald jemand den Empfänger einhängt.
-      await pump(tester, facts: _munichFacts());
-      await goToPicker(tester);
-      await tapAt(tester, find.byKey(HuntStartPointView.startKey));
+    testWidgets(
+      'mit genug Fakten erscheint keine Meldung, sondern der Pausebildschirm',
+      (WidgetTester tester) async {
+        // Der Gegenbeweis zur Meldung: derselbe Weg mit einem Bestand, aus dem
+        // der Generator eine Jagd bauen kann. **D-16 ist seit Schritt 39
+        // beantwortet und der Empfänger eingehängt**: die fertige Jagd geht an
+        // `huntRunProvider.start`, und der Reiter zeigt danach den
+        // Pausebildschirm statt des Pickers. Vorher endete dieser Test an der
+        // Stelle, die auffiel, sobald jemand den Empfänger einhängt; das ist
+        // jetzt geschehen.
+        await pump(tester, facts: _munichFacts());
+        await goToPicker(tester);
+        await tapAt(tester, find.byKey(HuntStartPointView.startKey));
 
-      expect(find.byKey(ChallengesPage.toastKey), findsNothing);
-      expect(find.byType(HuntStartPointView), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        expect(find.byKey(ChallengesPage.toastKey), findsNothing);
+        expect(find.byType(HuntStartPointView), findsNothing);
+        expect(find.byType(HuntPauseView), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('ein Fakt ohne Stadt landet nicht im Kandidatenpool', (
       WidgetTester tester,
@@ -971,10 +987,73 @@ void main() {
           await tapAt(tester, find.byKey(HuntStartPointView.startKey));
 
           expect(find.byKey(ChallengesPage.toastKey), findsNothing);
-          expect(find.byType(HuntStartPointView), findsOneWidget);
+          expect(find.byType(HuntPauseView), findsOneWidget);
         },
       );
     }
+  });
+
+  group('Die laufende Jagd verdrängt Assistent und Picker (`:4292-4317`)', () {
+    // Drei Fälle, drei Tests: `huntRunProvider` entscheidet, was der Reiter
+    // zeigt, unabhängig davon, was `_choice` gerade trägt.
+
+    testWidgets('ohne Jagd steht weiterhin der Assistent da', (
+      WidgetTester tester,
+    ) async {
+      await pump(tester);
+
+      expect(find.byType(ChallengeSetupView), findsOneWidget);
+      expect(find.byType(HuntPauseView), findsNothing);
+      expect(find.byType(HuntResultView), findsNothing);
+    });
+
+    testWidgets(
+      'eine laufende, nicht beendete Jagd zeigt den Pausebildschirm statt '
+      'des Assistenten',
+      (WidgetTester tester) async {
+        final HuntRun run = HuntRun.start(_testPlan(stopCount: 3));
+        expect(run.isFinished, isFalse, reason: 'Vorbedingung des Tests');
+
+        await pump(tester, seededRun: run);
+
+        expect(find.byType(HuntPauseView), findsOneWidget);
+        expect(find.byType(ChallengeSetupView), findsNothing);
+        expect(find.byType(HuntResultView), findsNothing);
+      },
+    );
+
+    testWidgets('eine beendete Jagd zeigt den Ergebnisbildschirm', (
+      WidgetTester tester,
+    ) async {
+      HuntRun run = HuntRun.start(_testPlan(stopCount: 1));
+      run = run.solveStop(0, pointsAwarded: 100, hintUsed: false);
+      expect(run.isFinished, isTrue, reason: 'Vorbedingung des Tests');
+
+      await pump(tester, seededRun: run);
+
+      expect(find.byType(HuntResultView), findsOneWidget);
+      expect(find.byType(HuntPauseView), findsNothing);
+      expect(find.byType(ChallengeSetupView), findsNothing);
+    });
+
+    testWidgets(
+      '„Ja, abbrechen" und „Fertig" beenden die Jagd über denselben Weg',
+      (WidgetTester tester) async {
+        // `onHuntAbort`, `:4300` und `:4312`: dieselbe Methode für Abbruch
+        // und planmäßiges Ende. Geprüft am Pausebildschirm: nach der
+        // Rückfrage verschwindet er, ohne dass irgendwo eine Ausnahme fällt.
+        final HuntRun run = HuntRun.start(_testPlan(stopCount: 1));
+
+        await pump(tester, seededRun: run);
+        expect(find.byType(HuntPauseView), findsOneWidget);
+
+        await tapAt(tester, find.byKey(HuntPauseView.abortButtonKey));
+        await tapAt(tester, find.byKey(HuntPauseView.confirmAbortKey));
+
+        expect(find.byType(HuntPauseView), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 
   group('Maße', () {
@@ -1094,4 +1173,47 @@ List<Fact> _munichFacts({
     }
   }
   return facts;
+}
+
+/// Ein [HuntPlan] mit [stopCount] Stationen, für die Verzweigungstests im
+/// Zustand des Reiters. Anders als [_munichFacts] geht es hier nicht um den
+/// Generator, sondern nur darum, einen gültigen [HuntRun] zu bauen.
+HuntPlan _testPlan({required int stopCount}) {
+  return HuntPlan(
+    stops: <HuntStop>[
+      for (int i = 1; i <= stopCount; i++)
+        HuntStop(
+          fact: Fact(
+            id: FactId(i),
+            content: FactText(title: 'Fakt $i'),
+            coordinates: FactCoordinates(latitude: 48.0 + i, longitude: 11.0),
+            puzzles: const <FactPuzzle>[
+              FactPuzzle(
+                question: 'Wie viele Löwen bewachen das Tor?',
+                type: 'inschrift',
+                confidence: 'curated',
+              ),
+            ],
+          ),
+          puzzle: const FactPuzzle(
+            question: 'Wie viele Löwen bewachen das Tor?',
+            type: 'inschrift',
+            confidence: 'curated',
+          ),
+        ),
+    ],
+    difficulty: PuzzleDifficulty.leicht,
+    duration: HuntDuration.thirty,
+  );
+}
+
+/// Liefert [initial] als Startwert statt `null`, siehe [pump]. Wörtlich
+/// dasselbe Muster wie in `hunt_pill_test.dart`.
+class _SeededHuntRunNotifier extends HuntRunNotifier {
+  _SeededHuntRunNotifier(this.initial);
+
+  final HuntRun? initial;
+
+  @override
+  HuntRun? build() => initial;
 }

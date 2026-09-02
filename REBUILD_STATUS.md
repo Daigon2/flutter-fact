@@ -1285,7 +1285,7 @@ führt jetzt in ihn, und er ruft den Generator aus Schritt 34.
 - [x] 33. Wizard · [x] 34. Solo-Setup · [x] 35. Hotspot-Picker
 - [x] 36. Phasen-Maschine · [x] 37. Active-UI (beide am 31.08.2026 im neuen Zuschnitt gebaut: Regeln, `HuntRun`, Zustandshalter, Jagd-Pille auf der Karte)
   · [!] 38. Rätsel und Ökonomie
-- [ ] 39. Pause und Results · [ ] 40. Gruppen-Flow (Realtime mit ADR-009 entschieden, seit dem 31.08.2026 frei; erbt E-21, E-54 und E-57 aus dem Backend)
+- [x] 39. Pause und Results (31.08.2026, dabei den seit Schritt 35 durchtrennten Jagdstart wieder angeschlossen) · [ ] 40. Gruppen-Flow (Realtime mit ADR-009 entschieden, seit dem 31.08.2026 frei; erbt E-21, E-54 und E-57 aus dem Backend)
 
 ## Phase 6, Tour
 
@@ -1389,6 +1389,106 @@ Nachbesserung fallen alle sechs.
 logische Pixel stand bis dahin an einer Stelle, und `fact_balloon_overlay.dart`,
 `map_screen_point.dart` und die Liste „Was bewusst fehlt" sagten alle drei noch
 „nirgendwo sonst" beziehungsweise führten den Anker als fehlend.
+
+
+## Schritt 39, Pause und Ergebnis, und die Kette schließt sich, 31.08.2026
+
+2266 → 2287 Tests. Der Challenge-Reiter zeigt jetzt, was die Quelle dort zeigt,
+solange eine Jagd läuft: den Pausebildschirm mit Stationsliste, Kacheln und
+Abbruch-Rückfrage, und nach der letzten Station den Ergebnisbildschirm.
+
+**Neun Mutationen, neun Treffer.** Fünf aus dem Auftrag, vier danach von der
+prüfenden Seite gesetzt: die aktuelle Station nie markieren, im Ergebnis alle
+Stationen als gelöst zählen, „Doch weiterspielen" heimlich abbrechen lassen, und
+die Punktekachel des Pausebildschirms auf `0` festnageln. Keine hat überlebt.
+
+### Der eigentliche Fund: die Kette war seit Schritt 35 durchtrennt
+
+`_startHunt` hat den fertig erzeugten Jagdplan **weggeworfen**. Nicht vergessen,
+sondern begründet: D-16 war offen, und der Kommentar an dieser Stelle sagte das
+auch. Nur ist D-16 seit dem 31.08.2026 beantwortet, ADR-007 und ADR-009 stehen,
+`huntRunProvider` ist seit Schritt 36 gebaut, und **niemand hat den Draht wieder
+angeschlossen**. Der Schritt, zu dem die Stelle gehörte, war abgehakt; die Lücke
+saß in einem Kommentar, den kein Tor liest.
+
+Das ist die allgemeine Form: **eine dokumentierte Lücke in einem erledigten
+Schritt findet niemand wieder.** Sie steht nicht auf der Schrittliste, sie
+erzeugt keine Warnung, und der Kommentar, der sie erklärt, liest sich beim
+Überfliegen wie eine Absicht.
+
+### Was sie doch gefunden hat, war ein Test, der genau dafür gebaut war
+
+Der Test „mit genug Fakten erscheint keine Meldung" sicherte zu, dass nach dem
+Start **nichts** passiert, und sein Kommentar sagte wörtlich: „Diese Zusicherung
+ist die Stelle, die auffällt, sobald jemand den Empfänger einhängt." Genau das
+ist eingetreten. Er wurde rot, sein Kommentar erklärte warum, und die Änderung
+ist im Diff sichtbar begründet statt stillschweigend.
+
+**Eine Zusicherung auf eine bekannte Lücke ist billiger als jede Notiz**, weil
+sie sich meldet, statt gelesen werden zu müssen. Sie gehört an die Stelle, an
+der die Lücke sitzt, mit dem Satz dazu, wer sie wann auflösen darf.
+
+### Die Zeit steht als Platzhalter da, und das ist E-62
+
+Die Quelle rechnet `Date.now() - hunt.startedAt` und lässt dafür einen
+Sekundentakt laufen. `HuntRun` trägt bewusst keine Zeitstempel, E-19 ist mit
+„der Server rechnet“ entschieden, und Dairens Satz dazu deckt genau diesen Fall
+ab: „der baubare Teil ist alles, was den Ablauf anzeigt."
+
+**Kachel und Zeile bleiben stehen und zeigen `—`.** Das Layout ist damit das der
+Quelle, und der Tag, an dem ein Startzeitstempel vom Server kommt, kostet eine
+Zeile statt eines Umbaus. Der Sekundentakt ist ausdrücklich **nicht** gebaut: er
+hätte ohne laufende Zeit keinen Zweck, und ein Zeitgeber ohne Zweck ist im
+Widget-Test ein „A Timer is still pending". Das Zeichen `—` ist das
+Platzhalter-Idiom der Quelle selbst (`:2828`).
+
+### Die Wiederherstellungslücke wird zum ersten Mal sichtbar
+
+Verzweigt wird auf `huntRunProvider` und **nicht** auf `activeHuntProvider`.
+Letzterer liefert auch eine aus dem Speicher wiederhergestellte Jagd, und die
+trägt weder Stationszustände noch Punkte, also genau das, was diese beiden
+Bildschirme zeigen.
+
+Folge, unbequem und stehen gelassen: **eine Jagd, die einen App-Neustart
+überlebt hat, ist auf der Karte als Pille sichtbar, im Challenge-Reiter aber
+nicht.** Dort steht wieder der Assistent. Das ist die schon in
+`HuntRunNotifier.build` dokumentierte Grenze aus ADR-007, die hier zum ersten
+Mal auf einen Bildschirm durchschlägt. Ein abgespeckter Pausebildschirm für
+genau diesen Fall wäre erfundenes Verhalten und ist nicht gebaut.
+
+### Zwei Kleinigkeiten aus dem Bericht, beide richtig entschieden
+
+**Kein Rückfalltext für einen leeren Fakt-Titel.** `HuntPill` baut
+`stop.factTitle || stop.title || '—'` nach, `HuntStopRow` nicht: die Quelle hat
+den Rückfall dort schlicht nicht (`:2930`, roher Zugriff). Nicht nachgebaut, weil
+erfundene Robustheit eine Abweichung ist wie jede andere.
+
+**Keine harten Bildpunkte `paddingTop 44 / paddingBottom 80`.** Dieser Bildschirm
+sitzt innerhalb der bestehenden App-Chrome und nicht in einem eigenen
+`ScreenFrame`, genau wie `HuntStartPointView` es vormacht.
+
+### Die Stufe geht über `AppStrings`, mit den Rohwerten als Text
+
+Die Quelle zeigt `hunt.difficulty` roh an, also „leicht", „mittel", „schwer" in
+Kleinschreibung. Der Kopf von `kernel/puzzle_difficulty.dart` verlangt dagegen,
+dass Anzeigetext über `AppStrings` läuft und nicht über `code`. Beides zusammen:
+drei Schlüssel, deren Werte genau die Rohwerte sind. Sichtbar identisch zur
+Quelle, strukturell auf dem vorgeschriebenen Weg, und wer später englische
+Wörter will, ändert zwei Werte und keine Zeile Code.
+
+22 neue Schlüssel unter `challenge.huntPause.` und `challenge.huntResult.`, in
+beiden Sprachkarten mit demselben deutschen Wert. Der Grund ist E-61 und
+unverändert: die Quelle hält diese Beschriftungen hartcodiert deutsch.
+
+### E-44 war falsch zugeordnet, und das ist nachgemessen
+
+Der Faktor 1,5 am letzten Stopp (angezeigt, nicht gutgeschrieben) stand im
+Register unter „Schritt 37". Beide Zeilen liegen in `SnjdActiveView`
+(`screen-challenge.jsx:2158`), also im **alten** Jagd-Ablauf. Der neue, den die
+Schritte 36 bis 39 nachbauen, kennt den Faktor überhaupt nicht: `1.5` kommt in
+`screen-map.jsx` kein einziges Mal als Rechenfaktor vor, in `puzzle-sheet.jsx`
+nur als Zeilenhöhe und Rahmenstärke, im Jagd-Reduzierer gar nicht. **Der Neubau
+erbt diesen Widerspruch nicht.** Die Zeile im Register steht richtiggestellt da.
 
 
 ## Schritt 37, die Jagd-Pille, 31.08.2026
@@ -4175,7 +4275,7 @@ eine Fundstelle.
 | E-37 | **Das Launcher-Symbol ist noch das Flutter-Logo.** Android 12 und neuer zeichnet `@mipmap/ic_launcher` über die SplashScreen-API mitten in den nativen Startbildschirm. Der Hintergrund ist seit dem 27.08.2026 richtig (`#FF0F0D0A`), das Symbol nicht. Braucht das FACT-Symbol in allen Dichten, plus eine Entscheidung, ob der native Startbildschirm es überhaupt zeigen soll. | 2 | vor Auslieferung |
 | E-41 | **Drei Rätseltypen rendern eine leere Auswahl mit totem Antwortknopf.** `puzzle-sheet.jsx:255-257` und `:268-269` schicken `klang-sinnes-check`, `verstecktes-detail` und `zeitreise` auf `PszMcq`. Diese Zweige sind aber **nur mit leerer Optionenliste erreichbar**, weil `:247` alles mit Optionen vorher abfängt. `PszMcq` erzeugt dann null Antwortknöpfe (`:353-358`), `pick` bleibt `null`, `canSubmit` (`:344`) ist dauerhaft falsch, und das Rätsel ist nur über „Überspringen (0 Punkte)" (`:230-236`) verlassbar. Wie viele Datensätze das trifft, ist **nicht gezählt**: die Markdown-Quellen in `05_Content/facts/` tragen eine andere Typkodierung (`T2`, `T3`, `T9`) als die Datenbank, es braucht die Live-Daten. Zu entscheiden ist, welche Form ein solches Rätsel im Neubau bekommt. Der Zustand ist an `ChoicePuzzle.choices` ablesbar. | 3, verwandt mit E-08 | Phase 4, Schritt 28 |
 | E-42 | **Der 150-Meter-Radius der Foto-Rätsel wirkt in der PWA nie.** `screen-map.jsx:3915` übergibt die Nutzerposition als `userPos`, `puzzle-sheet.jsx:50` erwartet sie als `userPosition`. Folge in `PszPhoto`: `:373` liefert immer `null`, `:374` setzt `inRange = true`, und die Näherungsprüfung `:378` läuft nie. `foto-beweis` und `perspektiven` sind damit von überall mit einem beliebigen Foto lösbar, obwohl `gpsRadius` (`:372`) in den Daten durchgehend auf 150 steht. Dieselbe Klasse wie E-08: ein Defekt der Quelle, der wie Parität aussieht, und wie E-07 einer, der eine Ortsprüfung aushebelt. **Ändert sichtbares Verhalten, geht deshalb an Janek.** | 3, verwandt mit E-07 | Phase 4, Schritt 28 |
-| E-44 | **Der Faktor 1,5 am letzten Stopp wird angezeigt, aber nicht gutgeschrieben.** `screen-challenge.jsx:2479` übergibt dem Nächster-Fakt-Abzeichen `isLast ? Math.round(diff.points * 1.5) : diff.points`. Die tatsächlich vergebenen Punkte rechnet `handleChallengeComplete` (`:2295-2299`), und dort kommt der Faktor nicht vor. Das Abzeichen verspricht am letzten Stopp das Anderthalbfache, gutgeschrieben wird der einfache Satz. Widerspruch in der Quelle, nicht in E-19. Sichtbares Verhalten. | 3 | Schritt 37 |
+| E-44 | **Der Faktor 1,5 am letzten Stopp wird angezeigt, aber nicht gutgeschrieben, und er steht in einem Bildschirm, den der Neubau nicht nachbaut.** `screen-challenge.jsx:2479` übergibt dem Nächster-Fakt-Abzeichen `isLast ? Math.round(diff.points * 1.5) : diff.points`. Die tatsächlich vergebenen Punkte rechnet `handleChallengeComplete` (`:2295-2299`), und dort kommt der Faktor nicht vor. **Am 31.08.2026 nachgemessen, und die Zuordnung war falsch:** beide Zeilen liegen in `SnjdActiveView` (`:2158`), also im **alten** Jagd-Ablauf. Der neue Ablauf, den die Schritte 36 und 37 nachgebaut haben, kennt den Faktor überhaupt nicht: `1.5` kommt in `screen-map.jsx` kein einziges Mal als Rechenfaktor vor, in `puzzle-sheet.jsx` nur als Zeilenhöhe und Rahmenstärke, und im Jagd-Reduzierer in `app.jsx` gar nicht. **Der Neubau erbt diesen Widerspruch also nicht.** Er wird erst wieder wichtig, wenn jemand die Altansicht nachbaut, und dafür gibt es keinen Schritt. Sichtbares Verhalten in der laufenden PWA, kein offener Punkt des Neubaus. | 3 | PWA, im Neubau nicht geerbt |
 | E-47 | **Drei Bedienelemente im Challenge-Reiter tun bis Schritt 35 nichts.** Seit Schritt 33 zeigt der Reiter den Assistenten. Wer ihn zu Ende bedient, drückt einen vollflächigen roten Knopf „Starten", sieht die Drück-Animation und danach passiert nichts, weil der Startpunkt-Picker fehlt. Dasselbe gilt für die Kachel „Gruppe" und für „Mit Code beitreten", deren Formulare Sitzungen über Supabase anlegen müssten, die es im Neubau nicht gibt. **Eine Sackgasse ist es nicht**, der Zurück-Knopf und die Tab-Leiste bleiben erreichbar, gemessen im Widget-Test. Aber es ist derselbe Zustand, den E-33 beim Kästchen „Angemeldet bleiben" beanstandet, und der Bau begründet an anderer Stelle ausdrücklich, warum die Zufallskarte **nicht** antippbar ist („ein Tipp, der nichts ändert, ist ein Bedienelement, das nichts tut"). Die Ungleichbehandlung ist bewusst, weil eine erfundene Navigation schlechter wäre als keine, aber sie gehört gewusst. Löst sich mit den Schritten 35 und 40 von selbst auf. | 2 | Schritt 35 |
 | E-48 | **Wohin zeigt der Tutorial-Pfeil, wenn kein Ballon in der Nähe ist?** Die Quelle verwirft beim Suchen alles unter 30 mal 30 Pixel, und ein ruhender Ballon ist selbst nur 26 breit; sie zeigt also nur dann auf einen echten Ballon, wenn der Nutzer nah genug steht, sonst auf ein festes Rechteck in der unteren Bildmitte. Der Neubau misst statt des Kopfes die Zeichenfläche samt Schattenrand und wählt deshalb ab Zoom 14,6 auch ferne Ballons. **Parität** hieße, den Kopf zu messen; **Abweichung** hieße, es so zu lassen, und der Pfeil fände fast immer einen echten Ballon, was möglicherweise besser aussieht. Zu entscheiden ist auch, ob die Zoomsperre des Ankers auf `factAnimationRunsAt` verschärft wird: das schnitte den Löwenanteil der Plattformkanal-Aufrufe weg und schlösse nebenbei die Gruppierungslücke unter Zoom 15, um den Preis, dass unter Zoom 16 das Ersatzrechteck steht. **Die tragende Kette ist hergeleitet und nicht am Browser gemessen**, siehe „Der `balloon`-Anker". | 2 | vor Auslieferung |
 | E-49 | **Zwei verschiedene Wahrheiten darüber, ob eine Trophäe verdient ist.** Der Profil-Bildschirm liest den Freischaltstand vom Server (`user_trophies`) und färbt danach. Das Reiseregal rechnet ihn **clientseitig neu**: `wltDeriveTrophies` (`screen-wallet.jsx:114-128`) zählt die gesammelten Fakten je Kategorie und setzt `earned` auf `counts[t.cat] >= t.threshold`. Beide können auseinanderlaufen, und beide zeigen dieselben 36 Definitionen. **Zusätzlich ist die Client-Rechnung unvollständig:** nur die Kategorie-Trophäen tragen ein `threshold`; die Stadt-, Rang- und Geheim-Trophäen haben keins, und `>= undefined` ist in JavaScript immer falsch. Im Reiseregal sind sie damit **dauerhaft** unverdient, egal was der Server sagt. Zu entscheiden ist, welche Quelle im Neubau gilt, bevor Schritt 45 gebaut wird; die Trophäenliste aus Schritt 49 nimmt heute den Stand als Parameter entgegen und legt sich nicht fest. Berührt E-16, weil `user_trophies` für jeden lesbar ist. **Am 31.08.2026 entschieden: der Server ist die einzige Wahrheit.** Dazu zwei Aufträge, die nicht auf der Liste standen: die defekte Client-Ableitung wird nicht portiert, und E-16 wird mitgeschlossen. Antwort im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“. | 3 | vor Schritt 45 |
@@ -4191,6 +4291,7 @@ eine Fundstelle.
 | E-59 | **Welchen Bezugsrahmen hat die Kompass-Richtung, magnetisch Nord oder wahres Nord?** Der Neubau setzt seit Schritt 14 ausdrücklich **magnetisch** Nord, weil der Android-Pfad der Quelle `deviceorientationabsolute` liest und das magnetometerbasiert ist. **Offen ist der iOS-Pfad:** `webkitCompassHeading` leitet sich aus `CLHeading` ab, und dort gibt es `trueHeading` **und** `magneticHeading`. Nimmt die Quelle dort das wahre Nord, sind ihre beiden Zweige nicht deckungsgleich, und der Unterschied ist die örtliche Missweisung, in Mitteleuropa ungefähr 2 bis 5 Grad. Das ist **mehr** als die Totzone von 1,5 Grad, also sichtbar, und es hiesse, dass die Karte auf iOS und Android unterschiedlich zeigt. Zu klären an einem iOS-Gerät oder an Apples Dokumentation; der Neubau kann beide Rahmen, die Umstellung ist eine Zeile im Adapter. Belege unter „Schritt 14, die Wahl des Sensorpakets". | 2 | vor Auslieferung |
 | E-60 | **Die gestuften Hinweise der Jagd beschreiben die Station nach der aktuellen, nicht die aktuelle.** Gemessen und nicht vermutet, siehe „Ein Fund beim Zuschnitt von Schritt 36". Der Generator legt an Stopp `i` das Hinweis-Trio des Fakts von Stopp `i+1` ab (`hunt-generator.jsx:319-338`), und die Pille liest an der aktuellen Station genau dieses Feld (`screen-map.jsx:1035-1043`). Weil `currentStopIdx` beim Lösen sofort weiterspringt, sieht der Spieler nie einen Hinweis auf den Ort, den er gerade sucht. Zwei Lesarten: **Absicht** (der erste Hinweis heißt im Kommentar „atmospheric teaser", also eine Vorschau auf den nächsten Ort) oder **Defekt** (dann zahlt man 20 und 30 Münzen für Hinweise auf einen Ort, den man noch nicht sucht). Zu entscheiden ist, welche gilt; der Neubau kann beide, der Unterschied ist ein Index. **Und die letzte Station hat gar keine Hinweise**, denn dort setzt der Generator `nextHints = null`. | 2 | vor Schritt 37 |
 | E-61 | **Die Beschriftungen der Jagd-Pille gibt es nur auf Deutsch, und das ist Parität.** Geprüft: die Quelle hält „Station {n} / {total}", „Tipps", „Tipp freischalten (−20 🪙 vom Fakt-Lohn)", „Schließen" und den Rückfallsatz „Schau dich in der Umgebung aufmerksam um." als **hartcodiertes Deutsch** in `screen-map.jsx`, ohne einen einzigen i18n-Schlüssel. Englischsprachige Nutzer sehen dort also Deutsch. Der Neubau trägt sie über die Ergänzungs-Map aus E-39 ein, **nur auf Deutsch**, und der Rückfall auf die Fallback-Sprache erzeugt genau dasselbe Verhalten. **Erfundener englischer Nutzertext wäre die schlechtere Lösung**, dieselbe Linie wie bei E-28. Zu entscheiden ist, ob die Pille englische Texte bekommen soll; dann sind es fünf bis sechs Sätze, und die bessere Behebung wäre ein Schlüssel in der PWA, weil die Gegenprüfung des Generators den lokalen Eintrag dann von selbst wieder abräumt. Verwandt mit E-08, wo dieselbe Sorglosigkeit ein Rätsel auf Englisch unlösbar macht. | 2 | vor Auslieferung |
+| E-62 | **Der Pause- und der Ergebnisbildschirm der Jagd zeigen keine Zeit, sondern den Platzhalter `—`.** Die Quelle rechnet dort `Date.now() - hunt.startedAt` (`screen-challenge.jsx:2807-2808` und `:2954`) und lässt dafür einen Sekundentakt laufen. `HuntRun` trägt bewusst keine Zeitstempel, und der gespeicherte Vertrag `ActiveHunt` auch nicht: E-19 ist mit „der Server rechnet“ entschieden, und Dairens Satz dazu lautet „der baubare Teil ist alles, was den Ablauf anzeigt“. Angezeigt wird hier nichts, was der Client kennt, also steht der Platzhalter da, den die Quelle selbst für fehlende Werte benutzt (`:2828`). **Die Kachel und die Zeile bleiben stehen**, damit das Layout stimmt und der Tag, an dem ein Startzeitstempel vom Server kommt, eine Zeile kostet und keinen Umbau. Kein Sicherheitsbefund, sondern eine sichtbare Lücke mit bekannter Ursache und bekannter Behebung. | 2 | Schritt 39, Behebung mit dem Backend-Auftrag |
 
 ## Wie Tests hier blind werden
 

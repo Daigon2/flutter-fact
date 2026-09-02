@@ -22,9 +22,9 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 Phase 0 und Phase 1 sind abgeschlossen. Aus Phase 2 sind laut Protokoll die
 Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
-den Schritten 33 bis 37.
+den Schritten 33 bis 37 und 39.
 
-**Fertig sind 25 von 50:** 1 bis 17, dazu 19, 21, 27 und 33 bis 37. Schritt 14 ist
+**Fertig sind 26 von 50:** 1 bis 17, dazu 19, 21, 27, 33 bis 37 und 39. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -38,7 +38,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2266 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
+**Kennzahlen:** 2287 Tests grün, alle vier Gates auf Exit-Code 0, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -303,6 +303,41 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 31.08.2026, Schritt 39, und die Kette war seit Schritt 35 durchtrennt
+
+Pause- und Ergebnisbildschirm der Jagd stehen. 2266 → 2287 Tests, neun
+Mutationen, neun Treffer (fünf aus dem Auftrag, vier danach zur Gegenprobe).
+Belege in `REBUILD_STATUS.md`.
+
+**Überraschend war nicht der Bildschirm, sondern was beim Anschließen auffiel:**
+`_startHunt` hat den fertig erzeugten Jagdplan seit Schritt 35 **weggeworfen**.
+Begründet, nicht vergessen, D-16 war offen. Nur ist D-16 längst beantwortet,
+`huntRunProvider` steht seit Schritt 36, und niemand hat den Draht wieder
+angeschlossen. Der Schritt war abgehakt, die Lücke saß in einem Kommentar, und
+Kommentare liest kein Tor. **Eine dokumentierte Lücke in einem erledigten
+Schritt findet von allein niemand wieder.**
+
+**Gefunden hat sie ein Test, der genau dafür gebaut war.** „Mit genug Fakten
+erscheint keine Meldung" sicherte zu, dass nach dem Start nichts passiert, und
+sein Kommentar sagte wörtlich, er sei die Stelle, die auffällt, sobald jemand den
+Empfänger einhängt. Er wurde rot. Das ist die billigere Hälfte der Lehre: eine
+Zusicherung auf eine bekannte Lücke meldet sich selbst, eine Notiz muss gelesen
+werden.
+
+**Neu offen: E-62.** Die Zeit auf beiden Bildschirmen zeigt `—` statt einer
+Dauer. E-19 ist mit „der Server rechnet“ entschieden, `HuntRun` hat bewusst
+keine Zeitstempel, und Dairens Satz deckt den Fall ab. Kachel und Zeile bleiben
+stehen, damit das später eine Zeile kostet und keinen Umbau.
+
+**Sichtbar geworden, nicht neu entstanden:** eine Jagd, die einen App-Neustart
+überlebt hat, ist auf der Karte als Pille da, im Challenge-Reiter nicht. Das ist
+die Grenze aus ADR-007, die hier zum ersten Mal auf einen Bildschirm durchschlägt.
+
+**Richtiggestellt: E-44.** Der 1,5-Faktor am letzten Stopp war Schritt 37
+zugeordnet, sitzt aber in der abgelösten Altansicht. Im neuen Ablauf kommt er
+nirgends vor, der Neubau erbt ihn also nicht.
+
 
 ### 31.08.2026, Die Jagd-Pille, und zwei Korrekturen nach dem Bericht
 

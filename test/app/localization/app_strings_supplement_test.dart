@@ -35,7 +35,7 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die zweiundvierzig belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die vierundsechzig belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
@@ -55,7 +55,10 @@ void main() {
       // Die sechs `challenge.huntPill.`-Schlüssel kamen am 02.09.2026 mit
       // Schritt 37 dazu, `screen-map.jsx:1036-1130`; die Quelle zeigt die
       // Jagd-Pille in beiden Sprachen deutsch, deshalb steht in beiden Karten
-      // hier derselbe Wert.
+      // hier derselbe Wert. Die zweiundzwanzig `challenge.huntPause.`- und
+      // `challenge.huntResult.`-Schlüssel kamen mit Schritt 39 dazu,
+      // `screen-challenge.jsx:2797-2980`, aus demselben Grund (E-61) wieder in
+      // beiden Sprachkarten mit demselben deutschen Wert.
       expect(supplementTextsFor(AppLanguage.de).keys.toSet(), {
         'tour.stepCounter',
         'tour.step1.meta',
@@ -99,6 +102,28 @@ void main() {
         'challenge.huntPill.close',
         'challenge.huntPill.hintFallback',
         'challenge.huntPill.missingTitle',
+        'challenge.huntPause.stopsLabel',
+        'challenge.huntPause.pointsLabel',
+        'challenge.huntPause.timeLabel',
+        'challenge.huntPause.timePlaceholder',
+        'challenge.huntPause.stationsHeading',
+        'challenge.huntPause.backToMap',
+        'challenge.huntPause.abort',
+        'challenge.huntPause.abortConfirmMessage',
+        'challenge.huntPause.abortConfirmYes',
+        'challenge.huntPause.abortConfirmNo',
+        'challenge.huntPause.stopSkipped',
+        'challenge.huntPause.stopCurrent',
+        'challenge.huntPause.stopPending',
+        'challenge.huntPause.difficulty.leicht',
+        'challenge.huntPause.difficulty.mittel',
+        'challenge.huntPause.difficulty.schwer',
+        'challenge.huntResult.title',
+        'challenge.huntResult.pointsLabel',
+        'challenge.huntResult.solvedCount',
+        'challenge.huntResult.timeLine',
+        'challenge.huntResult.timePlaceholder',
+        'challenge.huntResult.close',
       });
     });
 
@@ -576,6 +601,170 @@ void main() {
         for (final key in supplementTextsFor(
           language,
         ).keys.where((String key) => key.startsWith('challenge.huntPill.'))) {
+          expect(AppStrings.of(language).hasText(key), isTrue, reason: key);
+          expect(
+            AppStrings.of(language).textKeys.contains(key),
+            isFalse,
+            reason: key,
+          );
+        }
+      }
+    });
+  });
+
+  group('Der Pause- und der Ergebnisbildschirm', () {
+    // Zweiundzwanzig Schlüssel, Schritt 39, dieselbe Lage wie bei der
+    // Jagd-Pille: die Quelle zeigt jeden davon in beiden Sprachen deutsch.
+
+    test('die drei Kachel-Beschriftungen', () {
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(language).text('challenge.huntPause.stopsLabel'),
+          'Stops',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntPause.pointsLabel'),
+          'Punkte',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntPause.timeLabel'),
+          'Zeit',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('der Zeit-Platzhalter ist ein eigener Schlüssel und kein Rohzeichen '
+        'im Widget (E-19)', () {
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(language).text('challenge.huntPause.timePlaceholder'),
+          '—',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('die drei Ersatztexte einer Station füllen die Stationsnummer', () {
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(
+            language,
+          ).text('challenge.huntPause.stopSkipped', params: {'station': '2'}),
+          'Station 2 · übersprungen',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(
+            language,
+          ).text('challenge.huntPause.stopCurrent', params: {'station': '3'}),
+          'Station 3 · aktuell',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(
+            language,
+          ).text('challenge.huntPause.stopPending', params: {'station': '5'}),
+          'Station 5',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('die drei Schwierigkeitsstufen sind Datenwerte, keine Übersetzung '
+        '(Entscheidung 3)', () {
+      // `puzzle_difficulty.dart` verlangt, dass eine Anzeige über
+      // `AppStrings` läuft; sichtbar bleibt trotzdem der rohe Datenwert.
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(language).text('challenge.huntPause.difficulty.leicht'),
+          'leicht',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntPause.difficulty.mittel'),
+          'mittel',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntPause.difficulty.schwer'),
+          'schwer',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('Rückfrage und Knöpfe des Pausebildschirms', () {
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(
+            language,
+          ).text('challenge.huntPause.abortConfirmMessage'),
+          'Punkte gehen verloren. Wirklich abbrechen?',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntPause.backToMap'),
+          'Zurück zur Karte',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntPause.abort'),
+          'Hunt abbrechen',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('Überschrift, Punkte-Beschriftung und Zeitzeile des Ergebnisses', () {
+      for (final language in AppLanguage.values) {
+        expect(
+          AppStrings.of(language).text('challenge.huntResult.title'),
+          'Hunt beendet!',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntResult.pointsLabel'),
+          'Punkte erspielt',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text(
+            'challenge.huntResult.solvedCount',
+            params: {'solved': '2', 'total': '5'},
+          ),
+          '2 von 5 Stationen gelöst',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(
+            language,
+          ).text('challenge.huntResult.timeLine', params: {'time': '—'}),
+          'Zeit: —',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntResult.timePlaceholder'),
+          '—',
+          reason: language.code,
+        );
+        expect(
+          AppStrings.of(language).text('challenge.huntResult.close'),
+          'Fertig',
+          reason: language.code,
+        );
+      }
+    });
+
+    test('die zweiundzwanzig Schlüssel bleiben aus der PWA-Fläche heraus', () {
+      for (final language in AppLanguage.values) {
+        for (final key in supplementTextsFor(language).keys.where(
+          (String key) =>
+              key.startsWith('challenge.huntPause.') ||
+              key.startsWith('challenge.huntResult.'),
+        )) {
           expect(AppStrings.of(language).hasText(key), isTrue, reason: key);
           expect(
             AppStrings.of(language).textKeys.contains(key),
