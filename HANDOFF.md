@@ -66,7 +66,7 @@ Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
 den Schritten 33 bis 37 und 39.
 
-**Fertig sind 27 von 50:** 1 bis 17, dazu 19, 20, 21, 27, 33 bis 37 und 39. Schritt 14 ist
+**Fertig sind 28 von 50:** 1 bis 17, dazu 19 bis 22, 27, 33 bis 37 und 39. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -80,7 +80,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2400 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2468 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -168,6 +168,29 @@ siehe „Rechner einrichten".
 ---
 
 ## Als Nächstes
+
+**Am 02.09.2026 sind drei Schritte auf einmal frei geworden, und zwar durch
+zwei Sätze.** Janek: „ja 1. passt und dann mach webview gern".
+
+- **`flutter_tts` ist freigegeben.** Damit sind **Schritt 25** (Audio-Dienst)
+  und **26** (Kopplung an die Karte) baubar. Der Vertrag bleibt
+  anbieterneutral, die drei Anforderungen dazu stehen bei E-15. Nebenwirkung,
+  die dabei verschwindet: der Audio-Modus hat heute keinen einzigen Abnehmer,
+  man schaltet ihn ein und niemand hört zu.
+- **`webview_flutter` ist wieder freigegeben, und die 3D-Laufzeit ist
+  entschieden: WebView mit Three.js.** Damit ist **Schritt 18** (Avatar) frei.
+  Der Grund für diese Wahl steht in `REBUILD_STATUS.md`: in `08_Flutter/` ist
+  dort die geografische Verankerung auf der bewegten Karte schon gelöst.
+  Beachten: das Paket war am 31.08.2026 ausdrücklich **aus** der Liste
+  gefallen, weil der Avatar 2D werden sollte. Diese Entscheidung ist am selben
+  Abend aufgehoben worden.
+
+**Was daneben unmittelbar fällig wäre, ohne neue Entscheidung:** der zweite
+Ballon-Bildsatz. Seit dem 02.09.2026 weiß die App, welcher Fakt gesammelt ist,
+und auf der Karte sieht man es nicht: der goldene Ballon der Quelle ist
+vollständig belegt (Farben, Haken, Graustufe, Schatten), es fehlt allein die
+Zeichenarbeit. Der Auslöser dafür stand seit Schritt 16 in
+`fact_balloon_images.dart` und ist jetzt eingetreten.
 
 **Am 31.08.2026 hat Janek den ganzen Stapel Produkt-, UX- und Kostenfragen an
 einem Stück beantwortet.** Wortlaut, Folgen und meine zwei Widersprüche stehen
@@ -345,6 +368,72 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 02.09.2026, Schritt 22 war schon fertig, und dafür fehlte das Gedächtnis
+
+2468 Tests, neun Mutationen, alle gefallen. **28 von 50.**
+
+**„Collect-Reveal-Overlay" hatte keinen eigenen Bauteil mehr.** Nachgemessen
+vor dem Zuschnitt: in der Quelle ist das `CollectAnimOverlay`
+(`screen-map.jsx:1157-1200`), also der Münzflug plus `+12 🪙`, und der
+Aufrufer legt danach mit `setTimeout(..., 1400)` das Fakt-Blatt auf. Genau das
+steht seit Schritt 20 als `FactCollectBurst`. Vierter Fall, in dem Kästchen
+und Wirklichkeit auseinanderliegen, nach 19, 15 und 23.
+
+**Dafür fehlten zwei Dinge, und das erste war größer als der Schritt.**
+
+1. **Es gab keinen Speicher für gesammelte Fakten.** Seit Schritt 20 kann man
+   sammeln, und es überlebte den nächsten Start nicht: `MapPage` meldete das
+   Ereignis an die Diagnosesenke, und das war alles. Jetzt gibt es
+   `CollectedFactsStore` als sechsten Speicher am `KeyValueStore`, unter dem
+   Schlüssel `fact_collected` wie in der Quelle. **Münzen bucht dabei weiter
+   nichts**, das bleibt beim Server (E-19), und die Meldung
+   `discovery.collect.unbooked` markiert nur noch diese halbe Naht.
+
+   Eine Entscheidung darin ist die Umkehrung der Regel vom Jagd-Speicher: ein
+   **einzelner** unlesbarer Eintrag verwirft nicht die ganze Sammlung. Bei der
+   Jagd ist die halbe Nutzlast keine Jagd, hier sind die Einträge unabhängig,
+   und wer wegen einer kaputten Zahl zwei Wochen Sammlung verliert, hat den
+   schlechteren Tausch gemacht.
+
+2. **Man sammelt in der Quelle auch ohne jeden Tipp, und davon stand hier
+   nichts.** `scanAutoOpenRef` (`:1471-1489`) läuft bei jeder Ortung und löst
+   innerhalb von 18 Metern von selbst `triggerCollect` aus. **Das verschiebt,
+   was Schritt 20 überhaupt ist:** der Tipp ist nur für die mittlere
+   Entfernung nötig. Gebaut in `fact_auto_collect.dart`, aufgenommen als E-68.
+
+   Drei Angaben stimmen an der Fundstelle nicht: der Kommentar sagt 30 Meter
+   und der Code prüft 18; der Kommentar sagt „pop a fact's full sheet" und der
+   Code **sammelt**, bucht also; und die 20-Meter-Meldung wird gerendert,
+   während `setAutoToast` in der **ganzen PWA nie** aufgerufen wird. Gebaut
+   sind die 18 Meter, die tote Meldung nicht.
+
+**Ein Fund als Nebenwirkung, und er ist die scharfe Fassung von E-06.**
+`onCollectFact` hat keine Prüfung auf „schon gesammelt" (`app.jsx:680-716`).
+Die Liste entdoppelt sich, aber `Storage.addCoins(50)` und
+`Api.addCoins(userId, 50)` laufen bei **jedem** Aufruf, und ein gesammelter
+Fakt lässt sich beliebig oft antippen. **50 Münzen je Tipp, lokal und auf dem
+Server.** Steht als E-69, Stufe 3. Der Neubau ist davon durch Bauweise frei.
+
+**Und ein Muster für den Blindheitskatalog, Nummer 26, das mich fast erwischt
+hat.** Das automatische Sammeln machte drei bestehende Tests derselben Datei
+kaputt, zwei davon sichtbar rot. Der dritte blieb **grün und verlor dabei
+seine Aussage**: er prüfte, dass die Entfernung aus der Punktkoordinate kommt
+und nicht aus der Fingerstelle, mit einem Fakt in 10 Metern. Den sammelte die
+Ortung ab jetzt ohnehin ein, und damit wäre er auch bei einem falschen
+Empfänger grün gewesen. Eine grüne Suite sagt nach so einer Änderung nur, dass
+nichts bricht.
+
+**Was mich am meisten gekostet hat, war mein eigenes Mutations-Skript.** Es
+setzte jede Mutation mit `git checkout -- <datei>` zurück. Für die **neuen**
+Dateien tut das gar nichts (unverfolgt), und für die eine verfolgte setzt es
+auf **HEAD** zurück, also auf den Stand vor dieser Arbeit: es hat mitten im
+Durchgang meine Änderungen an `fact_collect_overlay.dart` verworfen. Die drei
+folgenden Mutationen „fielen" danach, weil das ganze Merkmal weg war, und nicht
+weil ein Test sie fing. Wiederhergestellt, mit Sicherungskopien statt
+`git checkout` wiederholt, und danach fielen alle neun einzeln und jede auf
+ihren eigenen Test. **Regel daraus: eine Mutationsschleife sichert per
+Dateikopie, nie über die Versionsverwaltung.**
 
 ### 02.09.2026, Schritt 20, und der Kern-Griff der App hatte keinen Empfänger
 

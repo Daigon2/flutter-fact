@@ -51,12 +51,21 @@ import 'package:flutter/rendering.dart' show Matrix4;
 
 /// Der Sammelzustand „noch nicht gesammelt".
 ///
-/// **Heute der einzige, weil es keine Quelle für einen zweiten gibt.**
-/// `features/collection` existiert nicht, niemand kann sagen, welcher Fakt
-/// gesammelt ist, und ein zweiter Satz Bilder wäre Zeichenarbeit ohne
-/// Aufrufer.
+/// **Heute noch der einzige, aber der Auslöser ist seit dem 02.09.2026
+/// eingetreten.** Der Satz hier lautete „es gibt keine Quelle für einen
+/// zweiten"; es gibt sie: `CollectedFactsStore` weiß seit diesem Tag, welcher
+/// Fakt gesammelt ist, und `fact_auto_collect.dart` liest ihn schon.
 ///
-/// **Der Auslöser:** das erste Feature, das den Sammelzustand kennt. Der
+/// Was noch fehlt, ist damit nur die **Zeichenarbeit**, und sie ist
+/// vollständig belegt, siehe unten. Zwei Dinge hängen daran: dieser zweite
+/// Bildsatz und die Achse in [buildFactBalloonImages], die ihn ausrollt.
+/// Solange er fehlt, sieht ein gesammelter Fakt aus wie ein neuer. Falsch
+/// wird dadurch nichts, `factProximityOf` und die Sammelregel arbeiten
+/// unabhängig von der Farbe, und ein zweiter Tipp bucht nichts doppelt
+/// (anders als in der Quelle, E-69). Aber es fehlt die einzige Rückmeldung,
+/// die dem Nutzer auf der Karte zeigt, wo er schon war.
+///
+/// **Der Auslöser war:** das erste Feature, das den Sammelzustand kennt. Der
 /// goldene Ballon der Quelle ist vollständig belegt und muss nicht erfunden
 /// werden (`screen-map.jsx:2147-2181`): Kopf als Radialverlauf
 /// `#EAD58E → #B0974A → #6E5826`, Rahmen `rgba(240,220,150,0.55)`,

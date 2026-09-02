@@ -47,8 +47,20 @@
 ///
 /// **Der gesammelte Zustand.** Ein bereits gesammelter Fakt bekommt in der
 /// Quelle dasselbe Verhalten wie jeder andere; nur die Tour-Abfrage darüber
-/// liest ihn. Es gibt im Neubau ohnehin keine Quelle dafür, siehe
-/// `fact_overlay.dart`.
+/// liest ihn.
+///
+/// Seit dem 02.09.2026 gibt es im Neubau eine Quelle dafür
+/// (`CollectedFactsStore`), und diese Regel liest sie trotzdem nicht. **Das
+/// ist die Parität, und sie ist hier auch die richtige Wahl**, weil ein
+/// gesammelter Fakt ansonsten unlesbar würde: der Tipp ist der einzige Weg in
+/// die Akte. Was in der Quelle daran hängt, ist dagegen ein Defekt und wird
+/// nicht nachgebaut: sie bucht bei **jedem** Tipp 50 Münzen, auch beim
+/// zwanzigsten auf denselben Fakt (E-69). Der Neubau bucht im Client
+/// überhaupt nicht.
+///
+/// Die Stelle, die den Sammelzustand jetzt liest, ist
+/// `fact_auto_collect.dart`: dort ist er der Unterschied zwischen „springt
+/// von selbst auf" und „springt immer wieder auf".
 ///
 /// ## Warum die Regel in `discovery` liegt und nicht in `collection`
 ///

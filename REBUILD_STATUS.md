@@ -1072,7 +1072,7 @@ eine der beiden Stellen richtig.
 - [x] 14. Kompass-Rotation (am 31.08.2026 in zwei Teilen gebaut; am Gerät ungeprüft wie alles seit dem 29.08.2026) ·
   [x] 15. Cluster-Layer **und Antippen** (das Antippen am 31.08.2026 nachgezogen)
   · [x] 16. Einzel-Marker
-- [x] 17. Münz-Proximity-Animation · [!] 18. 3D-Avatar (die 2D-Entscheidung vom 31.08.2026 ist am selben Tag aufgehoben, „bau doch gleich 3D"; die 3D-Laufzeit liegt bei Janek)
+- [x] 17. Münz-Proximity-Animation · [ ] 18. 3D-Avatar (**seit dem 02.09.2026 frei**: WebView mit Three.js, „dann mach webview gern"; `webview_flutter` ist damit wieder freigegeben)
 - [x] 19. Top-Chrome (vorgezogen, D-5 am 29.08.2026 abgeschlossen) · [x] 20. Sammel-Erlebnis (02.09.2026; der Punkt-Tipp hatte gar keinen Empfänger, und die Ballons innerhalb von 150 Metern lagen zusätzlich im `IgnorePointer`)
 
 ## Phase 3, Fakt-Akte und Audio
@@ -1115,9 +1115,115 @@ plus 19 Mutationen, alle gefallen.
   braucht, zieht diese Datei um", und `project-structure.md:200` nennt genau
   diese Bedingung.
 
-- [x] 21. Fact-Detail-Sheet · [ ] 22. Collect-Reveal-Overlay
-- [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [ ] 25. Audio-Service (am 31.08.2026 entschieden: Gerät zuerst)
+- [x] 21. Fact-Detail-Sheet · [x] 22. Collect-Reveal-Overlay (**war mit Schritt 20 bereits gebaut**, am 02.09.2026 nachgemessen, siehe unten)
+- [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [ ] 25. Audio-Service (Gerät zuerst am 31.08.2026 entschieden, `flutter_tts` am 02.09.2026 freigegeben, damit frei)
 - [ ] 26. Map-Audio-Kopplung
+
+### Schritt 22 war mit Schritt 20 schon fertig, und dafür fehlt etwas anderes
+
+Am 02.09.2026 vor dem Zuschnitt nachgemessen, und es ist das **vierte Mal**,
+dass Kästchen und Wirklichkeit auseinanderliegen (nach den Schritten 19, 15 und
+23).
+
+„Collect-Reveal-Overlay" ist in der Quelle die Komponente `CollectAnimOverlay`
+(`screen-map.jsx:1157-1200`): zehn Münzen auf festen Winkeln, eine
+Beschriftung `+12 🪙`, und der Aufrufer `triggerCollect` legt danach mit
+`setTimeout(..., 1400)` das Fakt-Blatt auf (`:3070-3077`). Genau das steht seit
+Schritt 20 als `FactCollectBurst` samt `factCollectRevealDelay` und der
+Reihenfolge „Animation weg, dann Blatt auf". **Ein eigener Bauteil ist daran
+nicht übrig.** Das Kästchen ist gesetzt, ohne dass eine Zeile dazugekommen ist.
+
+#### Der Fund daneben: man sammelt in der Quelle auch ohne jeden Tipp
+
+**Im Neubau gibt es davon keine Zeile, und in diesem Dokument stand bis heute
+kein Wort.** Gesucht wurde nach `autoOpen`, `autoToast`, „automatisch öffnen",
+„30 Meter" und „20 Meter"; kein Treffer in `lib/` und keiner hier.
+
+`scanAutoOpenRef` (`screen-map.jsx:1471-1489`) läuft bei **jeder** neuen Ortung
+(`:2650`) und zusätzlich 600 ms nachdem ein Blatt geschlossen wurde (`:1544`,
+mit dem Kommentar „maybe the user is still standing near another fact"). Er
+sucht den nächsten Fakt, der weder gesammelt noch in dieser Sitzung schon
+automatisch ausgelöst wurde, und ruft `triggerCollectRef.current?.(nearest)`.
+
+**Das verschiebt, was Schritt 20 überhaupt ist.** Der Tipp aus Schritt 20 ist
+nur für die **mittlere** Entfernung nötig. Wer nah genug herangeht, sammelt
+ohne jede Eingabe, und das Blatt öffnet sich als Folge davon.
+
+Drei Dinge stimmen an der Stelle nicht, alle am 02.09.2026 nachgemessen, und
+sie sind nach der Regel aus `CLAUDE.md` zu trennen:
+
+1. **Der Kommentar sagt 30 Meter, der Code prüft 18** (`d <= 18` in `:1483`,
+   gegen „when entering 30m" in `:1470`). Das Verhalten ist die Referenz, also
+   **18**. Ein Kommentardefekt der Quelle, keine Verhaltensfrage.
+2. **Der Kommentar sagt „pop a fact's full sheet", der Code sammelt.** Der
+   Unterschied ist nicht kosmetisch: `triggerCollect` ruft `onCollectFact` und
+   bucht damit die Münzen. Das Blatt ist nur die Folge nach 1400 ms. Wer den
+   Kommentar liest, hält es für eine Anzeige; es ist eine Buchung.
+3. **Die 20-Meter-Meldung ist tote Anzeige.** Der Kasten wird gerendert
+   (`:3808-3822`, mit dem Kommentar „appears for 1.8s when entering 20m zone"),
+   aber `setAutoToast` wird **in der ganzen PWA nie aufgerufen**; die einzige
+   Fundstelle ist die Deklaration selbst (`:1370`), dazu die Kopie in
+   `screen-map.original.jsx:1123`. Dasselbe Muster wie der Vorrangzweig
+   `stop.locationHints` aus E-60 und wie `audio.dialog.volumeHint` aus E-28:
+   eine Anzeige, die nie erscheinen kann. **Sie wird nicht nachgebaut.** Was
+   dort stehen soll, wäre eine Inhaltsfrage, und erfundener Nutzertext ist
+   nach derselben Linie wie bei E-28 keine Lösung.
+
+Ein vierter Punkt gehört dazu, weil er den Neubau trifft und nicht die Quelle:
+`onCollectFact` beginnt mit `if (!requireAuth()) return;` (`app.jsx:681`). In
+der Quelle springt einem also beim **Vorbeigehen** eine Anmeldeaufforderung
+entgegen, ohne dass man etwas angetippt hat. Steht als E-68.
+
+#### Was gebaut ist, und die eine Entscheidung, die anders ausfällt als bisher
+
+2468 Tests. Drei neue Bauteile, dazu eine Verdrahtung:
+
+- **`features/facts/domain/collected_facts_store.dart`**, der sechste Speicher
+  am `KeyValueStore`, Schlüssel `fact_collected` wie in der Quelle
+  (`storage.jsx:4` und `:48`). **Ohne ihn war das automatische Sammeln nicht
+  baubar**, denn `scanAutoOpenRef` sucht den nächsten **noch nicht**
+  gesammelten Fakt, und dieses Wort gab es im Neubau nicht.
+- **`features/facts/data/key_value_collected_facts_store.dart`**. Hier fällt
+  eine Entscheidung **umgekehrt** aus als beim Jagd-Speicher: ein einzelner
+  unlesbarer Eintrag verwirft **nicht** die ganze Sammlung. `ActiveHunt`
+  verwirft alles, und das ist dort richtig, weil eine halbe Jagd keine Jagd
+  ist. Hier sind die Einträge unabhängig, und wer wegen einer kaputten Zahl
+  die Sammlung von zwei Wochen verliert, hat den schlechteren Tausch gemacht.
+  Verworfen wird, was keine positive ganze Zahl ist; gemeldet wird die Anzahl.
+- **`features/facts/application/collected_facts_providers.dart`**. In
+  `application/` und nicht in `presentation/notifiers/`, weil der Verbraucher
+  `features/discovery` ist und Regel 8 gilt; dieselbe Zwangslage, die
+  `fact_providers.dart` daneben ausführlich aufschreibt. Der Kreis wächst
+  ohnehin: Schritt 45 und 49 lesen dieselbe Liste.
+- **`features/discovery/presentation/fact_auto_collect.dart`** hält die Regel,
+  und `fact_collect_overlay.dart` löst sie am Ortungsstrom aus. Beides endet
+  in genau demselben `_startCollect` wie der Tipp; ein zweiter Ort mit einer
+  zweiten Sperre wären zwei Sammelvorgänge, die sich überlagern können.
+
+Drei Dinge daran sind erst beim Bauen aufgefallen:
+
+1. **Die Sperre „ein Blatt liegt darüber" braucht keinen eigenen Zustand.**
+   `ModalRoute.isCurrentOf(context)` hängt an einem `InheritedModel`, dessen
+   `updateShouldNotify` ausdrücklich `isCurrent` vergleicht
+   (`flutter/lib/src/widgets/routes.dart:1032-1038`), also ruft Flutter
+   `didChangeDependencies`, sobald eine Route darüber auf- oder zugeht. Das ist
+   auch der Auslöser für die zweite Suche nach 600 Millisekunden. Ohne
+   `NavigatorObserver` und ohne ein zweites „Blatt offen"-Feld.
+2. **Der Scan muss auch am Fakten-Hörer hängen, nicht nur am Ortungsstrom.**
+   Die Quelle sucht nur bei einer Ortung, weil `window.FACTS` dort längst
+   geladen ist. Hier ist es ein `FutureProvider`: trifft die Ortung **vor** den
+   Fakten ein, hatte der Scan keine Überlagerung und kehrte still zurück.
+   Gefunden hat es der Test „eine Ortung, die schon vorlag, sammelt beim
+   Entstehen".
+3. **Der Rand ist ein eigenes Prädikat, `factAutoCollectsAt`.** Aus demselben
+   gemessenen Grund wie bei `factTapCollectsAt`: genau 18,0 Meter sind über
+   zwei Koordinaten nicht erreichbar, ein Test am Rand wäre also blind
+   gegenüber `<=` gegen `<`. Und **hier ist es `<=`**, anders als bei der 150:
+   diese Zahl hat genau eine Fundstelle, und die ist einschließend. Es gibt
+   nichts zu vereinheitlichen.
+
+Was **Schritt 22** selbst betrifft, ist damit nichts dazugekommen; das Kästchen
+steht, weil die Quelle dort nichts weiter hält.
 
 ### Schritt 23 ist zur Hälfte schon fertig, und zwar seit Schritt 21
 
@@ -2873,7 +2979,9 @@ Nicht im REBUILD_PLAN, aber notwendig:
 | `provider` | **nicht aufgenommen** | ADR-003 verlangt Riverpod 3 |
 | `riverpod_annotation`, `riverpod_generator` | **nicht aufgenommen** | nicht gleichzeitig mit `go_router_builder` auflösbar; ADR-004 verlangt letzteres, Riverpod-Codegen ist optional. Provider werden manuell geschrieben. |
 | `riverpod_lint`, `custom_lint` | **nicht installierbar** | `riverpod_lint 3.1.8` verlangt `analyzer ^13.0.0`. `flutter_test` aus dem SDK pinnt `test_api 0.7.11`, was `test` in `analyzer >=8.0.0 <13.0.0` zwingt; der Ausweg über ältere `test`-Versionen ist durch `supabase_flutter` → `supabase 2.16.1` → `realtime_client 2.13.0` → `web_socket_channel ^3.0.3` versperrt. Zusätzlich kollidieren `analyzer_plugin ^0.14.0` gegen `^0.13.0`. Vier Auflösungsversuche verifiziert. |
-| `webview_flutter`, `flutter_compass`, `sensors_plus`, `flutter_tts`, `audioplayers`, `image_picker`, `share_plus`, `qr_flutter` | **noch nicht aufgenommen** | kommen phasenweise, jeweils mit Freigabe |
+| `flutter_tts` | **freigegeben am 02.09.2026**, noch nicht aufgenommen | „ja 1. passt". Damit sind Schritt 25 und 26 frei. Der Vertrag bleibt anbieterneutral, siehe die drei Anforderungen aus E-15. |
+| `webview_flutter` | **freigegeben am 02.09.2026**, noch nicht aufgenommen | „dann mach webview gern". Die 3D-Laufzeit des Avatars, Schritt 18. Am 31.08.2026 war das Paket noch ausdrücklich herausgefallen, weil der Avatar 2D werden sollte; diese Entscheidung ist am selben Abend aufgehoben worden. |
+| `flutter_compass`, `sensors_plus`, `audioplayers`, `image_picker`, `share_plus`, `qr_flutter` | **noch nicht aufgenommen** | kommen phasenweise, jeweils mit Freigabe. `flutter_compass` und `sensors_plus` sind durch `flutter_rotation_sensor` ersetzt, siehe „Schritt 14, die Wahl des Sensorpakets". |
 
 `docs/engineering/quality-gates.md`, `architecture-overview.md` §16 und
 `engineering-principles.md` fordern `riverpod_lint` als Pflichtbasis. Diese
@@ -4171,6 +4279,13 @@ Freigabe für die **benannte Liste** und nicht als Blankoscheck:
 `shared_preferences`, `flutter_rotation_sensor`, `flutter_tts`, `audioplayers`,
 `image_picker`, `share_plus`. **`webview_flutter` fällt weg** (Avatar).
 
+> **Nachtrag 02.09.2026: `webview_flutter` ist wieder drin.** Der Satz darüber
+> galt für den 2D-Avatar, und diese Entscheidung ist noch am 31.08.2026 abends
+> aufgehoben worden („bau doch gleich 3D"). Auf die Frage nach der 3D-Laufzeit
+> heißt die Antwort „dann mach webview gern", also WebView mit Three.js. Damit
+> ist **Schritt 18 frei**, und `flutter_tts` ist im selben Zug ein zweites Mal
+> bestätigt („ja 1. passt"), was **Schritt 25 und 26** freimacht.
+
 Zwei Folgen, die dazugehören: `flutter_rotation_sensor` verlangt Dart ≥ 3.12.1,
 die `pubspec.yaml` deklariert `^3.9.0` und muss mit angehoben werden. Und
 `shared_preferences` macht `readActiveHunt` zur Startbedingung: `bootstrap()`
@@ -4698,6 +4813,8 @@ eine Fundstelle.
 | E-65 | **Die Persistenz der laufenden Jagd wird nirgends gelesen, und die Produktvorgabe aus ADR-007 ist damit an keiner Stelle eingelöst.** Am 02.09.2026 von einer unabhängigen Prüfung gefunden und nachgezählt: `activeHuntProvider` hat in `lib/` **keinen einzigen Verbraucher**. `HuntPill` liest seit Schritt 37 direkt `huntRunProvider` (`hunt_pill.dart:136`), weil sie Stationen, Hinweise und Punkte braucht, die ein `ActiveHunt` nicht trägt. Der Schreibweg funktioniert, der Leseweg hat keinen Abnehmer. **Folge:** eine Jagd, die einen App-Neustart überlebt, ist weder auf der Karte noch im Challenge-Reiter sichtbar, und `bootstrap.dart:180-183` zitiert genau diesen Fall als das, was ADR-007 ausschließt. **Zweite Folge, kleiner aber unsauber:** der Eintrag `fact_active_challenge` lässt sich dann auch nicht mehr löschen, weil `HuntRunNotifier.end()` bei `state == null` sofort zurückkehrt; er wird erst von der nächsten Jagd überschrieben. **Zur Wahl stehen zwei Wege.** (a) Die Pille bekommt eine abgespeckte Lesart aus `ActiveHunt`: Stationszähler, Titel und Entfernung stehen dort alle, Hinweise und Punkte nicht. Das löst die Vorgabe ein, ohne den Plan zu speichern. (b) Der Start räumt einen nicht fortsetzbaren Eintrag auf und die Vorgabe wird als unerfüllbar zurückgegeben, dann gehört ADR-007 geändert. **Die Wahl ist nicht von hier aus getroffen worden.** Der Fund ist kein Codefehler dieser Nacht, sondern eine Lücke aus Schritt 37, die eine falsche Behauptung in vier Dokumentstellen als erledigt aussehen ließ; die Behauptung ist berichtigt.  **Am 02.09.2026 entschieden, und die Entscheidung geht weiter als beide vorgelegten Wege.** Janek: „man sollte sowohl sehen was da ist und auch weitermachen können. also sollte es so sein, als hätte man nie aufgehört.“ Damit fällt (b) weg, und (a) reicht nicht: eine sichtbare, aber nicht fortsetzbare Jagd ist ausdrücklich nicht die Antwort. Verlangt ist die **vollständige Wiederherstellung**, also auch der `HuntPlan` mit Fakt und Rätsel je Station. Genau den schließt ADR-007 heute bewusst von der Nutzlast aus. **Das ist jetzt eine Architekturfrage an Dairen**, samt Folge-ADR, siehe den Fragenblock. | 3 | vor Schritt 40 |
 | E-66 | **Ein Fakt ohne zuordenbare Stadt zählt als eigene Stadt, und damit sind zwei Trophäen zu früh zu haben.** Am 02.09.2026 gemessen. `handle_fact_collected` (`supabase-schema.sql:240-250`) bildet einen Fakt, dessen Stadt sich weder aus `facts.city` noch aus dem `nr`-Präfix ergibt, auf den Schlüssel `'unknown'` ab. Zwei Zeilen später zählt `select count(distinct city_key) ... where score > 0` (`:287-288`) genau diesen Schlüssel mit. **Folge:** `weltenbummler` (drei Städte) ist mit zwei echten Städten plus einem nicht zuordenbaren Fakt erreichbar, `grand_tour` (vier) mit drei. Dazu kommt eine Trophäe `unknown_first`, die in `wallet-colors.jsx` keinen Namen hat. **Dritte Folge derselben Wurzel** wie E-11 und E-56: die Stadt wird aus einem Präfix geraten, statt gepflegt zu sein. Die Behebung berührt eine Spielregel und bereits vergebene Trophäen, ist also keine reine Migration. Aufgefallen beim Zählen der Städte für E-16; die Anzahl dort schließt `'unknown'` bewusst aus und wird der Trophäenschwelle deshalb absichtlich widersprechen. | 3 | vor Schritt 45 |
 | E-67 | **Dieselbe 150 wird an drei Stellen unterschiedlich verglichen, zweimal ausschliessend und einmal einschliessend.** Am 02.09.2026 beim Ausmessen von Schritt 20 gefunden. `dist < COIN_RADIUS` bei der Münz-Animation (`screen-map.jsx:2249`, die Konstante heisst dort ausdrücklich „in-range threshold“), `distM < 150` am Nächster-Fakt-Knopf (`:3775`, `:3781`), aber `dist <= 150` beim Tipp auf einen Ballon (`:2131`). **Folge:** bei genau 150,0 Metern sammelt der Ballon-Tipp, der Knopf daneben nicht, und die Münzen fliegen nicht. Praktisch trifft das nur einen Gleitkommawert, der exakt auf der Grenze liegt, ist also kaum je sichtbar. **Entschieden für den Neubau: durchgehend `<`.** Zwei von drei Fundstellen und die benannte Konstante sagen das, und `factProximityRadiusInMeters` (`fact_proximity.dart:43-48`) hält seit Schritt 17 fest, dass 150 Meter aussen liegen. Ein eigener Radius für den Tipp wäre eine vierte Wahrheit. Kein Sicherheitsbefund, aber ein Widerspruch der Quelle, der nach dem Grundsatz vom 02.09.2026 nicht nachgebaut wird.  **Vierte Fundstelle, am 02.09.2026 nachgetragen, und es ist die einzige serverseitige:** `collect_fact_validated` prüft `if v_dist_m > 150 then reject` (`supabase-schema.sql:120`), genau 150,0 Meter werden dort also **angenommen**. Der Server ist damit einschliessend, der Neubau ausschliessend. Die Richtung ist die harmlose, der Client ist strenger als der Server. **Und ein Nebenfund zur Prüfbarkeit:** genau 150,0 Meter sind über Koordinaten gar nicht erreichbar, per Bisektion gemessen, es bleibt bei 149,99999999998155 und springt darüber hinweg. `fact_proximity_test.dart` hatte dieselbe Beobachtung und daraus geschlossen, den Rand **nicht** zu prüfen; damit war die Wahl zwischen `<` und `<=` unsichtbar. Schritt 20 zieht den Vergleich deshalb als `factTapCollectsAt(double)` heraus, erst damit ist er prüfbar. **Der blinde Fleck in `fact_proximity_test.dart` bleibt und wäre denselben Eingriff wert.** | 1 | Schritt 20, entschieden |
+| E-68 | **Man sammelt in der Quelle auch ohne jeden Tipp, und dabei springt einem eine Anmeldeaufforderung entgegen.** Am 02.09.2026 beim Zuschnitt von Schritt 22 gefunden, und im Neubau gab es davon bis dahin keine Zeile. `scanAutoOpenRef` (`screen-map.jsx:1471-1489`) läuft bei jeder Ortung und löst innerhalb von 18 Metern von selbst `triggerCollect` aus. Das ist **eine Buchung, keine Anzeige**, auch wenn der Kommentar darüber „pop a fact's full sheet" sagt und „30m" nennt, wo der Code 18 prüft. Und `onCollectFact` beginnt mit `if (!requireAuth()) return;` (`app.jsx:681`): wer nicht angemeldet ist, bekommt die Aufforderung **beim Vorbeigehen**, ohne etwas angetippt zu haben. **Der Neubau baut die 18 Meter, weil das das gemessene Verhalten ist, und die Anmeldesperre nicht.** Sie hängt an einer Frage, die noch offen ist: der Neubau hat für das Sammeln überhaupt keine Anmeldeschranke, und E-19 legt fest, dass der Client keinen Betrag bestimmt. Zu entscheiden ist, ob das automatische Sammeln für Gäste stumm mitlaufen und erst bei der Anmeldung nachbuchen soll, oder ob es für Gäste gar nicht stattfindet. Der Vorbeigeh-Prompt der Quelle ist jedenfalls die schlechteste der drei Möglichkeiten. | 2 | vor Auslieferung |
+| E-69 | **Denselben Fakt zweimal anzutippen bringt zweimal 50 Münzen, und zwar unbegrenzt oft.** Am 02.09.2026 beim Bau des Sammel-Speichers gefunden und dreifach nachgemessen. `onCollectFact` (`app.jsx:680-716`) hat **keine** Prüfung auf „schon gesammelt": `Storage.collectFact(id)` entdoppelt zwar die Liste (`storage.jsx:49-52`), aber `Storage.addCoins(50)` und `Api.addCoins(userId, 50)` laufen **bei jedem Aufruf** (`:712`, `:714`). Und der zweite Aufruf ist erreichbar: die Tipp-Regel (`screen-map.jsx:2129-2145`) fragt den Sammelzustand nicht, ein gesammelter Fakt verhält sich wie jeder andere. Wer innerhalb von 150 Metern eines Fakts steht und ihn wiederholt antippt, erzeugt 50 Münzen je Tipp, lokal **und** auf dem Server. Die Erfahrungspunkte sind nicht betroffen, `computeXP` rechnet aus `collected.length`. **Das ist die scharfe Fassung von E-06:** dort geht es darum, dass `increment_coins` den Betrag nicht prüft, hier um unbegrenzte Wiederholung desselben Betrags. Es widerspricht Janeks Regel vom 02.09.2026 („jeder Fakt gibt nur einmal Coins") direkt. **Der Neubau ist davon durch Bauweise frei**, und das ist keine Nachlässigkeit, sondern das Ergebnis von E-19: er bucht überhaupt keine Münzen im Client, und `CollectedFactsNotifier.collect` ist idempotent. Zu tun ist es im anderen Repository, zusammen mit E-06 und E-24. | 3 | vor dem PWA-Release |
 
 ## Wie Tests hier blind werden
 
@@ -4889,6 +5006,25 @@ halben Tag.
     war, und wurde erst rot, als er zusätzlich die **Anwesenheit** des
     richtigen Satzes forderte. Belegt am 31.08.2026. Allgemein: wer prüft, dass
     etwas weg ist, prüft im selben Test, was stattdessen da ist.
+
+26. **Neues Verhalten kann einen alten Test grün lassen und ihm dabei die
+    Aussage nehmen.** Am 02.09.2026 belegt, dreifach in derselben Datei. Der
+    Test „die Entfernung kommt aus der Koordinate des Punktes und nicht aus
+    der Fingerstelle" legte einen Fakt in 10 Metern und tippte 900 Meter
+    daneben; er war grün, weil ein Empfänger, der mit der Fingerstelle
+    rechnet, dort nicht sammeln würde. Mit dem automatischen Sammeln bei 18
+    Metern sammelte die **Ortung** diesen Fakt ohnehin ein, und die Zusicherung
+    unten war ab da auch für einen falschen Empfänger erfüllt. Zwei
+    Geschwistertests wurden im selben Zug wenigstens rot und haben es
+    verraten; dieser nicht.
+
+    Allgemein, und das ist die teure Hälfte: **wer eine neue Mechanik in einen
+    gemeinsamen Aufbau einbaut, muss die alten Tests danach durchsehen, nicht
+    nur laufen lassen.** Eine grüne Suite sagt nach so einer Änderung nur, dass
+    nichts *bricht*, nicht dass noch alles *geprüft* wird. Der Griff, der es
+    hier gefunden hat: nachsehen, welche Testdaten in den Wirkungsbereich der
+    neuen Regel fallen (`grep` auf die Entfernungen), und die betroffenen
+    bewusst daraus herausschieben.
 
 ## Datenvertrag: die bekannten Fallen
 

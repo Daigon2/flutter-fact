@@ -16,8 +16,12 @@ import 'package:fact_app/features/challenges/data/key_value_active_hunt_store.da
 import 'package:fact_app/features/challenges/domain/active_hunt_store.dart';
 import 'package:fact_app/features/challenges/domain/entities/active_hunt.dart';
 import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
+import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
+import 'package:fact_app/features/facts/data/key_value_collected_facts_store.dart';
+import 'package:fact_app/features/facts/domain/collected_facts_store.dart';
 import 'package:fact_app/features/facts/domain/repositories/fact_repository.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/features/identity/data/key_value_first_launch_store.dart';
 import 'package:fact_app/features/identity/domain/first_launch_store.dart';
 import 'package:fact_app/features/identity/domain/repositories/auth_repository.dart';
@@ -328,8 +332,58 @@ void main() {
       expect(container.read(activeHuntStoreProvider).readActiveHunt(), hunt);
     });
 
-    test('ohne die Overrides bleiben alle fünf Speicher flüchtig', () {
-      // Die Gegenprobe zu den fünf Tests darüber, in einem. Ohne sie könnten
+    test('bindet collectedFactsStoreProvider an den übergebenen Speicher', () {
+      // Der zweite echte Schaden neben der Jagd: ohne diesen Override ist die
+      // Sammlung nach einem Neustart weg, und das trifft die Kernhandlung der
+      // App. Man geht hin, sammelt, und am nächsten Tag war man nie dort.
+      final container = ProviderContainer(
+        overrides: _scope(
+          preferences: InMemoryKeyValueStore(<String, Object>{
+            KeyValueCollectedFactsStore.storageKey: '[7,3]',
+          }),
+        ).overrides,
+      );
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(collectedFactsStoreProvider).readCollectedFacts(),
+        const <FactId>[FactId(7), FactId(3)],
+      );
+    });
+
+    test('der Sammel-Speicher meldet an die überschriebene Senke', () {
+      // Der zweite von zwei Einträgen mit `overrideWith` statt
+      // `overrideWithValue`, aus demselben Grund wie der Jagd-Speicher: er
+      // liest die Diagnosesenke. Ohne `ref.watch` bekäme er eine zweite,
+      // selbst gebaute, und ein verworfener Eintrag wäre auf dem Gerät nicht
+      // zu sehen.
+      final container = ProviderContainer(
+        overrides: _scope(
+          preferences: InMemoryKeyValueStore(<String, Object>{
+            KeyValueCollectedFactsStore.storageKey: 'kein json',
+          }),
+        ).overrides,
+      );
+      addTearDown(container.dispose);
+      final lines = <String?>[];
+
+      final List<FactId> restored = runZoned(
+        () => container.read(collectedFactsStoreProvider).readCollectedFacts(),
+        zoneSpecification: ZoneSpecification(
+          print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
+              lines.add(line),
+        ),
+      );
+
+      expect(restored, isEmpty);
+      final String expected =
+          'FACT-DIAG ${KeyValueCollectedFactsStore.discardedEventName} '
+          '${KeyValueCollectedFactsStore.discardedCountField}=1';
+      expect(lines, <String>[expected]);
+    });
+
+    test('ohne die Overrides bleiben alle sechs Speicher flüchtig', () {
+      // Die Gegenprobe zu den sechs Tests darüber, in einem. Ohne sie könnten
       // sie auch grün sein, wenn die Standards selbst schon persistierten.
       final container = ProviderContainer();
       addTearDown(container.dispose);
@@ -350,6 +404,10 @@ void main() {
       expect(
         container.read(activeHuntStoreProvider),
         isA<InMemoryActiveHuntStore>(),
+      );
+      expect(
+        container.read(collectedFactsStoreProvider),
+        isA<InMemoryCollectedFactsStore>(),
       );
     });
 

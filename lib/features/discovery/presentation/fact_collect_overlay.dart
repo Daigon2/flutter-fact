@@ -41,9 +41,19 @@
 ///
 /// **Der Tour-Zweig** (`:2120-2127`), siehe `fact_collect_decision.dart`.
 ///
-/// **Das automatische Öffnen bei 18 Metern** (`:1470-1490`). Das ist ein
-/// eigener Auslöser am Ortungsstrom und nicht am Tipp; es gehört nicht in
-/// diesen Schritt.
+/// ## Der zweite Auslöser, seit dem 02.09.2026: die Nähe selbst
+///
+/// Hier stand bis dahin, das automatische Sammeln bei 18 Metern
+/// (`:1470-1490`) gehöre nicht in diesen Schritt. Es gehört aber in **diese
+/// Datei**, und der Grund ist derselbe, aus dem die Ballon-Überlagerung hier
+/// liegt: es endet in genau demselben `_startCollect`. Ein zweiter Ort mit
+/// einer zweiten Sperre und einem zweiten Zeitgeber wären zwei
+/// Sammelvorgänge, die sich überlagern können.
+///
+/// Der Auslöser hängt am Ortungsstrom statt am Tipp, die Regel steht in
+/// `fact_auto_collect.dart`, und was sie an der Quelle gefunden hat, steht
+/// dort: drei widersprüchliche Angaben und eine Anzeige, die nie erscheinen
+/// kann (E-68).
 library;
 
 import 'dart:async';
@@ -52,6 +62,7 @@ import 'package:fact_app/app/localization/app_language.dart';
 import 'package:fact_app/app/localization/app_strings.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/core/async/detached_work.dart';
+import 'package:fact_app/features/discovery/presentation/fact_auto_collect.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_images.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/fact_categories.dart';
@@ -62,8 +73,10 @@ import 'package:fact_app/features/discovery/presentation/fact_proximity.dart';
 import 'package:fact_app/features/discovery/presentation/fact_teaser_card.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/fact_overlay_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
+import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_host.dart';
 import 'package:fact_app/map/domain/map_overlay.dart';
@@ -189,6 +202,36 @@ class _FactCollectOverlayState extends ConsumerState<FactCollectOverlay> {
   /// also bis zu fünfmal je Sekunde, obwohl sich nichts Sichtbares ändert.
   DevicePosition? _fix;
 
+  /// Die Fakten, die in dieser Sitzung schon **automatisch** ausgelöst wurden.
+  ///
+  /// `autoOpenedRef` aus `screen-map.jsx:1344`, und die Lebensdauer ist
+  /// dieselbe: sie hängt am Bildschirm und nicht am Gerätespeicher. Die Menge
+  /// beantwortet eine andere Frage als die Sammlung. „Schon gesammelt" ist
+  /// dauerhaft und gehört dem Server; „in dieser Sitzung schon von selbst
+  /// aufgesprungen" verhindert nur, dass ein Fakt beim Herumstehen wieder und
+  /// wieder aufspringt, wenn die Buchung ins Leere lief.
+  ///
+  /// **Sie ist damit die zweite Absicherung und nicht die erste.** Fiele sie
+  /// weg, wäre die Sammlung immer noch die Sperre; fiele die Sammlung weg,
+  /// hielte diese Menge wenigstens die laufende Sitzung ruhig.
+  final Set<String> _automaticallyTriggered = <String>{};
+
+  /// Ob dieser Bildschirm oben liegt, oder `true` außerhalb einer Route.
+  ///
+  /// Die Sperre aus `screen-map.jsx:1474` (`if (factSheetOpenRef.current)
+  /// return;`): solange ein Fakt-Blatt offen ist, sucht der Scan nicht. Ohne
+  /// sie sammelte die Karte unter dem Blatt weiter, und wer liest, bekäme
+  /// alle 1400 Millisekunden eine neue Akte vorgesetzt.
+  ///
+  /// **`true` außerhalb einer Route ist die richtige Voreinstellung**, nicht
+  /// die bequeme: ohne Navigator gibt es kein Blatt, das etwas verdecken
+  /// könnte. Ein `false` würde den Scan in genau der Umgebung abschalten, in
+  /// der die Tests laufen.
+  bool _routeIsCurrent = true;
+
+  /// Der Zeitgeber der zweiten Suche nach dem Schließen des Blatts.
+  Timer? _rescanTimer;
+
   @override
   void initState() {
     super.initState();
@@ -211,6 +254,16 @@ class _FactCollectOverlayState extends ConsumerState<FactCollectOverlay> {
       AsyncValue<MapOverlay> next,
     ) {
       _latestOverlay = next.value ?? _latestOverlay;
+      // **Auch hier gesucht, und das ist gemessen.** Die Quelle sucht nur am
+      // Ortungsstrom (`screen-map.jsx:2650`), weil `window.FACTS` dort längst
+      // geladen ist, bevor der Kartenbildschirm entsteht. Hier ist es ein
+      // `FutureProvider`: beim ersten Bild ist er `AsyncLoading`, und wenn
+      // die Ortung **vor** den Fakten eintrifft, hatte der Scan von dort
+      // keine Überlagerung und ist still zurückgekehrt. Ohne diese Zeile
+      // sammelt in genau dieser Reihenfolge nichts von selbst, bis das
+      // nächste GPS-Signal kommt. Gefunden hat es der Test „eine Ortung, die
+      // schon vorlag, sammelt beim Entstehen".
+      _scanForAutomaticCollect();
     }, fireImmediately: true);
 
     // Die Ortung, aus dem Grund an [_fix]. `fireImmediately`, weil dieses
@@ -221,7 +274,44 @@ class _FactCollectOverlayState extends ConsumerState<FactCollectOverlay> {
       UserLocationState next,
     ) {
       _fix = next.fix;
+      // Der zweite Auslöser: die Nähe selbst, `scanAutoOpenRef.current?.(pos)`
+      // im Ortungs-Handler der Quelle (`screen-map.jsx:2650`). Er hängt hier
+      // **im** Hörer und nicht in `build`, weil `UserLocationState` bewusst
+      // keine Wertgleichheit hat: in `build` liefe er bis zu fünfmal je
+      // Sekunde auch dann, wenn sich nichts bewegt hat.
+      //
+      // **Der Aufruf sitzt bewusst auch im sofortigen Feuern.** Wer die App
+      // neben einem Fakt öffnet oder auf die Karte zurückwechselt, während
+      // eine Ortung längst vorliegt, soll nicht auf das nächste GPS-Signal
+      // warten. Ein `setState` löst das nicht aus, `_startCollect` setzt
+      // synchron nur Felder; der sichtbare Teil kommt einen Umlauf später aus
+      // der Projektion.
+      _scanForAutomaticCollect();
     }, fireImmediately: true);
+  }
+
+  /// Fängt den Augenblick, in dem das Fakt-Blatt sich schließt.
+  ///
+  /// `ModalRoute.isCurrentOf` hängt an einem `InheritedModel`, dessen
+  /// `updateShouldNotify` ausdrücklich `isCurrent != old.isCurrent` prüft
+  /// (`flutter/lib/src/widgets/routes.dart:1032-1038`). Der Aufruf hier
+  /// meldet dieses Widget also als Abhängigen an, und Flutter ruft
+  /// `didChangeDependencies` genau dann, wenn eine Route darüber aufgeht oder
+  /// zugeht. **Das ist die ganze Verdrahtung**, ohne `NavigatorObserver` und
+  /// ohne einen Zustand, der „Blatt offen" doppelt führt.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final bool isCurrent = ModalRoute.isCurrentOf(context) ?? true;
+    final bool wasCurrent = _routeIsCurrent;
+    _routeIsCurrent = isCurrent;
+    if (isCurrent && !wasCurrent) {
+      _rescanTimer?.cancel();
+      _rescanTimer = Timer(factAutoCollectRescanDelay, () {
+        _rescanTimer = null;
+        _scanForAutomaticCollect();
+      });
+    }
   }
 
   @override
@@ -230,6 +320,8 @@ class _FactCollectOverlayState extends ConsumerState<FactCollectOverlay> {
     _pointTapSubscription = null;
     _revealTimer?.cancel();
     _revealTimer = null;
+    _rescanTimer?.cancel();
+    _rescanTimer = null;
     super.dispose();
   }
 
@@ -310,6 +402,73 @@ class _FactCollectOverlayState extends ConsumerState<FactCollectOverlay> {
         style: style ?? factCategoryStylesByKey[fallbackFactCategoryKey]!,
       );
     });
+  }
+
+  /// Die Suche nach einem Fakt, der von selbst eingesammelt wird,
+  /// `scanAutoOpenRef`, `screen-map.jsx:1471-1489`.
+  ///
+  /// Drei Sperren stehen vor der Suche, alle aus der Quelle: eine laufende
+  /// Animation (`:1475`), ein offenes Fakt-Blatt (`:1474`, hier
+  /// [_routeIsCurrent]) und eine fehlende Ortung (`:1472`).
+  ///
+  /// **Die Vorschau wird nicht weggeräumt**, anders als beim Tipp. Die Quelle
+  /// leert `teaserFact` nur im Tipp-Zweig (`:2132`) und ruft aus dem Scan
+  /// direkt `triggerCollect`. Wer also die Vorschau eines fernen Fakts vor
+  /// sich hat und dabei an einen nahen herantritt, behält sie. Gemessenes
+  /// Verhalten der Quelle, und die harmlosere der beiden Möglichkeiten: die
+  /// Vorschau verschwindet ohnehin mit dem Fakt-Blatt, das 1400
+  /// Millisekunden später aufgeht.
+  void _scanForAutomaticCollect() {
+    if (_collecting || !_routeIsCurrent) {
+      return;
+    }
+    final DevicePosition? fix = _fix;
+    final MapOverlay? overlay = _latestOverlay;
+    if (fix == null || overlay == null) {
+      return;
+    }
+    // `read` und nicht `watch`: dieser Aufruf ist ein Ereignis am
+    // Ortungsstrom und keine Abhängigkeit eines Bildes. Ein `watch` hier
+    // wäre ohnehin nicht möglich, ein Hörer ist kein `build`.
+    final List<FactId> collected = ref.read(collectedFactsProvider);
+    final MapOverlayPoint? target = pickAutomaticCollect(
+      user: mapPositionOf(fix),
+      candidates: overlay.points,
+      isEligible: (String factId) =>
+          _isEligibleForAutomaticCollect(factId, collected),
+    );
+    if (target == null) {
+      return;
+    }
+    _automaticallyTriggered.add(target.id);
+    _startCollect(factId: target.id, factPosition: target.position);
+  }
+
+  /// Ob [factId] von selbst eingesammelt werden darf.
+  ///
+  /// Zwei Ausschlüsse der Quelle (`:1479-1480`) und einer, der dazugehört:
+  ///
+  ///  * schon in dieser Sitzung ausgelöst, siehe [_automaticallyTriggered];
+  ///  * schon gesammelt, [collected];
+  ///  * **die Kennung ist keine Zahl.**
+  ///
+  /// Der dritte ist neu und behandelt denselben Fall strenger als der Tipp.
+  /// Ein Tipp auf einen Ballon mit unlesbarer Kennung sammelt sichtbar und
+  /// wird nicht dauerhaft vermerkt, weil hinter ihm eine Absicht steht, die
+  /// man nicht ins Leere laufen lassen will. Ein automatisches Sammeln, das
+  /// niemand vermerken kann, hat diese Absicht nicht: es wäre eine Buchung,
+  /// die die Sammlung nie erreicht, und nur [_automaticallyTriggered] hielte
+  /// sie von der Wiederholung ab. Solche Kennungen entstehen ohnehin nur bei
+  /// einem Verdrahtungsfehler, `factOverlayOf` setzt sie aus `Fact.id`.
+  bool _isEligibleForAutomaticCollect(String factId, List<FactId> collected) {
+    if (_automaticallyTriggered.contains(factId)) {
+      return false;
+    }
+    final int? numeric = int.tryParse(factId);
+    if (numeric == null) {
+      return false;
+    }
+    return !collected.contains(FactId(numeric));
   }
 
   /// `triggerCollect`, `screen-map.jsx:3057-3078`.

@@ -19,6 +19,8 @@ import 'package:fact_app/features/discovery/presentation/notifiers/map_mode_prov
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
 import 'package:fact_app/features/discovery/presentation/pages/map_page.dart';
 import 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome.dart';
+import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
 import 'package:fact_app/map/domain/map_camera_gate.dart';
@@ -1898,6 +1900,107 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  });
+
+  group('Ein gesammelter Fakt bleibt gesammelt', () {
+    // **Diese Verdrahtung hatte bis zum 02.09.2026 keinen einzigen Test**,
+    // und sie ist genau die Sorte, die `REBUILD_STATUS.md` als Muster 10
+    // führt: wenige Zeilen Durchreichung, die in der App wirklich laufen. Bis
+    // dahin gab es auch nichts zu prüfen, das Sammeln endete in einer
+    // Diagnosemeldung.
+
+    const MapOverlay numericOverlay = MapOverlay(
+      id: factOverlayId,
+      points: <MapOverlayPoint>[
+        MapOverlayPoint(
+          // Eine Zahl, weil `Fact.id` eine ist und weil der automatische
+          // Sammelweg alles andere bewusst überspringt.
+          id: '7',
+          position: MapPosition(latitude: 48.1351, longitude: 11.582),
+          styleId: 'fact.hist.uncollected',
+          state: 'uncollected',
+        ),
+      ],
+    );
+
+    testWidgets('ein Fakt direkt neben dem Nutzer landet in der Sammlung', (
+      tester,
+    ) async {
+      final ProviderContainer container = newContainer(overlay: numericOverlay);
+      await pumpPage(tester, container: container);
+      await mapComesAlive(tester, zoom: 16);
+
+      await emitFix(tester, fixAt());
+
+      expect(container.read(collectedFactsProvider), const <FactId>[FactId(7)]);
+    });
+
+    // **Dass derselbe Fakt nicht zweimal in der Sammlung landet, steht nicht
+    // hier**, und das ist eine Grenze dieses Aufbaus und keine Auslassung.
+    // Der zweite Sammelvorgang braucht das Ende des ersten, und nach
+    // `factCollectRevealDelay` ruft `_onOpenFact` die Route auf. `pumpPage`
+    // stellt keinen `GoRouter`, also endet der Test in „No GoRouter found in
+    // context". Die Zusicherung liegt deshalb dort, wo sie ohne Navigation
+    // prüfbar ist: `collected_facts_providers_test.dart` („ein zweiter
+    // Sammelvorgang auf denselben Fakt") und
+    // `fact_collect_overlay_test.dart` („eine zweite Ortung sammelt denselben
+    // Fakt nicht erneut").
+
+    testWidgets('eine Kennung, die keine Zahl ist, landet nirgends', (
+      tester,
+    ) async {
+      // Die Kennungen setzt `factOverlayOf` aus `Fact.id`, eine unlesbare
+      // wäre also ein Verdrahtungsfehler. Sie darf nicht mit einem `!` in
+      // einen Absturz laufen, und sie darf auch nicht als Fakt Nummer
+      // irgendetwas in der Sammlung landen.
+      final ProviderContainer container = newContainer(
+        overlay: overlayWithNearbyFact,
+      );
+      await pumpPage(tester, container: container);
+      await mapComesAlive(tester, zoom: 16);
+
+      await emitFix(tester, fixAt());
+
+      expect(container.read(collectedFactsProvider), isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('die Münzen bucht dabei niemand, und das ist gemeldet', (
+      tester,
+    ) async {
+      // `MapPage.unbookedCollectEvent`. Die Naht ist absichtlich sichtbar:
+      // die Belohnungsregel aus J-C verlangt ein Buchungsjournal, das es
+      // nicht gibt. Wer die Buchung anschließt, löscht diese Meldung, und
+      // dieser Test ist die Stelle, an der er es merkt.
+      final RecordingSink sink = RecordingSink();
+      final ProviderContainer container = newContainer(
+        overlay: numericOverlay,
+        diagnostics: sink,
+      );
+      await pumpPage(tester, container: container);
+      await mapComesAlive(tester, zoom: 16);
+
+      await emitFix(tester, fixAt());
+
+      expect(
+        sink.events
+            .map((DiagnosticEvent event) => event.name)
+            .where((String name) => name == MapPage.unbookedCollectEvent),
+        <String>[MapPage.unbookedCollectEvent],
+      );
+      expect(
+        sink.events
+            .where(
+              (DiagnosticEvent e) => e.name == MapPage.unbookedCollectEvent,
+            )
+            .single
+            .attributes,
+        isEmpty,
+        reason:
+            'die Fakt-Kennung darf nicht mitgehen, sie wäre zusammen mit der '
+            'öffentlichen Koordinate eine Standortspur (security.md §6)',
+      );
+    });
   });
 }
 

@@ -16,6 +16,8 @@ import 'package:fact_app/features/discovery/presentation/notifiers/fact_overlay_
 import 'package:fact_app/features/discovery/presentation/notifiers/map_mode_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
 import 'package:fact_app/features/discovery/presentation/widgets/map_top_chrome.dart';
+import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
+import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/map/application/map_host_providers.dart';
 import 'package:fact_app/map/domain/bearing_smoothing.dart';
 import 'package:fact_app/map/domain/map_camera.dart';
@@ -229,16 +231,22 @@ class MapPage extends ConsumerStatefulWidget {
   /// serverseitige Zahl an und keine erfundene.
   static const int collectCoinAmount = 10;
 
-  /// Gemeldet, wenn gesammelt wurde und niemand es verbucht hat.
+  /// Gemeldet, wenn gesammelt wurde und **die Münzen** niemand verbucht hat.
   ///
   /// ## Warum ein Diagnose-Ereignis und nicht schlicht nichts
   ///
   /// Weil „nichts" von „vergessen" nicht zu unterscheiden wäre. Der
   /// Sammel-Rückruf feuert an der richtigen Stelle und zur richtigen Zeit,
-  /// nur nimmt ihn niemand an: das Buchungsjournal aus J-C ist eine
+  /// nur nimmt die Buchung niemand an: das Buchungsjournal aus J-C ist eine
   /// Entscheidung der Stufe 3, es gibt weder Tabelle noch RPC dafür. Dieses
   /// Ereignis ist die ehrliche Markierung dieser Naht, und es ist die Stelle,
   /// an der die Buchung angeschlossen wird.
+  ///
+  /// **Seit dem 02.09.2026 ist es nur noch die halbe Naht.** Bis dahin
+  /// passierte beim Sammeln überhaupt nichts, was den Start überlebt; seit
+  /// `CollectedFactsStore` geht der Fakt in die Sammlung. Offen ist allein
+  /// die Gutschrift. Wer den Namen dieses Ereignisses liest, soll nicht mehr
+  /// glauben, das Sammeln selbst käme nicht an.
   ///
   /// **Es feuert nicht im Sekundentakt**, anders als die Ereignisse, die
   /// dieses Repository sonst bewusst vermeidet: höchstens einmal je
@@ -1015,9 +1023,32 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   /// Es wurde gesammelt, `onCollectFact` in `screen-map.jsx:3069`.
   ///
-  /// **Heute wird nichts verbucht**, siehe [MapPage.unbookedCollectEvent] für
-  /// den Grund und für die Stelle, an der das Journal einmal anhängt.
+  /// Zwei Dinge sind hier eine Zeile auseinander und im Neubau ausdrücklich
+  /// getrennt, genau wie in `app.jsx:709-712`:
+  ///
+  ///  1. **Der Fakt geht in die Sammlung**, dauerhaft. Das ist der Teil, den
+  ///     der Client entscheiden darf: *was* er gefunden hat.
+  ///  2. **Die Münzen werden nicht verbucht.** Das ist der Teil, den er nicht
+  ///     entscheiden darf, siehe [MapPage.unbookedCollectEvent].
+  ///
+  /// **Eine nicht lesbare Kennung sammelt nichts**, dieselbe Regel wie in
+  /// [_onOpenFact] und aus demselben Grund: die Kennungen setzt
+  /// `factOverlayOf` selbst aus `Fact.id`, ein Fehlschlag wäre also ein
+  /// Verdrahtungsfehler. Er wird dort gemeldet, wo er auffällt, und nicht
+  /// zweimal; deshalb steht hier keine eigene Meldung. Der Rückfall ist
+  /// unterschiedlich: die Akte bleibt zu, die Sammlung bleibt unverändert,
+  /// und die Animation läuft in beiden Fällen, weil sie schon lief.
   void _onFactCollected(String factId) {
+    final int? id = int.tryParse(factId);
+    if (id != null) {
+      // `read` und nicht `watch`: das ist ein Befehl aus einem Rückruf und
+      // keine Abhängigkeit dieses Bildes. Das Ergebnis wird bewusst nicht
+      // abgewartet, der Vertrag verspricht, dass es nicht wirft.
+      reportDetached(
+        ref.read(collectedFactsProvider.notifier).collect(FactId(id)),
+        origin: 'discovery.collect.persist',
+      );
+    }
     ref
         .read(diagnosticSinkProvider)
         .report(

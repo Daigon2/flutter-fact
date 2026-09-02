@@ -7,7 +7,9 @@ import 'package:fact_app/core/diagnostics/diagnostics_providers.dart';
 import 'package:fact_app/core/preferences/key_value_store.dart';
 import 'package:fact_app/features/challenges/application/active_hunt_providers.dart';
 import 'package:fact_app/features/challenges/data/key_value_active_hunt_store.dart';
+import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
+import 'package:fact_app/features/facts/data/key_value_collected_facts_store.dart';
 import 'package:fact_app/features/facts/data/repositories/supabase_fact_repository.dart';
 import 'package:fact_app/features/identity/data/datasources/remote/supabase_auth_remote_data_source.dart';
 import 'package:fact_app/features/identity/data/key_value_first_launch_store.dart';
@@ -175,14 +177,16 @@ ProviderScope productionProviderScope({
       factRepositoryProvider.overrideWith(
         (ref) => ref.watch(supabaseFactRepositoryProvider),
       ),
-      // Die fünf Speicher. Ohne diese Overrides bleiben die flüchtigen
+      // Die sechs Speicher. Ohne diese Overrides bleiben die flüchtigen
       // Standards stehen, und dann tut die App vier Unbequemlichkeiten und
-      // einen echten Schaden: Startbildschirm, Tutorial, Sprachauswahl und
-      // Audio-Modus kämen bei jedem Start zurück, und **eine laufende Jagd
-      // wäre nach einem Neustart weg**. Genau diesen letzten Fall schließt
-      // ADR-007 als Produktvorgabe aus.
+      // **zwei** echte Schäden: Startbildschirm, Tutorial, Sprachauswahl und
+      // Audio-Modus kämen bei jedem Start zurück, eine laufende Jagd wäre
+      // nach einem Neustart weg, und **die eingesammelten Fakten wären es
+      // auch**. Den Jagd-Fall schließt ADR-007 als Produktvorgabe aus, und
+      // der Sammel-Fall ist derselbe Schaden an der Kernhandlung der App:
+      // man geht hin, sammelt, und am nächsten Tag war man nie dort.
       //
-      // Jeder der fünf Verträge hat diesen Weg vorgeschrieben: „Wer später
+      // Jeder der sechs Verträge hat diesen Weg vorgeschrieben: „Wer später
       // persistiert, lädt in `bootstrap()` vor und überschreibt den Provider
       // mit einer gefüllten Implementierung." Dies ist diese Stelle.
       //
@@ -199,12 +203,19 @@ ProviderScope productionProviderScope({
       languagePreferenceStoreProvider.overrideWithValue(
         KeyValueLanguagePreferenceStore(preferences),
       ),
-      // Der fünfte braucht `overrideWith`, und zwar nicht aus Faulheit, sondern
-      // weil er die Diagnosesenke braucht. Über `ref.watch` bekommt er die
-      // **überschriebene** Senke aus dem Eintrag ganz oben; eine hier direkt
-      // gebaute wäre eine zweite Wahrheit darüber, wohin Meldungen gehen.
+      // Die letzten zwei brauchen `overrideWith`, und zwar nicht aus
+      // Faulheit, sondern weil sie die Diagnosesenke brauchen. Über
+      // `ref.watch` bekommen sie die **überschriebene** Senke aus dem Eintrag
+      // ganz oben; eine hier direkt gebaute wäre eine zweite Wahrheit
+      // darüber, wohin Meldungen gehen.
       activeHuntStoreProvider.overrideWith(
         (ref) => KeyValueActiveHuntStore(
+          preferences,
+          sink: ref.watch(diagnosticSinkProvider),
+        ),
+      ),
+      collectedFactsStoreProvider.overrideWith(
+        (ref) => KeyValueCollectedFactsStore(
           preferences,
           sink: ref.watch(diagnosticSinkProvider),
         ),

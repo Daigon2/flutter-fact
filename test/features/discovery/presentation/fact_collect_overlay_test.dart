@@ -5,6 +5,7 @@ import 'package:fact_app/app/localization/app_language.dart';
 import 'package:fact_app/app/localization/app_strings.dart';
 import 'package:fact_app/app/localization/language_preference_store.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
+import 'package:fact_app/features/discovery/presentation/fact_auto_collect.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_images.dart';
 import 'package:fact_app/features/discovery/presentation/fact_balloon_overlay.dart';
 import 'package:fact_app/features/discovery/presentation/fact_categories.dart';
@@ -15,7 +16,9 @@ import 'package:fact_app/features/discovery/presentation/fact_proximity.dart';
 import 'package:fact_app/features/discovery/presentation/fact_teaser_card.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/fact_overlay_providers.dart';
 import 'package:fact_app/features/discovery/presentation/notifiers/user_location_providers.dart';
+import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
+import 'package:fact_app/features/facts/domain/collected_facts_store.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_coordinates.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
@@ -90,9 +93,13 @@ void main() {
     FactProximity proximity = FactProximity.empty,
     List<Fact> facts = const <Fact>[],
     AppLanguage language = AppLanguage.de,
+    List<FactId> collectedFacts = const <FactId>[],
   }) {
     final ProviderContainer container = ProviderContainer(
       overrides: [
+        collectedFactsStoreProvider.overrideWithValue(
+          InMemoryCollectedFactsStore(collectedFacts),
+        ),
         mapHostProvider.overrideWithValue(host),
         locationServiceProvider.overrideWithValue(location),
         languagePreferenceStoreProvider.overrideWithValue(
@@ -319,8 +326,14 @@ void main() {
 
     testWidgets('ein Tipp auf eine fremde Überlagerung geht diesen '
         'Bildschirm nichts an', (tester) async {
+      // **50 Meter und nicht 10, seit dem 02.09.2026.** Der Punkt muss
+      // innerhalb des Sammelradius liegen, damit ein Tipp überhaupt sammeln
+      // könnte, und **außerhalb** von `factAutoCollectRadiusInMeters`, sonst
+      // sammelt ihn die Ortung von selbst ein und dieser Test prüfte den
+      // Tipp-Weg nicht mehr. Bei 10 Metern war er nach dem Bau des
+      // automatischen Sammelns rot, und das war richtig so.
       final ProviderContainer container = newContainer(
-        points: <MapOverlayPoint>[pointAt('7', 10)],
+        points: <MapOverlayPoint>[pointAt('7', 50)],
         facts: <Fact>[factWith(7, 'Alter Peter')],
       );
       await pumpOverlay(tester, container: container);
@@ -343,13 +356,14 @@ void main() {
     testWidgets('eine Kennung, die die Überlagerung nicht kennt, tut nichts', (
       tester,
     ) async {
+      // 50 statt 10 Meter, aus dem Grund im Test darüber.
       final ProviderContainer container = newContainer(
-        points: <MapOverlayPoint>[pointAt('7', 10)],
+        points: <MapOverlayPoint>[pointAt('7', 50)],
       );
       await pumpOverlay(tester, container: container);
       await locateUser(tester);
 
-      await tap(tester, tapOn('999', 10));
+      await tap(tester, tapOn('999', 50));
 
       expect(collected, isEmpty);
       expect(find.byType(FactTeaserCard), findsNothing);
@@ -359,9 +373,16 @@ void main() {
         'nicht aus der Fingerstelle', (tester) async {
       // **Der Tipp liegt 900 Meter weiter nördlich als der Punkt.** Rechnete
       // der Empfänger mit `tap.position`, wäre dieser Fakt außer Reichweite
-      // und es gäbe nur die Vorschau. Der Punkt selbst liegt bei 10 Metern.
+      // und es gäbe nur die Vorschau. Der Punkt selbst liegt bei 50 Metern.
+      //
+      // **Und 50 und nicht 10, seit dem 02.09.2026.** Dieser Test war mit
+      // 10 Metern grün, aber aus dem falschen Grund: die Ortung hätte den
+      // Fakt ohnehin von selbst eingesammelt, und dann wäre die Zusicherung
+      // unten auch bei einem Empfänger erfüllt, der mit der Fingerstelle
+      // rechnet. Ein grüner Test, der seine eigene Aussage nicht mehr prüft,
+      // ist die teuerste Sorte; er steht als Muster 26 im Blindheitskatalog.
       final ProviderContainer container = newContainer(
-        points: <MapOverlayPoint>[pointAt('7', 10)],
+        points: <MapOverlayPoint>[pointAt('7', 50)],
         facts: <Fact>[factWith(7, 'Alter Peter')],
       );
       await pumpOverlay(tester, container: container);
@@ -372,7 +393,7 @@ void main() {
         MapOverlayPointTap(
           overlayId: factOverlayId,
           pointId: '7',
-          position: northOf(910),
+          position: northOf(950),
         ),
       );
       await tester.pump();
@@ -848,6 +869,265 @@ void main() {
       );
     });
   });
+
+  group('Das automatische Sammeln', () {
+    // `scanAutoOpenRef`, `screen-map.jsx:1471-1489`. Die Regel selbst hat
+    // ihren eigenen Test (`fact_auto_collect_test.dart`); hier steht die
+    // Verdrahtung: wer den Scan auslöst, was ihn sperrt, und dass er im
+    // selben Sammelvorgang endet wie der Tipp.
+
+    testWidgets('eine Ortung neben einem Fakt sammelt ihn ohne Tipp', (
+      tester,
+    ) async {
+      final ProviderContainer container = newContainer(
+        points: <MapOverlayPoint>[pointAt('7', 5)],
+        facts: <Fact>[factWith(7, 'Alter Peter')],
+      );
+      await pumpOverlay(tester, container: container);
+
+      await locateUser(tester);
+
+      expect(collected, <String>['7']);
+    });
+
+    testWidgets('und öffnet danach dasselbe Blatt wie ein Tipp', (
+      tester,
+    ) async {
+      // Der automatische Weg endet in `_startCollect` und damit im selben
+      // Zeitgeber. Wäre es ein zweiter Ablauf, könnte er sich mit dem des
+      // Tipps überlagern.
+      final ProviderContainer container = newContainer(
+        points: <MapOverlayPoint>[pointAt('7', 5)],
+        facts: <Fact>[factWith(7, 'Alter Peter')],
+      );
+      await pumpOverlay(tester, container: container);
+
+      await locateUser(tester);
+      expect(opened, isEmpty);
+      await tester.pump(factCollectRevealDelay);
+
+      expect(opened, <String>['7']);
+    });
+
+    testWidgets('ein Fakt außerhalb des Radius bleibt liegen', (tester) async {
+      final ProviderContainer container = newContainer(
+        points: <MapOverlayPoint>[pointAt('7', 50)],
+        facts: <Fact>[factWith(7, 'Alter Peter')],
+      );
+      await pumpOverlay(tester, container: container);
+
+      await locateUser(tester);
+
+      expect(collected, isEmpty);
+    });
+
+    testWidgets('ohne Ortung sammelt nichts von selbst', (tester) async {
+      // Der Fakt liegt **auf** dem Nutzer. Nur die fehlende Ortung hält den
+      // Scan auf, wie `if (!pos) return` in `:1472`.
+      final ProviderContainer container = newContainer(
+        points: <MapOverlayPoint>[pointAt('7', 0)],
+        facts: <Fact>[factWith(7, 'Alter Peter')],
+      );
+
+      await pumpOverlay(tester, container: container);
+
+      expect(collected, isEmpty);
+    });
+
+    testWidgets('ein schon gesammelter Fakt springt nicht auf', (tester) async {
+      // Der Ausschluss aus `:1480`, und der Grund, warum
+      // `CollectedFactsStore` vor dieser Mechanik gebaut werden musste: ohne
+      // ihn gäbe es das Wort „noch nicht gesammelt" nicht.
+      final ProviderContainer container = newContainer(
+        points: <MapOverlayPoint>[pointAt('7', 5)],
+        facts: <Fact>[factWith(7, 'Alter Peter')],
+        collectedFacts: const <FactId>[FactId(7)],
+      );
+      await pumpOverlay(tester, container: container);
+
+      await locateUser(tester);
+
+      expect(collected, isEmpty);
+    });
+
+    testWidgets('eine Kennung, die keine Zahl ist, springt nicht auf', (
+      tester,
+    ) async {
+      // Strenger als der Tipp, und begründet: ein automatisches Sammeln, das
+      // niemand vermerken kann, wäre eine Buchung, die die Sammlung nie
+      // erreicht.
+      final ProviderContainer container = newContainer(
+        points: <MapOverlayPoint>[pointAt('keine-zahl', 5)],
+      );
+      await pumpOverlay(tester, container: container);
+
+      await locateUser(tester);
+
+      expect(collected, isEmpty);
+    });
+
+    testWidgets('der nächste Fakt gewinnt, nicht der erste in der Liste', (
+      tester,
+    ) async {
+      final ProviderContainer container = newContainer(
+        points: <MapOverlayPoint>[pointAt('17', 15), pointAt('3', 2)],
+        facts: <Fact>[factWith(17, 'Weiter'), factWith(3, 'Näher')],
+      );
+      await pumpOverlay(tester, container: container);
+
+      await locateUser(tester);
+
+      expect(collected, <String>['3']);
+    });
+
+    testWidgets('eine zweite Ortung sammelt denselben Fakt nicht erneut', (
+      tester,
+    ) async {
+      // **Und hier hängt es allein an der Sitzungsmenge**, nicht an der
+      // Sammlung: `onCollected` schreibt in diesem Test nur in eine Liste,
+      // der Speicher bleibt leer. Genau so ist es auch am Gerät, wenn der
+      // Schreibvorgang ins Leere läuft. Wer `_automaticallyTriggered`
+      // entfernt, bekommt hier zwei Einträge.
+      final ProviderContainer container = newContainer(
+        points: <MapOverlayPoint>[pointAt('7', 5)],
+        facts: <Fact>[factWith(7, 'Alter Peter')],
+      );
+      await pumpOverlay(tester, container: container);
+
+      await locateUser(tester);
+      // Erst den Ablauf zu Ende laufen lassen, sonst prüfte dieser Test die
+      // Animationssperre und nicht die Sitzungsmenge.
+      await tester.pump(factCollectRevealDelay);
+      await locateUser(tester);
+
+      expect(collected, <String>['7']);
+    });
+
+    testWidgets('während der Animation sammelt nichts Zweites von selbst', (
+      tester,
+    ) async {
+      // Die Sperre aus `:1475` (`if (collectAnim) return;`). **Beide Fakten
+      // liegen in Reichweite**, der zweite ist nach dem ersten Durchlauf
+      // immer noch frisch, und nur die laufende Animation hält ihn auf. Ohne
+      // die Sperre stünde unten `['nah', 'mittel']`, also zwei Sammelvorgänge
+      // in derselben Sekunde, mit zwei Zeitgebern auf dasselbe Blatt.
+      final ProviderContainer container = newContainer(
+        // **Zahlen als Kennungen, und das ist kein Zufall.** Ein Punkt mit
+        // einer nicht lesbaren Kennung wird vom Scan bewusst übersprungen,
+        // siehe den Test darüber; mit 'nah' und 'mittel' war dieser Test rot.
+        points: <MapOverlayPoint>[pointAt('5', 5), pointAt('15', 15)],
+        facts: <Fact>[factWith(5, 'Nah'), factWith(15, 'Mittel')],
+      );
+      await pumpOverlay(tester, container: container);
+      await locateUser(tester);
+      expect(collected, <String>['5']);
+
+      // Eine zweite Ortung, mitten in der Animation.
+      await locateUser(tester);
+
+      expect(collected, <String>['5']);
+
+      // Und danach ist der zweite fällig, damit dieser Test nicht auch dann
+      // grün wäre, wenn der Scan gar nichts mehr täte.
+      await tester.pump(factCollectRevealDelay);
+      await locateUser(tester);
+
+      expect(collected, <String>['5', '15']);
+    });
+
+    testWidgets('eine Ortung, die schon vorlag, sammelt beim Entstehen', (
+      tester,
+    ) async {
+      // Derselbe Fall wie beim Tipp-Weg eine Gruppe weiter oben, nur für den
+      // Scan: nach einem Tabwechsel entsteht dieses Widget neu, während eine
+      // Ortung längst vorliegt. Ohne `fireImmediately` am Hörer sammelte
+      // hier **nie** etwas von selbst, bis das nächste GPS-Signal kommt.
+      final ProviderContainer container = newContainer(
+        points: <MapOverlayPoint>[pointAt('7', 5)],
+        facts: <Fact>[factWith(7, 'Alter Peter')],
+      );
+      container.read<UserLocationState>(userLocationProvider);
+      location.emit(
+        DevicePosition(
+          latitude: user.latitude,
+          longitude: user.longitude,
+          accuracyInMeters: 10,
+        ),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      await pumpOverlay(tester, container: container);
+
+      expect(collected, <String>['7']);
+    });
+
+    group('solange ein Blatt darüber liegt', () {
+      testWidgets('sammelt der Scan nicht', (tester) async {
+        // Die Sperre aus `:1474`. Ohne sie sammelte die Karte unter dem
+        // offenen Blatt weiter, und wer liest, bekäme alle 1400
+        // Millisekunden eine neue Akte vorgesetzt.
+        final ProviderContainer container = newContainer(
+          points: <MapOverlayPoint>[pointAt('7', 5)],
+          facts: <Fact>[factWith(7, 'Alter Peter')],
+        );
+        await pumpOverlay(tester, container: container);
+        await _pushSheet(tester);
+
+        await locateUser(tester);
+
+        expect(collected, isEmpty);
+      });
+
+      testWidgets('nach dem Schließen sucht er nach 600 Millisekunden', (
+        tester,
+      ) async {
+        // `setTimeout(..., 600)` in `:1544`. Der Nutzer steht noch neben dem
+        // Fakt, also soll er nicht auf das nächste GPS-Signal warten.
+        final ProviderContainer container = newContainer(
+          points: <MapOverlayPoint>[pointAt('7', 5)],
+          facts: <Fact>[factWith(7, 'Alter Peter')],
+        );
+        await pumpOverlay(tester, container: container);
+        await _pushSheet(tester);
+        await locateUser(tester);
+        expect(collected, isEmpty);
+
+        await _popSheet(tester);
+        expect(
+          collected,
+          isEmpty,
+          reason: 'nicht sofort, die Schließ-Animation soll durchlaufen',
+        );
+        await tester.pump(factAutoCollectRescanDelay);
+
+        expect(collected, <String>['7']);
+      });
+    });
+  });
+}
+
+/// Legt eine Route über den Kartenbildschirm, wie das Fakt-Blatt es tut.
+///
+/// `FactRoute` ist eine volle Seite (`app_routes.dart`), also liegt der
+/// Kartenbildschirm darunter und ist nicht mehr `isCurrent`. Genau daran
+/// hängt die Sperre des Scans, siehe `didChangeDependencies`.
+Future<void> _pushSheet(WidgetTester tester) async {
+  final BuildContext context = tester.element(find.byType(FactCollectOverlay));
+  unawaited(
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => const Text('Akte'),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Schließt die Route wieder.
+Future<void> _popSheet(WidgetTester tester) async {
+  Navigator.of(tester.element(find.text('Akte'))).pop();
+  await tester.pumpAndSettle();
 }
 
 /// Ein Karten-Host ohne Karte, mit einem steuerbaren Punkt-Tipp-Strom.

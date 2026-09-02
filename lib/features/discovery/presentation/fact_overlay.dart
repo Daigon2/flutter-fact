@@ -86,9 +86,12 @@ const double factOverlayMinZoom = 11;
 ///    tut es `_team_generate_orders` auch.
 /// 2. **Die Kategorie wird über die Aliastabelle abgebildet**, mit Rückfall auf
 ///    `hist` und einer Meldung, siehe [unknownFactCategoryEvent].
-/// 3. **Der Sammelzustand ist heute immer „nicht gesammelt".** Es gibt keine
-///    Quelle dafür, `features/collection` existiert nicht. Der Auslöser steht
-///    bei [factNotCollectedState].
+/// 3. **Der Sammelzustand ist hier immer „nicht gesammelt", obwohl es seit
+///    dem 02.09.2026 eine Quelle dafür gibt.** `CollectedFactsStore` weiß es,
+///    und diese Funktion fragt ihn nicht: es fehlt der zweite Bildsatz, siehe
+///    [factNotCollectedState]. Wer ihn zeichnet, gibt dieser Funktion die
+///    Sammlung als Parameter und **nicht** einen Provider; sie ist rein und
+///    soll es bleiben.
 ///
 /// ## Keine Deckelung
 ///
