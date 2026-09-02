@@ -3586,6 +3586,57 @@ Erlaubnisliste von Gate 6.
 
 **Antwort vom 31.08.2026: keine der drei Optionen, sondern der vierte Weg. Shared Kernel.** Die Architektur wird an dieser Stelle ausdrücklich als zu streng bewertet und minimal aufgelockert, die Kopien in `puzzles/domain` werden über denselben Weg aufgelöst, und beides gehört als Architekturentscheidung festgehalten. Wortlaut, die drei Aufträge darin und die Abgrenzung gegen D-9 stehen im Abschnitt „Der zweite Fragenblock an Dairen, 31.08.2026“.
 
+## Der dritte Fragenblock, 02.09.2026, verschickt
+
+**Der Wortlaut steht hier, bevor er rausgeht.** Das ist die Regel, die sich der
+zweite Block selbst gegeben hat, nachdem zwei seiner Antworten ohne den
+Fragetext nicht mehr auflösbar waren.
+
+Zuschnitt diesmal anders als bei den ersten beiden Blöcken, und zwar auf
+Janeks Hinweis: er liest meist nur die Fragen, und Dairen sieht ohnehin nur
+die Fragen. **Jede Frage trägt ihren Zusammenhang deshalb selbst**, damit sie
+ohne dieses Dokument beantwortbar ist.
+
+### An Janek
+
+**J-1: Dieses Repository ist öffentlich. Umstellen, und wann gehen die
+Backend-Löcher zu?** Gehört zu E-64. Nachgesehen und nicht angenommen,
+`gh repo view` meldet für `Daigon2/flutter-fact` die Sichtbarkeit `PUBLIC`.
+Darin liegt `REBUILD_STATUS.md` mit dem geprüften Verzeichnis von sieben
+Löchern im laufenden Supabase-Backend, mit Tabellen-, Policy- und
+Funktionsnamen, und `docs/operations/backend-inventory.md` nennt die
+Projekt-URL der laufenden Instanz. Der Schlüssel liegt nicht im Repository,
+aber der öffentliche Schlüssel der PWA ist aus jedem Browser zu holen.
+Zwei getrennte Entscheidungen, und die zweite ist die wichtigere: umstellen
+behebt nichts rückwirkend, die Löcher zu machen behebt es.
+
+**J-2: Zwei fehlende Texte, je Deutsch und Englisch.** Gehört zu E-28 und
+E-63. Beide Schlüssel werden in der PWA aufgerufen und stehen in keinem
+Wörterbuch, und weil `window.t` bei fehlendem Schlüssel den Schlüssel selbst
+zurückgibt, steht der Name auf dem Bildschirm. Vorschläge liegen bei, die
+Frage ist nur, ob sie so bleiben.
+
+### An Dairen
+
+**D-19: Die Rätsel-Antworten sind deutsche Datenwerte, und auf Englisch ist das
+Kompass-Rätsel unlösbar. Was baut der Neubau, bevor die Daten sprachfrei
+sind?** Gehört zu E-08 und blockiert die Schritte 28, 29, 30 und 38, also die
+ganze spielbare Jagd. Die Behebung an der Wurzel ist eine Datenstruktur im
+Monorepo.
+
+**D-20: Eine laufende Jagd soll einen Neustart vollständig überleben. Wie kommt
+der Plan in die Nutzlast, ohne ADR-007 zu sprengen?** Gehört zu E-65. Janek hat
+am 02.09.2026 entschieden: „als hätte man nie aufgehört“. ADR-007 speichert heute
+bewusst nur ein kleines Lesemodell und ausdrücklich **nicht** den `HuntPlan`
+mit Fakt und Rätsel je Station. Braucht einen Folge-ADR.
+
+**D-21: Was heißt „narrowly scoped Core“ konkret?** Letzte der drei Asymmetrien
+im Architektur-Prüfskript. `application` hat als einzige Schicht nur eine
+Verbotsliste, weil in `dependency-rules.md` niemand geschrieben hat, welche
+Teile von `lib/core/` gemeint sind. Das Skript kann nichts prüfen, was nicht
+dasteht.
+
+
 ## Der zweite Fragenblock an Dairen, 31.08.2026, mit Antworten
 
 **Der Wortlaut steht hier, und zwar aus demselben Grund wie beim ersten Block.**
