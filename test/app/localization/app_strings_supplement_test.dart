@@ -35,7 +35,7 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die sechsundsechzig belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die siebenundsechzig belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
@@ -56,6 +56,11 @@ void main() {
       // Schritt 37 dazu, `screen-map.jsx:1036-1130`. Die zweiundzwanzig
       // `challenge.huntPause.`- und `challenge.huntResult.`-Schlüssel kamen
       // mit Schritt 39 dazu, `screen-challenge.jsx:2797-2980`.
+      // **`wallet.shelfVolumeLabel` kam am 03.09.2026 mit Schritt 45 dazu**,
+      // `screen-wallet.jsx:968`. Die Vorlesehilfe eines Buchrückens steht
+      // dort als hartcodierter deutscher Satz im `aria-label`, ohne `t()`,
+      // und trifft damit genau die Nutzer, die sie am wenigsten umgehen
+      // können. Der englische Wert ist deshalb nach E-61 übersetzt.
       //
       // **`audio.dialog.volumeHint` kam am 02.09.2026 dazu und ist von allen
       // anderen verschieden** (E-28, `screen-auth.jsx:251`). Alle übrigen
@@ -152,6 +157,7 @@ void main() {
         'challenge.huntResult.timeLine',
         'challenge.huntResult.timePlaceholder',
         'challenge.huntResult.close',
+        'wallet.shelfVolumeLabel',
       });
     });
 

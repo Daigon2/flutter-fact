@@ -127,7 +127,7 @@ Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
 den Schritten 33 bis 37 und 39.
 
-**Fertig sind 31 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 31, 33 bis 37 und 39. Schritt 14 ist
+**Fertig sind 32 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 31, 33 bis 37, 39 und 45. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -141,7 +141,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2599 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2688 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -428,6 +428,36 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 03.09.2026, Schritt 45, und der Reiseführer gruppiert nach Luftlinie
+
+Der Wallet-Reiter zeigt statt einer Zeichenkette ein Bücherregal: Kopfkarte,
+Bände je Stadt mit Zähler, Trophäenzeile. **31 von 50 sind damit 32.** Stadt-Band
+und Lesemodus sind Schritt 46 und 47, ein Buchrücken ist deshalb tippbar und
+ohne Ziel, wie die Fakt-Akte in Schritt 21.
+
+**Der Kern ist eine Abweichung, nicht der Nachbau.** `wltCityKey` fragt
+`detectCity(lat, lng)`, und das ist eine Nächster-Nachbar-Suche über zwölf
+Stadtmitten **ohne Entfernungsgrenze**: ein Fakt in Paris landet im Heidelberger
+Band, `f.ort` wird nie erreicht, und die Stadt-Trophäen kommen aus `facts.city`,
+also aus einer anderen Quelle als die Bände. Gruppiert wird deshalb nach
+`FactCity.slug`. **Und das ist wichtiger als es klingt:** damit entsteht keine
+sechste Stadtschlüssel-Variante, und genau das ist die Falle von E-56.
+
+**Vier weitere Funde in derselben Datei**, alle gemessen: dreißig von
+sechsunddreißig Trophäen zeigen ihren rohen i18n-Schlüssel (E-73), die
+Schlagzeile zeigt das Doppelte der gesammelten Fakten, weil eine Menge jede
+Kennung zweimal enthält (E-74), 410 Zeilen sind toter Code, darunter ein
+Buchrücken, der **nicht** der gebaute ist (E-76), und im dunklen Theme ist keine
+einzige Trophäen-Beschriftung lesbar (E-77).
+
+**Überraschend war der eigene Werkzeugkasten.** Der JS-Leser des
+Datengenerators konnte den Objektschlüssel `münchen` nicht lesen, weil
+`_identifier()` nur `[A-Za-z0-9_$]` nahm. Er hat laut abgebrochen und nicht
+geraten, das war richtig. Und der gestrichelte Rahmen des Leerplatzes existierte
+seit Schritt 34 schon einmal, privat in `challenge_setup_view.dart`; er liegt
+jetzt in `core/widgets/dashed_border_painter.dart`, weil eine zweite Abschrift
+genau das Muster wäre, an dem dieses Repository sonst zu suchen anfängt.
 
 ### 03.09.2026, der goldene Ballon, und damit sieht man das Sammeln
 

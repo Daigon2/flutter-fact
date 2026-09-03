@@ -1,10 +1,9 @@
-import 'dart:ui' as ui;
-
 import 'package:fact_app/app/localization/app_strings.dart';
 import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/theme/fact_colors.dart';
 import 'package:fact_app/app/theme/fact_typography.dart';
 import 'package:fact_app/core/widgets/css_gradient_geometry.dart';
+import 'package:fact_app/core/widgets/dashed_border_painter.dart';
 import 'package:fact_app/core/widgets/primary_button.dart';
 import 'package:fact_app/features/challenges/domain/value_objects/hunt_duration.dart';
 import 'package:fact_app/features/challenges/presentation/challenge_genre.dart';
@@ -530,7 +529,11 @@ class _ChallengeSetupViewState extends ConsumerState<ChallengeSetupView> {
         // `marginTop: 4`, `:1743`.
         padding: const EdgeInsets.only(top: 4),
         child: CustomPaint(
-          painter: _DashedBorderPainter(color: colors.border2),
+          painter: DashedBorderPainter(
+            color: colors.border2,
+            borderRadius: _JoinButtonBorder.radius,
+            strokeWidth: _JoinButtonBorder.strokeWidth,
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
@@ -804,58 +807,18 @@ class _ChallengeSetupViewState extends ConsumerState<ChallengeSetupView> {
   }
 }
 
-/// Der gestrichelte Rahmen des Beitritts-Knopfes, `:1744`.
+/// Der gestrichelte Rahmen des Beitritts-Knopfes, `:1743-1744`.
 ///
-/// CSS legt bei `border-style: dashed` **nicht** fest, wie lang Strich und
-/// Lücke sind; das entscheidet der Browser. Die 3 Pixel hier sind deshalb
-/// gewählt und nicht gemessen. Alles andere am Knopf steht in der Quelle.
-class _DashedBorderPainter extends CustomPainter {
-  const _DashedBorderPainter({required this.color});
-
+/// **Der Maler selbst steht seit dem 03.09.2026 in
+/// `core/widgets/dashed_border_painter.dart`.** Die Leerplätze des
+/// Bücherregals brauchen denselben Rahmen, und Regel 8 lässt `collection`
+/// nicht in dieses Verzeichnis greifen. Hier bleiben nur die zwei Maße, die
+/// aus **dieser** Quellzeile kommen; Strich und Lücke sind eine Wahl und
+/// stehen als gemeinsame Vorgabe beim Maler.
+abstract final class _JoinButtonBorder {
   /// `borderRadius: 14`, `:1743`.
-  static const double cornerRadius = 14;
+  static const BorderRadius radius = BorderRadius.all(Radius.circular(14));
 
   /// `1px dashed`, `:1744`.
   static const double strokeWidth = 1;
-
-  static const double dashLength = 3;
-  static const double gapLength = 3;
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Path path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            strokeWidth / 2,
-            strokeWidth / 2,
-            size.width - strokeWidth,
-            size.height - strokeWidth,
-          ),
-          const Radius.circular(cornerRadius),
-        ),
-      );
-    final Paint paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..color = color;
-
-    for (final ui.PathMetric metric in path.computeMetrics()) {
-      double start = 0;
-      while (start < metric.length) {
-        final double end = start + dashLength;
-        canvas.drawPath(
-          metric.extractPath(start, end.clamp(0, metric.length)),
-          paint,
-        );
-        start = end + gapLength;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DashedBorderPainter oldDelegate) =>
-      oldDelegate.color != color;
 }

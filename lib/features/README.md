@@ -31,6 +31,15 @@ seitdem auch in `domain-map.md`, `architecture-overview.md` und
 `project-structure.md`. `tours` und `challenges` dürfen davon abhängen, aber nur
 von `puzzles/domain` und `puzzles/application`; umgekehrt nie.
 
+> **Nachtrag 03.09.2026: der Bildschirm steht, und er steht in `collection`.**
+> Schritt 45 hat die Bibliothek gebaut, also Kopfkarte, Bücherregal und
+> Trophäenzeile, unter `collection/presentation/pages/collection_page.dart`.
+> Die Produktfrage darunter ist damit auch praktisch beantwortet: es ist
+> **ein** Bildschirm. Cover und Lesemodus (Schritt 46 und 47) kommen als
+> weitere Zustände desselben Reiters dazu und nicht als eigenes Feature.
+> Die Trophäen liest er über einen öffentlichen Application-Vertrag von
+> `progression` (Regel 10), die Münzen fasst er nicht an.
+
 **`library` ist am 31.08.2026 gestrichen.** Die Produktfrage ist entschieden:
 alles kommt in den Wallet, also das Bücherregal mit den gesammelten Fakten, und
 `collection` besitzt diesen Bildschirm. Die Coins gehen ins **Profil**, sie

@@ -538,6 +538,21 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'challenge.huntResult.timePlaceholder': '—',
 
     'challenge.huntResult.close': 'Fertig',
+
+    // Die Vorlesehilfe eines Buchrückens im Reiseführer,
+    // `screen-wallet.jsx:968`:
+    // `aria-label={`${cityObj.name} öffnen, ${collected} von ${total}`}`.
+    //
+    // **Ein hartcodierter deutscher Satz für Screenreader**, ohne `t()` und
+    // damit ohne Schlüssel. Er trifft genau die Nutzer, die ihn am wenigsten
+    // umgehen können: wer die Seite auf Englisch liest und einen Screenreader
+    // benutzt, hört Deutsch. Nach E-61 ist das ein Defekt und keine Parität,
+    // deshalb steht der englische Wert übersetzt in der anderen Karte.
+    //
+    // Sichtbar ist auf dem Rücken selbst nur `3/12`. Diese Zeile ist die
+    // einzige Stelle, an der die Zahlen als Satz vorkommen, und sie steht
+    // deshalb in der Ergänzung und nicht bei der Zählerplatte.
+    'wallet.shelfVolumeLabel': '{city} öffnen, {collected} von {total}',
   },
   AppLanguage.en: <String, String>{
     // Siehe den deutschen Eintrag: dieser Schlüssel trägt als einziger einen
@@ -682,6 +697,7 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'challenge.huntResult.timeLine': 'Time: {time}',
     'challenge.huntResult.timePlaceholder': '—',
     'challenge.huntResult.close': 'Done',
+    'wallet.shelfVolumeLabel': 'Open {city}, {collected} of {total}',
   },
 };
 
