@@ -149,8 +149,16 @@ and it is the owner's, not the architect's.
 rule true for the first time: *"Schema changes are versioned migrations."* It has
 been the rule since 2026-07-19 and has never held.
 
-**2. A new, empty Supabase project.** Nothing is pulled from the old one. The old
-project stays untouched and keeps serving the PWA until the owner retires it.
+**2. A new, empty Supabase project, under a Supabase account of its own.**
+Nothing is pulled from the old one. The old project stays untouched and keeps
+serving the PWA until the owner retires it.
+
+Confirmed by the owner on 2026-09-03: *"ja okay, dann neuer Supabase Accout und
+wir verbinden Git damit und meinen ein neues Projekt."* The account matters as
+much as the project. The screenshot taken during that conversation showed the
+integration list of a Supabase project whose GitHub App is installed on the
+`RuleZero` organisation, which is the owner's employer. FACT hanging off work
+credentials and work billing is a dependency nobody chose.
 
 **3. The Git connection runs through the repository owner.** The Supabase GitHub
 App must be installed by the account that owns `Daigon2/flutter-fact`. Measured
@@ -236,8 +244,8 @@ costs the work done and nothing else.
 
 | Step | What | Who | Touches production? |
 |---|---|---|---|
-| 0 | `supabase/` as a CLI project in this repository, empty migrations directory, CI job that applies all migrations to a throwaway database from zero | me | no |
-| 1 | New, empty Supabase project. Supabase GitHub App installed on `Daigon2/flutter-fact` | **Maestro Dairen** | no |
+| 0 | `supabase/` as a CLI project in this repository, empty migrations directory, CI job that applies all migrations to a throwaway database from zero | me | no. **Done on 2026-09-03** |
+| 1 | New Supabase account, new empty project, Supabase GitHub App installed on `Daigon2/flutter-fact` | **Maestro Dairen** | no |
 | 2 | The schema as reviewable migrations, in order: extensions, cities, profiles, facts, collection, ledger, progression, hunts, creator and storage, then policies and functions | me | no, new project only |
 | 3 | Cities seed, then facts imported fresh | pipeline owner | new project only |
 | 4 | The client's keys point at the new project. Two files | me | no |
@@ -252,7 +260,13 @@ gates in `.github/workflows/gates.yml`.
 
 1. **The schema builds from zero.** All migrations applied to an empty database in
    CI. This is the single check the old backend never had, and its absence is the
-   root of everything in the Context section.
+   root of everything in the Context section. **Built on 2026-09-03** as Gate 5
+   in `.github/workflows/gates.yml`.
+
+   It runs in CI and not on the maintainer's machine, because it needs Docker and
+   none is installed there (measured 2026-09-03). That is a real gap and it is
+   named rather than papered over: a broken migration is caught on push, not
+   before it. `quality-gates.md` therefore still lists four local gates.
 2. **No table without RLS, and no policy with `USING (true)`.** A query over
    `pg_tables` and `pg_policies`, run as a test, not as a review habit.
 3. **No `SECURITY DEFINER` function with a user id parameter.** A query over

@@ -1,4 +1,5 @@
-# Die vier Gates aus `docs/engineering/quality-gates.md`, maschinell.
+# Die Gates aus `docs/engineering/quality-gates.md`, maschinell. Vier fuer den
+# Client, seit dem 03.09.2026 ein fuenftes fuer das Datenbankschema.
 #
 # Warum es das gibt: bis zum 31.08.2026 lief kein einziges Gate automatisch.
 # Alle vier hingen daran, dass jemand vier Befehle startet, und `HANDOFF.md`
@@ -111,3 +112,56 @@ jobs:
         run: |
           dart run build_runner build --delete-conflicting-outputs
           git diff --exit-code -- lib/app/routing/app_routes.g.dart
+
+  # ── Gate 5, das Schema baut von null ────────────────────────────────────────
+  #
+  # Die einzige Prüfung, die dem alten Backend gefehlt hat, und aus ihrer
+  # Abwesenheit folgt fast alles, was in `docs/operations/backend-inventory.md`
+  # steht. Dort tragen acht SQL-Dateien den Satz „Run manually in Supabase SQL
+  # Editor" im Kopf, zwei Funktionen sind doppelt definiert, und welche Fassung
+  # produktiv läuft, hängt daran, in welcher Reihenfolge jemand Dateien in
+  # einen Editor kopiert hat. Siehe ADR-010.
+  #
+  # `supabase db start` startet ein leeres Postgres und wendet `migrations/*`
+  # alphabetisch an. Bricht eine Migration, ist dieser Lauf rot.
+  #
+  # **Ein eigener Job und nicht ein fünfter Schritt im ersten.** Er braucht
+  # Docker und kein Flutter, der erste braucht Flutter und kein Docker. Als
+  # Schritt im ersten Job würde ein kaputtes Schema die vier Client-Gates mit
+  # ausbremsen, und umgekehrt.
+  #
+  # **Warum das lokal nicht läuft:** auf dem Rechner, auf dem dieses
+  # Repository gepflegt wird, ist kein Docker installiert, gemessen am
+  # 03.09.2026. `quality-gates.md` nennt deshalb weiterhin vier lokale Tore.
+  # Wer Docker hat, fährt es mit denselben zwei Befehlen.
+  #
+  # **Was hier bewusst noch fehlt:** die vier inhaltlichen Zusicherungen aus
+  # ADR-010 (kein Tisch ohne RLS, keine Policy mit `USING (true)`, keine
+  # `SECURITY DEFINER`-Funktion mit Nutzerkennung als Parameter, kein
+  # doppeltes Gutschreiben). An einer leeren Datenbank wären alle vier grün,
+  # ohne etwas geprüft zu haben. Sie kommen mit dem Schema, siehe
+  # `supabase/README.md`.
+  schema:
+    name: Gate 5, Schema baut von null
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Quelltext holen
+        uses: actions/checkout@v4
+
+      # Die CLI kommt über npm und nicht über eine Fremd-Action, aus demselben
+      # Grund wie beim Flutter-SDK weiter oben: eine Action ist eine
+      # Abhängigkeit wie jede andere. Die Fassung ist festgenagelt, damit hier
+      # und lokal dasselbe Werkzeug läuft.
+      - name: Supabase-CLI auf 2.116.0 festnageln
+        run: npm install --global supabase@2.116.0
+
+      - name: Stand ausgeben
+        run: supabase --version
+
+      - name: Gate 5, alle Migrationen von null anwenden
+        run: supabase db start
+
+      - name: Gate 5b, Linter über das entstandene Schema
+        run: supabase db lint --level warning
