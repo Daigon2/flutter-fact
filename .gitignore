@@ -42,6 +42,7 @@ ios/.symlinks/
 
 # === Claude local ===
 .claude/settings.local.json
+.claude/launch.json
 
 # === OS / Editor ===
 .DS_Store
