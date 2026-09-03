@@ -6,6 +6,7 @@ import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/theme/fact_theme.dart';
 import 'package:fact_app/features/collection/presentation/pages/collection_page.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_book_spine.dart';
+import 'package:fact_app/features/collection/presentation/widgets/library_chapters_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_cover_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_header_card.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_shelf_view.dart';
@@ -409,6 +410,104 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+  });
+
+  group('Der Weg zum Inhaltsverzeichnis, Schritt 47', () {
+    testWidgets('vom Deckel führt „Alle Kapitel" in die Kapitelliste', (
+      tester,
+    ) async {
+      await pumpPage(
+        tester,
+        facts: <Fact>[
+          factWith(id: 1, city: 'München', category: 'Historisch'),
+          factWith(id: 2, city: 'München', category: 'Architektur'),
+        ],
+        collected: <int>[1],
+      );
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('muenchen')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryCoverView.chaptersKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(LibraryChaptersView.headerKey), findsOneWidget);
+      expect(find.byKey(LibraryCoverView.coverKey), findsNothing);
+      // Das Kapitel mit dem gesammelten Fakt ist offen, das andere nicht.
+      expect(find.text('Historisch'), findsOneWidget);
+      expect(find.text('noch nicht entdeckt'), findsOneWidget);
+    });
+
+    testWidgets('vom Inhaltsverzeichnis führt der Weg auf denselben Deckel', (
+      tester,
+    ) async {
+      // **Deshalb hält der Bildschirm zwei Felder und nicht eins.** Mit einem
+      // einzigen Zustand landete man hier im Regal statt auf dem Buchdeckel
+      // der Stadt, die man eben offen hatte.
+      await pumpPage(tester, facts: <Fact>[factWith(id: 1, city: 'Rom')]);
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('rom')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryCoverView.chaptersKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryChaptersView.backKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(LibraryCoverView.coverKey), findsOneWidget);
+      expect(find.byKey(LibraryShelfView.boxKey), findsNothing);
+      expect(find.text('Rom'), findsOneWidget);
+    });
+
+    testWidgets('die Kapitel gehören der Stadt, nicht der ganzen Sammlung', (
+      tester,
+    ) async {
+      await pumpPage(
+        tester,
+        facts: <Fact>[
+          factWith(id: 1, city: 'München', category: 'Historisch'),
+          factWith(id: 2, city: 'Rom', category: 'Mythos'),
+          factWith(id: 3, city: 'Rom', category: 'Fun-Fact'),
+        ],
+        collected: <int>[1, 2],
+      );
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('rom')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryCoverView.chaptersKey));
+      await tester.pumpAndSettle();
+
+      // Rom hat Mythos und Fun, aber kein Historisch.
+      expect(
+        find.byKey(LibraryChaptersView.chapterKey('myth')),
+        findsOneWidget,
+      );
+      expect(find.byKey(LibraryChaptersView.chapterKey('fun')), findsOneWidget);
+      expect(find.byKey(LibraryChaptersView.chapterKey('hist')), findsNothing);
+      // Und das Kapitel „Fun" ist verschlossen, weil sein Fakt nicht
+      // gesammelt ist.
+      expect(find.text('Mythos'), findsOneWidget);
+      expect(find.text('noch nicht entdeckt'), findsOneWidget);
+    });
+
+    testWidgets('eine Kapitelkarte hat noch kein Ziel und wirft nicht', (
+      tester,
+    ) async {
+      // Der Lesemodus ist der Rest von Schritt 47.
+      await pumpPage(
+        tester,
+        facts: <Fact>[factWith(id: 1, city: 'München')],
+        collected: <int>[1],
+      );
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('muenchen')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryCoverView.chaptersKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryChaptersView.chapterKey('hist')));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(LibraryChaptersView.headerKey), findsOneWidget);
     });
   });
 }

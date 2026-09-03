@@ -574,6 +574,18 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // dieser steht für ein fehlendes Datum und nicht für eine
     // fehlende Dauer, und ein Test soll das benennen können.
     'wallet.statSincePlaceholder': '—',
+
+    // Der dritte Chip im Kopf der Kapitelliste,
+    // `screen-wallet.jsx:780`:
+    // `~{total} {lang === 'de' ? 'gesamt' : 'total'}`. Ein Ternär im
+    // JSX, also kein `t()`-Aufruf und kein Schlüssel; **beide Sprachen
+    // stehen aber wörtlich in der Quelle**, wie bei
+    // `fact.sourceMissing`, und genau die sind übernommen.
+    //
+    // Die Tilde ist mit übernommen. Sie sagt „etwa“, obwohl die
+    // Zahl exakt ist: `total` ist `cityFacts.length`. Eine Eigenart der
+    // Quelle und keine Ungenauigkeit von uns.
+    'wallet.chaptersTotal': '~{total} gesamt',
   },
   AppLanguage.en: <String, String>{
     // Siehe den deutschen Eintrag: dieser Schlüssel trägt als einziger einen
@@ -721,6 +733,7 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'wallet.shelfVolumeLabel': 'Open {city}, {collected} of {total}',
     'wallet.coverBrand': 'FACT Travel Guide',
     'wallet.statSincePlaceholder': '—',
+    'wallet.chaptersTotal': '~{total} total',
   },
 };
 

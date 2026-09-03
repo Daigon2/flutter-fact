@@ -44,19 +44,22 @@
 /// (`if (k.startsWith('natur')) return 'geo'`). Das ist keine Rückfall-Folge.
 library;
 
+import 'package:fact_app/features/collection/application/generated/wallet_categories.g.dart';
 import 'package:fact_app/features/collection/application/library_city_key.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 
-/// Die sechs Kapitelschlüssel in der Reihenfolge der Quelle,
-/// `window.WalletCatOrder`.
-const List<String> libraryCategoryOrder = <String>[
-  'hist',
-  'arch',
-  'myth',
-  'fun',
-  'geo',
-  'heute',
-];
+/// Die sechs Kapitelschlüssel in der Reihenfolge der Quelle.
+///
+/// **Erzeugt und nicht abgeschrieben**, seit dem 03.09.2026:
+/// [walletCategoryOrder] kommt aus `wallet-colors.jsx` durch
+/// `tool/generate_curated_data.dart`. Vorher stand hier eine Liste von Hand,
+/// und die wäre bei einer siebten Kategorie stumm veraltet. Der Prüflauf des
+/// Werkzeugs bricht jetzt ab, wenn Reihenfolge und Tabelle Löcher bekommen.
+///
+/// Als Alias und nicht als direkte Verwendung von [walletCategoryOrder]: der
+/// Name sagt, wofür es hier gebraucht wird, und die erzeugte Datei bleibt eine
+/// Abschrift ohne eigenen Begriff.
+const List<String> libraryCategoryOrder = walletCategoryOrder;
 
 /// Auf welches Kapitel [category] fällt.
 ///
@@ -174,4 +177,29 @@ List<LibraryChapter> libraryChaptersOf({
         total: totals[key] ?? 0,
       ),
   ];
+}
+
+/// Auf welcher Seite jedes Kapitel anfängt, `wltCatStartPages`
+/// (`screen-wallet.jsx:184-196`).
+///
+/// Die Seitenzahl ist die laufende Summe der **gesammelten** Fakten der
+/// vorherigen Kapitel, beginnend bei eins. Ein Kapitel, das nichts Gesammeltes
+/// hat, verbraucht keine Seite; das nächste fängt auf derselben an.
+///
+/// Das ist die Buchmetapher zu Ende gedacht: das Buch enthält nur, was man
+/// gelesen hat, und wächst mit dem Sammeln. Eine Seitenzahl über **alle**
+/// Fakten wäre die andere plausible Lesart und ist nicht die der Quelle.
+///
+/// Gibt eine Liste in der Reihenfolge von [chapters] zurück und keine
+/// Abbildung: die Kapitelliste läuft ohnehin mit Index darüber, und ein
+/// Kartenschlüssel, der zufällig zweimal vorkommt, könnte hier eine Seite
+/// verlieren.
+List<int> libraryChapterStartPages(List<LibraryChapter> chapters) {
+  final List<int> pages = <int>[];
+  var page = 1;
+  for (final LibraryChapter chapter in chapters) {
+    pages.add(page);
+    page += chapter.collected;
+  }
+  return pages;
 }

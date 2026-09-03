@@ -65,6 +65,15 @@ window.WalletCityDefault = {
 window.WalletCityOrder = ['münchen'];
 ''';
 
+  // Der Kapitelblock der Ersatzdatei. Dritter Block in derselben Quelle,
+  // siehe den Kommentar an `writeWalletColors`.
+  const validCategoryBlock = '''
+window.WalletCats = {
+  hist: { key: 'hist', short: 'Hist.', glyph: '§', color: '#E8380D', dk: '#A82508', kategorie: 'Historisch' },
+};
+window.WalletCatOrder = ['hist'];
+''';
+
   void writeHotspots(String content) {
     File(
       '${pwa.path}${Platform.pathSeparator}hunt-hotspots.js',
@@ -83,10 +92,14 @@ window.WalletCityOrder = ['münchen'];
   // Datei. Deshalb setzt diese Funktion den jeweils **anderen** Block auf
   // seinen Standard, und ein Test überschreibt nur den, dessen Verhalten er
   // prüft.
-  void writeWalletColors(String trophies, {String cities = validCityBlock}) {
+  void writeWalletColors(
+    String trophies, {
+    String cities = validCityBlock,
+    String categories = validCategoryBlock,
+  }) {
     File(
       '${pwa.path}${Platform.pathSeparator}wallet-colors.jsx',
-    ).writeAsStringSync('$trophies\n$cities');
+    ).writeAsStringSync('$trophies\n$cities\n$categories');
   }
 
   setUp(() {
@@ -117,9 +130,15 @@ window.WalletCityOrder = ['münchen'];
   const outputRelativePathCities =
       'lib/features/collection/application/generated/wallet_cities.g.dart';
 
+  const outputRelativePathCategories =
+      'lib/features/collection/application/generated/wallet_categories.g.dart';
+
   File outputTrophies() => File('${project.path}/$outputRelativePathTrophies');
 
   File outputCities() => File('${project.path}/$outputRelativePathCities');
+
+  File outputCategories() =>
+      File('${project.path}/$outputRelativePathCategories');
 
   _Run run(List<String> args) =>
       _runTool(project, <String>[...args, '--source', pwa.path]);
@@ -448,6 +467,72 @@ window.WalletCityOrder = ['münchen'];
       final result = run(<String>[]);
       expect(result.exitCode, 0, reason: result.stderr);
       expect(result.stdout, contains('ohne Palette: gibtsnicht'));
+    });
+  });
+  group('wallet-colors.jsx: die Kapitel, dritter Block derselben Datei', () {
+    test('erzeugt die Kapitel-Datei mit Glyph und Farbe', () {
+      final generate = run(<String>[]);
+      expect(generate.exitCode, 0, reason: generate.stderr);
+
+      final String written = outputCategories().readAsStringSync();
+      expect(written, contains("key: 'hist'"));
+      expect(written, contains("glyph: '\u00a7'"));
+      expect(written, contains("color: '#E8380D'"));
+      expect(written, contains("dark: '#A82508'"));
+      expect(written, contains("category: 'Historisch'"));
+
+      expect(run(<String>['--check']).exitCode, 0);
+    });
+
+    test('ein Kapitel mit abweichendem inneren Schlüssel bricht ab', () {
+      // Die Quelle schreibt den Schlüssel zweimal: als Kartenschluessel und
+      // als Feld `key`. Laufen die auseinander, könnte niemand sagen, welche
+      // Seite falsch ist.
+      writeWalletColors(
+        validTrophyBlock,
+        categories: '''
+window.WalletCats = {
+  hist: { key: 'historisch', short: 'Hist.', glyph: 'x', color: '#000000', dk: '#000000', kategorie: 'Historisch' },
+};
+window.WalletCatOrder = ['hist'];
+''',
+      );
+
+      final result = run(<String>[]);
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('trägt innen den Schlüssel'));
+      expect(outputCategories().existsSync(), isFalse);
+    });
+
+    test('ein Kapitel ohne Eintrag in der Reihenfolge bricht ab', () {
+      writeWalletColors(
+        validTrophyBlock,
+        categories: '''
+window.WalletCats = {
+  hist: { key: 'hist', short: 'H', glyph: 'x', color: '#000000', dk: '#000000', kategorie: 'Historisch' },
+  arch: { key: 'arch', short: 'A', glyph: 'y', color: '#000000', dk: '#000000', kategorie: 'Architektur' },
+};
+window.WalletCatOrder = ['hist'];
+''',
+      );
+
+      final result = run(<String>[]);
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('in der Reihenfolge'));
+    });
+
+    test('eine Reihenfolge mit unbekanntem Schlüssel bricht ab', () {
+      writeWalletColors(
+        validTrophyBlock,
+        categories: validCategoryBlock.replaceAll(
+          "window.WalletCatOrder = ['hist'];",
+          "window.WalletCatOrder = ['hist', 'gibtsnicht'];",
+        ),
+      );
+
+      final result = run(<String>[]);
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('ohne Eintrag'));
     });
   });
 }

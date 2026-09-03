@@ -132,6 +132,17 @@ const _curatedSources = <_CuratedSource>[
         'lib/features/collection/application/generated/wallet_cities.g.dart',
     render: _renderWalletCities,
   ),
+  // Dritter Eintrag auf `wallet-colors.jsx`, und der zweite für `collection`.
+  // Getrennt von den Städten, weil es zwei unabhängige Tabellen der Quelle
+  // sind: `WalletCities` beschreibt Bände, `WalletCats` beschreibt Kapitel.
+  // Eine Datei mit beiden hätte den Bezug zur Quelle verwischt.
+  _CuratedSource(
+    sourceFile: 'wallet-colors.jsx',
+    outputPath:
+        'lib/features/collection/application/generated/'
+        'wallet_categories.g.dart',
+    render: _renderWalletCategories,
+  ),
 ];
 
 void main(List<String> args) {
@@ -532,6 +543,111 @@ const WalletCityRecord walletCityDefault = ${_walletCityRecord('', fallback)};
 /// die Regalfolge münchen, regensburg, weimar, passau, rom zeigt damit die
 /// Bände 1, 3, 5, 4, 2 von links nach rechts.
 const List<String> walletCityOrder = <String>[
+${orderKeys.map((k) => '  ${_dartString(k)},\n').join()}];
+''';
+}
+
+String _renderWalletCategories(String source, _Report report) {
+  final cats = _JsLiteral.read(source, 'window.WalletCats');
+  if (cats is! Map<String, Object?>) {
+    _fail('wallet-colors.jsx: `window.WalletCats` ist keine Abbildung.');
+  }
+  final order = _JsLiteral.read(source, 'window.WalletCatOrder');
+  if (order is! List<Object?>) {
+    _fail('wallet-colors.jsx: `window.WalletCatOrder` ist keine Liste.');
+  }
+
+  final rows = StringBuffer();
+  for (final MapEntry<String, Object?> entry in cats.entries) {
+    final Object? raw = entry.value;
+    if (raw is! Map<String, Object?>) {
+      _fail(
+        'wallet-colors.jsx: Kapitel-Eintrag "${entry.key}" ist kein Objekt.',
+      );
+    }
+    final key = raw['key'];
+    final short = raw['short'];
+    final glyph = raw['glyph'];
+    final color = raw['color'];
+    final dark = raw['dk'];
+    final category = raw['kategorie'];
+    if (key is! String ||
+        short is! String ||
+        glyph is! String ||
+        color is! String ||
+        dark is! String ||
+        category is! String) {
+      _fail('wallet-colors.jsx: unvollständiger Kapitel-Eintrag: $raw');
+    }
+    // Der Schlüssel steht in der Quelle **zweimal**: als Kartenschlüssel und
+    // als Feld `key` im Objekt. Laufen die auseinander, ist eine der beiden
+    // Seiten falsch, und niemand könnte sagen welche.
+    if (key != entry.key) {
+      _fail(
+        'wallet-colors.jsx: Kapitel "${entry.key}" trägt innen den Schlüssel '
+        '"$key".',
+      );
+    }
+    rows.writeln(
+      '  (key: ${_dartString(key)}, '
+      'short: ${_dartString(short)}, '
+      'glyph: ${_dartString(glyph)}, '
+      'color: ${_dartString(color)}, '
+      'dark: ${_dartString(dark)}, '
+      'category: ${_dartString(category)}),',
+    );
+  }
+
+  final orderKeys = <String>[];
+  for (final raw in order) {
+    if (raw is! String) {
+      _fail('wallet-colors.jsx: WalletCatOrder enthält einen Nicht-Text.');
+    }
+    if (!cats.containsKey(raw)) {
+      _fail('wallet-colors.jsx: WalletCatOrder nennt "$raw" ohne Eintrag.');
+    }
+    orderKeys.add(raw);
+  }
+  if (orderKeys.length != cats.length) {
+    _fail(
+      'wallet-colors.jsx: ${cats.length} Kapitel, aber '
+      '${orderKeys.length} in der Reihenfolge.',
+    );
+  }
+
+  report.note(
+    'wallet-colors.jsx: ${cats.length} Kapitel in der Folge '
+    '${orderKeys.join(', ')}.',
+  );
+
+  return '''
+${_fileHeaderComment('wallet-colors.jsx')}
+/// Ein Kapitel eines Reiseführer-Bands, wörtlich wie in der Quelle.
+///
+/// `category` ist der **deutsche Anzeigename der Quelle** (`kategorie`) und
+/// kein Oberflächentext: die Kapitelliste holt ihren Namen über
+/// `t('cat.<key>')`. Das Feld steht hier, weil die Quelle es als Rückfall
+/// hinschreibt, und `library_chapter_look.dart` sagt, warum dieser Rückfall
+/// nicht erreichbar ist.
+typedef WalletCategoryRecord = ({
+  String key,
+  String short,
+  String glyph,
+  String color,
+  String dark,
+  String category,
+});
+
+/// Alle Kapitel, Reihenfolge wie im Quellobjekt.
+///
+/// Für die Anzeige gilt [walletCategoryOrder]; beide sind hier gleich, und der
+/// Prüflauf des Werkzeugs bricht ab, wenn eines der beiden Löcher bekommt.
+const List<WalletCategoryRecord> walletCategoryRecords =
+    <WalletCategoryRecord>[
+$rows];
+
+/// Die Reihenfolge der Kapitel, `window.WalletCatOrder`.
+const List<String> walletCategoryOrder = <String>[
 ${orderKeys.map((k) => '  ${_dartString(k)},\n').join()}];
 ''';
 }

@@ -141,7 +141,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2734 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2769 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -428,6 +428,30 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 03.09.2026, Schritt 47 zur Hälfte: das Inhaltsverzeichnis
+
+Der Reiseführer hat jetzt drei Zustände in einem Reiter: Regal,
+Buchdeckel, Inhaltsverzeichnis. **Schritt 47 ist damit nicht fertig**,
+sondern wie Schritt 49 aufgeteilt; der Lesemodus ist der Rest, und eine
+Kapitelkarte ist deshalb tippbar und ohne Ziel.
+
+**Zwei Unterschiede, die gleich aussehen und keine sind:** ein Kapitel,
+für das die Stadt keine Fakten hat, fehlt ganz; ein Kapitel ohne
+gesammelten Fakt steht da, abgeblendet, mit „noch nicht entdeckt"
+statt seines Namens und ohne Tipp. Das ist das „Lücken-Counter auf
+jeder Ebene" aus dem Kopf der Quelldatei.
+
+**Zwei Zahlen sehen nach Fehlern aus und sind keine.** Die römische Zahl
+zählt über alle sechs Kapitel, nicht über die sichtbaren; eine Stadt mit
+nur Mythos-Fakten zeigt also ein einzelnes „III". Und die
+Seitenzahl läuft über die **gesammelten** Fakten: ein Kapitel ohne
+Gesammeltes verbraucht keine Seite. Beide sind mit einer Mutation
+festgenagelt.
+
+**Nebenbei ist die Kategorietabelle vom Handabschreiben ins Erzeugen
+gewandert.** `libraryCategoryOrder` stand seit Schritt 46 von Hand da und
+wäre bei einer siebten Kategorie stumm veraltet.
 
 ### 03.09.2026, Schritt 46, das Cover, und zwei Städte haben keine Silhouette
 

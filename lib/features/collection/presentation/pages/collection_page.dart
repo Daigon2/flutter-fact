@@ -7,12 +7,13 @@
 /// `collection` besitzt diesen Bildschirm". Die Münzen gehen ins Profil, sie
 /// gehören `progression`. Siehe ADR-006.
 ///
-/// ## Zwei Zustände, eine Route
+/// ## Drei Zustände, eine Route
 ///
 /// Der Kopf von `screen-wallet.jsx` nennt drei Zustände: Bibliothek,
-/// Stadt-Band und Lesemodus. Gebaut sind die ersten zwei, Schritt 45 und 46;
-/// der Lesemodus ist Schritt 47, und deshalb bleibt der Knopf „Alle Kapitel"
-/// heute ohne Ziel.
+/// Stadt-Band und Lesemodus. Gebaut sind das Regal (Schritt 45), der
+/// Buchdeckel (Schritt 46) und das Inhaltsverzeichnis (Schritt 47). Der
+/// Lesemodus ist der Rest von Schritt 47, und deshalb bleibt eine
+/// Kapitelkarte heute ohne Ziel.
 ///
 /// **Der Wechsel ist Zustand und keine zweite Route.** `WalletScreen` hält
 /// `view` und `cityKey` als React-State (`:1834-1835`), und E-25 hat die
@@ -22,9 +23,10 @@
 ///
 /// Die Quelle merkt sich `cityKey` **über den Wechsel hinaus** und belegt ihn
 /// mit der ersten Stadt des Regals vor. Hier ist `null` der Zustand
-/// „Bibliothek", weil es keinen zweiten Verbraucher gibt, der die letzte Stadt
-/// bräuchte: der Lesemodus setzt sie in der Quelle selbst nach
-/// (`openFact`, `:1848-1852`), und das ist Schritt 47.
+/// „Bibliothek", weil es dafür heute keinen Verbraucher gibt: den einzigen
+/// Fall, in dem die Stadt von außen gesetzt werden muss, bringt der Lesemodus
+/// mit (`openFact` schaltet auf die Stadt des geöffneten Fakts,
+/// `:1848-1852`), und der ist noch nicht gebaut.
 ///
 /// ## Drei Teile fehlen aus je eigenem Grund, und keiner ist Bequemlichkeit
 ///
@@ -58,6 +60,7 @@ import 'package:fact_app/app/theme/fact_colors.dart';
 import 'package:fact_app/features/collection/application/library_categories.dart';
 import 'package:fact_app/features/collection/application/library_providers.dart';
 import 'package:fact_app/features/collection/application/library_shelf.dart';
+import 'package:fact_app/features/collection/presentation/widgets/library_chapters_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_cover_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_header_card.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_shelf_view.dart';
@@ -80,9 +83,29 @@ class CollectionPage extends ConsumerStatefulWidget {
   ConsumerState<CollectionPage> createState() => _CollectionPageState();
 }
 
+/// Welcher der drei Zustände sichtbar ist, `view` in der Quelle (`:1834`).
+enum _LibraryView {
+  /// Das Regal.
+  library,
+
+  /// Der Buchdeckel einer Stadt.
+  cover,
+
+  /// Das Inhaltsverzeichnis einer Stadt.
+  chapters,
+}
+
 class _CollectionPageState extends ConsumerState<CollectionPage> {
   /// Der offene Band, oder `null` für die Bibliothek.
   String? _openCityKey;
+
+  /// Der sichtbare Zustand.
+  ///
+  /// Zwei Felder statt einem: die Quelle hält `view` und `cityKey` ebenfalls
+  /// getrennt (`:1834-1835`), und der Weg vom Inhaltsverzeichnis zurück führt
+  /// auf den Deckel **derselben** Stadt. Ein einziges Feld müsste die Stadt
+  /// dabei mitschleppen.
+  _LibraryView _view = _LibraryView.library;
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +133,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
           ?.where((LibraryVolume v) => v.cityKey == openKey)
           .firstOrNull;
       if (open != null) {
-        return _cover(open);
+        return _view == _LibraryView.chapters ? _chapters(open) : _cover(open);
       }
     }
 
@@ -132,8 +155,10 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 ),
                 LibraryShelfView(
                   volumes: volumes ?? const <LibraryVolume>[],
-                  onOpenVolume: (LibraryVolume volume) =>
-                      setState(() => _openCityKey = volume.cityKey),
+                  onOpenVolume: (LibraryVolume volume) => setState(() {
+                    _openCityKey = volume.cityKey;
+                    _view = _LibraryView.cover;
+                  }),
                 ),
                 const LibraryTrophyRow(),
               ],
@@ -156,8 +181,26 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         startedChapters: chapters
             .where((LibraryChapter chapter) => chapter.isStarted)
             .length,
-        onBack: () => setState(() => _openCityKey = null),
+        onBack: () => setState(() {
+          _openCityKey = null;
+          _view = _LibraryView.library;
+        }),
+        onOpenChapters: () => setState(() => _view = _LibraryView.chapters),
       ),
     );
   }
+
+  Widget _chapters(LibraryVolume volume) => SafeArea(
+    child: LibraryChaptersView(
+      volume: volume,
+      // Auch hier ohne Warten, und mit demselben Grund wie beim Cover: die
+      // Fakten liegen schon geladen da, `libraryChaptersProvider` rechnet nur
+      // eine Schleife darüber. Ein Ladekreis für eine Rechnung im
+      // Mikrosekundenbereich wäre ein Flackern und keine Rückmeldung.
+      chapters:
+          ref.watch(libraryChaptersProvider(volume.cityKey)).value ??
+          const <LibraryChapter>[],
+      onBack: () => setState(() => _view = _LibraryView.cover),
+    ),
+  );
 }
