@@ -141,7 +141,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2769 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2777 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -452,6 +452,41 @@ festgenagelt.
 **Nebenbei ist die Kategorietabelle vom Handabschreiben ins Erzeugen
 gewandert.** `libraryCategoryOrder` stand seit Schritt 46 von Hand da und
 wäre bei einer siebten Kategorie stumm veraltet.
+
+### 03.09.2026, elf Kapitel statt sechs, und ein Stolperdraht hat ausgelöst
+
+Der Reiseführer sortierte fünf der zwölf Kartenkategorien still in
+„Historisch": Kulinarik, Persönlichkeiten, Kultur, Dunkel & Kriminell,
+Kirche & Glaube. Ein Fakt über ein Restaurant stand unter Geschichte. Der
+Eigentümer hat am 03.09.2026 entschieden, dass die fünf ihr eigenes Kapitel
+bekommen (E-78).
+
+**Kein Wortlaut war nötig, und beim Fragen sah das anders aus.** Drei der fünf
+Namen stehen zweisprachig in den erzeugten Tabellen, und für Kultur und Dunkel
+& Kriminell liefert die Aliastabelle der Karte beide Sprachen als Paar mit. Wer
+eine Textentscheidung erbittet, sollte vorher nachsehen, was schon dasteht.
+
+**Die Reihenfolge der Prüfungen ist der schwierige Teil**, und alle drei
+heiklen Stellen haben jetzt eine Mutation: `historical figures` muss vor `hist`
+stehen, sonst landet eine Person unter Geschichte; `arch` muss vor `art`
+stehen, weil ein Buchstabe sie trennt; `kulinar` muss vor `kultur` stehen, weil
+sie drei teilen. Der Test nagelt **jeden** der zweiunddreißig Kategorietexte
+einzeln fest, statt Stichproben zu nehmen.
+
+**Die fünf neuen Kapitel stehen hinten und nicht einsortiert.** Die
+Kapitelliste nummeriert römisch nach der Position in der Folge, und wer
+einsortiert, verschiebt jedem bestehenden Nutzer die Nummern seiner Kapitel.
+Angehängt bleibt I bis VI stehen, und es kommt VII bis XI dazu.
+
+**Überraschend war die Nebenwirkung, und sie kam von einem Test aus Schritt
+21.** `fact_category_look_test.dart` trug den Satz „bekommt die PWA die
+Schlüssel nachträglich, fällt dieser Test und die Tabelle darf wachsen". Er
+ist rot geworden, ausgelöst nicht von der PWA, sondern von der eigenen
+Entscheidung: `cat.kult` und `cat.dark` haben jetzt Text. Damit heißt derselbe
+Fakt an drei Stellen dreierlei, und die Akte könnte es richtig zeigen.
+**Nicht mitgeändert**, weil das eine sichtbare Verhaltensänderung in einem
+fertigen Bildschirm ist und als eigener Schritt entschieden gehört. Steht als
+E-81, und ein Test hält die Dreierlei-Benennung sichtbar.
 
 ### 03.09.2026, Schritt 46, das Cover, und zwei Städte haben keine Silhouette
 
