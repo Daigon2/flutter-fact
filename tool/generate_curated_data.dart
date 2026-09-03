@@ -121,6 +121,17 @@ const _curatedSources = <_CuratedSource>[
         'lib/features/progression/application/generated/wallet_trophies.g.dart',
     render: _renderWalletTrophies,
   ),
+  // Zweiter Eintrag auf derselben Quelldatei, und das ist kein Versehen: die
+  // Trophäen gehören `progression`, die Bände des Reiseführers gehören
+  // `collection`. Ein gemeinsamer Ausgabepfad hätte ein Feature das Datum des
+  // anderen importieren lassen. Die Datei wird deshalb zweimal gelesen, was
+  // ein Dateizugriff kostet und dafür die Eigentümerschaft klarhält.
+  _CuratedSource(
+    sourceFile: 'wallet-colors.jsx',
+    outputPath:
+        'lib/features/collection/application/generated/wallet_cities.g.dart',
+    render: _renderWalletCities,
+  ),
 ];
 
 void main(List<String> args) {
@@ -427,6 +438,140 @@ $rows];
 ''';
 }
 
+String _renderWalletCities(String source, _Report report) {
+  final cities = _JsLiteral.read(source, 'window.WalletCities');
+  if (cities is! Map<String, Object?>) {
+    _fail('wallet-colors.jsx: `window.WalletCities` ist keine Abbildung.');
+  }
+  final fallback = _JsLiteral.read(source, 'window.WalletCityDefault');
+  if (fallback is! Map<String, Object?>) {
+    _fail('wallet-colors.jsx: `window.WalletCityDefault` ist keine Abbildung.');
+  }
+  final order = _JsLiteral.read(source, 'window.WalletCityOrder');
+  if (order is! List<Object?>) {
+    _fail('wallet-colors.jsx: `window.WalletCityOrder` ist keine Liste.');
+  }
+
+  final rows = StringBuffer();
+  for (final entry in cities.entries) {
+    rows.writeln('  ${_walletCityRecord(entry.key, entry.value)},');
+  }
+
+  final orderKeys = <String>[];
+  for (final raw in order) {
+    if (raw is! String) {
+      _fail('wallet-colors.jsx: WalletCityOrder enthält einen Nicht-Text.');
+    }
+    orderKeys.add(raw);
+  }
+
+  final withoutPalette = orderKeys
+      .where((k) => !cities.containsKey(k))
+      .toList();
+  final withoutOrder = cities.keys
+      .where((k) => !orderKeys.contains(k))
+      .toList();
+
+  report
+    ..note('wallet-colors.jsx: ${cities.length} Städte übernommen.')
+    ..note('wallet-colors.jsx: Regalreihenfolge ${orderKeys.join(', ')}.');
+  if (withoutPalette.isNotEmpty) {
+    report.note(
+      'wallet-colors.jsx: in der Reihenfolge, aber ohne Palette: '
+      '${withoutPalette.join(', ')}.',
+    );
+  }
+  if (withoutOrder.isNotEmpty) {
+    report.note(
+      'wallet-colors.jsx: mit Palette, aber nicht in der Reihenfolge: '
+      '${withoutOrder.join(', ')}.',
+    );
+  }
+
+  return '''
+${_fileHeaderComment('wallet-colors.jsx')}
+/// Die Ausstattung eines Bandes im Bücherregal, wörtlich wie in der Quelle.
+///
+/// `key` ist der Quellschlüssel, kleingeschrieben und **mit** Umlaut
+/// (`münchen`). Er ist hier absichtlich nicht auf die Vergleichsform gebracht:
+/// diese Datei schreibt ab, sie normalisiert nicht. Wer einen Fakt einem Band
+/// zuordnet, geht über `collection/domain/library_city_key.dart`, und dort
+/// steht auch, warum die Zuordnung nicht so läuft wie in der Quelle.
+typedef WalletCityRecord = ({
+  String key,
+  String name,
+  String initial,
+  int bandNo,
+  String region,
+  String color,
+  String colorDk,
+  String colorLt,
+  String accent,
+});
+
+/// Alle Städte mit eigener Palette, Reihenfolge wie im Quellobjekt.
+///
+/// Das ist **nicht** die Reihenfolge im Regal, die steht in
+/// [walletCityOrder] und weicht ab.
+const List<WalletCityRecord> walletCityRecords = <WalletCityRecord>[
+$rows];
+
+/// Die Ausstattung einer Stadt ohne eigenen Eintrag,
+/// `window.WalletCityDefault`.
+///
+/// `bandNo` ist dort `0`, und die Quelle behandelt das als „keine Nummer":
+/// `city.bandNo || (4 * ri + ci + 1)` (`screen-wallet.jsx:966`) fällt bei `0`
+/// auf die Gitterposition zurück, weil `0` in JavaScript unwahr ist.
+const WalletCityRecord walletCityDefault = ${_walletCityRecord('', fallback)};
+
+/// Die Reihenfolge der Bände im Regal, `window.WalletCityOrder`.
+///
+/// Städte, die hier fehlen, hängt die Quelle hinten an
+/// (`screen-wallet.jsx:1826-1832`). Die Nummern auf den Buchrücken folgen
+/// dieser Reihenfolge **nicht**: sie stehen als `bandNo` an der Stadt, und
+/// die Regalfolge münchen, regensburg, weimar, passau, rom zeigt damit die
+/// Bände 1, 3, 5, 4, 2 von links nach rechts.
+const List<String> walletCityOrder = <String>[
+${orderKeys.map((k) => '  ${_dartString(k)},\n').join()}];
+''';
+}
+
+/// Ein einzelner Städte-Datensatz als Dart-Ausdruck.
+String _walletCityRecord(String key, Object? raw) {
+  if (raw is! Map<String, Object?>) {
+    _fail('wallet-colors.jsx: Städte-Eintrag "$key" ist kein Objekt.');
+  }
+  final name = raw['name'];
+  final initial = raw['initial'];
+  final region = raw['region'];
+  final color = raw['color'];
+  final colorDk = raw['colorDk'];
+  final colorLt = raw['colorLt'];
+  final accent = raw['accent'];
+  if (name is! String ||
+      initial is! String ||
+      region is! String ||
+      color is! String ||
+      colorDk is! String ||
+      colorLt is! String ||
+      accent is! String) {
+    _fail('wallet-colors.jsx: unvollständiger Städte-Eintrag: $raw');
+  }
+  final bandNo = raw['bandNo'];
+  if (bandNo is! num) {
+    _fail('wallet-colors.jsx: "bandNo" ist keine Zahl bei "$key".');
+  }
+  return '(key: ${_dartString(key)}, '
+      'name: ${_dartString(name)}, '
+      'initial: ${_dartString(initial)}, '
+      'bandNo: ${bandNo.toInt()}, '
+      'region: ${_dartString(region)}, '
+      'color: ${_dartString(color)}, '
+      'colorDk: ${_dartString(colorDk)}, '
+      'colorLt: ${_dartString(colorLt)}, '
+      'accent: ${_dartString(accent)})';
+}
+
 // ── Gemeinsames ──────────────────────────────────────────────────────────────
 
 String _fileHeaderComment(String sourceFile) =>
@@ -729,7 +874,7 @@ class _JsLiteral {
   String _identifier() {
     final start = _index;
     while (_index < _source.length &&
-        RegExp(r'[A-Za-z0-9_$]').hasMatch(_source[_index])) {
+        _identifierChar.hasMatch(_source[_index])) {
       _index++;
     }
     if (start == _index) {
@@ -737,6 +882,22 @@ class _JsLiteral {
     }
     return _source.substring(start, _index);
   }
+
+  /// Was in einem unquotierten Objektschlüssel stehen darf.
+  ///
+  /// **Der Bereich hinter `_$` ist am 03.09.2026 dazugekommen, und zwar
+  /// gemessen.** Bis dahin stand hier `[A-Za-z0-9_$]`, und `window.WalletCities`
+  /// beginnt mit dem Schlüssel `münchen:`. Der Leser nahm das `m`, brach beim
+  /// `ü` ab und meldete „Kein `:` nach dem Schlüssel "m"". Das war laut, nicht
+  /// still, und damit hat der Leser sich richtig verhalten: er rät nicht.
+  ///
+  /// JavaScript erlaubt in einem Bezeichner beliebige Unicode-Buchstaben.
+  /// Aufgenommen ist bewusst nur `U+00C0` bis `U+024F`, also Latin-1-Zusatz und
+  /// Latin Extended-A/B: das deckt ä, ö, ü, ß und die Akzente der romanischen
+  /// Sprachen ab, in denen die Städtedaten liegen. Alles darüber wirft weiter,
+  /// weil ein Schlüssel in kyrillischer oder griechischer Schrift in diesen
+  /// Dateien ein Fehler wäre und keine Erweiterung.
+  static final RegExp _identifierChar = RegExp(r'[A-Za-z0-9_$À-ɏ]');
 
   num _number() {
     final start = _index;

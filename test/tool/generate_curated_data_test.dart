@@ -40,12 +40,29 @@ window.HUNT_HOTSPOTS = {
 };
 ''';
 
-  const validTrophies = '''
+  const validTrophyBlock = '''
 window.WalletTrophies = [
   { key: 'chronist', cat: 'hist', threshold: 10, glyph: '§',
     label_de: 'Chronist', label_en: 'Chronicler',
     desc_de: '10 Fakten gesammelt', desc_en: '10 facts collected' },
 ];
+''';
+
+  // Der Städteblock der Ersatzdatei. **Der Schlüssel `münchen` steht hier mit
+  // Absicht**: unquotierte Objektschlüssel mit Umlaut sind der Grund, warum
+  // `_identifier()` am 03.09.2026 über `[A-Za-z0-9_$]` hinauswachsen musste.
+  const validCityBlock = '''
+window.WalletCities = {
+  münchen: {
+    name: 'München', initial: 'M', bandNo: 1, region: 'Bayern · Hauptstadt',
+    color: '#1E5FAD', colorDk: '#0D3A6B', colorLt: '#3B82F6', accent: '#3B82F6',
+  },
+};
+window.WalletCityDefault = {
+  name: '–', initial: '?', bandNo: 0, region: '',
+  color: '#5C4A30', colorDk: '#3D3020', colorLt: '#A08860', accent: '#A08860',
+};
+window.WalletCityOrder = ['münchen'];
 ''';
 
   void writeHotspots(String content) {
@@ -54,10 +71,22 @@ window.WalletTrophies = [
     ).writeAsStringSync(content);
   }
 
-  void writeTrophies(String content) {
+  // Seit Schritt 45 liest die Registrierung `wallet-colors.jsx` **zweimal**:
+  // einmal für die Trophäen von `progression`, einmal für die Städte von
+  // `collection`. Beide Blöcke müssen deshalb in der Ersatzdatei stehen, sonst
+  // scheitert der Lauf an der fehlenden Zuweisung, auch wenn der Test mit dem
+  // anderen Block nichts zu tun hat.
+  //
+  // Genau die Nebenwirkung, die Schritt 49 vorhergesagt hat: „das Werkzeug
+  // verlangt jede registrierte Quelle, bevor es überhaupt rendert". Sie wächst
+  // hier nicht in der Zahl der Dateien, sondern in der Zahl der Blöcke je
+  // Datei. Deshalb setzt diese Funktion den jeweils **anderen** Block auf
+  // seinen Standard, und ein Test überschreibt nur den, dessen Verhalten er
+  // prüft.
+  void writeWalletColors(String trophies, {String cities = validCityBlock}) {
     File(
       '${pwa.path}${Platform.pathSeparator}wallet-colors.jsx',
-    ).writeAsStringSync(content);
+    ).writeAsStringSync('$trophies\n$cities');
   }
 
   setUp(() {
@@ -65,7 +94,7 @@ window.WalletTrophies = [
     project = Directory.systemTemp.createTempSync('fact_curated_project');
     // Standardinhalt für beide registrierten Quellen, siehe Kopf der Datei.
     writeHotspots(validSource);
-    writeTrophies(validTrophies);
+    writeWalletColors(validTrophyBlock);
   });
 
   tearDown(() {
@@ -85,7 +114,12 @@ window.WalletTrophies = [
 
   File output() => File('${project.path}/$outputRelativePath');
 
+  const outputRelativePathCities =
+      'lib/features/collection/application/generated/wallet_cities.g.dart';
+
   File outputTrophies() => File('${project.path}/$outputRelativePathTrophies');
+
+  File outputCities() => File('${project.path}/$outputRelativePathCities');
 
   _Run run(List<String> args) =>
       _runTool(project, <String>[...args, '--source', pwa.path]);
@@ -202,7 +236,7 @@ window.HUNT_HOTSPOTS = {
     // (`§`, `⌂`, „…"), die der JS-Leser noch nie sehen musste.
 
     test('erzeugt die Datei aus einer Liste, und --check ist danach grün', () {
-      writeTrophies(validTrophies);
+      writeWalletColors(validTrophyBlock);
 
       final generate = run(<String>[]);
       expect(
@@ -222,10 +256,10 @@ window.HUNT_HOTSPOTS = {
     });
 
     test('--check ist rot, sobald sich die Quelle geändert hat', () {
-      writeTrophies(validTrophies);
+      writeWalletColors(validTrophyBlock);
       expect(run(<String>[]).exitCode, 0);
 
-      writeTrophies('''
+      writeWalletColors('''
 window.WalletTrophies = [
   { key: 'chronist', cat: 'hist', threshold: 10, glyph: '§',
     label_de: 'Chronist', label_en: 'Chronicler',
@@ -251,7 +285,7 @@ window.WalletTrophies = [
         // UTF-16-Code-Units kopiert, ohne eine Ebene zu unterscheiden, muss
         // damit nichts Besonderes tun; ein Leser, der stattdessen etwa nach
         // Bytes läse, könnte hier stolpern.
-        writeTrophies('''
+        writeWalletColors('''
 window.WalletTrophies = [
   { key: 'a', cat: 'hist', threshold: 10, glyph: '§',
     label_de: 'Ein Test', label_en: 'A Test',
@@ -282,7 +316,7 @@ window.WalletTrophies = [
     test(
       'threshold fehlt bei Stadt- und Rangtrophäen und wird zu null, nicht 0',
       () {
-        writeTrophies('''
+        writeWalletColors('''
 window.WalletTrophies = [
   { key: 'grand_tour', cat: 'city', glyph: '🌍',
     label_de: 'Grand Tour', label_en: 'Grand Tour',
@@ -300,7 +334,7 @@ window.WalletTrophies = [
     );
 
     test('ein doppelter Schlüssel innerhalb eines Eintrags bricht ab', () {
-      writeTrophies('''
+      writeWalletColors('''
 window.WalletTrophies = [
   { key: 'a', key: 'b', cat: 'hist', glyph: '§',
     label_de: 'x', label_en: 'x', desc_de: 'x', desc_en: 'x' },
@@ -311,6 +345,109 @@ window.WalletTrophies = [
       expect(result.exitCode, 1);
       expect(result.stderr, contains('Doppelter Schlüssel'));
       expect(outputTrophies().existsSync(), isFalse);
+    });
+  });
+
+  group('wallet-colors.jsx: die Städte, dritter Eintrag auf zweiter Datei', () {
+    // Diese Gruppe prüft zwei Dinge, die die Registrierung vorher nicht
+    // konnte: **zwei Einträge auf derselben Quelldatei** und einen
+    // unquotierten Objektschlüssel mit Umlaut.
+
+    test('erzeugt die Städte-Datei zusätzlich zu den Trophäen', () {
+      final generate = run(<String>[]);
+      expect(generate.exitCode, 0, reason: generate.stderr);
+
+      // Dieselbe Quelldatei, zwei Ausgabedateien, zwei Features.
+      expect(outputTrophies().existsSync(), isTrue);
+      expect(outputCities().existsSync(), isTrue);
+
+      final String written = outputCities().readAsStringSync();
+      expect(written, contains("key: 'münchen'"));
+      expect(written, contains("name: 'München'"));
+      expect(written, contains('bandNo: 1'));
+      expect(written, contains("region: 'Bayern · Hauptstadt'"));
+      // Als Muster und nicht als feste Zeichenkette: `dart format` schreibt
+      // eine Liste mit einem Eintrag auf eine Zeile und eine mit fünf auf
+      // fünf. In der echten Quelle stehen fünf Städte, in dieser Ersatzdatei
+      // eine, und der Test soll von beidem unabhängig sein.
+      expect(
+        written,
+        matches(RegExp(r"walletCityOrder = <String>\[\s*'münchen',?\s*\]")),
+      );
+      // Die Vorgabe kommt mit, und `bandNo` bleibt dort die 0 der Quelle.
+      expect(written, matches(RegExp(r"walletCityDefault = \(\s*key: '',")));
+      expect(written, contains('bandNo: 0'));
+
+      expect(run(<String>['--check']).exitCode, 0);
+    });
+
+    test('ein Schlüssel mit Umlaut wird gelesen und nicht abgeschnitten', () {
+      // Bis zum 03.09.2026 nahm `_identifier()` nur `[A-Za-z0-9_$]`. Bei
+      // `münchen:` las es das `m`, brach beim `ü` ab und meldete
+      // „Kein `:` nach dem Schlüssel". Der Beweis, dass das jetzt trägt, ist
+      // der vollständige Schlüssel in der Ausgabe: ein `key: 'm'` wäre der
+      // stille Fehler, den es zu verhindern gilt.
+      expect(run(<String>[]).exitCode, 0);
+      final String written = outputCities().readAsStringSync();
+
+      expect(written, contains("key: 'münchen'"));
+      expect(written, isNot(contains("key: 'm'")));
+    });
+
+    test('--check ist rot, sobald sich eine Stadtfarbe geändert hat', () {
+      expect(run(<String>[]).exitCode, 0);
+
+      writeWalletColors(
+        validTrophyBlock,
+        cities: validCityBlock.replaceAll('#1E5FAD', '#000000'),
+      );
+
+      final check = run(<String>['--check']);
+      expect(check.exitCode, isNot(0));
+      expect(check.stderr, contains(outputRelativePathCities));
+      // Die Trophäen-Datei stimmt weiter, es darf nur eine abweichen.
+      expect(check.stderr, isNot(contains(outputRelativePathTrophies)));
+    });
+
+    test('eine fehlende Bandnummer bricht ab, statt 0 zu erfinden', () {
+      writeWalletColors(
+        validTrophyBlock,
+        cities: '''
+window.WalletCities = {
+  münchen: {
+    name: 'München', initial: 'M', region: 'Bayern',
+    color: '#1E5FAD', colorDk: '#0D3A6B', colorLt: '#3B82F6', accent: '#3B82F6',
+  },
+};
+window.WalletCityDefault = {
+  name: '–', initial: '?', bandNo: 0, region: '',
+  color: '#5C4A30', colorDk: '#3D3020', colorLt: '#A08860', accent: '#A08860',
+};
+window.WalletCityOrder = ['münchen'];
+''',
+      );
+
+      final result = run(<String>[]);
+      expect(result.exitCode, 1);
+      expect(result.stderr, contains('"bandNo" ist keine Zahl'));
+      expect(outputCities().existsSync(), isFalse);
+    });
+
+    test('eine Stadt in der Reihenfolge ohne Palette wird gemeldet', () {
+      // Kein Abbruch: die Quelle filtert eine solche Stadt beim Aufbau des
+      // Regals ohnehin heraus. Gemeldet wird es trotzdem, weil es sonst
+      // niemandem auffällt.
+      writeWalletColors(
+        validTrophyBlock,
+        cities: validCityBlock.replaceAll(
+          "window.WalletCityOrder = ['münchen'];",
+          "window.WalletCityOrder = ['münchen', 'gibtsnicht'];",
+        ),
+      );
+
+      final result = run(<String>[]);
+      expect(result.exitCode, 0, reason: result.stderr);
+      expect(result.stdout, contains('ohne Palette: gibtsnicht'));
     });
   });
 }
