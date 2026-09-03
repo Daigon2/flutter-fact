@@ -15,12 +15,15 @@ und Fundstellen stehen in `REBUILD_STATUS.md`, nicht hier.
 
 ---
 
-## Zuerst: ein echter API-Schlüssel liegt ausgeliefert im Klartext
+## Erledigt am 03.09.2026: der ausgelieferte OpenAI-Schlüssel ist deaktiviert
 
-Am 02.09.2026 beim Zuschnitt von Schritt 25 gefunden, und es ist die einzige
-Zeile in dieser Datei, die **heute** eine Handlung verlangt.
+Janek: „api key ist deaktiviert bei open AI". Damit ist die einzige Zeile
+erledigt, die in dieser Datei je eine Handlung am selben Tag verlangt hat. Der
+Fund bleibt stehen, weil er begründet, warum der Neubau nie einen Schlüssel in
+den Client legt.
 
-`02_Frontend/app/audio-player.jsx:12` hält eine Konstante `OPENAI_KEY` mit
+Gefunden am 02.09.2026 beim Zuschnitt von Schritt 25.
+`02_Frontend/app/audio-player.jsx:12` hielt eine Konstante `OPENAI_KEY` mit
 einem vollständigen `sk-proj-…`-Schlüssel. Die Datei wird **nicht** gebündelt,
 sondern im Quelltext ausgeliefert: `index.html:180` lädt sie als
 `<script type="text/babel" src="audio-player.jsx?v=5">`. Wer die Seite offen
@@ -46,19 +49,34 @@ Wortlaut: der Schlüssel werde im Quelltext sichtbar sein, das sei „acceptable
 for a personal project at this scale", und man solle rotieren, falls
 unerwartete Kosten auftauchen. Das war am 14.05.2026. Seither gibt es einen
 DACH-Rollout-Plan und den Weg in die App Stores, und „personal project at this
-scale" trifft es nicht mehr. **Ob die Abwägung heute noch gilt, ist eine
-Entscheidung des Eigentümers und wurde von hier aus nicht getroffen.**
+scale" trifft es nicht mehr. **Am 03.09.2026 hat der Eigentümer die Abwägung
+umgestoßen und den Schlüssel deaktiviert.**
 
-**Die Behebung ist kein Code:** den Schlüssel bei OpenAI zurückziehen und neu
-ausstellen. Ihn nur aus den Dateien zu löschen genügt nicht, er steht in der
-Versionsgeschichte des anderen Repositories und war ausgeliefert. Steht als
-E-70, Stufe 4.
+**Deaktivieren war die richtige Behebung, Löschen wäre es nicht gewesen.** Der
+Schlüssel steht in der Versionsgeschichte des anderen Repositories und war
+ausgeliefert; nur der Widerruf bei OpenAI nimmt ihm die Wirkung. Die vier
+Dateien tragen jetzt einen toten Schlüssel; sie aufzuräumen ist Kosmetik im
+Lese-Repo und keine Sicherheitsarbeit mehr.
 
-Für den Neubau ändert das nichts, es bestätigt die Entscheidung: E-15 heißt
-„Gerät zuerst", und die Cloud-Variante läuft laut derselben Entscheidung über
-Edge Function und Proxy, nie über einen Schlüssel im Client.
+**Die laufende PWA bricht dadurch nicht, und das ist nachgesehen und nicht
+angenommen.** `audio-player.jsx:171` wirft bei jeder Antwort, die nicht `ok`
+ist, und der `catch` zwei Zeilen weiter liest den Text über
+`SpeechSynthesisUtterance` vor, mit gespeicherter Vorlesegeschwindigkeit und
+gewählter Stimme. Ein 401 fällt also auf die Browserstimme zurück statt zu
+schweigen. Nutzer verlieren die Qualität von `tts-1-hd`/`nova`, nicht die
+Funktion. Zwei Nebenwirkungen gehören dazu: jedes Vorlesen macht erst einen
+vergeblichen HTTP-Weg, und der Blob-Zwischenspeicher füllt sich nie, der
+vergebliche Weg fällt also bei **jedem** Abspielen an.
 
-## Eine Sache liegt vor allem anderen, seit dem 02.09.2026
+**Nebenbei bestätigt das die Wahl von Schritt 25.** Was die PWA seit heute
+tatsächlich tut, ist die Gerätestimme, und genau die baut `flutter_tts`.
+
+Für den Neubau ändert der Fund nichts, er bestätigt E-15 („Gerät zuerst"): die
+Cloud-Variante läuft laut derselben Entscheidung über Edge Function und Proxy,
+nie über einen Schlüssel im Client. **Falls je ein neuer Schlüssel ausgestellt
+wird, gehört er dorthin und nicht in die PWA.**
+
+## Was heute offen bleibt: dieses Repository ist öffentlich
 
 **Dieses Repository ist öffentlich.** Nachgesehen, nicht angenommen:
 `gh repo view` meldet für `Daigon2/flutter-fact` die Sichtbarkeit `PUBLIC`.
