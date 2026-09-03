@@ -553,6 +553,27 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // einzige Stelle, an der die Zahlen als Satz vorkommen, und sie steht
     // deshalb in der Ergänzung und nicht bei der Zählerplatte.
     'wallet.shelfVolumeLabel': '{city} öffnen, {collected} von {total}',
+
+    // Das Abzeichen oben auf dem Stadt-Cover,
+    // `screen-wallet.jsx:531`: der Text `FACT Reiseführer` steht
+    // dort **hartcodiert im JSX**, ohne `t()` und ohne
+    // Schlüssel. Nach E-61 ist das ein Defekt und keine
+    // Parität, deshalb steht der englische Wert übersetzt in der
+    // anderen Karte.
+    'wallet.coverBrand': 'FACT Reiseführer',
+
+    // Der Platzhalter der Kachel „seit" auf dem Cover,
+    // `screen-wallet.jsx:551`:
+    // `firstFoundTs ? wltFormatDateShort(firstFoundTs) : '—'`.
+    // **Er steht heute immer da**, weil es keinen Leseverlauf mit
+    // Zeitstempeln gibt; `CollectedFactsStore` speichert
+    // Kennungen in Sammelreihenfolge, ohne Zeit. Die Quelle zeigt
+    // an dieser Stelle dasselbe Zeichen, wenn ihr Verlauf leer
+    // ist, das ist also kein Platzhalter für fehlenden Code.
+    // Eigener Schlüssel und nicht der aus `challenge.huntPause.`:
+    // dieser steht für ein fehlendes Datum und nicht für eine
+    // fehlende Dauer, und ein Test soll das benennen können.
+    'wallet.statSincePlaceholder': '—',
   },
   AppLanguage.en: <String, String>{
     // Siehe den deutschen Eintrag: dieser Schlüssel trägt als einziger einen
@@ -698,6 +719,8 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'challenge.huntResult.timePlaceholder': '—',
     'challenge.huntResult.close': 'Done',
     'wallet.shelfVolumeLabel': 'Open {city}, {collected} of {total}',
+    'wallet.coverBrand': 'FACT Travel Guide',
+    'wallet.statSincePlaceholder': '—',
   },
 };
 

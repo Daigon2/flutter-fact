@@ -6,6 +6,7 @@ import 'package:fact_app/app/localization/localization_providers.dart';
 import 'package:fact_app/app/theme/fact_theme.dart';
 import 'package:fact_app/features/collection/presentation/pages/collection_page.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_book_spine.dart';
+import 'package:fact_app/features/collection/presentation/widgets/library_cover_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_header_card.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_shelf_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_trophy_row.dart';
@@ -31,9 +32,13 @@ import '../../../../support/app_fonts.dart';
 void main() {
   setUpAll(loadAppFonts);
 
-  Fact factWith({required int id, String? city}) => Fact(
+  Fact factWith({
+    required int id,
+    String? city,
+    String category = 'Historisch',
+  }) => Fact(
     id: FactId(id),
-    content: FactText(title: 'Titel $id'),
+    content: FactText(title: 'Titel $id', category: category),
     city: city == null ? null : FactCity(city),
   );
 
@@ -312,5 +317,98 @@ void main() {
 
     expect(find.text('1/2'), findsOneWidget);
     expect(find.text('1 Geschichten\naus deinen Städten'), findsOneWidget);
+  });
+
+  group('Der Weg zum Cover, Schritt 46', () {
+    testWidgets('ein Tipp auf einen Rücken schlägt den Band auf', (
+      tester,
+    ) async {
+      await pumpPage(
+        tester,
+        facts: <Fact>[
+          factWith(id: 1, city: 'München'),
+          factWith(id: 2, city: 'Rom'),
+        ],
+      );
+
+      expect(find.byKey(LibraryCoverView.coverKey), findsNothing);
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('rom')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(LibraryCoverView.coverKey), findsOneWidget);
+      // Der aufgeschlagene Band ist der angetippte und nicht der erste.
+      expect(find.text('Rom'), findsOneWidget);
+      expect(find.byKey(LibraryShelfView.boxKey), findsNothing);
+    });
+
+    testWidgets('der Zurück-Weg führt in die Bibliothek', (tester) async {
+      await pumpPage(tester, facts: <Fact>[factWith(id: 1, city: 'München')]);
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('muenchen')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryCoverView.backKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(LibraryCoverView.coverKey), findsNothing);
+      expect(find.byKey(LibraryShelfView.boxKey), findsOneWidget);
+    });
+
+    testWidgets('die Kapitelzahl des Covers kommt aus den Fakten', (
+      tester,
+    ) async {
+      // Drei Kategorien in München, zwei davon angefangen. Gezählt wird, was
+      // angefangen ist, nicht was existiert.
+      await pumpPage(
+        tester,
+        facts: <Fact>[
+          factWith(id: 1, city: 'München', category: 'Historisch'),
+          factWith(id: 2, city: 'München', category: 'Architektur'),
+          factWith(id: 3, city: 'München', category: 'Mythos'),
+          factWith(id: 4, city: 'Rom', category: 'Fun-Fact'),
+        ],
+        collected: <int>[1, 2, 4],
+      );
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('muenchen')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byKey(LibraryCoverView.statKey('chapters')),
+          matching: find.text('2'),
+        ),
+        findsOneWidget,
+      );
+      // Die Geschichten-Kachel zählt die Stadt und nicht die ganze Sammlung:
+      // Rom hat einen dritten gesammelten Fakt, der hier nicht mitzählt.
+      expect(
+        find.descendant(
+          of: find.byKey(LibraryCoverView.statKey('stories')),
+          matching: find.text('2'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('ein Band ohne Kapiteldaten zeigt eine Null und wartet nicht', (
+      tester,
+    ) async {
+      // Die Kapitelzahl ist eine zweite Abfrage. Wartete das Cover auf sie,
+      // flackerte der ganze Deckel für eine von drei Zahlen.
+      await pumpPage(tester, facts: <Fact>[factWith(id: 1, city: 'München')]);
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('muenchen')));
+      await tester.pump();
+
+      expect(find.byKey(LibraryCoverView.coverKey), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(LibraryCoverView.statKey('chapters')),
+          matching: find.text('0'),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 }

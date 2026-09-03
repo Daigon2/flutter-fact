@@ -35,7 +35,7 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die siebenundsechzig belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die neunundsechzig belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
@@ -61,6 +61,10 @@ void main() {
       // dort als hartcodierter deutscher Satz im `aria-label`, ohne `t()`,
       // und trifft damit genau die Nutzer, die sie am wenigsten umgehen
       // können. Der englische Wert ist deshalb nach E-61 übersetzt.
+      // Mit dem Cover kamen am selben Tag `wallet.coverBrand`
+      // (`screen-wallet.jsx:531`, ein hartcodiertes „FACT
+      // Reiseführer") und `wallet.statSincePlaceholder`
+      // (`:551`) dazu.
       //
       // **`audio.dialog.volumeHint` kam am 02.09.2026 dazu und ist von allen
       // anderen verschieden** (E-28, `screen-auth.jsx:251`). Alle übrigen
@@ -158,6 +162,8 @@ void main() {
         'challenge.huntResult.timePlaceholder',
         'challenge.huntResult.close',
         'wallet.shelfVolumeLabel',
+        'wallet.coverBrand',
+        'wallet.statSincePlaceholder',
       });
     });
 
@@ -192,6 +198,7 @@ void main() {
         'challenge.huntPill.missingTitle': 'ein Gedankenstrich, sprachfrei',
         'challenge.huntResult.timePlaceholder':
             'ein Gedankenstrich, sprachfrei',
+        'wallet.statSincePlaceholder': 'ein Gedankenstrich, sprachfrei',
         'tour.step1.meta': 'eine Namensnennung, Goethe heißt in beiden so',
       };
 

@@ -127,7 +127,7 @@ Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
 den Schritten 33 bis 37 und 39.
 
-**Fertig sind 32 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 31, 33 bis 37, 39 und 45. Schritt 14 ist
+**Fertig sind 33 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 31, 33 bis 37, 39, 45 und 46. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -141,7 +141,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2688 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2734 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -428,6 +428,37 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 03.09.2026, Schritt 46, das Cover, und zwei Städte haben keine Silhouette
+
+Aus dem Regal führt ein Tipp jetzt in den Buchdeckel: Illustration,
+Titelblock, drei Kennzahlen, zurück ins Regal. **33 von 50.** Der Knopf „Alle
+Kapitel" bleibt ohne Ziel, das ist Schritt 47. Regal und Deckel sind zwei
+Zustände **eines** Reiters und keine zweite Route, wie bei `ChallengesPage`.
+
+**Der größte Fund:** `WltCityIllustration` hat drei Zweige, für München, Rom
+und Regensburg. **Passau und Weimar bekommen den allgemeinen Rückfall**,
+obwohl sie eine eigene Palette haben und im Regal stehen. Stand der Quelle,
+kein Versäumnis hier.
+
+**Die Paketfrage ist bewusst nicht gestellt.** Die Vorlage ist SVG, und
+`flutter_svg` ist nicht freigegeben; für vier Zeichnungen aus Rechtecken,
+Kreisen und quadratischen Kurven braucht es keins. **Wo die Frage wieder
+aufkommt, steht im Kopf von `library_illustrations.dart`:** bei einer sechsten
+Stadt mit eigener Silhouette. Eine SVG-Datei je Stadt ist besser zu pflegen als
+ein Painter je Stadt.
+
+**Dazu ein Fund für den Eigentümer, E-78:** fünf Kartenkategorien landen im
+Reiseführer im Kapitel „Historisch", darunter Kulinarik. `walletKatToKey` hat
+sechs Ziele und fällt sonst auf `hist` zurück. Ein Fakt über ein Restaurant
+steht damit unter Geschichte. Nachgebaut wie es ist, weil sechs Kapitel eine
+gestalterische Entscheidung sind; die richtige Antwort ist ein Inhaltsentscheid
+und keine Codeänderung.
+
+**Eine Pflichtmutation hat überlebt**, und zwar an Muster 18: die Zusicherung
+für die 58 Prozent Bildhöhe las auf beiden Seiten dieselbe Konstante. Das
+Muster stand seit Schritt 27 im Katalog und ist trotzdem wieder passiert; es
+trägt jetzt einen zweiten Beleg.
 
 ### 03.09.2026, Schritt 45, und der Reiseführer gruppiert nach Luftlinie
 

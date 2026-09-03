@@ -1119,6 +1119,69 @@ plus 19 Mutationen, alle gefallen.
 - [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [x] 25. Audio-Service (02.09.2026; „normal“ heißt im Paket 0,5 und nicht 1,0, und die Quelle hat einen echten API-Schlüssel ausgeliefert)
 - [x] 26. Map-Audio-Kopplung (03.09.2026; der Hinweiston mit Hysterese, und die Ansage geht **nicht** über den Fakt-Vorleser)
 
+### Schritt 46, das Cover, und zwei Städte haben gar keine Silhouette
+
+2716 → 2734 Tests, vierzehn Mutationen. Damit steht der zweite der drei
+Zustände von `screen-wallet.jsx`: aus dem Regal führt ein Tipp auf den
+Buchrücken in den Buchdeckel und von dort zurück. Der Knopf „Alle Kapitel"
+bleibt ohne Ziel, das ist Schritt 47.
+
+**Der Wechsel ist Zustand und keine zweite Route.** `WalletScreen` hält `view`
+und `cityKey` als React-State, und E-25 hat die öffentliche Routenfläche auf
+sieben Pfade festgelegt. Dieselbe Bauform wie `ChallengesPage`.
+
+#### Der größte Fund: die Silhouetten sind unvollständig
+
+`WltCityIllustration` hat genau **drei** Zweige, für München, Rom und
+Regensburg, danach einen Rückfall. **Passau und Weimar bekommen den
+Rückfall**, obwohl sie in `WalletCities` eine eigene Palette haben, in der
+Regalfolge stehen und Fakten tragen. Das ist kein Versäumnis des Neubaus, es
+ist der Stand der Quelle: die Silhouetten sind Handarbeit, und für zwei der
+fünf Pilotstädte hat sie noch niemand gezeichnet. Weil die Farben aus der
+Palette kommen, sieht der Rückfall trotzdem nach der jeweiligen Stadt aus.
+
+#### Die Paketfrage ist bewusst nicht gestellt worden
+
+Die Quelle ist wörtliches SVG, und `flutter_svg` wäre der offensichtliche Weg.
+Es ist **nicht** freigegeben, und ein neues Paket ist eine Entscheidung des
+Eigentümers. Für vier Zeichnungen aus Rechtecken, Kreisen, Ellipsen, Linien und
+quadratischen Kurven braucht es keins; alles davon kann `Canvas`.
+
+**Wo die Frage wieder aufkommt, steht im Kopf von
+`library_illustrations.dart`:** sobald eine sechste Stadt eine eigene
+Silhouette bekommen soll. Eine SVG-Datei je Stadt ist besser zu pflegen als ein
+Painter je Stadt, und mehrstädtisch wächst genau diese Zahl. Heute wäre das
+Paket ein Vorgriff, morgen ist es vielleicht die richtige Antwort.
+
+#### Was beim Bauen überrascht hat
+
+* **Die Geometrie steckte in einem Attribut.** `preserveAspectRatio="xMidYMax
+  slice"` heißt: **größerer** Maßstab, waagerecht mittig, senkrecht **unten**.
+  Mit `contain` stünde die Silhouette in der Luft, mit mittiger senkrechter
+  Ausrichtung verschwände die Häuserzeile aus dem Bild. Zwei Mutationen prüfen
+  genau diese zwei Verwechslungen.
+* **Die Türme sind nicht symmetrisch, und zwar beide gleich unsymmetrisch.**
+  Die Kuppel der Frauenkirche greift auf jeder Seite zwei Pixel über den
+  Schaft; die Spitze des Regensburger Doms greift **nur links** vier Pixel
+  über und endet rechts an der Schaftkante. Zweimal derselbe Versatz an zwei
+  Türmen, also die Quelle und kein Zufall. Beim Zusammenfassen der zwei
+  ausgeschriebenen Türme in eine Funktion sind zuerst fünf Koordinaten um
+  einen Pixel verrutscht, weil die Ableitung aus der Mitte plausibel aussah;
+  nachgerechnet gegen **beide** Türme fiel es auf.
+* **Eine Pflichtmutation hat überlebt, und der Grund war Muster 18.** Die
+  Zusicherung für die 58 Prozent Bildhöhe lautete
+  `closeTo(844 * LibraryCoverView.illustrationHeightFactor, 0.01)`, las also
+  auf beiden Seiten dieselbe Konstante. Jetzt steht dort die Zahl 489,52 aus
+  der Quelle, plus eine eigene Zusicherung auf die Konstante. Danach fielen
+  0,50 **und** 0,60.
+* **Das `data-cover-interactive`-Attribut der Quelle braucht keine
+  Entsprechung.** Sie stapelt Zeiger-Ereignisse und muss `stopPropagation`
+  rufen; in Flutter gewinnt der innerste Erkenner von selbst. Der Test hängt
+  deshalb am Verhalten („ein Tipp auf Zurück öffnet nicht die Kapitel") und
+  nicht an einer Umsetzung.
+* **Fünf Kategorien fallen still in „Historisch"**, siehe E-78. Aufgefallen
+  beim Bau der einen Kennzahl „Kapitel", die auf dem Cover steht.
+
 ### Schritt 45, der Reiseführer, und die Quelle gruppiert nach Luftlinie
 
 2630 → 2688 Tests, acht Mutationen, alle gefallen. Gebaut ist der erste der
@@ -1783,7 +1846,7 @@ Gebaut ist die Liste, ohne Einstieg, wie die Fakt-Akte und das Rätsel-Sheet.
   derselben Datei zweimal mit verschiedenen Werten: `#B0BEC5` für die
   Trophäenstufe, `#A8A8A8` für das Rang-Abzeichen.
 
-- [x] 45. Library (03.09.2026, die Bibliothek; Cover und Lesemodus sind 46 und 47) · [ ] 46. Cover und Illustrationen · [!] 47. Chapters und
+- [x] 45. Library (03.09.2026, die Bibliothek) · [x] 46. Cover und Illustrationen (03.09.2026; drei Städte haben eine eigene Silhouette, Passau und Weimar nicht) · [!] 47. Chapters und
   Reader („Frag Claude") · [ ] 48. Leaderboard · [~] 49. Trophäen (Liste steht,
   Stimmen-Picker hängt an E-15, Sitzungsende an E-19)
 
@@ -5147,6 +5210,7 @@ eine Fundstelle.
 | E-75 | **Der Reiseführer gruppiert die Bücher nach Luftlinie zur nächsten von zwölf Städten, ohne jede Entfernungsgrenze.** Am 03.09.2026 gemessen. `wltCityKey` (`screen-wallet.jsx:11-29`) fragt zuerst `detectCity(lat, lng)`, und das ist eine reine Nächster-Nachbar-Suche über eine feste Liste von zwölf Stadtmitten (`screen-map.jsx:342-350`), ohne Radius und ohne Rückgabe „keine Stadt". **Drei Folgen.** (1) Jeder Fakt landet in einem Band: einer in Berlin bei Weimar oder Göttingen, einer in Paris bei Heidelberg. (2) `f.ort` ist toter Code, denn sobald `lat` und `lng` Zahlen sind, liefert `detectCity` immer etwas. (3) **Bände und Stadt-Trophäen widersprechen sich konstruktiv:** die vier `*_first`-Trophäen vergibt der Server aus `facts.city` mit dem `nr`-Präfix als Notnagel (`supabase-schema.sql:240-250`), das Regal gruppiert nach Entfernung. Ein Fakt kann im Münchner Band stehen, während die Trophäe einer anderen Stadt zugerechnet wurde. Dazu zwei kleinere Funde derselben Stelle: von den zwölf Städten haben nur fünf eine Palette, die anderen sieben (Nürnberg, Wien, Salzburg, Heidelberg, Bologna, Piran, Göttingen) bekommen einen braunen Vorgabe-Band, und ihre **Bandnummer hängt an der Gitterposition** (`city.bandNo \|\| (4 * ri + ci + 1)`, `:966`), ändert sich also, sobald eine Stadt davor dazukommt. **Gebaut ist die Gruppierung nach `FactCity.slug`**, also nach der Spalte in genau der Normalisierung von `public._slugify`: die Spalte ist gepflegt, der Server rechnet die Trophäen aus ihr, und es entsteht keine sechste Normalisierung. Die Bandnummer ist unverändert übernommen, weil eine erfundene Nummerierung neues Verhalten wäre. **Fünfter Stadtschlüssel neben den vier aus E-56**, und der erste, der rein clientseitig ist. Weimar steht übrigens im Regal, hat aber gar keine `*_first`-Trophäe; `grand_tour` spricht von „allen 4 Städten". | 3 | Gruppierung gebaut, E-56 offen |
 | E-76 | **`screen-wallet.jsx` trägt 410 Zeilen toten Code und zwei Kleinigkeiten daneben.** Am 03.09.2026 über alle `*.jsx` der PWA gesucht. (1) `WltBookSpine` (`:381-459`, 79 Zeilen) sieht aus wie **der** Buchrücken, mit Papierkorn, eingeprägtem `FACT`-Stempel und der Bandnummer über `t('wallet.bandLabel')` — und wird **nirgends aufgerufen**. `WltLibraryView` zeichnet den Rücken direkt im Gitter, mit anderen Maßen (165 bis 215 statt 178 bis 250), anderem Goldband (6 statt 8 Pixel) und ohne Korn und Stempel. Wer die Datei liest, baut leicht die falsche Fassung nach. (2) `WltCityVolumeView_REMOVED` (`:1082-1412`, 330 Zeilen) ist als ausgebaut markiert und steht trotzdem da. (3) Der ausgebaute Zwilling verrät eine Absurdität: `t('wallet.bandLabel').replace('{n}', …).replace('Band', '№').replace('Vol.', '№')` holt einen Schlüssel und ersetzt danach sein einziges Wort durch ein Zeichen — übrig bleibt in jeder Sprache „№ 3", der Schlüssel ist wirkungslos. (4) Die Rangzeile schreibt `t('wallet.rankSoon').replace('↗', '')` und hängt danach ein goldenes `↗` an; der Schlüssel trägt das Zeichen aber **in der Mitte** (`Sammler-Rang ↗ bald verfügbar`), übrig bleiben zwei Leerzeichen. (5) Die Überschrift der Trophäenzeile lautet „Zuletzt erreicht", die Zeile zeigt aber Definitionsreihenfolge; der Profil-Bildschirm sortiert Verdiente nach vorn, diese Zeile nicht. Nachgebaut ist die lebende Fassung, das doppelte Leerzeichen ist weg, die Reihenfolge ist übernommen. | 1 | nachgebaut, Etikett offen |
 | E-77 | **Im dunklen Theme sind alle sechsunddreißig Trophäen-Beschriftungen des Reiseführers unlesbar.** Am 03.09.2026 gemessen. `screen-wallet.jsx:1057` setzt den Grund einer gesperrten Karte hart auf `background: '#fff'`, ohne Token, und die verdiente bekommt einen cremefarbenen Verlauf (`:1055-1056`). Die Beschriftung nimmt `tok.ink` (`:1071`), und das ist im dunklen Theme `#F5F0E8`. Weiß auf Weiß. Die Karte selbst ist in beiden Themes hell, der Text folgt aber dem App-Theme; der Fehler tritt also **nur** im dunklen Theme auf und dort bei jeder Karte. **Behoben ohne Gestaltungsentscheidung:** die Schriftfarbe folgt der Karte und nicht dem Theme, genommen wird `FactColors.light.ink`, also genau die Farbe, die die Quelle im hellen Theme zeigt. | 2 | **behoben 03.09.2026** |
+| E-78 | **Fünf Kartenkategorien landen im Reiseführer im Kapitel „Historisch", darunter Kulinarik.** Am 03.09.2026 gemessen und in `library_categories_test.dart` festgenagelt. `walletKatToKey` (`wallet-colors.jsx:88-100`) kennt sechs Ziele und fällt sonst auf `hist` zurück. Von den Kategorietexten, die `factCategoryAliases` als eigene Kartenkategorien führt, treffen deshalb **alle vierzehn** Schreibweisen von Kulinarik (`kul`), Persönlichkeiten (`pers`), Kultur (`kult`), Dunkel & Kriminell (`dark`) und Kirche & Glaube (`kirche`) auf `hist`. Ein Fakt über ein Restaurant steht im Reiseführer damit unter Geschichte. Der auffälligste Einzelfall ist `Historical Figures`: die Karte führt es ausdrücklich als `pers`, der Reiseführer macht daraus Geschichte, weil der Text mit „hist" anfängt. Zwei Tabellen, ein Text, zwei Antworten. **Eine Ausnahme ist gewollt:** `Natur` fällt auf `geo`, dafür hat die Quelle eine eigene Zeile. **Übernommen wie es ist, und das ist eine Abwägung:** sechs Kapitel sind eine gestalterische Entscheidung, zwölf daraus zu machen wäre neues Verhalten und keine Behebung. Dass ein kulinarischer Fakt unter Geschichte einsortiert wird, ist einem Leser gegenüber trotzdem falsch. **Die Antwort ist eine Inhaltsentscheidung des Eigentümers**, nicht eine Codeänderung: entweder eigene Kapitel für die fünf, oder ein Kapitel „Vermischtes", oder es bleibt. | 2 | Inhaltsentscheidung |
 | E-70 | **In der Quelle liegt ein vollständiger OpenAI-API-Schlüssel im Klartext, in einer Datei, die jeder Browser ausgeliefert bekommt.** Am 02.09.2026 beim Zuschnitt von Schritt 25 gefunden. Fundstelle: `02_Frontend/app/audio-player.jsx:12`, eine Konstante `OPENAI_KEY` mit einem echten `sk-proj-…`-Schlüssel, direkt darunter Stimme und Modell. **Die Datei wird ausgeliefert, nicht gebündelt:** `index.html:180` lädt sie als `<script type="text/babel" src="audio-player.jsx?v=5">`, also im Quelltext und ohne jede Verarbeitung. Wer die Seite offen hatte, konnte den Schlüssel lesen. **Vier Fundstellen, und meine erste Zählung war falsch:** sie stand kurz als „genau eine", weil die Suche auf `02_Frontend` begrenzt war und gebaute Artefakte übersprungen hat. Tatsächlich sind es `02_Frontend/app/audio-player.jsx:12` (die Quelle), `02_Frontend/dist/assets/index-4JDjuKco.js` (das gebaute Web-Bündel), `02_Frontend/android/app/src/main/assets/public/assets/index-4JDjuKco.js` (dasselbe Bündel in den Android-Assets, also im Paket, wenn es je verteilt wurde) und `06_Planung/plans/2026-05-14-openai-tts.md:275`. Nicht im Backend, nicht im eingefrorenen Flutter-Port. **Der Schlüssel selbst steht bewusst nirgends in diesem Repository**, auch nicht hier; dieses Repository ist öffentlich (E-64). **Es war eine bewusste Abwägung und kein Versehen:** das Planungsdokument sagt, der Schlüssel werde im Quelltext sichtbar sein, das sei „acceptable for a personal project at this scale", und man solle rotieren, falls unerwartete Kosten auftauchen. Das war der 14.05.2026; seither gibt es `DACH_Rollout_Plan.md` und den Weg in die App Stores. **Ob die Abwägung heute noch gilt, entscheidet der Eigentümer, nicht dieses Repository.** **Die Behebung ist nicht Code:** den Schlüssel bei OpenAI zurückziehen und neu ausstellen. Ihn nur aus den Dateien zu löschen genügt nicht, er steht in der Versionsgeschichte des anderen Repositories und war ausgeliefert. Für den Neubau ändert sich dadurch nichts, er bestätigt die Entscheidung: E-15 legt „Gerät zuerst" fest, und Janek hat am 31.08.2026 dazu gesagt „soll aber nirgends rumliegen, ist ja schließlich ein api key". Die Cloud-Variante läuft über Edge Function und Proxy, nie über einen Schlüssel im Client. **Am 03.09.2026 erledigt:** „api key ist deaktiviert bei open AI". Der Widerruf ist die vollständige Behebung; die vier Dateien tragen jetzt einen toten Schlüssel, und sie aufzuräumen ist Kosmetik im Lese-Repo. **Die laufende PWA bricht nicht, nachgesehen und nicht angenommen:** `audio-player.jsx:171` wirft bei jeder Antwort, die nicht `ok` ist, und der `catch` liest über `SpeechSynthesisUtterance` vor, mit gespeicherter Geschwindigkeit und gewählter Stimme. Ein 401 fällt also auf die Browserstimme zurück statt zu schweigen; verloren geht `tts-1-hd`/`nova`, nicht die Funktion. Zwei Nebenwirkungen: jedes Vorlesen macht erst einen vergeblichen HTTP-Weg, und weil der Blob-Zwischenspeicher sich nie füllt, fällt der bei **jedem** Abspielen an. Nebenbei bestätigt das Schritt 25: was die PWA seit dem 03.09.2026 tatsächlich tut, ist die Gerätestimme, und genau die baut `flutter_tts`. | 4 | **erledigt 03.09.2026** |
 | E-71 | **Für die Sprechgeschwindigkeit und die Stimme gibt es im Neubau keine Einstellung, und die Zahl dahinter ist eine Falle.** Am 02.09.2026 mit Schritt 25 aufgenommen. Die Quelle hat im Profil einen Schieber (`Storage.getAudioRate`, Rückfall `1.0`, `storage.jsx:168`) und eine Stimmenwahl (`Storage.getAudioVoice`, `:171`). Beide fehlen, weil es den Einstellungs-Bildschirm noch nicht gibt; der Neubau benutzt `defaultSpeechRate` als Konstante und die Standardstimme des Geräts. **Wer den Schieber baut, muss die Umrechnung kennen:** der Vertrag trägt die menschliche Einheit (1,0 ist normal), `flutter_tts` nicht (dort ist 0,5 normal), und die Umrechnung sitzt in `FlutterTtsSpeechService._pluginRate`. Ein Schieber, der seinen Wert direkt an das Paket gibt, verdoppelt jede Einstellung. Die Stimmenwahl hängt zusätzlich an E-15. **Seit Schritt 26 hängt ein drittes daran:** der Kopfhörer-Modus (`Storage.getHeadphoneMode()`, `storage.jsx:174`), der die Stereo-Verteilung des Hinweistons einschaltet. Der Weg dorthin ist gebaut und geprüft, der Schalter fehlt, und ohne ihn klingt der Ton mittig. Wird zu einem siebten Speicher am `KeyValueStore`, wenn er kommt. | 2 | mit dem Einstellungs-Bildschirm |
 | E-72 | **Die iOS-Audio-Kategorie des Vortrags ist ungeprüft, und sie entscheidet, ob der Stummschalter ihn abschaltet.** Am 02.09.2026 offen gelassen. `flutter_tts` bietet `setIosAudioCategory` und `setSharedInstance`; der Neubau ruft beides **nicht** und nimmt damit die Voreinstellung. Ob der Vortrag dann über den Medienkanal läuft, ob er sich mit anderer Wiedergabe mischt und was bei aktivem Stummschalter passiert, ist am Gerät zu messen und nicht zu raten. **Es hängt an derselben Frage wie E-28:** dort ist begründet, dass der Stummschalter auf keiner der beiden Plattformen die Medienlautstärke steuert, und genau das gilt nur, wenn die Kategorie stimmt. Die Quelle kann dazu nichts sagen, sie läuft im Browser. Zu tun: eine Messung auf einem iPhone, danach eine Zeile im Adapter oder eine begründete Zeile, warum keine nötig ist. | 2 | vor Auslieferung |
@@ -5277,7 +5341,14 @@ halben Tag.
     Zusicherungen dafür geschrieben worden waren, und dieselbe Form steckte in
     zwei älteren Zeilen. Der Wert muss aus der **Quelle** kommen, nicht aus dem
     Code, den er bewachen soll. Verwandt mit Muster 9: die Zusicherung sieht
-    gemessen aus und ist es nicht.
+    gemessen aus und ist es nicht. **Zweiter Beleg am 03.09.2026, Schritt 46:**
+    `closeTo(844 * LibraryCoverView.illustrationHeightFactor, 0.01)` hat die
+    Mutation von 0,58 auf 0,50 überlebt. Das Muster stand da, war gelesen und
+    ist trotzdem wieder entstanden, weil eine Rechnung mit einer Konstante
+    weniger nach „gegen sich selbst geprüft" aussieht als ein direkter
+    Vergleich. **Die Regel ist damit schärfer als „nicht vergleichen":** eine
+    Konstante des Produktivcodes darf in einer Zusicherung überhaupt nicht
+    vorkommen, auch nicht als Faktor.
 19. **`toImage()` hängt im Rumpf von `testWidgets` bis zur Zeitüberschreitung.**
     Zehn Minuten ohne eine einzige Meldung. Das ist Muster 14 mit einem dritten
     Helfer neben `pumpEventQueue()` und `loadAppFonts()`, und der Ausweg ist

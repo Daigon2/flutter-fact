@@ -4,6 +4,7 @@
 /// einzige DI-Mechanismus, ohne Codegenerierung).
 library;
 
+import 'package:fact_app/features/collection/application/library_categories.dart';
 import 'package:fact_app/features/collection/application/library_shelf.dart';
 import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
@@ -40,6 +41,28 @@ final FutureProvider<List<LibraryVolume>> libraryShelfProvider =
           .map((FactId id) => id.value)
           .toSet();
       return libraryShelfOf(facts: await facts, collected: collected);
+    });
+
+/// Die sechs Kapitel eines Bands.
+///
+/// Ein `family` über den Bandschlüssel. Der Kartenbildschirm braucht das nie,
+/// das Cover braucht daraus nur die Zahl der angefangenen Kapitel, und die
+/// Kapitelliste aus Schritt 47 braucht alle sechs samt Zählern. Deshalb liefert
+/// dieser Provider die ganze Liste und nicht die Zahl: eine Zahl wäre beim
+/// nächsten Schritt zu wenig, und zwei Provider über denselben Daten wären eine
+/// Rechnung zu viel.
+final libraryChaptersProvider =
+    FutureProvider.family<List<LibraryChapter>, String>((ref, cityKey) async {
+      final Future<List<Fact>> facts = ref.watch(allFactsProvider.future);
+      final Set<int> collected = ref
+          .watch(collectedFactsProvider)
+          .map((FactId id) => id.value)
+          .toSet();
+      return libraryChaptersOf(
+        facts: await facts,
+        cityKey: cityKey,
+        collected: collected,
+      );
     });
 
 /// Wie viele Fakten insgesamt gesammelt sind.
