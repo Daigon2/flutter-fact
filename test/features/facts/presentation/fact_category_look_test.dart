@@ -98,19 +98,49 @@ void main() {
       }
     });
 
-    test('die vier ausgelassenen Schlüssel haben wirklich keinen Text', () {
-      // Gegenprobe zur Behauptung im Kopf von `fact_category_look.dart`.
-      // Bekommt die PWA die Schlüssel nachträglich, fällt dieser Test und
-      // die Tabelle darf wachsen.
+    test('von den vier Lücken sind seit dem 03.09.2026 zwei geschlossen', () {
+      // **Dieser Test war ein Stolperdraht und hat ausgelöst.** Er stand hier
+      // mit der Ansage: „Bekommt die PWA die Schlüssel nachträglich, fällt
+      // dieser Test und die Tabelle darf wachsen."
+      //
+      // Ausgelöst hat ihn nicht die PWA, sondern die Entscheidung zu E-78:
+      // der Reiseführer bekam eigene Kapitel für Kultur und Dunkel &
+      // Kriminell, und weil die PWA für beide den nackten Schlüssel anzeigt,
+      // sind sie in `app_strings_supplement.dart` gelandet. Damit haben sie
+      // Text, nur nicht aus den erzeugten Tabellen.
       final AppStrings strings = AppStrings.of(AppLanguage.de);
-      for (final String key in <String>['kult', 'dark', 'kirche']) {
-        expect(strings.hasText('cat.$key'), isFalse, reason: key);
-      }
-      // `pers` ist der Sonderfall: den Schlüssel gibt es, die Akte erreicht
-      // ihn trotzdem nicht, weil ihre eigene Zuordnungstabelle
+
+      expect(strings.hasText('cat.kult'), isTrue);
+      expect(strings.hasText('cat.dark'), isTrue);
+
+      // **`kirche` bleibt die Lücke**, und zwar aus einem anderen Grund als
+      // vorher: das Wörterbuch führt „Kirche & Glaube" unter `cat.chr`,
+      // während die Kategorietabelle den Schlüssel `kirche` benutzt. Es fehlt
+      // kein Text, es fehlt die Abbildung. Der Reiseführer hat sie in
+      // `libraryChapterNameKey`; die Akte hätte sie noch nicht.
+      expect(strings.hasText('cat.kirche'), isFalse);
+      expect(strings.hasText('cat.chr'), isTrue);
+
+      // `pers` war schon immer der Sonderfall: den Schlüssel gibt es, die
+      // Akte erreicht ihn trotzdem nicht, weil ihre eigene Zuordnungstabelle
       // "Persönlichkeiten" nicht kennt.
       expect(strings.hasText('cat.pers'), isTrue);
       expect(factCategoryLookAliases.containsKey('Persönlichkeiten'), isFalse);
+    });
+
+    test('die Akte zeigt für Kultur weiter Historisch, der Führer nicht', () {
+      // **Die Folge, die dieser Test sichtbar hält, und sie ist unschön.**
+      // Derselbe Fakt heißt jetzt an drei Stellen dreierlei: der Ballon auf
+      // der Karte trägt die Kultur-Farbe, die Akte sagt „Historisch", und der
+      // Reiseführer sagt „Kunst & Kultur".
+      //
+      // Die Akte **könnte** das jetzt richtig zeigen, ihre Tabelle darf laut
+      // dem Test darüber wachsen. Sie tut es bewusst noch nicht: das ist eine
+      // sichtbare Verhaltensänderung in einem fertigen Bildschirm und gehört
+      // als eigener Schritt entschieden, nicht als Nebenwirkung der
+      // Kapitel-Arbeit. Steht als E-81 im Register.
+      expect(factCategoryLookOf('Kunst & Kultur').key, 'hist');
+      expect(factCategoryLookAliases.containsKey('Kunst & Kultur'), isFalse);
     });
   });
 }

@@ -1,4 +1,4 @@
-/// Die sechs Kapitel eines Reiseführer-Bands und die Tabelle, die eine
+/// Die elf Kapitel eines Reiseführer-Bands und die Tabelle, die eine
 /// Fakt-Kategorie darauf abbildet.
 ///
 /// ## Quelle
@@ -12,32 +12,37 @@
 /// ## Warum das eine zweite, unabhängige Abschrift ist
 ///
 /// `features/discovery/presentation/fact_categories.dart` hält **zwölf**
-/// Kategorien mit Emoji und Farbe, aus `screen-map.jsx`. Diese hier hält
-/// **sechs**, aus `wallet-colors.jsx`. Das sind zwei verschiedene Tabellen der
-/// Quelle mit verschiedenen Zwecken, und Regel 8 lässt `collection` ohnehin
-/// nicht in die Presentation von `discovery`.
+/// Kategorien mit Emoji und Farbe, aus `screen-map.jsx`. Diese hier hielt
+/// bis zum 03.09.2026 **sechs**, aus `wallet-colors.jsx`, und hält seit der
+/// Entscheidung zu E-78 **elf**. Das sind zwei Tabellen der Quelle mit
+/// verschiedenen Zwecken, und Regel 8 lässt `collection` ohnehin nicht in
+/// die Presentation von `discovery`.
 ///
-/// **Die sechs sind eine Teilmenge der zwölf**, das ist geprüft: `hist`,
-/// `arch`, `myth`, `fun`, `geo` und `heute` kommen in beiden vor. Die
-/// Abbildung ist trotzdem nicht dieselbe, siehe unten.
+/// **Die elf sind eine Teilmenge der zwölf**, das ist geprüft: es fehlt
+/// allein `nat`, und zwar mit Absicht, siehe unten.
 ///
-/// ## Fünf Kartenkategorien landen im Kapitel „Historisch"
+/// ## Elf Kapitel, und warum es vorher fünf zu wenig waren
 ///
-/// Gemessen am 03.09.2026 und in `library_categories_test.dart` festgenagelt.
-/// `walletKatToKey` kennt nur sechs Ziele und fällt auf `hist` zurück. Von den
-/// Kategorietexten, die `factCategoryAliases` kennt, treffen deshalb
-/// **Kulinarik, Persönlichkeiten, Kultur, Dunkel & Kriminell und Kirche &
-/// Glaube** alle auf `hist`, dazu `Historical Figures`, das die Karte als
-/// eigene Kategorie `pers` führt. Ein Fakt über ein Restaurant steht im
-/// Reiseführer damit im Kapitel „Historisch".
+/// Am 03.09.2026 gemessen: `walletKatToKey` kennt nur sechs Ziele und
+/// fällt sonst auf `hist` zurück. Von den Kategorietexten, die
+/// `factCategoryAliases` kennt, trafen deshalb **vierzehn** auf `hist`,
+/// nämlich alle Schreibweisen von Kulinarik, Persönlichkeiten, Kultur,
+/// Dunkel & Kriminell und Kirche & Glaube. Ein Fakt über ein Restaurant
+/// stand im Reiseführer unter Geschichte, und `Historical Figures`, das
+/// die Karte ausdrücklich als `pers` führt, ebenfalls.
 ///
-/// **Übernommen wie es ist, und das ist eine Abwägung.** Sechs Kapitel sind
-/// eine gestalterische Entscheidung der Quelle; zwölf daraus zu machen wäre
-/// neues Verhalten und keine Behebung. Dass ein kulinarischer Fakt unter
-/// Geschichte einsortiert wird, ist einem Leser gegenüber trotzdem falsch, und
-/// die Antwort darauf ist eine Inhaltsentscheidung des Eigentümers. Steht als
-/// E-78 im Register. Der Test hält die Zuordnung fest, damit niemand sie
-/// nebenbei „korrigiert" und damit die Kapitelzahl auf allen Covern verschiebt.
+/// **Der Eigentümer hat am 03.09.2026 entschieden, dass die fünf ihr
+/// eigenes Kapitel bekommen** (E-78). Die Abbildung unten ist damit keine
+/// wörtliche Abschrift von `walletKatToKey` mehr, sondern die Quelle plus
+/// fünf Zeilen. Welche Reihenfolge die Prüfungen haben, ist dabei nicht
+/// gleichgültig, und `library_categories_test.dart` nagelt jeden der
+/// zweiunddreißig Kategorietexte einzeln fest.
+///
+/// **Kein Wortlaut war nötig, und das war beim Fragen noch nicht klar.**
+/// `cat.kul`, `cat.pers` und `cat.chr` stehen zweisprachig in den
+/// erzeugten Tabellen. Für `kult` und `dark` liefert die Aliastabelle der
+/// Karte beide Sprachen als Paar mit, siehe die beiden Ergänzungs-Einträge
+/// in `app_strings_supplement.dart`. Erfunden ist nichts.
 ///
 /// **Eine Ausnahme ist ausdrücklich gewollt:** `Natur` und `Nature` fallen auf
 /// `geo`, weil `walletKatToKey` dafür eine eigene Zeile hat
@@ -48,34 +53,89 @@ import 'package:fact_app/features/collection/application/generated/wallet_catego
 import 'package:fact_app/features/collection/application/library_city_key.dart';
 import 'package:fact_app/features/facts/domain/entities/fact.dart';
 
-/// Die sechs Kapitelschlüssel in der Reihenfolge der Quelle.
+/// Die fünf Kapitel, die es in der Quelle nicht gibt.
 ///
-/// **Erzeugt und nicht abgeschrieben**, seit dem 03.09.2026:
-/// [walletCategoryOrder] kommt aus `wallet-colors.jsx` durch
-/// `tool/generate_curated_data.dart`. Vorher stand hier eine Liste von Hand,
-/// und die wäre bei einer siebten Kategorie stumm veraltet. Der Prüflauf des
-/// Werkzeugs bricht jetzt ab, wenn Reihenfolge und Tabelle Löcher bekommen.
+/// **Entscheidung des Eigentümers vom 03.09.2026**, siehe E-78: „ne, das soll
+/// nicht alles unter historisch. die bekommen ihr eigenes akapitel, wäre am
+/// cleansten oder?"
 ///
-/// Als Alias und nicht als direkte Verwendung von [walletCategoryOrder]: der
-/// Name sagt, wofür es hier gebraucht wird, und die erzeugte Datei bleibt eine
-/// Abschrift ohne eigenen Begriff.
-const List<String> libraryCategoryOrder = walletCategoryOrder;
+/// Die Reihenfolge ist die der Kartentabelle (`screen-map.jsx:195-208`), und
+/// sie stehen **hinten**, nicht zwischen den sechs. Der Grund ist sichtbar:
+/// die Kapitelliste nummeriert römisch nach der Position in dieser Folge. Wer
+/// die fünf einsortiert, verschiebt jedem bestehenden Nutzer die Nummern
+/// seiner Kapitel; wer sie anhängt, lässt I bis VI stehen und ergänzt VII bis
+/// XI.
+const List<String> libraryExtraCategories = <String>[
+  'kul',
+  'pers',
+  'kult',
+  'dark',
+  'kirche',
+];
+
+/// Die elf Kapitelschlüssel, erst die sechs der Quelle, dann die fünf neuen.
+///
+/// **Die sechs sind erzeugt und nicht abgeschrieben:** [walletCategoryOrder]
+/// kommt aus `wallet-colors.jsx` durch `tool/generate_curated_data.dart`.
+/// Stand hier vorher als Liste von Hand und wäre bei einer siebten Kategorie
+/// der Quelle stumm veraltet.
+///
+/// **`nat` fehlt in beiden Teilen, und das ist Absicht.** `walletKatToKey` hat
+/// für Natur eine eigene Zeile auf `geo` (`if (k.startsWith('natur')) return
+/// 'geo'`). Das ist eine redaktionelle Entscheidung der Quelle und kein
+/// Rückfall wie bei den fünf anderen, deshalb elf Kapitel und nicht zwölf.
+final List<String> libraryCategoryOrder = <String>[
+  ...walletCategoryOrder,
+  ...libraryExtraCategories,
+];
+
+/// Der i18n-Schlüssel für den Namen von [categoryKey].
+///
+/// Zehn der elf heißen `cat.<schlüssel>`. **Die Ausnahme ist `kirche`:** das
+/// Wörterbuch führt „Kirche & Glaube" unter `cat.chr`, während die
+/// Kategorietabelle der Karte den Schlüssel `kirche` benutzt. Zwei Namen für
+/// dieselbe Sache, und `t('cat.kirche')` fände nichts. Dieselbe Sorte
+/// Stolperstelle wie E-28 und E-63, hier einmal abgefangen statt an jeder
+/// Aufrufstelle.
+String libraryChapterNameKey(String categoryKey) =>
+    categoryKey == 'kirche' ? 'cat.chr' : 'cat.$categoryKey';
 
 /// Auf welches Kapitel [category] fällt.
 ///
-/// Wörtliche Abschrift von `walletKatToKey` (`wallet-colors.jsx:88-100`),
-/// **einschließlich der Reihenfolge der Prüfungen**. Sie ist bedeutsam: `geo`
-/// steht vor `natur`, und beide führen auf denselben Schlüssel, aber ein
-/// späterer Umbau, der die Zeilen sortiert, ändert das Ergebnis für jeden Text,
-/// der auf mehr als eine Regel passt.
+/// **Bis zum 03.09.2026 war das die wörtliche Abschrift von
+/// `walletKatToKey` (`wallet-colors.jsx:88-100`). Jetzt ist es die Quelle
+/// plus fünf Zeilen**, weil die fünf zusammengefalteten Kategorien ihr
+/// eigenes Kapitel bekommen haben (E-78).
 ///
-/// Der Rückfall ist `hist` und nicht `null`. Das ist die Quelle, und es ist
-/// gleichzeitig der Grund für E-78.
+/// **Die Reihenfolge der Prüfungen ist der schwierige Teil**, und drei
+/// Stellen sind heikel:
+///
+/// * `historical figures` muss **vor** `hist` stehen, sonst gewinnt der
+///   Anfang des Wortes und eine Person landet unter Geschichte. Genau das
+///   tut die Quelle.
+/// * `arch` muss **vor** `art` stehen: `architektur` und `architecture`
+///   fangen mit `arc` an, nicht mit `art`, und der Unterschied ist ein
+///   Buchstabe.
+/// * `kulinar` muss **vor** `kultur` stehen. Beide fangen mit `kul` an,
+///   und eine Prüfung auf drei Buchstaben machte aus Kulinarik Kultur.
+///
+/// Der Rückfall bleibt `hist` und nicht `null`, wie in der Quelle. Er
+/// fängt jetzt aber nur noch wirklich unbekannte Texte und nicht mehr fünf
+/// ganze Kategorien.
 String libraryCategoryKeyOf(String category) {
   final String key = category.toLowerCase();
+  // **Steht vor der `hist`-Zeile, und das ist der Kern der Erweiterung.**
+  // `Historical Figures` führt die Karte als `pers`, und der Text fängt mit
+  // „hist" an. Bei der Quelle gewinnt deshalb `hist`, und eine Person landet
+  // unter Geschichte. Genau dieser Fall war der auffälligste Beleg in E-78.
+  if (key.startsWith('historical figures')) {
+    return 'pers';
+  }
   if (key.startsWith('hist') || key.startsWith('gesch')) {
     return 'hist';
   }
+  // Vor `art`: `architektur` und `architecture` fangen mit „arc" an, nicht
+  // mit „art", der Unterschied ist ein Buchstabe.
   if (key.startsWith('arch')) {
     return 'arch';
   }
@@ -90,6 +150,25 @@ String libraryCategoryKeyOf(String category) {
   }
   if (key.startsWith('natur')) {
     return 'geo';
+  }
+  // `kulinar` vor `kultur`: beide fangen mit „kul" an, und ein `startsWith`
+  // auf drei Buchstaben würde Kulinarik zu Kultur machen.
+  if (key.startsWith('kulinar') || key.startsWith('food')) {
+    return 'kul';
+  }
+  if (key.startsWith('kultur') ||
+      key.startsWith('kunst') ||
+      key.startsWith('art')) {
+    return 'kult';
+  }
+  if (key.startsWith('persön') || key.startsWith('person')) {
+    return 'pers';
+  }
+  if (key.startsWith('dunkel') || key.startsWith('dark')) {
+    return 'dark';
+  }
+  if (key.startsWith('kirche') || key.startsWith('church')) {
+    return 'kirche';
   }
   if (key.startsWith('stadt heute') ||
       key.startsWith('heute') ||

@@ -34,14 +34,19 @@ void main() {
     total: 20,
   );
 
-  /// Sechs Kapitel aus zwei Listen: gesammelt und gesamt, je Kapitel.
+  /// Alle elf Kapitel aus zwei Listen: gesammelt und gesamt.
+  ///
+  /// **Kürzere Listen werden mit Nullen aufgefüllt.** Ein Test nennt nur die
+  /// Kapitel, um die es ihm geht, und die Zahl elf steht an einer Stelle statt
+  /// in jedem Aufruf. Als die Kapitel mit E-78 von sechs auf elf wuchsen, war
+  /// das der Unterschied zwischen einer geänderten Zeile und zwanzig.
   List<LibraryChapter> chaptersOf(List<int> collected, List<int> total) =>
       <LibraryChapter>[
         for (int i = 0; i < libraryCategoryOrder.length; i++)
           LibraryChapter(
             categoryKey: libraryCategoryOrder[i],
-            collected: collected[i],
-            total: total[i],
+            collected: i < collected.length ? collected[i] : 0,
+            total: i < total.length ? total[i] : 0,
           ),
       ];
 

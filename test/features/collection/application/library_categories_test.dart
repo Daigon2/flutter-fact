@@ -5,12 +5,14 @@ import 'package:fact_app/features/facts/domain/value_objects/fact_id.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Die sechs Kapitel eines Bands.
+/// Die elf Kapitel eines Bands.
 ///
-/// Der wichtigste Block ist der letzte: er nagelt fest, welche der zwölf
-/// Kartenkategorien im Reiseführer in „Historisch" landen (E-78). Ohne ihn
-/// ließe sich der Rückfall „korrigieren", und die Kapitelzahl auf jedem Cover
-/// verschöbe sich, ohne dass ein Test rot wird.
+/// Der wichtigste Block ist der mittlere: er nagelt **jeden** der
+/// zweiunddreißig Kategorietexte der Karte auf sein Kapitel fest. Vor dem
+/// 03.09.2026 fielen vierzehn davon auf „Historisch", weil die Abbildung
+/// nur sechs Ziele kannte (E-78). Ohne diesen Block ließe sich eine Zeile
+/// der Abbildung entfernen, und die Kapitel auf jedem Cover verschoben
+/// sich, ohne dass ein Test rot wird.
 void main() {
   Fact factWith({
     required int id,
@@ -23,7 +25,7 @@ void main() {
   );
 
   group('Abbildung', () {
-    test('die sechs Schlüssel der Quelle treffen sich selbst', () {
+    test('die elf Schlüssel treffen sich selbst', () {
       expect(libraryCategoryKeyOf('Historisch'), 'hist');
       expect(libraryCategoryKeyOf('Architektur'), 'arch');
       expect(libraryCategoryKeyOf('Mythos'), 'myth');
@@ -67,19 +69,38 @@ void main() {
     });
   });
 
-  group('E-78: was im Kapitel „Historisch" landet, ohne dort hinzugehören', () {
-    // Diese fünf Kategorietexte kennt `factCategoryAliases` als eigene
-    // Kartenkategorien (`kul`, `pers`, `kult`, `dark`, `kirche`).
-    // `walletKatToKey` hat für keine von ihnen eine Zeile, alle fallen auf
-    // `hist`. Ein Fakt über ein Restaurant steht damit im Reiseführer unter
-    // Geschichte.
-    const Map<String, String> foldedIntoHistory = <String, String>{
+  group('E-78: jeder Kategorietext der Karte trifft sein Kapitel', () {
+    // **Die vollständige Aliastabelle der Karte**, abgeschrieben aus
+    // `features/discovery/presentation/fact_categories.dart`, und daneben das
+    // Kapitel, in dem der Text im Reiseführer landen muss.
+    //
+    // Warum abgeschrieben und nicht importiert: Regel 8 lässt `collection`
+    // nicht in die Presentation von `discovery`. Diese Liste ist damit die
+    // zweite, unabhängige Abschrift, genau wie die Kategorietabelle selbst.
+    // Läuft sie auseinander, wird dieser Test rot, und das ist sein Zweck.
+    //
+    // **`nat` ist der einzige Kartenschlüssel ohne eigenes Kapitel**, mit
+    // Absicht: `walletKatToKey` hat für Natur eine Zeile auf `geo`.
+    const Map<String, String> expectedChapter = <String, String>{
+      'Historisch': 'hist',
+      'Historical': 'hist',
+      'Historical Figures': 'pers',
+      'Architektur': 'arch',
+      'Architecture': 'arch',
+      'Fun-Fact': 'fun',
+      'Fun Fact': 'fun',
+      'Geografie': 'geo',
+      'Geographie': 'geo',
+      'Mythos': 'myth',
+      'Mythen': 'myth',
+      'Myth & Legend': 'myth',
+      'Natur': 'geo',
+      'Nature': 'geo',
       'Kulinarik': 'kul',
       'Kulinarisch': 'kul',
       'Food & Drink': 'kul',
       'Persönlichkeiten': 'pers',
       'Personalities': 'pers',
-      'Historical Figures': 'pers',
       'Kultur': 'kult',
       'Kunst & Kultur': 'kult',
       'Art & Culture': 'kult',
@@ -88,43 +109,68 @@ void main() {
       'Dark History': 'dark',
       'Kirche & Glaube': 'kirche',
       'Church & Faith': 'kirche',
+      'Stadt heute': 'heute',
+      'Stadt Heute': 'heute',
+      'City Today': 'heute',
+      'Today': 'heute',
+      'Aktuell': 'heute',
     };
 
-    test('alle vierzehn Texte fallen auf hist', () {
-      for (final MapEntry<String, String> entry in foldedIntoHistory.entries) {
+    test('alle zweiunddreißig Texte treffen', () {
+      expect(expectedChapter.length, 32);
+      for (final MapEntry<String, String> entry in expectedChapter.entries) {
         expect(
           libraryCategoryKeyOf(entry.key),
-          'hist',
-          reason:
-              '"${entry.key}" ist auf der Karte "${entry.value}" und '
-              'im Reiseführer erwartet "hist"',
+          entry.value,
+          reason: '"${entry.key}" erwartet Kapitel "${entry.value}"',
         );
       }
     });
 
-    test('Historical Figures ist der auffälligste Fall', () {
-      // Die Karte führt es als `pers`, ausdrücklich **nicht** als `hist`
-      // (`factCategoryAliases`). Der Reiseführer macht daraus Geschichte,
-      // weil der Text mit „hist" anfängt. Zwei Tabellen, ein Text, zwei
-      // Antworten.
-      expect(libraryCategoryKeyOf('Historical Figures'), 'hist');
+    test('kein Text landet mehr im Rückfall, außer er ist unbekannt', () {
+      // Vor dem 03.09.2026 fielen vierzehn dieser Texte auf `hist`. Wären es
+      // wieder mehr als die vier echten `hist`-Texte, hätte jemand eine Zeile
+      // der Abbildung entfernt.
+      final Iterable<String> toHistory = expectedChapter.entries
+          .where((MapEntry<String, String> e) => e.value == 'hist')
+          .map((MapEntry<String, String> e) => e.key);
+
+      expect(toHistory, <String>['Historisch', 'Historical']);
     });
 
-    test('„Dark History" trifft hist über den Rückfall, nicht über „hist"', () {
-      // Die Prüfung ist `startsWith` und nicht `contains`: „dark history"
-      // **enthält** `hist`, fängt aber nicht damit an. Es landet also über den
-      // Rückfall dort, wie die anderen dreizehn. Steht als eigener Fall da,
-      // weil ein Umbau auf `contains` denselben Wert liefern würde und damit
-      // vier andere Texte still verschöbe (`Kunst & Kultur` enthält kein
-      // `hist`, `Dunkel & Kriminell` auch nicht, `Historical Figures` schon).
-      expect(libraryCategoryKeyOf('Dark History'), 'hist');
-      expect('dark history'.startsWith('hist'), isFalse);
-      expect('dark history'.contains('hist'), isTrue);
+    test('Historical Figures war der auffälligste Fall und ist behoben', () {
+      // Die Karte führt es als `pers`, ausdrücklich nicht als `hist`. Weil der
+      // Text mit „hist" anfängt, gewinnt in der Quelle die Reihenfolge der
+      // Prüfungen. Deshalb steht die `pers`-Zeile jetzt **vor** der
+      // `hist`-Zeile, und dieser Test hält genau das fest.
+      expect(libraryCategoryKeyOf('Historical Figures'), 'pers');
+      expect(libraryCategoryKeyOf('Historisch'), 'hist');
+    });
+
+    test('Architektur gewinnt gegen Kunst, ein Buchstabe Unterschied', () {
+      // `arch` muss vor `art` geprüft werden. „architektur" fängt mit „arc"
+      // an, nicht mit „art", aber wer die Zeilen sortiert, merkt es nicht.
+      expect(libraryCategoryKeyOf('Architektur'), 'arch');
+      expect(libraryCategoryKeyOf('Art & Culture'), 'kult');
+    });
+
+    test('Kulinarik gewinnt gegen Kultur, drei Buchstaben Überschneidung', () {
+      expect(libraryCategoryKeyOf('Kulinarik'), 'kul');
+      expect(libraryCategoryKeyOf('Kultur'), 'kult');
+      expect('kulinarik'.startsWith('kul'), isTrue);
+      expect('kultur'.startsWith('kul'), isTrue);
+    });
+
+    test('ein unbekannter Text fällt weiter auf hist', () {
+      // Der Rückfall der Quelle bleibt. Er fängt jetzt aber nur noch, was
+      // wirklich niemand kennt.
+      expect(libraryCategoryKeyOf('Quantenphysik'), 'hist');
+      expect(libraryCategoryKeyOf(''), 'hist');
     });
   });
 
   group('Kapitel eines Bands', () {
-    test('immer alle sechs, immer in der Reihenfolge der Quelle', () {
+    test('immer alle elf, immer in derselben Reihenfolge', () {
       final List<LibraryChapter> chapters = libraryChaptersOf(
         facts: <Fact>[factWith(id: 1)],
         cityKey: 'muenchen',
@@ -135,7 +181,7 @@ void main() {
         chapters.map((LibraryChapter c) => c.categoryKey),
         libraryCategoryOrder,
       );
-      expect(chapters.length, 6);
+      expect(chapters.length, 11);
     });
 
     test('gezählt werden Fakten der eigenen Stadt', () {

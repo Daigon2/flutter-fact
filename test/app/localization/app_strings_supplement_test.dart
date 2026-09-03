@@ -35,7 +35,7 @@ void main() {
       }
     });
 
-    test('die Ergänzung trägt genau die siebzig belegten Schlüssel', () {
+    test('die Ergänzung trägt genau die zweiundsiebzig belegten Schlüssel', () {
       // Wächst diese Menge, gehört jeder neue Eintrag zu einem Text, den die
       // PWA sichtbar anzeigt, ohne ihn als Schlüssel zu führen. Alles andere
       // gehört in die Quelle. Die beiden Meta-Zeilen kamen am 28.08.2026 mit
@@ -66,7 +66,9 @@ void main() {
       // Reiseführer") und `wallet.statSincePlaceholder`
       // (`:551`) dazu. `wallet.chaptersTotal` kam mit der
       // Kapitelliste (`:780`), und dort stehen **beide** Sprachen
-      // wörtlich in der Quelle.
+      // wörtlich in der Quelle. `cat.kult` und `cat.dark` kamen mit
+      // den elf Kapiteln aus E-78 dazu; beide Wortlaute stehen als
+      // Sprachpaar in der Aliastabelle der Karte.
       //
       // **`audio.dialog.volumeHint` kam am 02.09.2026 dazu und ist von allen
       // anderen verschieden** (E-28, `screen-auth.jsx:251`). Alle übrigen
@@ -167,6 +169,8 @@ void main() {
         'wallet.coverBrand',
         'wallet.statSincePlaceholder',
         'wallet.chaptersTotal',
+        'cat.kult',
+        'cat.dark',
       });
     });
 

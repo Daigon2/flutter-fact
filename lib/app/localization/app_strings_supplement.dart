@@ -586,6 +586,19 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     // Zahl exakt ist: `total` ist `cityFacts.length`. Eine Eigenart der
     // Quelle und keine Ungenauigkeit von uns.
     'wallet.chaptersTotal': '~{total} gesamt',
+
+    // Die Namen der zwei Kapitel, die der Eigentümer am 03.09.2026
+    // dazubestellt hat (E-78) und für die das Wörterbuch der PWA keinen
+    // Schlüssel führt. Es gibt dreizehn `cat.*`-Schlüssel, und `cat.kult`
+    // und `cat.dark` sind nicht darunter.
+    //
+    // **Beide Wortlaute sind abgeschrieben und nicht erfunden.** Die
+    // Aliastabelle der Karte (`screen-map.jsx:211-256`) führt für diese
+    // zwei Kategorien je ein deutsches und ein englisches Paar:
+    // `Kunst & Kultur` neben `Art & Culture`, `Dunkel & Kriminell` neben
+    // `Dark & Criminal`. Genau die stehen hier.
+    'cat.kult': 'Kunst & Kultur',
+    'cat.dark': 'Dunkel & Kriminell',
   },
   AppLanguage.en: <String, String>{
     // Siehe den deutschen Eintrag: dieser Schlüssel trägt als einziger einen
@@ -734,6 +747,8 @@ supplementTextsByLanguage = <AppLanguage, Map<String, String>>{
     'wallet.coverBrand': 'FACT Travel Guide',
     'wallet.statSincePlaceholder': '—',
     'wallet.chaptersTotal': '~{total} total',
+    'cat.kult': 'Art & Culture',
+    'cat.dark': 'Dark & Criminal',
   },
 };
 

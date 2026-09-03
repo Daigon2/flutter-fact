@@ -65,7 +65,57 @@ class LibraryChapterLook {
   int get hashCode => Object.hash(key, glyph, color, darkColor);
 }
 
-/// Die Fassungen aller sechs Kapitel, nach Schlüssel.
+/// Die fünf Kapitel, die die Quelle nicht hat, mit Zeichen und Farbe
+/// aus der **Kartentabelle** (`screen-map.jsx:195-208`).
+///
+/// **Warum von dort und nicht aus `WalletCats`:** dort stehen sie nicht.
+/// Der Reiseführer der Quelle kennt nur sechs Kapitel, für die fünf neuen
+/// gibt es also keine Reiseführer-Optik, die man abschreiben könnte. Die
+/// Karte hat für alle zwölf Kategorien ein Emoji und zwei Farben, und das
+/// ist die einzige vorhandene Vorlage. Übernommen ist sie unverändert;
+/// erfunden ist nichts.
+///
+/// **Damit sehen die fünf anders aus als die sechs**, und das ist eine
+/// sichtbare Folge der Entscheidung zu E-78: die sechs tragen die
+/// Schriftzeichen des Reiseführers (`§`, `⌂`, `☾`), die fünf ein Emoji
+/// (`🍺`, `👤`, `🎭`, `☠️`, `⛪`). Wer das vereinheitlichen will, braucht
+/// fünf gestaltete Zeichen und damit eine Entscheidung, keine Codeänderung.
+/// Die Kapitelliste zeigt ohnehin die römische Zahl und kein Zeichen.
+const Map<String, LibraryChapterLook> libraryExtraChapterLooks =
+    <String, LibraryChapterLook>{
+      'kul': LibraryChapterLook(
+        key: 'kul',
+        glyph: '🍺',
+        color: Color(0xFFF97316),
+        darkColor: Color(0xFFC2410C),
+      ),
+      'pers': LibraryChapterLook(
+        key: 'pers',
+        glyph: '👤',
+        color: Color(0xFFD946EF),
+        darkColor: Color(0xFFA21CAF),
+      ),
+      'kult': LibraryChapterLook(
+        key: 'kult',
+        glyph: '🎭',
+        color: Color(0xFFF59E0B),
+        darkColor: Color(0xFFB45309),
+      ),
+      'dark': LibraryChapterLook(
+        key: 'dark',
+        glyph: '☠️',
+        color: Color(0xFF64748B),
+        darkColor: Color(0xFF1E293B),
+      ),
+      'kirche': LibraryChapterLook(
+        key: 'kirche',
+        glyph: '⛪',
+        color: Color(0xFF818CF8),
+        darkColor: Color(0xFF4338CA),
+      ),
+    };
+
+/// Die Fassungen aller elf Kapitel, nach Schlüssel.
 final Map<String, LibraryChapterLook> libraryChapterLooks =
     <String, LibraryChapterLook>{
       for (final WalletCategoryRecord record in walletCategoryRecords)
@@ -75,6 +125,7 @@ final Map<String, LibraryChapterLook> libraryChapterLooks =
           color: _color(record.color),
           darkColor: _color(record.dark),
         ),
+      ...libraryExtraChapterLooks,
     };
 
 /// Die Fassung von [key].

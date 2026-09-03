@@ -399,7 +399,9 @@ class LibraryChaptersView extends ConsumerWidget {
                 Text(
                   locked
                       ? strings.text('wallet.chaptersLocked')
-                      : strings.text('cat.${chapter.categoryKey}'),
+                      : strings.text(
+                          libraryChapterNameKey(chapter.categoryKey),
+                        ),
                   style: TextStyle(
                     fontFamily: FactFont.display,
                     fontWeight: FontWeight.w900,
