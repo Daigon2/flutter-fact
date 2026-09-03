@@ -278,12 +278,13 @@ zwei Sätze.** Janek: „ja 1. passt und dann mach webview gern".
   gefallen, weil der Avatar 2D werden sollte. Diese Entscheidung ist am selben
   Abend aufgehoben worden.
 
-**Was daneben unmittelbar fällig wäre, ohne neue Entscheidung:** der zweite
-Ballon-Bildsatz. Seit dem 02.09.2026 weiß die App, welcher Fakt gesammelt ist,
-und auf der Karte sieht man es nicht: der goldene Ballon der Quelle ist
-vollständig belegt (Farben, Haken, Graustufe, Schatten), es fehlt allein die
-Zeichenarbeit. Der Auslöser dafür stand seit Schritt 16 in
-`fact_balloon_images.dart` und ist jetzt eingetreten.
+**Der zweite Ballon-Bildsatz stand hier bis zum 03.09.2026 als „unmittelbar
+fällig" und ist am selben Tag gebaut worden.** Der goldene Ballon hat seine
+Farben, den grünen Haken, die Entfärbung des Emojis und den eigenen
+Bodenschatten; `factCollectedState` ist gezeichnet und geprüft. Wer auf der
+Karte steht, sieht jetzt, wo er schon war. Der Eintrag bleibt als Hinweis
+stehen, dass diese Liste altert: er war zwei Stunden nach seiner eigenen
+Fälligkeit erledigt und stand danach noch einen Tag da.
 
 **Am 31.08.2026 hat Janek den ganzen Stapel Produkt-, UX- und Kostenfragen an
 einem Stück beantwortet.** Wortlaut, Folgen und meine zwei Widersprüche stehen

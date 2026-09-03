@@ -3349,11 +3349,17 @@ Nicht im REBUILD_PLAN, aber notwendig:
   (`_checkParity`, die Veraltungsmeldung der Ergänzung, das Render-Format, die
   Fehlerpfade von `_readConfig`). Eine Testdatei, die so tut, als decke sie ein
   Werkzeug ab, ist schlimmer als keine.
-- [ ] **Gate für generierten Code fehlt.** `docs/engineering/quality-gates.md`
-  nennt `tool/check_generated_code.dart`, das Skript existiert nicht. Ein
-  veralteter `*.g.dart`-Stand fällt heute nur auf, wenn jemand zufällig
-  `build_runner` startet. Am 27.08.2026 einmal von Hand geprüft: ein frischer
-  Lauf erzeugt `app_routes.g.dart` byteidentisch.
+- [x] **Gate für generierten Code**, am 03.09.2026 als erledigt nachgemessen
+  und vorher zu Unrecht offen. Der Eintrag hier sagte, ein veralteter
+  `*.g.dart`-Stand falle nur auf, wenn jemand zufällig `build_runner` startet.
+  Das stimmt seit dem 02.09.2026 nicht mehr: der Schritt „Erzeugter Code,
+  go_router_builder" in `.github/workflows/gates.yml` baut neu und lässt
+  `git diff --exit-code` darüber laufen. **Das Skript
+  `tool/check_generated_code.dart` gibt es weiterhin nicht, und es soll auch
+  keins geben**; `quality-gates.md` begründet das an zwei Stellen: von den
+  sechs erzeugten Dateien stammt genau eine von `build_runner`, die anderen
+  fünf haben ihre eigene `--check`-Drift-Prüfung. Die Dokumentation war also
+  aktuell und dieser Eintrag veraltet, nicht umgekehrt.
 - [x] **Zwei der drei Asymmetrien im Architektur-Check geschlossen**
   (31.08.2026), beide gemessen und beide mit Gegenprobe. Erstens war die
   Cross-Feature-Prüfung flach: `_crossFeaturePattern` verlangte die Schicht
@@ -3381,9 +3387,17 @@ Nicht im REBUILD_PLAN, aber notwendig:
   85 → 90 Tests am Skript, sechs Mutationen (drei vom Bauenden, drei von der
   prüfenden Seite), alle gefallen. Die verschärfte Prüfung findet im Bestand
   **keinen** Verstoß, es gab also nichts nachzuziehen.
-- [ ] **Der Audio-Modus lässt sich einschalten und tut nichts**, am 02.09.2026
-  gemessen: `audioModeProvider` hat ausserhalb von `features/settings/` und der
-  App-Komposition **keinen einzigen Verbraucher**. Der Aktivierungsdialog steht
+- [x] **Der Audio-Modus hat seit dem 03.09.2026 Verbraucher**, hier am selben
+  Tag nachgemessen: `fact_beacon_providers.dart:115` und `fact_page.dart:336`
+  lesen `audioModeProvider`, beide als Schranke vor dem Vorlesen. Damit ist die
+  Lage unten aufgelöst, und zwar genau auf dem Weg, den sie vorhergesagt hat:
+  die Verbraucher waren Schritt 25 und Schritt 26, und beide sind gebaut. Der
+  Eintrag bleibt im Wortlaut stehen, weil er den Grund nennt, aus dem er
+  überhaupt aufgeschrieben wurde.
+
+  Was am 02.09.2026 gemessen wurde: `audioModeProvider` hatte ausserhalb von
+  `features/settings/` und der App-Komposition **keinen einzigen
+  Verbraucher**. Der Aktivierungsdialog steht
   seit Schritt 8, der Lautstärke-Hinweis darin seit dem 02.09.2026, und wer
   bestätigt, schaltet einen Zustand ein, den niemand liest.
   **Das ist kein Defekt, sondern die Reihenfolge der Schritte**: die Verbraucher
