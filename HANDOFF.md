@@ -125,7 +125,9 @@ getroffen.** Steht als E-64 im Register, Stufe 4.
 **Seit dem 03.09.2026 liegt die Datenbank in diesem Repository, und zwar neu
 gebaut.** Acht Migrationen in `supabase/migrations/` bauen das Schema von null:
 15 Tabellen, 2 Sichten, 8 Funktionen. **Gate 5 ist neu** und wendet in der CI
-alle Migrationen auf ein leeres Postgres an, danach läuft der Linter darüber.
+alle Migrationen auf ein leeres Postgres an, danach läuft der Linter darüber
+und danach **Gate 5c**, die sechs inhaltlichen Zusicherungen aus
+`supabase/tests/zusicherungen.sql`.
 Lokal geht das nicht, auf dieser Maschine ist kein Docker; Gate 5 ist deshalb
 CI-only. Die Begründung steht in
 `docs/decisions/adr/ADR-010-database-rebuild-in-repository.md`, und die ist
@@ -250,11 +252,8 @@ Meinung; sie stehen mit ihrem jeweiligen Preis in
 `docs/handover/dairen-schema-2026-09-03.md`, Abschnitt 5.
 
 - **Was im Schema fehlt, und zwar bewusst:** Trophäen, Gruppen- und Team-Jagd,
-  Creator-Bildablage. Dazu die vier Zusicherungen als Test (kein Tisch ohne
-  RLS, keine `using (true)`-Policy auf Personendaten, keine Funktion mit
-  Nutzerkennung als Parameter, kein doppeltes Gutschreiben). Die brauchen
-  Testdaten und zwei Konten, an einer leeren Datenbank wären sie grün, ohne
-  etwas geprüft zu haben.
+  Creator-Bildablage. **Die Zusicherungen sind seit dem 03.09.2026 gebaut**,
+  sechs statt vier, und laufen als Gate 5c.
 - **Was der Client nachziehen muss:** aufhören, den Stadtschlüssel abzuleiten,
   und `facts.city_id` lesen. Und die **eine** `sort_order` aus
   `fact_categories` übernehmen. Letzteres verschiebt die Kapitelfolge und die
@@ -462,6 +461,41 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 03.09.2026, Gate 5c: das Schema wird jetzt auf Inhalt geprüft
+
+Gate 5 sagte bisher, **dass** die acht Migrationen von null durchlaufen. Das
+ist die halbe Antwort; ein Schema kann fehlerfrei entstehen und trotzdem jedem
+alles zeigen. `supabase/tests/zusicherungen.sql` liest den Katalog der
+entstandenen Datenbank und prüft sechs Sätze, darunter „kein Tisch ohne RLS",
+„keine öffentliche Funktion nimmt eine Nutzerkennung", „jede Sicht läuft als
+Aufrufer" und „wo eine Belohnung hängt, schreibt kein Client". Alle sechs
+liefen im CI durch, gegen ein echtes Postgres.
+
+**Der Einwand aus ADR-010 galt nur für eine der vier**, nämlich die gegen
+doppeltes Gutschreiben: die wäre an einer leeren Datenbank grün, ohne etwas
+geprüft zu haben. Sie legt ihr Testkonto deshalb selbst an und rollt am Ende
+zurück. Die anderen lesen den Katalog, und der ist ohne eine Zeile Nutzdaten
+vollständig. Aus vier Zusicherungen sind dabei sechs geworden.
+
+**Was überraschend war: die Prüfung hätte fast die richtige Funktion
+angeschwärzt.** `pg_proc.proargnames` führt auch die Ausgabe-Parameter, und
+`get_leaderboard` gibt `username` heraus. Der Ausdruck, der nach
+Identitäts-Parametern sucht, traf darin das Wort `user` — die Prüfung hätte
+also genau die Funktion gemeldet, die E-16b behebt. Ein Test, der das Richtige
+anschwärzt, ist schlimmer als keiner: der Nächste hängt eine Ausnahme dran und
+hat damit die Regel entschärft.
+
+**Und ein Widerspruch in der Projektdatei, der vorher niemandem aufgefallen
+ist.** `auto_expose_new_tables` steht in `config.toml` mit dem Kommentar, die
+Voreinstellung `true` mache neue Tabellen in `public` für die API-Rollen
+erreichbar, **ohne** ausdrückliches `grant`. Migration 1 entzieht genau diese
+Rechte, bevor die erste Tabelle existiert. Beides zusammen heißt: das Schema
+meint es ernst, und die Plattform hält sich nicht daran. Jetzt auf `false`, und
+das ist sicher, weil alle 15 Tabellen und beide Sichten ein ausdrückliches
+`grant` haben. **Der Kommentar sagt, `true` sei die Cloud-Voreinstellung** —
+dann ist die gehostete Datenbank großzügiger als diese hier, und der Schalter
+gehört dort genauso gesetzt. Das ist eine Frage an das Backend.
 
 ### 03.09.2026, Schritt 47 ist fertig: die Buchseite
 
