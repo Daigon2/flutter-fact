@@ -20,7 +20,24 @@ max_rows = 1000
 # `postgres` are reachable through the Data API roles (`anon`, `authenticated`, `service_role`)
 # without explicit GRANTs, matching the cloud default. Set to `false` to require explicit GRANTs
 # instead. Left unset, a fresh project falls back to `true`.
-# auto_expose_new_tables = true
+#
+# **Auf `false` gesetzt, und das ist keine Vorsichtsmassnahme, sondern die
+# Aufloesung eines Widerspruchs.** Migration 1 entzieht `anon` und
+# `authenticated` die Default-Privilegien, bevor die erste Tabelle existiert;
+# die Voreinstellung `true` haendigt neuen Tabellen genau diese Rechte wieder
+# aus. Beides zusammen heisst: das Schema meint es ernst, und die Plattform
+# haelt sich nicht daran.
+#
+# Sicher ist das, weil jede der 15 Tabellen und beide Sichten ein
+# ausdrueckliches `grant` haben; am 03.09.2026 abgezaehlt. Wer eine Tabelle
+# ohne `grant` anlegt, merkt es hier sofort statt in der App.
+#
+# **Zu klaeren, und es ist eine Frage an das Backend, nicht an dieses
+# Repository:** der Kommentar sagt, `true` sei die Cloud-Voreinstellung. Dann
+# ist die gehostete Datenbank grosszuegiger als diese hier, und Gate 5 pruefte
+# einen strengeren Zustand als den, der laeuft. Der Schalter gehoert dort
+# genauso gesetzt.
+auto_expose_new_tables = false
 
 [api.tls]
 # Enable HTTPS endpoints locally using a self-signed certificate.

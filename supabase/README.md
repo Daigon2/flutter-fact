@@ -64,12 +64,32 @@ Was hier schon steht, ist ausschließlich das Gerüst: die Projektdatei, das
 Verzeichnis, die Prüfung. Fällt ADR-010 durch, kostet das Löschen dieses
 Ordners nichts.
 
-**Die vier inhaltlichen Zusicherungen fehlen bewusst** (kein Tisch ohne RLS,
-keine Policy mit `USING (true)`, keine `SECURITY DEFINER`-Funktion mit
-Nutzerkennung als Parameter, kein doppeltes Gutschreiben im Journal). Sie
-kommen mit dem Schema, weil sie an einer leeren Datenbank alle grün wären, ohne
-etwas geprüft zu haben. Das ist Muster 9 aus dem Blindheits-Katalog in
-`REBUILD_STATUS.md`: eine Zusicherung, die gemessen aussieht und es nicht ist.
+**Die inhaltlichen Zusicherungen stehen seit dem 03.09.2026** in
+`tests/zusicherungen.sql` und laufen als Gate 5c. Es sind sechs geworden und
+nicht vier:
+
+1. kein Tisch in `public` ohne RLS;
+2. keine Policy mit `USING (true)` auf einer Tabelle mit Personenbezug, wobei
+   „Personenbezug" abgeleitet wird (Fremdschlüssel auf `auth.users`) und nicht
+   aus einer Liste, die jemand pflegen müsste;
+3. keine öffentliche Funktion mit einer Nutzerkennung, geprüft über den Typ
+   (`uuid`) **und** über den Parameternamen, dazu 3c: jede eigene Funktion
+   setzt `search_path`;
+4. derselbe Bezug bucht genau einmal, mit einem Konto und zwei Aufrufen, die
+   die Prüfung selbst anlegt;
+5. jede Sicht hat `security_invoker = true`;
+6. `anon` schreibt nirgends, und in Journal und Sammlung schreibt **kein**
+   Client, auch nicht der Besitzer.
+
+Der Einwand, der hier vorher stand, war richtig und gilt nur noch für die
+vierte: an einer leeren Datenbank wäre sie grün, ohne etwas geprüft zu haben
+(Muster 9 des Blindheits-Katalogs). Deshalb legt sie ihre Daten selbst an. Die
+anderen fünf lesen den Katalog, und der ist auch ohne eine Zeile Nutzdaten
+vollständig.
+
+**Reines SQL statt pgTAP**, mit `psql -v ON_ERROR_STOP=1`. Das spart eine
+Erweiterung in der Datenbank und eine zweite Werkzeugkette; wer pgTAP später
+will, ersetzt die eine Datei.
 
 ## Zum `project_id`
 

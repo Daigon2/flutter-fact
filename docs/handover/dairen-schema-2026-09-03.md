@@ -188,11 +188,12 @@ lang sein. Fehlt im Schema und im Generator.
 Fotos aus Jagd-Rätseln ausdrücklich **nicht** (Anweisung Janek, 03.09.2026).
 Einen Ablageort gibt es noch nicht.
 
-**Vier Zusicherungen als Test.** Kein Tisch ohne RLS, keine Policy mit
-`using (true)` auf Personendaten, keine Funktion mit Nutzerkennung als
-Parameter, kein doppeltes Gutschreiben. Die fehlen mit Absicht: an einer leeren
-Datenbank wären alle vier grün, ohne etwas geprüft zu haben. Sie brauchen
-Testdaten und zwei Testkonten.
+**Die Zusicherungen sind gebaut**, am 03.09.2026, in
+`supabase/tests/zusicherungen.sql` als Gate 5c. Sechs statt der vier aus
+ADR-010: dazu kamen „jede Sicht hat `security_invoker = true`" und „`anon`
+schreibt nirgends, in Journal und Sammlung schreibt kein Client". Die vierte
+legt ihr Testkonto selbst an; ohne Daten wäre sie grün, ohne etwas geprüft zu
+haben. Reines SQL mit `psql -v ON_ERROR_STOP=1`, kein pgTAP.
 
 **Rätsel-Auswertung.** Rührt niemand an. Anweisung Janek vom 03.09.2026: „Lass
 den teil erstmal ruhen." Grund: von 1911 Rätseln der Vorlage sind nur 247

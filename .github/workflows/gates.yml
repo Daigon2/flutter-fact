@@ -165,3 +165,25 @@ jobs:
 
       - name: Gate 5b, Linter über das entstandene Schema
         run: supabase db lint --level warning
+
+      # Gate 5 und 5b sagen zusammen: die Migrationen laufen durch und der
+      # Linter hat nichts zu meckern. Beides ist über die **Form**, nicht über
+      # den Inhalt: ein Schema kann fehlerfrei entstehen und trotzdem jedem
+      # alles zeigen.
+      #
+      # Die sechs Zusicherungen aus `supabase/tests/zusicherungen.sql` lesen
+      # deshalb den Katalog der entstandenen Datenbank. Sie sind das, was
+      # ADR-010 als „noch fehlend" führt.
+      #
+      # **`psql` statt `supabase test db`.** Die CLI bringt pgTAP mit, und
+      # pgTAP bräuchte eine Erweiterung in der Datenbank. Sechs `do`-Blöcke mit
+      # `raise exception` brauchen nichts davon; `ON_ERROR_STOP=1` macht jeden
+      # Abbruch zu einem roten Lauf, und die Meldung nennt die verletzende
+      # Tabelle beim Namen. `psql` liegt auf dem Ubuntu-Abbild ohnehin.
+      #
+      # Der Port steht in `supabase/config.toml` unter `[db]`.
+      - name: Gate 5c, die inhaltlichen Zusicherungen
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/tests/zusicherungen.sql
