@@ -1119,6 +1119,108 @@ plus 19 Mutationen, alle gefallen.
 - [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [x] 25. Audio-Service (02.09.2026; „normal“ heißt im Paket 0,5 und nicht 1,0, und die Quelle hat einen echten API-Schlüssel ausgeliefert)
 - [x] 26. Map-Audio-Kopplung (03.09.2026; der Hinweiston mit Hysterese, und die Ansage geht **nicht** über den Fakt-Vorleser)
 
+### Schritt 47, zweite Hälfte: der Lesemodus
+
+2838 Tests (von 2777), 26 Mutationen, alle gefallen. **Schritt 47 ist damit
+fertig**, und die Kapitelkarte hat ein Ziel. Der Reiseführer hält jetzt vier
+Zustände in einem Reiter, nicht drei: Regal, Deckel, Inhaltsverzeichnis,
+Buchseite. Der Kopf der Quelldatei zählt drei, ihr `view` kennt vier
+(`screen-wallet.jsx:1868-1905`), und die vier sind die richtige Zahl.
+
+#### Blättern ist drei Gesten und ein Aufruf
+
+Wischen, Tippen auf das linke oder rechte Seitendrittel, und die zwei Knöpfe
+unten. Alle rufen dasselbe: den Nachbarn öffnen. Eine Buchseite kennt ihre
+Nachbarn, mehr Zustand braucht es nicht.
+
+**Die Reihenfolge ist nach Kennung sortiert und nicht nach Sammelzeit**, und
+der Kommentar an der Quellenstelle nennt den Anlass: eine frühere Fassung
+sortierte nach Leseverlauf, und weil das Öffnen den Verlauf ändert, führte
+„Nächste" zurück auf die Seite davor. Uns kann das nicht passieren, aber aus
+einem anderen Grund als dort: es gibt keinen Leseverlauf, „gesammelt ist
+gelesen" (E-80).
+
+#### Zwei Seitenzahlen, die verschiedene Dinge zählen
+
+Die Kapitelliste zeigt „S. 7", die Buchseite darunter „1 / 4". Das sieht
+widersprüchlich aus und ist es nicht: die erste ist die Seite **im Band** über
+alle Kapitel, die zweite die Position **im aktuellen Zusammenhang**. Beide
+stehen so in der Quelle (`:748`, `:1783`). Ein Test hält beide Zahlen fest.
+
+#### Ein gemessener Defekt der Quelle, behoben
+
+**Die Buchseite zeigt Zitat-Hochziffern, ohne eine Quellenliste zu haben.** Sie
+gibt den Rohtext aus (`:1651`), also steht `[3]` mitten im Fließtext; darunter
+kommt nur der Link „Mehr erfahren" (`:1671-1679`) und keine Liste. In der Akte
+ist die Hochziffer richtig, dort steht die Liste darunter. Auf der Buchseite
+verweist sie auf nichts.
+
+Behoben, ohne dass es eine Wortlaut-Entscheidung braucht: es wird nichts
+erfunden, sondern etwas weggelassen. Das Entfernen gab es schon, für die
+Sprachausgabe (Schritt 25), als private Funktion in `spoken_fact_text.dart`.
+Sie liegt jetzt als `factTextWithoutReferences` in
+`features/facts/domain/fact_prose.dart`, mit **einer** Definition und zwei
+Verbrauchern.
+
+#### Zwei Umzüge in die Domäne, beide aus demselben Grund
+
+`isRealProse` lag in `features/facts/presentation/cited_text.dart`. Der
+Lesemodus braucht es, und Regel 8 verbietet jedem Feature den Import aus dem
+`presentation` eines anderen. Dasselbe Muster wie bei `spoken_fact_text.dart`
+in Schritt 25, dessen Kopf die Begründung schon trägt: reines Dart auf einer
+Zeichenkette gehört in die Domäne. `cited_text.dart` gibt beides weiter nach
+außen, damit die Akte und ihre Tests unverändert bleiben.
+
+#### Was nicht gebaut ist, und warum jeweils
+
+* **Die Frage-Leiste „Frag Claude"** (`:1685-1755`). Sie schickt Fakt und Frage
+  an die Anthropic-Schnittstelle, führt ein Kontingent von zehn Fragen und
+  braucht einen Schlüssel. Laufende Kosten, ein Geheimnis und ausgehende
+  Nutzerdaten: nach `docs/ai/escalation.md` eine Entscheidung des Eigentümers.
+  Aufgenommen als **E-83**.
+* **Der Link „Mehr erfahren"** (`:1671-1679`). Bräuchte `url_launcher`. Genau
+  dieselbe Lage wie bei der Quellenliste der Akte, und dieselbe Antwort: ein
+  Ding, das wie ein Link aussieht und keiner ist, wäre die schlechtere Hälfte.
+* **Die Wiedergabeliste beim Vorlesen** (`:1551-1559`). Die Quelle legt die
+  ganze Blätterfolge in den Abspieler. `SpeechService` kennt einen Text und
+  keine Liste; der Knopf liest **diese** Seite vor. Weniger, aber nichts
+  Falsches, und der Knopf tut etwas.
+* **Die Leseposition** (`:1420-1435`). Hängt an einem Leseverlauf mit
+  Zeitstempeln, siehe E-80.
+* **Die Tastaturbedienung** (`:1438-1447`). Die einzige der vier Gesten, die
+  hier nichts hinzufügt: die Quelle läuft im Browser.
+* **Die Reiterleiste bleibt stehen**, anders als in der Quelle (`:1919`).
+  Aufgenommen als **E-82**, weil es sichtbar ist.
+
+#### Die Initiale schwimmt nicht, und das ist eine Grenze von Flutter
+
+`float: left` (`:1648`) lässt die ersten zwei Zeilen um den großen Buchstaben
+herumlaufen. Flutters Textsatz kennt kein Umfließen; es gäbe es nur mit einem
+eigenen `RenderObject`. Die Initiale steht deshalb **in** der ersten Zeile, in
+ihrer Größe und ihrer Farbe.
+
+#### Ein Fund über Farben, den man leicht als Nachlässigkeit liest
+
+Der Lesemodus setzt sich drei eigene Marken-Konstanten (`:1562`). Zwei sind die
+CSS-Variablen, die dritte nicht: `BRAND_DK` ist `#B82707`, `FactColors.redDark`
+ist `#A82508`. Nachgesehen, woher das kommt: `#B82707` ist `--brand-dk` in den
+**Entwurfsdateien** des Reiseführers (`variants.html:15`,
+`wallet-final.html:12`, `wallet-variants.html:12`), `#A82508` in `styles.css`,
+und jeder andere Bildschirm nimmt die Variable. Der Reiseführer trägt den Wert
+seines Prototyps weiter.
+
+Genommen ist `#B82707`, und zwar nicht aus Paritätstreue: derselbe Wert steht
+seit Schritt 45 als dritte Stützstelle in `libraryHeaderColors`, wo er eine
+sichtbare Verlaufsfläche ist. Zwei verschiedene Rot-Dunkel in einem Bildschirm
+wären schlechter als eines, das um vier Prozent von der Variable abweicht.
+
+#### Und ein Zeichensatz-Unterschied, der kein Fehler ist
+
+Die Karte nimmt `CAT.emoji` (🏛), der Reiseführer `WalletCats.glyph` (§). Zwei
+Zeichensätze für dieselben Kategorien, und die Quelle benutzt sie getrennt: das
+Emoji auf dem Ballon, das Schriftzeichen im Buch. Der erste Testlauf ist genau
+darüber rot geworden, weil die Erwartung das Emoji trug.
+
 ### Schritt 47, erste Hälfte: das Inhaltsverzeichnis
 
 2734 → 2769 Tests, zwölf Mutationen, alle gefallen. **Schritt 47 ist
@@ -1909,8 +2011,8 @@ Gebaut ist die Liste, ohne Einstieg, wie die Fakt-Akte und das Rätsel-Sheet.
   Trophäenstufe, `#A8A8A8` für das Rang-Abzeichen.
 
 - [x] 45. Library (03.09.2026, die Bibliothek) · [x] 46. Cover und Illustrationen (03.09.2026; drei Städte haben eine eigene Silhouette, Passau und Weimar nicht)
-  · [~] 47. Chapters und Reader (Kapitelliste am 03.09.2026 gebaut; der
-  Lesemodus mit „Frag Claude" fehlt, der Aufruf hängt an E-13)
+  · [x] 47. Chapters und Reader (03.09.2026 in zwei Hälften; die Frage-Leiste
+  „Frag Claude" ist **nicht** gebaut und liegt als E-83 beim Eigentümer)
   · [ ] 48. Leaderboard · [~] 49. Trophäen (Liste steht,
   Stimmen-Picker hängt an E-15, Sitzungsende an E-19)
 
@@ -5331,6 +5433,8 @@ eine Fundstelle.
 | E-79 | **Von 1911 Rätseln der Quelle sind 247 überhaupt richtig zu beantworten, und das liegt nicht an der Sprache.** Am 03.09.2026 über alle kuratierten Datendateien gezählt, ausgelöst durch Janeks Antwort auf D-19. **Die Auswertung vergleicht Zeichenketten auf Gleichheit:** `puzzle-sheet.jsx:320-324` normalisiert (trimmen, kleinschreiben, `.,;:!?` entfernen, Leerraum zusammenziehen) und prüft dann `normalize(value) === normalize(puzzle.expected)`. **Das Feld `expected` enthält aber keine Antworten, sondern Lösungsnotizen für Menschen.** Beispiele wortwörtlich aus den Daten: `Vintage-Einrichtung, alte Fotos, unpretentiöser Stil` (Typ `foto-beweis`), `Südwest, ca. 220-240 Grad` (`perspektive`), `Variiert, etwa 10-25 pro Abschnitt` (`zaehlen`), und bei `local-fragen` ein Aufsatz von über 200 Zeichen. Wer das buchstabengetreu eintippen müsste, kann es nicht. **Die Zahlen:** 1911 Rätsel mit `expected`, davon 1793 mit Buchstaben, 107 reine Zahlen, 11 Datumsangaben. Maschinell prüfbar sind heute die **246 `mcq`-Rätsel** (251 tragen `choices`, und dort wird der Text der gewählten Option verglichen, `:348-350`) und **genau ein** Formel-Rätsel (`expectedResult` steht in 1 von 1911). **Die 82 Zähl-Rätsel vergleichen gegen null:** `:461` liest `puzzle.expectedCount || 0`, und `expectedCount` kommt in **keiner** Datendatei vor. Die richtige Antwort auf jedes Zähl-Rätsel ist damit `0`, und `1` gibt wegen `tol = puzzle.tolerance || 1` noch halbe Punkte. **Die Jagd weicht dem nicht aus:** `hunt-generator.jsx:93-94` wählt je Station bewusst einen **anderen** Typ als bisher benutzt, mischt also gerade die nicht prüfbaren hinein. **Folge für D-19 und E-08:** die dortige Beobachtung („auf Englisch unlösbar") ist ein Sonderfall. Es ist auf Deutsch genauso unlösbar, für rund 87 Prozent der Rätsel. Antworten zu übersetzen behebt nichts, solange nichts Vergleichbares dasteht. **Was zu entscheiden ist, ist eine Produktfrage und keine Übersetzung:** was ist ein Rätsel in dieser App. Entweder alles wird Mehrfachauswahl (funktioniert heute, 246 Belege), oder der Spieler bewertet sich selbst und `expected` wird zur Musterlösung, die nach dem Antippen erscheint, oder die Datenpipeline erzeugt je Rätsel eine maschinenprüfbare Zweitform (`expectedCount`, `expectedResult`, `choices`). Die dritte Variante ist die teuerste und die einzige, die den Bestand behält. **Am 03.09.2026 zurückgestellt:** Dairen löst das laut Janek „ganz anders", und bis der Weg bekannt ist, entsteht an der Auswertung nichts, auch nichts Vorbereitendes. Die drei Wege hier sind die Landkarte der Messung und **keine** Auswahlliste. | **4** | bei Dairen, hier gesperrt |
 | E-80 | **Ist „gelesen" dasselbe Ereignis wie „gesammelt"?** Am 03.09.2026 gefragt, weil drei Stellen des Reiseführers einen Zeitpunkt brauchen und `CollectedFactsStore` nur Kennungen in Sammelreihenfolge hält: die Pille „Weiterlesen" (`screen-wallet.jsx:899-912`), die Kachel „seit" auf dem Buchdeckel (`:551`) und die Sortierung der gesammelten Fakten (`wltCollectedFactsForCity`, `:91-100`). Die PWA führt dafür **zwei** Listen, `Storage.getCollected()` und `Storage.getReadHistory()`, sagt aber nirgends, dass das Absicht ist. **Am 03.09.2026 entschieden: dasselbe.** Janek: „Ja, gesammelt ist gelesen! man sammelt etwas und fertig." Folge für den Bau: der Sammel-Speicher bekommt einen Zeitstempel je Kennung, es entsteht **keine** zweite Liste, und der Begriff „ungelesen" existiert im Neubau nicht. Bestehende Einträge ohne Zeit bleiben gültig und zeigen auf dem Buchdeckel den Gedankenstrich, den die Quelle bei leerem Verlauf auch zeigt. | 2 | **entschieden 03.09.2026** |
 | E-81 | **Derselbe Fakt trägt seit dem 03.09.2026 an drei Stellen drei verschiedene Kategorienamen, und das ist eine Nebenwirkung von E-78.** Für einen Fakt der Kategorie `Kunst & Kultur` gilt heute: der Ballon auf der Karte trägt die Kultur-Farbe (`factCategoryStyles`, zwölf Einträge), die Fakt-Akte schreibt „Historisch" (`factCategoryLook`, acht Einträge, Rückfall auf `hist`), und der Reiseführer schreibt „Kunst & Kultur" (elf Kapitel). Dasselbe gilt für Dunkel & Kriminell. **Die Ursache ist behoben, die Folge nicht.** Die Akte benutzt bewusst die **kleinere** Tabelle der Quelle, weil `cat.kult`, `cat.dark` und `cat.kirche` keinen Text hatten und ein Nutzer sonst den nackten Schlüssel gesehen hätte (siehe den Kopf von `fact_category_look.dart`, Schritt 21). Genau diese Lücke ist mit E-78 für `kult` und `dark` geschlossen: beide stehen jetzt zweisprachig in `app_strings_supplement.dart`. Der Grund für die kleine Tabelle gilt damit nur noch für `kirche`, und dort fehlt kein Text, sondern eine Abbildung: das Wörterbuch führt „Kirche & Glaube" unter `cat.chr`. Der Reiseführer hat sie in `libraryChapterNameKey`. **Der Stolperdraht hat ausgelöst und ist stehen geblieben.** `fact_category_look_test.dart` trug den Satz „bekommt die PWA die Schlüssel nachträglich, fällt dieser Test und die Tabelle darf wachsen"; er ist am 03.09.2026 rot geworden. Ausgelöst hat ihn nicht die PWA, sondern die eigene Entscheidung. **Nicht mitgeändert, und das ist Absicht:** die Tabelle der Akte zu erweitern ändert, was ein fertiger Bildschirm für Fakten in vier Kategorien anzeigt. Das gehört als eigener Schritt entschieden und nicht als Nebenwirkung der Kapitel-Arbeit. Ein Test hält die Dreierlei-Benennung sichtbar, damit sie nicht in Vergessenheit gerät. **Zu entscheiden ist nur die Reihenfolge, nicht die Richtung:** dass drei Bildschirme denselben Fakt gleich benennen sollen, ist keine Geschmacksfrage. | 2 | vor dem Gerätelauf |
+| E-82 | **Der Lesemodus behält die Reiterleiste, die Quelle blendet sie aus.** Am 03.09.2026 mit Schritt 47 aufgenommen. `screen-wallet.jsx:1919` rendert die Leiste nur für `view !== 'reader'`, die Buchseite ist dort also Vollbild. Hier trägt die `StatefulShellRoute` die Leiste, und eine Seite darin kann sie nicht verstecken; dafür bräuchte es eine achte Route **außerhalb** der Shell, und E-25 hat die öffentliche Routenfläche auf sieben Pfade festgelegt. **Genommen ist der Zustand, den die Akte schon hat:** `/map/fact/:factId` ist ebenfalls ein Kind der Shell und zeigt die Leiste. Zwei Vollbild-Lesearten mit verschiedenem Rahmen wären der schlechtere Zustand als eine, die in beiden Fällen dieselbe Leiste behält. **Zu entscheiden ist, ob Lesen Vollbild sein soll.** Wenn ja, betrifft es zwei Bildschirme und nicht einen, und es ist eine Änderung an der Routenfläche, also an ADR-004 und E-25. Wenn nein, ist nichts zu tun und dieser Eintrag fällt weg. | 2 | vor dem Gerätelauf |
+| E-83 | **„Frag Claude zu diesem Fakt" ist nicht gebaut, und die Entscheidung dahinter ist keine technische.** Am 03.09.2026 mit Schritt 47 aufgenommen. Die Buchseite der Quelle hat unten eine Eingabezeile, die den Fakt und eine Frage an die Anthropic-Schnittstelle schickt (`screen-wallet.jsx:1685-1755`, `Api.askAboutFact`), mit einem Kontingent von zehn Fragen je Nutzer (`Storage.getClaudeQuota`) und einem Schlüssel, den der Nutzer selbst im Creator-Bildschirm einträgt. **Drei Dinge davon sind je einzeln eine Eigentümer-Entscheidung nach `docs/ai/escalation.md`:** laufende Kosten, ein Geheimnis im Client und Nutzerdaten, die das Gerät verlassen. Zusammen ist es keine Frage, die dieser Schritt beantworten darf. **Dazu ein gemessener Zustand:** der ausgelieferte OpenAI-Schlüssel der Quelle ist seit dem 03.09.2026 deaktiviert (E-70), und für Anthropic gilt derselbe Gedanke — ein Schlüssel im Client ist ein veröffentlichter Schlüssel. Wenn die Funktion kommt, dann über eine Edge Function mit serverseitigem Schlüssel und serverseitigem Kontingent, wie E-15 es für die Cloud-Stimme festlegt. **Der Rest der Buchseite hängt nicht daran:** die Seite ist ohne die Leiste vollständig, es fehlt kein Weg und kein Text. | 3 | Produktentscheidung |
 | E-70 | **In der Quelle liegt ein vollständiger OpenAI-API-Schlüssel im Klartext, in einer Datei, die jeder Browser ausgeliefert bekommt.** Am 02.09.2026 beim Zuschnitt von Schritt 25 gefunden. Fundstelle: `02_Frontend/app/audio-player.jsx:12`, eine Konstante `OPENAI_KEY` mit einem echten `sk-proj-…`-Schlüssel, direkt darunter Stimme und Modell. **Die Datei wird ausgeliefert, nicht gebündelt:** `index.html:180` lädt sie als `<script type="text/babel" src="audio-player.jsx?v=5">`, also im Quelltext und ohne jede Verarbeitung. Wer die Seite offen hatte, konnte den Schlüssel lesen. **Vier Fundstellen, und meine erste Zählung war falsch:** sie stand kurz als „genau eine", weil die Suche auf `02_Frontend` begrenzt war und gebaute Artefakte übersprungen hat. Tatsächlich sind es `02_Frontend/app/audio-player.jsx:12` (die Quelle), `02_Frontend/dist/assets/index-4JDjuKco.js` (das gebaute Web-Bündel), `02_Frontend/android/app/src/main/assets/public/assets/index-4JDjuKco.js` (dasselbe Bündel in den Android-Assets, also im Paket, wenn es je verteilt wurde) und `06_Planung/plans/2026-05-14-openai-tts.md:275`. Nicht im Backend, nicht im eingefrorenen Flutter-Port. **Der Schlüssel selbst steht bewusst nirgends in diesem Repository**, auch nicht hier; dieses Repository ist öffentlich (E-64). **Es war eine bewusste Abwägung und kein Versehen:** das Planungsdokument sagt, der Schlüssel werde im Quelltext sichtbar sein, das sei „acceptable for a personal project at this scale", und man solle rotieren, falls unerwartete Kosten auftauchen. Das war der 14.05.2026; seither gibt es `DACH_Rollout_Plan.md` und den Weg in die App Stores. **Ob die Abwägung heute noch gilt, entscheidet der Eigentümer, nicht dieses Repository.** **Die Behebung ist nicht Code:** den Schlüssel bei OpenAI zurückziehen und neu ausstellen. Ihn nur aus den Dateien zu löschen genügt nicht, er steht in der Versionsgeschichte des anderen Repositories und war ausgeliefert. Für den Neubau ändert sich dadurch nichts, er bestätigt die Entscheidung: E-15 legt „Gerät zuerst" fest, und Janek hat am 31.08.2026 dazu gesagt „soll aber nirgends rumliegen, ist ja schließlich ein api key". Die Cloud-Variante läuft über Edge Function und Proxy, nie über einen Schlüssel im Client. **Am 03.09.2026 erledigt:** „api key ist deaktiviert bei open AI". Der Widerruf ist die vollständige Behebung; die vier Dateien tragen jetzt einen toten Schlüssel, und sie aufzuräumen ist Kosmetik im Lese-Repo. **Die laufende PWA bricht nicht, nachgesehen und nicht angenommen:** `audio-player.jsx:171` wirft bei jeder Antwort, die nicht `ok` ist, und der `catch` liest über `SpeechSynthesisUtterance` vor, mit gespeicherter Geschwindigkeit und gewählter Stimme. Ein 401 fällt also auf die Browserstimme zurück statt zu schweigen; verloren geht `tts-1-hd`/`nova`, nicht die Funktion. Zwei Nebenwirkungen: jedes Vorlesen macht erst einen vergeblichen HTTP-Weg, und weil der Blob-Zwischenspeicher sich nie füllt, fällt der bei **jedem** Abspielen an. Nebenbei bestätigt das Schritt 25: was die PWA seit dem 03.09.2026 tatsächlich tut, ist die Gerätestimme, und genau die baut `flutter_tts`. | 4 | **erledigt 03.09.2026** |
 | E-71 | **Für die Sprechgeschwindigkeit und die Stimme gibt es im Neubau keine Einstellung, und die Zahl dahinter ist eine Falle.** Am 02.09.2026 mit Schritt 25 aufgenommen. Die Quelle hat im Profil einen Schieber (`Storage.getAudioRate`, Rückfall `1.0`, `storage.jsx:168`) und eine Stimmenwahl (`Storage.getAudioVoice`, `:171`). Beide fehlen, weil es den Einstellungs-Bildschirm noch nicht gibt; der Neubau benutzt `defaultSpeechRate` als Konstante und die Standardstimme des Geräts. **Wer den Schieber baut, muss die Umrechnung kennen:** der Vertrag trägt die menschliche Einheit (1,0 ist normal), `flutter_tts` nicht (dort ist 0,5 normal), und die Umrechnung sitzt in `FlutterTtsSpeechService._pluginRate`. Ein Schieber, der seinen Wert direkt an das Paket gibt, verdoppelt jede Einstellung. Die Stimmenwahl hängt zusätzlich an E-15. **Seit Schritt 26 hängt ein drittes daran:** der Kopfhörer-Modus (`Storage.getHeadphoneMode()`, `storage.jsx:174`), der die Stereo-Verteilung des Hinweistons einschaltet. Der Weg dorthin ist gebaut und geprüft, der Schalter fehlt, und ohne ihn klingt der Ton mittig. Wird zu einem siebten Speicher am `KeyValueStore`, wenn er kommt. | 2 | mit dem Einstellungs-Bildschirm |
 | E-72 | **Die iOS-Audio-Kategorie des Vortrags ist ungeprüft, und sie entscheidet, ob der Stummschalter ihn abschaltet.** Am 02.09.2026 offen gelassen. `flutter_tts` bietet `setIosAudioCategory` und `setSharedInstance`; der Neubau ruft beides **nicht** und nimmt damit die Voreinstellung. Ob der Vortrag dann über den Medienkanal läuft, ob er sich mit anderer Wiedergabe mischt und was bei aktivem Stummschalter passiert, ist am Gerät zu messen und nicht zu raten. **Es hängt an derselben Frage wie E-28:** dort ist begründet, dass der Stummschalter auf keiner der beiden Plattformen die Medienlautstärke steuert, und genau das gilt nur, wenn die Kategorie stimmt. Die Quelle kann dazu nichts sagen, sie läuft im Browser. Zu tun: eine Messung auf einem iPhone, danach eine Zeile im Adapter oder eine begründete Zeile, warum keine nötig ist. | 2 | vor Auslieferung |
@@ -5567,6 +5671,28 @@ halben Tag.
     `invalidate` aufrufen. Allgemein: **wer eine Zusicherung über die
     Wiederholung schreibt, muss die Wiederholung im Aufbau erzeugen**, und
     eine Mutation ist der einzige verlässliche Weg, das zu merken.
+
+28. **Eine Konstante, die aus der Quelle abgeschrieben ist und die der eigene
+    Code nie liest, sieht wie Parität aus und ist Deko.** Am 03.09.2026 beim
+    **Vorbereiten** der Mutationen gefunden, nicht von einem Test.
+    `libraryReaderSwipeThreshold = 50` stand mit Fundstelle in
+    `library_reader_look.dart`, wörtlich der Wert der Quelle
+    (`Math.abs(dx) < 50`). Die erste Fassung des Wischens entschied aber über
+    `details.primaryVelocity`, also über **Geschwindigkeit**, und las die
+    Konstante nicht.
+
+    Zwei Schäden auf einmal, und der zweite ist der schlimmere. Erstens ein
+    Verhaltensunterschied: ein langsamer Zug über die halbe Seite hat kaum
+    Geschwindigkeit und blättert in der Quelle trotzdem. Zweitens **eine
+    Mutation an dieser Konstante kann nichts töten**, weil niemand sie liest;
+    sie sieht im Bericht wie eine geprüfte Zahl aus und ist keine.
+
+    Der Analysator schweigt dazu: eine öffentliche Konstante ohne Verbraucher
+    ist kein Fund. Gegenmittel, und es ist billig: **jede Konstante aus dem
+    Grundsatzteil kommt in die Mutationsliste.** Überlebt eine, ist entweder
+    die Zusicherung zu schwach oder die Konstante tot, und beides muss man
+    wissen. Verwandt mit Muster 18, aber spiegelbildlich: dort liest die
+    Zusicherung die Konstante, hier liest sie **niemand**.
 
 ## Datenvertrag: die bekannten Fallen
 

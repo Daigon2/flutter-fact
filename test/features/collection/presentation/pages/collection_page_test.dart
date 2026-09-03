@@ -9,6 +9,8 @@ import 'package:fact_app/features/collection/presentation/widgets/library_book_s
 import 'package:fact_app/features/collection/presentation/widgets/library_chapters_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_cover_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_header_card.dart';
+import 'package:fact_app/features/collection/presentation/widgets/library_reader_footer.dart';
+import 'package:fact_app/features/collection/presentation/widgets/library_reader_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_shelf_view.dart';
 import 'package:fact_app/features/collection/presentation/widgets/library_trophy_row.dart';
 import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
@@ -37,9 +39,10 @@ void main() {
     required int id,
     String? city,
     String category = 'Historisch',
+    String? title,
   }) => Fact(
     id: FactId(id),
-    content: FactText(title: 'Titel $id', category: category),
+    content: FactText(title: title ?? 'Titel $id', category: category),
     city: city == null ? null : FactCity(city),
   );
 
@@ -489,10 +492,96 @@ void main() {
       expect(find.text('noch nicht entdeckt'), findsOneWidget);
     });
 
-    testWidgets('eine Kapitelkarte hat noch kein Ziel und wirft nicht', (
+    testWidgets('eine Kapitelkarte öffnet den Lesemodus', (tester) async {
+      await pumpPage(
+        tester,
+        facts: <Fact>[factWith(id: 1, city: 'München', title: 'Alter Peter')],
+        collected: <int>[1],
+      );
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('muenchen')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryCoverView.chaptersKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryChaptersView.chapterKey('hist')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LibraryReaderView), findsOneWidget);
+      expect(find.text('Alter Peter'), findsOneWidget);
+      expect(find.byKey(LibraryChaptersView.headerKey), findsNothing);
+    });
+
+    testWidgets('der Lesemodus fängt beim ersten Fakt des Kapitels an', (
       tester,
     ) async {
-      // Der Lesemodus ist der Rest von Schritt 47.
+      // Die Kapitelkarte gibt keinen Fakt mit, nur das Kapitel. Welcher der
+      // erste ist, entscheidet die Sortierung: aufsteigend nach Kennung, und
+      // deshalb ist es die 7 und nicht die 41, obwohl die 41 vorne steht.
+      await pumpPage(
+        tester,
+        facts: <Fact>[
+          factWith(id: 41, city: 'München', title: 'Später'),
+          factWith(id: 7, city: 'München', title: 'Früher'),
+        ],
+        collected: <int>[41, 7],
+      );
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('muenchen')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryCoverView.chaptersKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryChaptersView.chapterKey('hist')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Früher'), findsOneWidget);
+      expect(find.text('1 / 2'), findsOneWidget);
+    });
+
+    testWidgets('Blättern bleibt im Kapitel', (tester) async {
+      // Zwei Kapitel, je zwei Fakten. Der Umfang muss 2 sein und nicht 4:
+      // wer über die Kapitelliste kommt, blättert im Kapitel.
+      await pumpPage(
+        tester,
+        facts: <Fact>[
+          factWith(id: 1, city: 'München', title: 'Hist eins'),
+          factWith(id: 2, city: 'München', title: 'Hist zwei'),
+          factWith(
+            id: 3,
+            city: 'München',
+            title: 'Mythos eins',
+            category: 'Mythos',
+          ),
+          factWith(
+            id: 4,
+            city: 'München',
+            title: 'Mythos zwei',
+            category: 'Mythos',
+          ),
+        ],
+        collected: <int>[1, 2, 3, 4],
+      );
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('muenchen')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryCoverView.chaptersKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryChaptersView.chapterKey('myth')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mythos eins'), findsOneWidget);
+      expect(find.text('1 / 2'), findsOneWidget);
+
+      await tester.tap(find.byKey(LibraryReaderFooter.nextKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mythos zwei'), findsOneWidget);
+      expect(find.text('2 / 2'), findsOneWidget);
+      expect(find.text('Hist eins'), findsNothing);
+    });
+
+    testWidgets('der Weg aus dem Lesemodus führt auf die Kapitelliste', (
+      tester,
+    ) async {
       await pumpPage(
         tester,
         facts: <Fact>[factWith(id: 1, city: 'München')],
@@ -505,8 +594,32 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(LibraryChaptersView.chapterKey('hist')));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryReaderView.backKey));
+      await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
+      expect(find.byKey(LibraryChaptersView.headerKey), findsOneWidget);
+      expect(find.byType(LibraryReaderView), findsNothing);
+    });
+
+    testWidgets('ein verschlossenes Kapitel öffnet nichts', (tester) async {
+      // `onOpenChapter` ist dort `null`, die Karte nimmt keinen Tipp an.
+      await pumpPage(
+        tester,
+        facts: <Fact>[
+          factWith(id: 1, city: 'München'),
+          factWith(id: 2, city: 'München', category: 'Mythos'),
+        ],
+        collected: <int>[1],
+      );
+
+      await tester.tap(find.byKey(LibraryBookSpine.spineKey('muenchen')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryCoverView.chaptersKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(LibraryChaptersView.chapterKey('myth')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LibraryReaderView), findsNothing);
       expect(find.byKey(LibraryChaptersView.headerKey), findsOneWidget);
     });
   });

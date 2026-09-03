@@ -120,14 +120,27 @@ getroffen.** Steht als E-64 im Register, Stufe 4.
 
 ## Stand
 
-**Zuletzt aktualisiert:** 02.09.2026
+**Zuletzt aktualisiert:** 03.09.2026
+
+**Seit dem 03.09.2026 liegt die Datenbank in diesem Repository, und zwar neu
+gebaut.** Acht Migrationen in `supabase/migrations/` bauen das Schema von null:
+15 Tabellen, 2 Sichten, 8 Funktionen. **Gate 5 ist neu** und wendet in der CI
+alle Migrationen auf ein leeres Postgres an, danach läuft der Linter darüber.
+Lokal geht das nicht, auf dieser Maschine ist kein Docker; Gate 5 ist deshalb
+CI-only. Die Begründung steht in
+`docs/decisions/adr/ADR-010-database-rebuild-in-repository.md`, und die ist
+**`proposed`**: es fehlt die Annahme von Maestro Dairen. Das Paket für ihn
+liegt in `docs/handover/dairen-schema-2026-09-03.md`.
 
 Phase 0 und Phase 1 sind abgeschlossen. Aus Phase 2 sind laut Protokoll die
 Schritte 12 bis 17 und 19 fertig, offen bleiben dort nur noch 18 und 20.
 Phase 3 hat mit Schritt 21 begonnen, Phase 4 mit Schritt 27, Phase 5 mit
 den Schritten 33 bis 37 und 39.
 
-**Fertig sind 33 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 31, 33 bis 37, 39, 45 und 46. Schritt 14 ist
+**Am 03.09.2026 ist Schritt 47 zu Ende gebaut**, mit der Buchseite. Damit sind
+es 34, und der Reiseführer ist bis auf die Trophäen vollständig.
+
+**Fertig sind 34 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 31, 33 bis 37, 39, 45 und 46. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -141,7 +154,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2777 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2838 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -229,6 +242,26 @@ siehe „Rechner einrichten".
 ---
 
 ## Als Nächstes
+
+**Am 03.09.2026 ist die Datenbank dazugekommen, und damit hängt der nächste
+Schritt an einer Annahme, nicht an Arbeit.** ADR-010 ist `proposed`. Sechs
+Punkte darin sind entschieden, damit es weitergeht, und brauchen eine zweite
+Meinung; sie stehen mit ihrem jeweiligen Preis in
+`docs/handover/dairen-schema-2026-09-03.md`, Abschnitt 5.
+
+- **Was im Schema fehlt, und zwar bewusst:** Trophäen, Gruppen- und Team-Jagd,
+  Creator-Bildablage. Dazu die vier Zusicherungen als Test (kein Tisch ohne
+  RLS, keine `using (true)`-Policy auf Personendaten, keine Funktion mit
+  Nutzerkennung als Parameter, kein doppeltes Gutschreiben). Die brauchen
+  Testdaten und zwei Konten, an einer leeren Datenbank wären sie grün, ohne
+  etwas geprüft zu haben.
+- **Was der Client nachziehen muss:** aufhören, den Stadtschlüssel abzuleiten,
+  und `facts.city_id` lesen. Und die **eine** `sort_order` aus
+  `fact_categories` übernehmen. Letzteres verschiebt die Kapitelfolge und die
+  römischen Zahlen im Reiseführer, ist also eine sichtbare Änderung und gehört
+  in einen eigenen Schritt.
+- **Offen bei Supabase:** von welchem Branch die GitHub-Integration deployen
+  soll. Standard ist `main`.
 
 **Am 02.09.2026 sind drei Schritte auf einmal frei geworden, und zwar durch
 zwei Sätze.** Janek: „ja 1. passt und dann mach webview gern".
@@ -428,6 +461,68 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 03.09.2026, Schritt 47 ist fertig: die Buchseite
+
+Die Kapitelkarte hat ein Ziel. Der Reiseführer hält jetzt vier Zustände in
+einem Reiter, und vier ist die richtige Zahl: der Kopf der Quelldatei zählt
+drei, ihr `view` kennt `library`, `cover`, `chapters` und `reader`. Blättern
+geht über Wischen, über das linke und rechte Seitendrittel und über zwei
+Knöpfe; alle drei rufen dasselbe, nämlich „öffne den Nachbarn".
+
+**Zwei Seitenzahlen sehen wie ein Widerspruch aus und sind keiner.** Die
+Kapitelliste zeigt „S. 7", die Buchseite darunter „1 / 4": die erste ist die
+Seite im Band über alle Kapitel, die zweite die Position im Kapitel. Beide
+stehen so in der Quelle.
+
+**Ein Defekt der Quelle ist dabei behoben.** Die Buchseite gibt den Rohtext aus
+und zeigt damit `[3]` mitten im Fließtext, obwohl sie **keine Quellenliste**
+hat, sondern nur den Link „Mehr erfahren". In der Akte ist die Hochziffer
+richtig, dort steht die Liste darunter; auf der Buchseite verweist sie auf
+nichts. Das Entfernen gab es schon für die Sprachausgabe, als private Funktion;
+es liegt jetzt als `factTextWithoutReferences` in der Domäne, mit einer
+Definition und zwei Verbrauchern. Dasselbe gilt für `isRealProse`.
+
+**Was überraschend war: eine abgeschriebene Konstante, die niemand liest.**
+`libraryReaderSwipeThreshold = 50` stand mit Fundstelle da, und die erste
+Fassung des Wischens entschied über die **Geschwindigkeit** statt über die
+Strecke, las die Konstante also nie. Zwei Schäden: ein langsamer langer Zug
+blätterte nicht, obwohl die Quelle ihn nimmt, und eine Mutation an dieser Zahl
+hätte nichts töten können. Gefunden hat es nicht ein Test, sondern das
+**Vorbereiten** der Mutationsliste. Neues Blindheitsmuster 28, und die Regel
+daraus ist billig: jede Konstante aus dem Grundsatzteil kommt in die
+Mutationsliste.
+
+**Zwei Dinge sind nicht gebaut und liegen beim Eigentümer.** Die Frage-Leiste
+„Frag Claude" (laufende Kosten, ein Geheimnis, ausgehende Nutzerdaten) als
+**E-83**, und dass die Reiterleiste im Lesemodus stehen bleibt, während die
+Quelle sie ausblendet, als **E-82**.
+
+### 03.09.2026, die Datenbank zieht um und wird von null neu gebaut
+
+Acht Migrationen, 1578 Zeilen, und der Umzug aus dem PWA-Monorepo war der
+kleinere Teil daran. Die Absicht war nicht, Befunde zu beheben, sondern Familien
+von Befunden **unmöglich** zu machen: `unique (user_id, kind, ref)` auf dem
+Buchungsjournal erledigt doppeltes Gutschreiben, keine Funktion nimmt eine
+Nutzerkennung als Parameter, und die Default-Privilegien sind entzogen, bevor
+die erste Tabelle existiert.
+
+**Die Hälfte der bekannten Befunde sind keine Fehler in Funktionen, sondern
+fehlende Spalten.** Die Stadt wurde geraten, weil es keine Stadtspalte gab; das
+Kapitel wurde aus einem Präfix abgeleitet, weil es keine Kapitelspalte gab. Fünf
+Befunde verschwinden, indem man zwei Spalten hinzufügt.
+
+**Beim Aufschreiben der zwanzig Fremdschlüssel ist eine Produktfrage
+aufgetaucht, die vorher niemand gestellt hat.** `reward_ledger.ref` ist
+absichtlich kein Fremdschlüssel, also lässt ein gelöschter Fakt seine Buchung
+über 50 Münzen stehen, während die Zeile in `collected_facts` mitgelöscht wird.
+Sammelzahl und Journal sagen danach Verschiedenes. Beim geplanten Löschen aller
+Fakten vor dem Start gleichgültig, im Betrieb nicht.
+
+**Der moderne Weg war der falsche.** Deklarative Schemas (`supabase/schemas/`
+plus `db diff`) sind die aktuelle Supabase-Empfehlung, und sie taugen hier
+nicht: `db diff` zieht RLS-Policies, Grants und Spaltenrechte nicht mit, und
+genau die sind hier die Substanz.
 
 ### 03.09.2026, Schritt 47 zur Hälfte: das Inhaltsverzeichnis
 

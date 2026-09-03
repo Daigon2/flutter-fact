@@ -9,6 +9,7 @@
 /// einem Wertobjekt, also gehört es in die Domäne.
 library;
 
+import 'package:fact_app/features/facts/domain/fact_prose.dart';
 import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
 
 /// Wie die Textteile im Vortrag getrennt werden, `parts.join('. ')` in
@@ -18,23 +19,6 @@ import 'package:fact_app/features/facts/domain/value_objects/fact_text.dart';
 /// setzt beim Sprecher die Satzpause. Ohne ihn liest die Sprachausgabe die
 /// Überschrift in den ersten Satz hinein.
 const String spokenFactTextSeparator = '. ';
-
-/// Die Zitat-Hochziffern, dieselbe Form wie in `cited_text.dart`, also `[3]`,
-/// **samt dem Leerraum davor**.
-///
-/// `\s*` davor ist gemessen und nicht vorsorglich: ohne es wurde aus
-/// „Text [42]." ein „Text ." mit Leerzeichen vor dem Punkt. Manche
-/// Sprachausgaben machen daraus eine zusätzliche Pause, andere sprechen die
-/// Satzzeichen anders. Der Leerraum **hinter** der Hochziffer bleibt, er ist
-/// der Wortabstand zum nächsten Wort.
-final RegExp _reference = RegExp(r'\s*\[(\d+)\]');
-
-/// Zwei oder mehr Leerzeichen.
-///
-/// Bleibt als Netz, obwohl [_reference] den Leerraum davor schon mitnimmt:
-/// „Wort  [1]  Wort" mit doppeltem Abstand auf beiden Seiten lässt sonst zwei
-/// Leerzeichen zurück.
-final RegExp _doubleSpace = RegExp(r'  +');
 
 /// Der Text, den die Sprachausgabe vorliest.
 ///
@@ -67,6 +51,10 @@ final RegExp _doubleSpace = RegExp(r'  +');
 /// Es braucht dafür keine Wortlaut-Entscheidung: es wird nichts erfunden,
 /// sondern etwas weggelassen, das nicht zum Sprechen gedacht war. Aufgenommen
 /// als Fund an der Quelle.
+///
+/// **Das Entfernen selbst liegt seit Schritt 47 in `fact_prose.dart`**, weil
+/// der Lesemodus des Reiseführers denselben Text braucht und aus demselben
+/// Grund: dort steht die Hochziffer ebenfalls ohne Quellenliste daneben.
 String spokenFactText(FactText content) {
   final List<String> parts = <String>[];
   for (final String? part in <String?>[
@@ -76,26 +64,10 @@ String spokenFactText(FactText content) {
     content.bodyBackground,
     content.bodyToday,
   ]) {
-    final String spoken = _withoutReferences(part);
+    final String spoken = factTextWithoutReferences(part);
     if (spoken.isNotEmpty) {
       parts.add(spoken);
     }
   }
   return parts.join(spokenFactTextSeparator);
-}
-
-/// [text] ohne Zitat-Hochziffern und ohne die Lücken, die dabei entstehen.
-///
-/// Aus „Der Turm [3] wurde" wird „Der Turm wurde" und nicht „Der Turm  wurde":
-/// die Hochziffer steht im Bestand mit einem Leerzeichen davor, und zwei
-/// Leerzeichen hintereinander sind für manche Sprachausgaben eine zusätzliche
-/// Pause.
-///
-/// Getrimmt am Ende, weil eine Hochziffer auch als letztes Zeichen eines
-/// Absatzes vorkommt und dann ein Leerzeichen zurücklässt.
-String _withoutReferences(String? text) {
-  if (text == null) {
-    return '';
-  }
-  return text.replaceAll(_reference, '').replaceAll(_doubleSpace, ' ').trim();
 }

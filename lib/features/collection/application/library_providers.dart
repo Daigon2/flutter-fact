@@ -5,6 +5,7 @@
 library;
 
 import 'package:fact_app/features/collection/application/library_categories.dart';
+import 'package:fact_app/features/collection/application/library_reader.dart';
 import 'package:fact_app/features/collection/application/library_shelf.dart';
 import 'package:fact_app/features/facts/application/collected_facts_providers.dart';
 import 'package:fact_app/features/facts/application/fact_providers.dart';
@@ -96,3 +97,76 @@ final libraryChaptersProvider =
 final Provider<int> collectedFactCountProvider = Provider<int>(
   (ref) => ref.watch(collectedFactsProvider).length,
 );
+
+/// Wonach der Lesemodus blättert, als Schlüssel einer Provider-Familie.
+///
+/// Eine eigene Klasse und kein Record: die Familie braucht Wertgleichheit,
+/// damit Riverpod denselben Zustand wiederfindet, und der Rest dieses Projekts
+/// schreibt Wertobjekte aus (`FactId`, `LibraryChapter`). Ein Record könnte das
+/// auch, wäre hier aber die einzige Stelle mit dieser Bauform.
+final class LibraryReaderKey {
+  /// [categoryKey] `null` blättert durch den ganzen Band.
+  const LibraryReaderKey({required this.cityKey, this.categoryKey});
+
+  /// Der Band.
+  final String cityKey;
+
+  /// Das Kapitel, oder `null` für den ganzen Band.
+  final String? categoryKey;
+
+  /// Der Zusammenhang, in dem geblättert wird.
+  LibraryReaderScope get scope => categoryKey == null
+      ? LibraryReaderScope.volume
+      : LibraryReaderScope.chapter;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LibraryReaderKey &&
+      other.cityKey == cityKey &&
+      other.categoryKey == categoryKey;
+
+  @override
+  int get hashCode => Object.hash(cityKey, categoryKey);
+
+  @override
+  String toString() => 'LibraryReaderKey($cityKey, ${categoryKey ?? '*'})';
+}
+
+/// Die Blätterfolge des Lesemodus.
+///
+/// Getrennt von [libraryChaptersProvider], obwohl beide über dieselben Fakten
+/// laufen: die Kapitelliste braucht **Zähler** über alle Kategorien, der
+/// Lesemodus braucht die **Fakten** einer einzigen, sortiert. Aus Zählern
+/// bekommt man keine Nachbarseite.
+///
+/// ## Der einzige synchrone Provider dieser Datei, und das ist Absicht
+///
+/// Ein [FutureProvider] beginnt seinen ersten Bildaufbau immer im Zustand
+/// `loading`, auch wenn das Future, auf das er wartet, längst fertig ist. Für
+/// [libraryChaptersProvider] ist das gleichgültig: die Kapitelliste zeigt für
+/// einen Bildaufbau Nullen, und das ist der dort begründete Preis.
+///
+/// **Für den Lesemodus wäre es sichtbar falsch.** Ohne Folge gibt es keine
+/// Seite, und keine Seite heißt zurück zur Kapitelliste. Das Buch würde beim
+/// Aufschlagen einmal flackern.
+///
+/// Der Ausweg ist keine Ausnahme, sondern die Lage: der Lesemodus ist nur von
+/// der Kapitelliste aus erreichbar, und die gibt es erst, wenn die Fakten
+/// geladen sind. Ein `await` auf ein erfülltes Future ist hier also kein
+/// Warten, sondern nur ein verlorener Bildaufbau. `.value ?? const []` liest
+/// denselben Zustand ohne ihn.
+final libraryReaderOrderProvider =
+    Provider.family<List<Fact>, LibraryReaderKey>((ref, key) {
+      final List<Fact> facts =
+          ref.watch(allFactsProvider).value ?? const <Fact>[];
+      final Set<int> collected = ref
+          .watch(collectedFactsProvider)
+          .map((FactId id) => id.value)
+          .toSet();
+      return libraryReaderOrder(
+        facts: facts,
+        cityKey: key.cityKey,
+        collected: collected,
+        categoryKey: key.categoryKey,
+      );
+    });

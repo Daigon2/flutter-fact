@@ -1,6 +1,11 @@
-/// Der Fakttext: Zitat-Hochziffern (`renderCited`,
-/// `02_Frontend/app/screen-fact.jsx:3-37`) und die Frage, ob ein Textfeld
-/// überhaupt Fließtext trägt (`isRealProse`, `:44-48`).
+/// Der Fakttext: die Zitat-Hochziffern (`renderCited`,
+/// `02_Frontend/app/screen-fact.jsx:3-37`).
+///
+/// `isRealProse` (`:44-48`) stand bis Schritt 47 ebenfalls hier und liegt
+/// jetzt in `domain/fact_prose.dart`, weil der Lesemodus des Reiseführers es
+/// braucht und Regel 8 den Import aus dem `presentation` eines anderen
+/// Features verbietet. Diese Datei gibt es weiter, damit es bei einer
+/// Definition bleibt.
 ///
 /// ## Was die Hochziffer tut
 ///
@@ -30,6 +35,12 @@
 library;
 
 import 'package:flutter/foundation.dart';
+
+/// `isRealProse` liegt in der Domäne, wird aber weiter von hier bezogen: die
+/// Akte und ihre Tests haben es immer hier gefunden, und zwei Importpfade für
+/// eine Funktion sind ein Grund, den falschen zu erwischen.
+export 'package:fact_app/features/facts/domain/fact_prose.dart'
+    show isRealProse;
 
 /// Ein Stück eines Fakttexts.
 @immutable
@@ -163,25 +174,3 @@ int highestSourceReference(Iterable<String?> texts) {
   }
   return highest;
 }
-
-/// Ob [text] als Absatz taugt, `screen-fact.jsx:44-48` (`isRealProse`).
-///
-/// Länger als 25 Zeichen **und** mindestens ein Leerraum, also mehr als ein
-/// Wort. Der Kommentar über der Funktion nennt den Anlass: `text2` enthielt in
-/// vielen Weimar-Fakten nur das Emotion-Tag („Nachdenklichkeit", „Staunen",
-/// „Trauer"), gedacht als interne Meta-Angabe. Ohne diesen Filter erschien es
-/// als sichtbarer Absatz, sobald der Nutzer „mehr zeigen" tippte.
-///
-/// Gemessen wird am **getrimmten** Text, die Länge also ohne führende und
-/// nachlaufende Leerzeichen; das Leerraum-Kriterium prüft die Quelle ebenfalls
-/// am getrimmten Wert.
-bool isRealProse(String? text) {
-  if (text == null) {
-    return false;
-  }
-  final String trimmed = text.trim();
-  return trimmed.length > 25 && _whitespace.hasMatch(trimmed);
-}
-
-/// `/\s/` aus `screen-fact.jsx:47`.
-final RegExp _whitespace = RegExp(r'\s');
