@@ -1204,6 +1204,16 @@ Browser, und dieser führt 700 KB fremdes JavaScript aus; heute lädt die Seite
 nichts aus dem Netz, und ein Test hält das fest. Ändert das jemand, wäre der
 Weg nach draußen offen, ohne aufzufallen.
 
+#### Ein Fund, den erst die CI gemacht hat
+
+Der Assettest verlangte eine Byte-Größe, und die ist bei einer Textdatei eine
+Aussage über die Zeilenenden: lokal 30.893, auf dem Linux-Läufer 29.962, und
+die Differenz von 931 sind genau die 931 CRLF-Zeilen der Datei. Der zweite
+Anlauf mit der normalisierten Länge lag auch daneben, um 46 Zeichen, weil
+`readAsStringSync().length` **Zeichen** zählt und nicht Bytes. Jetzt steht dort
+die Zeichenzahl **und** ein Kennzeichen aus dem Inhalt. Neues Blindheitsmuster
+29.
+
 #### Was fehlt, und zwar mit Grund
 
 * **Die Entfernungspille** über der Figur (`screen-map.jsx:658-669`,
@@ -5787,6 +5797,33 @@ halben Tag.
     `invalidate` aufrufen. Allgemein: **wer eine Zusicherung über die
     Wiederholung schreibt, muss die Wiederholung im Aufbau erzeugen**, und
     eine Mutation ist der einzige verlässliche Weg, das zu merken.
+
+29. **Eine Zusicherung über die Größe einer Textdatei prüft den Checkout und
+    nicht den Inhalt.** Am 04.09.2026 belegt, und zwar von der CI und nicht
+    von einem Lauf hier. `avatar_bridge_test.dart` verlangte 30.893 Bytes für
+    `tourist-character.js`; der Linux-Läufer sah 29.962. Die Differenz ist
+    genau **931**, und die Datei hat genau 931 Zeilen mit CRLF. Git
+    normalisiert sie beim Einchecken auf LF, die Windows-Arbeitskopie holt sie
+    beim Auschecken zurück, und derselbe Test ist damit auf einem Rechner grün
+    und auf dem anderen rot.
+
+    **Der zweite Anlauf war auch falsch, und lehrreicher.** Ersetzt durch die
+    Länge des *normalisierten* Inhalts, gemessen mit
+    `readAsStringSync().replaceAll(…).length`: erwartet 29.962, gemessen
+    29.916. Der Unterschied sind 46 Bytes Mehrfachbyte-Zeichen im
+    Kopfkommentar. `readAsStringSync` liest UTF-8, und `length` zählt
+    **Zeichen**. Wer eine Bytezahl aus dem Dateisystem gegen eine
+    Zeichenzahl aus Dart stellt, vergleicht zwei verschiedene Dinge.
+
+    Gegenmittel: bei einem Textasset **nie** die Rohgröße prüfen. Entweder
+    die Zeichenzahl nach Normalisierung, oder besser noch ein Kennzeichen aus
+    dem Inhalt. Der Test hält jetzt beides.
+
+    Nebenbei ein Fund über die Werkzeuge: `pathlib.read_text` normalisiert
+    Zeilenenden ebenfalls, ein Suchmuster mit echtem CR findet danach nichts;
+    und `python -c` verliert Backslashes an die Codepage. Beide Fallen haben
+    beim Reparieren dieser einen Zeile hintereinander zugeschlagen. Steht so
+    in `CLAUDE.md`, und ich habe es zweimal übersehen.
 
 28. **Eine Konstante, die aus der Quelle abgeschrieben ist und die der eigene
     Code nie liest, sieht wie Parität aus und ist Deko.** Am 03.09.2026 beim

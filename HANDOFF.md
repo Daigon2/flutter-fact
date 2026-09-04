@@ -159,7 +159,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2888 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2890 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -488,6 +488,14 @@ solange der Marker sichtbar ist.
 ist: der naheliegende Test „ohne Ortung läuft nichts" tötet sie nicht, weil die
 geprüfte Zeile ohne Ortung gar nicht läuft. Erst der Weg sichtbar → unsichtbar
 prüft beide Richtungen.
+
+**Und einen Fund hat erst die CI gemacht.** Der Assettest verlangte eine
+Byte-Größe für `tourist-character.js`, lokal 30.893; der Linux-Läufer sah
+29.962. Die Differenz von 931 sind genau die 931 CRLF-Zeilen, die Git beim
+Einchecken auf LF normalisiert. Eine Byte-Größe ist bei einer Textdatei eine
+Aussage über den Checkout. Der zweite Anlauf lag auch daneben, um 46 Zeichen,
+weil `readAsStringSync().length` Zeichen zählt und nicht Bytes. Blindheitsmuster
+29.
 
 **Zwei Architekturregeln haben den Entwurf umgestellt, und beide zu Recht.**
 Der Marker lag zuerst im Feature; Regel 18 lässt einem Feature vom Karten-Host

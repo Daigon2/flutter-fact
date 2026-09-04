@@ -202,16 +202,66 @@ void main() {
   });
 
   group('Die Assets liegen da und sind die der Quelle', () {
-    test('drei Dateien, und three.min.js ist die große', () {
-      // Die Größen sind ausgeschrieben, damit ein versehentliches Ersetzen
-      // auffällt. `REBUILD_STATUS.md` nannte 270 KB; gemessen sind es 704.
+    /// Die Länge von [path] in Zeichen, mit CRLF auf LF gebracht.
+    ///
+    /// ## Warum normalisiert und nicht die Byte-Größe der Datei
+    ///
+    /// **Weil eine Byte-Größe bei einer Textdatei eine Aussage über die
+    /// Zeilenenden ist und nicht über den Inhalt.** Am 04.09.2026 im CI
+    /// gemessen: `tourist-character.js` hat lokal 30.893 Bytes und auf dem
+    /// Linux-Läufer 29.962. Die Differenz ist genau 931, und die Datei hat
+    /// genau 931 Zeilen mit CRLF; Git normalisiert sie beim Einchecken auf LF,
+    /// die Windows-Arbeitskopie holt sie beim Auschecken zurück.
+    ///
+    /// Der erste Entwurf dieses Tests war damit grün auf dem einen Rechner und
+    /// rot auf dem anderen. Normalisiert ist die Zahl auf jeder Plattform
+    /// dieselbe.
+    ///
+    /// **Kein Hash, und das ist kein Verzicht auf Strenge.** Ein SHA-256 wäre
+    /// schärfer und bräuchte `package:crypto`, das hier nur als indirekte
+    /// Abhängigkeit vorliegt. Eine indirekte Abhängigkeit direkt zu benutzen
+    /// ist genau die Bauform, die die Paket-Regeln verbieten: sie kann mit
+    /// jedem `pub upgrade` verschwinden. Länge plus die Kennzeichen unten
+    /// fangen jeden Tausch, der in der Praxis vorkommt.
+    int normalizedLength(String path) =>
+        File(path).readAsStringSync().replaceAll('\r\n', '\n').length;
+
+    test('index.html liegt da', () {
       expect(File('assets/avatar/index.html').existsSync(), isTrue);
+    });
+
+    test('three.min.js ist unverändert die der Quelle', () {
+      // three.js r160, UMD, aus `08_Flutter/assets/tourist/`. 670 KB, und
+      // damit der Grund, aus dem `REBUILD_STATUS.md` mit „270 KB" falsch lag:
+      // gemessen sind es 704 KB für alle drei Dateien.
+      expect(normalizedLength('assets/avatar/three.min.js'), 669884);
+      final String head = File(
+        'assets/avatar/three.min.js',
+      ).readAsStringSync().substring(0, 400);
+      expect(head, contains('Copyright 2010-2023 Three.js Authors'));
       expect(
-        File('assets/avatar/three.min.js').lengthSync(),
-        669884,
-        reason: 'three.js r160, UMD, unverändert aus der Verhaltensquelle.',
+        head,
+        contains('deprecated with r150+'),
+        reason: 'Die Datei warnt selbst, dass sie die letzte UMD-Fassung ist.',
       );
-      expect(File('assets/avatar/tourist-character.js').lengthSync(), 30893);
+    });
+
+    test('tourist-character.js ist unverändert die der Quelle', () {
+      // 29.916 und nicht 29.962: `readAsStringSync` liest UTF-8 und `length`
+      // zählt **Zeichen**, nicht Bytes. Die Datei trägt 46 Bytes
+      // Mehrfachbyte-Zeichen im Kopfkommentar. Auch das ist auf jeder
+      // Plattform dieselbe Zahl, und sie ist die schärfere: sie hängt nicht
+      // an der Kodierung des Auscheckens.
+      expect(normalizedLength('assets/avatar/tourist-character.js'), 29916);
+      final String content = File(
+        'assets/avatar/tourist-character.js',
+      ).readAsStringSync();
+      expect(content, contains('FACT — 3D Tourist Character'));
+      expect(
+        content,
+        contains('FactTourist'),
+        reason: 'Der Name, den index.html aufruft.',
+      );
     });
 
     test('die Lizenz liegt daneben', () {
