@@ -57,6 +57,7 @@ import 'package:fact_app/features/identity/presentation/pages/splash_page.dart';
 import 'package:fact_app/features/profile/presentation/pages/profile_page.dart';
 import 'package:fact_app/features/settings/presentation/widgets/audio_activation_dialog.dart';
 import 'package:fact_app/map/domain/map_position.dart';
+import 'package:fact_app/map/presentation/avatar/user_marker_overlay.dart';
 import 'package:fact_app/map/presentation/map_surface.dart';
 import 'package:fact_app/services/location/device_position.dart';
 import 'package:flutter/widgets.dart';
@@ -176,6 +177,16 @@ class MapRoute extends GoRouteData with $MapRoute {
           // besteht. Ein Feature, das diese Zeile bei sich nachbaut, bricht
           // den Architektur-Check.
           mapSurface: MapSurface(initialCamera: MapPage.placeholderCamera),
+          // Schritt 18, und derselbe Kompositions-Grund wie eine Zeile
+          // darüber: die Figur liegt wegen Regel 19 in
+          // `map/presentation/avatar/`, und Regel 18 lässt `discovery` von
+          // dort nur `map/domain/` sehen. Die Ortung, die schon für
+          // `HuntPill` gelesen wird, geht hier ein zweites Mal hinein.
+          userMarker: UserMarkerOverlay(
+            position: fix == null
+                ? null
+                : MapPosition(latitude: fix.latitude, longitude: fix.longitude),
+          ),
           // Derselbe Kompositions-Grund wie bei `mapSurface`, nur für Regel 8
           // statt Regel 18: `challenges/presentation` ist für `discovery`
           // unerreichbar. `HuntPill` bekommt die Nutzerposition hier

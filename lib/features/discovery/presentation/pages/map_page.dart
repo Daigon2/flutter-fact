@@ -152,6 +152,7 @@ class MapPage extends ConsumerStatefulWidget {
   /// Erzeugt den Karten-Bildschirm mit der Kartenfläche [mapSurface].
   const MapPage({
     required this.mapSurface,
+    this.userMarker,
     this.huntOverlay,
     this.now,
     super.key,
@@ -163,6 +164,14 @@ class MapPage extends ConsumerStatefulWidget {
   /// und eine Karte, die aus Versehen fehlt, sähe dann genauso aus wie eine,
   /// die noch lädt.
   final Widget mapSurface;
+
+  /// Der eigene Standort als Figur, Schritt 18.
+  ///
+  /// **Nullbar wie [huntOverlay] und aus demselben Grund**: ein Standard
+  /// dafür wäre ein `UserMarkerOverlay`, und dieses Feature darf es nicht
+  /// sehen. Wer den Bildschirm ohne Marker aufbaut, bekommt eine Karte ohne
+  /// Figur und keinen Fehler.
+  final Widget? userMarker;
 
   /// Die Jagd-Pille der laufenden Solo-Jagd, `HuntPill` in
   /// `screen-map.jsx:1011-1135`, Schritt 37.
@@ -1152,6 +1161,20 @@ class _MapPageState extends ConsumerState<MapPage> {
         // Kopf von `fact_collect_overlay.dart`: ein naher Ballon liegt nicht
         // nativ, sein Tipp kommt deshalb aus dem Zeichner und nicht aus
         // `MapHost.pointTaps`.
+        // Der eigene Standort als Figur, Schritt 18. **Unter den Ballons und
+        // unter dem Sammel-Erlebnis**, und das ist eine Entscheidung über die
+        // Malreihenfolge: ein Ballon in Reichweite und ein Münzflug sollen
+        // über der Figur liegen, nicht hinter ihr.
+        //
+        // Im selben `Stack` wie die Kartenfläche, aus demselben Grund wie die
+        // Ballons: die Bildschirmlagen des SDK zählen ab der linken oberen
+        // Ecke **der Karte**.
+        //
+        // Hereingereicht und nicht hier gebaut, derselbe Grund wie bei
+        // [mapSurface]: die Figur liegt wegen Regel 19 in
+        // `map/presentation/avatar/`, und Regel 18 lässt einem Feature von
+        // dort nur `map/domain/` sehen.
+        if (widget.userMarker != null) widget.userMarker!,
         FactCollectOverlay(
           coinAmount: MapPage.collectCoinAmount,
           onCollected: _onFactCollected,

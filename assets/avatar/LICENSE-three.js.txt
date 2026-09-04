@@ -1,0 +1,60 @@
+three.js — MIT-Lizenz
+=====================
+
+`three.min.js` in diesem Verzeichnis ist die unveränderte UMD-Fassung von
+three.js r160, wörtlich aus der Verhaltensquelle übernommen
+(`08_Flutter/assets/tourist/three.min.js`, 669.884 Bytes, SHA-256 beginnt mit
+170c6789f432). Der Lizenzkopf steht in der Datei selbst:
+
+    /**
+     * @license
+     * Copyright 2010-2023 Three.js Authors
+     * SPDX-License-Identifier: MIT
+     */
+
+Zwei Dinge, die man über diese Datei wissen muss, bevor man sie anfasst:
+
+**Es ist die letzte UMD-Fassung, die three.js ausgeliefert hat.** Die erste
+Zeile der Datei ist eine eigene Warnung: „Scripts build/three.js and
+build/three.min.js are deprecated with r150+, and will be removed with r160."
+Dies **ist** r160, also der letzte Stand, in dem es die Datei überhaupt noch
+gibt. Neuere Fassungen liefern nur ES-Module.
+
+**Warum trotzdem diese und nicht ein ES-Modul:** `tourist-character.js` ist
+gegen das globale `THREE` geschrieben, wie es die UMD-Fassung anlegt. Ein
+Umstieg auf ES-Module heißt, die Figur neu zu schreiben, und das ist eine
+eigene Entscheidung und nicht der Rand von Schritt 18. Aufgenommen als Fund;
+die Aufstiegspfad-Frage kommt, wenn ein Charakterentwurf existiert.
+
+Der Volltext der MIT-Lizenz:
+
+---
+
+The MIT License
+
+Copyright © 2010-2023 three.js authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+`tourist-character.js` (30.893 Bytes, SHA-256 beginnt mit 6ab0ea382644) ist
+eigener Code des FACT-Projekts und ebenfalls unverändert aus der
+Verhaltensquelle übernommen. Sein Kopf beschreibt die Schnittstelle:
+`FactTourist.mount(element, options)` mit `play(name)` und `dispose()`.

@@ -85,6 +85,28 @@ dependencies:
   supabase_flutter: ^2.17.2
   flutter_tts: ^4.2.5
   audioplayers: ^6.8.1
+  # Die 3D-Laufzeit des Avatars, Schritt 18. Am 02.09.2026 freigegeben:
+  # „dann mach webview gern".
+  #
+  # **Das Paket war zweimal draußen und ist zweimal zurückgekommen**, und die
+  # Geschichte gehört dazu, weil sie erklärt, warum hier ein WebView steht und
+  # keine Flutter-Szene. Am 31.08.2026 fiel es aus der Liste, weil der Avatar
+  # 2D werden sollte. Am selben Abend hat Janek das aufgehoben („ja dann bau
+  # doch gleich 3D der carakter wird sicher etwas brauchen. das ist es wert."),
+  # und damit stand eine neue Frage: welche 3D-Laufzeit. Drei Wege sind in
+  # `REBUILD_STATUS.md` abgewogen; genommen ist WebView mit Three.js, weil dort
+  # der teure Teil schon gelöst ist, nämlich die Verankerung einer Figur auf
+  # einer sich bewegenden Karte.
+  #
+  # **Regel 19 im Architektur-Check ist die Grenze:** `webview_flutter` darf
+  # ausschließlich unter `lib/map/presentation/avatar/` vorkommen. Die Regel
+  # stand schon da und hatte seit dem 31.08.2026 keinen Gegenstand mehr; jetzt
+  # hat sie wieder einen.
+  #
+  # 4.14.1 ist die Fassung, die `dart pub add` am 04.09.2026 aufgelöst hat, mit
+  # `webview_flutter_android 4.14.1` und `webview_flutter_wkwebview 3.26.1`
+  # darunter. Der eingefrorene Port lief auf ^4.10.0.
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   build_runner: ^2.15.1
@@ -113,6 +135,26 @@ flutter:
     # (4170 Bytes). Die Quelle laedt ihn als assets/beacon.mp3; hier liegt
     # er unter assets/audio/, weil assets/ hier mehrere Arten haelt.
     - assets/audio/beacon.mp3
+
+    # Die 3D-Figur des Avatars, Schritt 18. Drei Dateien, zusammen 704 KB, und
+    # das ist der Preis der Entscheidung vom 02.09.2026.
+    #
+    # `three.min.js` (670 KB) und `tourist-character.js` (31 KB) sind
+    # **unverändert** aus `08_Flutter/assets/tourist/` der Verhaltensquelle
+    # übernommen, Prüfsummen abgeglichen. `index.html` ist neu und trägt nur
+    # noch die Figur; Pulsring und Einflug zeichnet Flutter, die Begründung
+    # steht in der Datei.
+    #
+    # **Die Zahl in `REBUILD_STATUS.md` war falsch.** Dort standen „270 KB
+    # Assets"; gemessen sind es 704 KB, weil `three.min.js` allein 670 KB
+    # wiegt. Korrigiert am 04.09.2026.
+    #
+    # Zur Lizenz: `assets/avatar/LICENSE-three.js.txt`, MIT, und dort steht
+    # auch, warum es die letzte UMD-Fassung von three.js ist und nicht ein
+    # ES-Modul.
+    - assets/avatar/index.html
+    - assets/avatar/three.min.js
+    - assets/avatar/tourist-character.js
 
   fonts:
     - family: Nunito

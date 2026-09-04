@@ -1072,7 +1072,7 @@ eine der beiden Stellen richtig.
 - [x] 14. Kompass-Rotation (am 31.08.2026 in zwei Teilen gebaut; am Gerät ungeprüft wie alles seit dem 29.08.2026) ·
   [x] 15. Cluster-Layer **und Antippen** (das Antippen am 31.08.2026 nachgezogen)
   · [x] 16. Einzel-Marker
-- [x] 17. Münz-Proximity-Animation · [ ] 18. 3D-Avatar (**seit dem 02.09.2026 frei**: WebView mit Three.js, „dann mach webview gern"; `webview_flutter` ist damit wieder freigegeben)
+- [x] 17. Münz-Proximity-Animation · [x] 18. 3D-Avatar (04.09.2026; WebView mit Three.js, und vorher zeigte die Karte den eigenen Standort überhaupt nicht)
 - [x] 19. Top-Chrome (vorgezogen, D-5 am 29.08.2026 abgeschlossen) · [x] 20. Sammel-Erlebnis (02.09.2026; der Punkt-Tipp hatte gar keinen Empfänger, und die Ballons innerhalb von 150 Metern lagen zusätzlich im `IgnorePointer`)
 
 ## Phase 3, Fakt-Akte und Audio
@@ -1118,6 +1118,107 @@ plus 19 Mutationen, alle gefallen.
 - [x] 21. Fact-Detail-Sheet · [x] 22. Collect-Reveal-Overlay (**war mit Schritt 20 bereits gebaut**, am 02.09.2026 nachgemessen, siehe unten)
 - [!] 23. Akte-Interaktion (Zitat-Tap steht seit Schritt 21, der Rest gesperrt) · [ ] 24. Damals/Heute · [x] 25. Audio-Service (02.09.2026; „normal“ heißt im Paket 0,5 und nicht 1,0, und die Quelle hat einen echten API-Schlüssel ausgeliefert)
 - [x] 26. Map-Audio-Kopplung (03.09.2026; der Hinweiston mit Hysterese, und die Ansage geht **nicht** über den Fakt-Vorleser)
+
+### Schritt 18, der 3D-Avatar, und vorher zeigte die Karte den Standort nicht
+
+2888 Tests (von 2838), 22 Mutationen, 21 gefallen, eine gleichwertig und
+erklärt. Die Karte zeigt jetzt, wo man ist: eine Figur aus Three.js in einem
+durchsichtigen WebView, geografisch verankert, mit Pulsring darunter.
+
+**Der erste Fund war die Ausgangslage.** Erwartet hatte ich, eine 2D-Figur
+durch eine 3D zu ersetzen. Nachgesehen: es gab **keine**. Kein
+`myLocationEnabled`, kein Nutzermarker, und `DiscoveryAnchors.userMarker` trug
+seit dem Tutorial einen Anker ohne Gegenstand. Der Avatar ist nicht der Ersatz,
+er ist der erste eigene Standort auf dieser Karte.
+
+#### Was aus der Quelle wörtlich übernommen ist
+
+`three.min.js` (669.884 Bytes) und `tourist-character.js` (30.893 Bytes) liegen
+unverändert in `assets/avatar/`, Prüfsummen gegen
+`08_Flutter/assets/tourist/` abgeglichen. `index.html` ist neu.
+
+**Die Zahl in diesem Dokument war falsch.** Hier stand „270 KB Assets"; gemessen
+sind es **704 KB**, weil `three.min.js` allein 670 KB wiegt. Korrigiert.
+
+**Und es ist die letzte UMD-Fassung, die three.js ausgeliefert hat.** Die erste
+Zeile der Datei ist ihre eigene Warnung: deprecated ab r150, entfernt mit r160,
+und dies *ist* r160. Neuere Fassungen liefern nur ES-Module.
+`tourist-character.js` ist gegen das globale `THREE` geschrieben; ein Umstieg
+heißt, die Figur neu zu schreiben, und das ist eine eigene Entscheidung. Steht
+mit Lizenz in `assets/avatar/LICENSE-three.js.txt`.
+
+#### Drei Zuschnitte, die das Ergebnis prüfbar machen
+
+Ein `WebViewController` entsteht in **keinem** Widget-Test. Ohne Zuschnitt wäre
+alles an diesem Schritt nur auf einem Gerät prüfbar. Herausgezogen sind
+deshalb:
+
+* **`avatar_motion.dart`** — wann gelaufen wird. Zwei reine Funktionen über
+  zwei Ortungen und die Uhr, kein Zeitgeber, kein Zustand. Die Quelle und der
+  eingefrorene Port lösen es mit `setTimeout` beziehungsweise `Timer` und
+  `setState`; damit ist „nach 2,9 Sekunden läuft sie noch, nach 3,1 nicht mehr"
+  ein Test über einen Zeitgeber statt über zwei Zahlen.
+* **`avatar_bridge.dart`** — welcher JavaScript-Aufruf hinausgeht.
+  `runJavaScript` meldet **keinen** Fehler des Skripts: wer die Funktion in der
+  HTML-Datei umbenennt, bekommt eine stehende Figur und keine Meldung. Ein Test
+  liest deshalb das Asset und prüft, dass es hält, was Dart aufruft.
+* **`avatar_providers.dart`** — wer die Figur baut. Dieselbe Naht wie
+  `MapProjectionDriver`, und sie ist mehr als eine Testhilfe: der Nutzermarker
+  ist damit ohne WebView prüfbar, also seine Lage, sein Verschwinden und die
+  Animation, die er weitergibt.
+
+#### Der teuerste Fehler des Tages, und er hatte 88 Fehlschläge
+
+Der Pulsring läuft über einen `AnimationController.repeat()`, und der wird
+**nie fertig**. `pumpAndSettle` wartet darauf, dass nichts mehr aussteht. Ein
+Ring, der immer läuft, lässt damit **jeden** Test hängen, der die App aufbaut:
+gemessen 88 Fehlschläge in der ganzen Suite, alle mit „pumpAndSettle timed
+out", und **keiner** mit einem Hinweis auf den Avatar.
+
+Behoben mit derselben Sperre, die `fact_balloon_overlay.dart` für den Akku hat:
+der Taktgeber läuft nur, solange der Marker sichtbar ist.
+
+**Und die Mutation dazu hat zuerst überlebt.** Der naheliegende Test („ohne
+Ortung läuft nichts") tötet sie nicht: ohne Ortung wird die Zeile gar nicht
+gerufen, weil sie an der Antwort der Projektion hängt. Erst der Weg sichtbar →
+unsichtbar prüft beide Richtungen. Das ist Muster 25 in einer neuen Gestalt:
+ein Test, der Abwesenheit prüft, ohne dass die geprüfte Zeile überhaupt läuft.
+
+#### Zwei Architekturregeln haben den Entwurf umgestellt, und beide zu Recht
+
+Der Nutzermarker lag zuerst in `features/discovery/presentation/`. **Regel 18**
+hat ihn abgelehnt: ein Feature sieht vom Karten-Host nur `map/domain/`. Der
+Marker braucht aber die Figur, und die liegt wegen **Regel 19** in
+`map/presentation/avatar/`.
+
+Also liegt er dort, und die Nutzerposition kommt von außen herein — über
+`app_routes.dart`, genau wie `mapSurface` und wie `HuntPill.userPosition`.
+Regel 10 nennt das „an app-level composition adapter". Der Gewinn ist nicht
+formal: dieses Widget kennt jetzt weder einen Provider für den Standort noch
+ein Feature, es bekommt eine Koordinate und zeichnet eine Figur.
+
+#### Eine Härtung, die die Quelle nicht hat
+
+`onNavigationRequest` lässt nur das eigene Asset durch. Ein WebView ist ein
+Browser, und dieser führt 700 KB fremdes JavaScript aus; heute lädt die Seite
+nichts aus dem Netz, und ein Test hält das fest. Ändert das jemand, wäre der
+Weg nach draußen offen, ohne aufzufallen.
+
+#### Was fehlt, und zwar mit Grund
+
+* **Die Entfernungspille** über der Figur (`screen-map.jsx:658-669`,
+  `:2974`). Sie zeigt die Entfernung zum nächsten Fakt. Es fehlen ein Provider
+  „welcher Fakt ist der nächste" — heute rechnen das Audio-Beacon und
+  Selbstsammeln jeder für sich — und eine Formatierung für Entfernungen, und
+  die zweite ist eine Entscheidung über Einheiten und Wortlaut.
+* **Die Einflug-Animation** (`touristDropIn`). Sie gehört zum ersten
+  GPS-Empfang, also zu demselben Moment wie `skyFall` auf der Kameraseite, und
+  wer sie ohne jene baut, lässt die Figur einfliegen, während die Kamera noch
+  woanders steht.
+* **Die Wahl der Fassung** (`male`/`female`). Aufgenommen als **E-84**.
+* **Der Pulsring liegt in Flutter und nicht im WebView**, anders als die
+  Vorlage. Kein Geschmack: eine CSS-Animation kann
+  `MediaQuery.disableAnimations` nicht lesen.
 
 ### Schritt 47, zweite Hälfte: der Lesemodus
 
@@ -3550,7 +3651,7 @@ Nicht im REBUILD_PLAN, aber notwendig:
 | `riverpod_annotation`, `riverpod_generator` | **nicht aufgenommen** | nicht gleichzeitig mit `go_router_builder` auflösbar; ADR-004 verlangt letzteres, Riverpod-Codegen ist optional. Provider werden manuell geschrieben. |
 | `riverpod_lint`, `custom_lint` | **nicht installierbar** | `riverpod_lint 3.1.8` verlangt `analyzer ^13.0.0`. `flutter_test` aus dem SDK pinnt `test_api 0.7.11`, was `test` in `analyzer >=8.0.0 <13.0.0` zwingt; der Ausweg über ältere `test`-Versionen ist durch `supabase_flutter` → `supabase 2.16.1` → `realtime_client 2.13.0` → `web_socket_channel ^3.0.3` versperrt. Zusätzlich kollidieren `analyzer_plugin ^0.14.0` gegen `^0.13.0`. Vier Auflösungsversuche verifiziert. |
 | `flutter_tts` | **freigegeben am 02.09.2026**, noch nicht aufgenommen | „ja 1. passt". Damit sind Schritt 25 und 26 frei. Der Vertrag bleibt anbieterneutral, siehe die drei Anforderungen aus E-15. |
-| `webview_flutter` | **freigegeben am 02.09.2026**, noch nicht aufgenommen | „dann mach webview gern". Die 3D-Laufzeit des Avatars, Schritt 18. Am 31.08.2026 war das Paket noch ausdrücklich herausgefallen, weil der Avatar 2D werden sollte; diese Entscheidung ist am selben Abend aufgehoben worden. |
+| `webview_flutter` | **aufgenommen am 04.09.2026 in 4.14.1** (freigegeben am 02.09.2026) | „dann mach webview gern". Die 3D-Laufzeit des Avatars, Schritt 18. Am 31.08.2026 war das Paket noch ausdrücklich herausgefallen, weil der Avatar 2D werden sollte; diese Entscheidung ist am selben Abend aufgehoben worden. |
 | `flutter_compass`, `sensors_plus`, `audioplayers`, `image_picker`, `share_plus`, `qr_flutter` | **noch nicht aufgenommen** | kommen phasenweise, jeweils mit Freigabe. `flutter_compass` und `sensors_plus` sind durch `flutter_rotation_sensor` ersetzt, siehe „Schritt 14, die Wahl des Sensorpakets". |
 
 `docs/engineering/quality-gates.md`, `architecture-overview.md` §16 und
@@ -5447,6 +5548,7 @@ eine Fundstelle.
 | E-79 | **Von 1911 Rätseln der Quelle sind 247 überhaupt richtig zu beantworten, und das liegt nicht an der Sprache.** Am 03.09.2026 über alle kuratierten Datendateien gezählt, ausgelöst durch Janeks Antwort auf D-19. **Die Auswertung vergleicht Zeichenketten auf Gleichheit:** `puzzle-sheet.jsx:320-324` normalisiert (trimmen, kleinschreiben, `.,;:!?` entfernen, Leerraum zusammenziehen) und prüft dann `normalize(value) === normalize(puzzle.expected)`. **Das Feld `expected` enthält aber keine Antworten, sondern Lösungsnotizen für Menschen.** Beispiele wortwörtlich aus den Daten: `Vintage-Einrichtung, alte Fotos, unpretentiöser Stil` (Typ `foto-beweis`), `Südwest, ca. 220-240 Grad` (`perspektive`), `Variiert, etwa 10-25 pro Abschnitt` (`zaehlen`), und bei `local-fragen` ein Aufsatz von über 200 Zeichen. Wer das buchstabengetreu eintippen müsste, kann es nicht. **Die Zahlen:** 1911 Rätsel mit `expected`, davon 1793 mit Buchstaben, 107 reine Zahlen, 11 Datumsangaben. Maschinell prüfbar sind heute die **246 `mcq`-Rätsel** (251 tragen `choices`, und dort wird der Text der gewählten Option verglichen, `:348-350`) und **genau ein** Formel-Rätsel (`expectedResult` steht in 1 von 1911). **Die 82 Zähl-Rätsel vergleichen gegen null:** `:461` liest `puzzle.expectedCount || 0`, und `expectedCount` kommt in **keiner** Datendatei vor. Die richtige Antwort auf jedes Zähl-Rätsel ist damit `0`, und `1` gibt wegen `tol = puzzle.tolerance || 1` noch halbe Punkte. **Die Jagd weicht dem nicht aus:** `hunt-generator.jsx:93-94` wählt je Station bewusst einen **anderen** Typ als bisher benutzt, mischt also gerade die nicht prüfbaren hinein. **Folge für D-19 und E-08:** die dortige Beobachtung („auf Englisch unlösbar") ist ein Sonderfall. Es ist auf Deutsch genauso unlösbar, für rund 87 Prozent der Rätsel. Antworten zu übersetzen behebt nichts, solange nichts Vergleichbares dasteht. **Was zu entscheiden ist, ist eine Produktfrage und keine Übersetzung:** was ist ein Rätsel in dieser App. Entweder alles wird Mehrfachauswahl (funktioniert heute, 246 Belege), oder der Spieler bewertet sich selbst und `expected` wird zur Musterlösung, die nach dem Antippen erscheint, oder die Datenpipeline erzeugt je Rätsel eine maschinenprüfbare Zweitform (`expectedCount`, `expectedResult`, `choices`). Die dritte Variante ist die teuerste und die einzige, die den Bestand behält. **Am 03.09.2026 zurückgestellt:** Dairen löst das laut Janek „ganz anders", und bis der Weg bekannt ist, entsteht an der Auswertung nichts, auch nichts Vorbereitendes. Die drei Wege hier sind die Landkarte der Messung und **keine** Auswahlliste. | **4** | bei Dairen, hier gesperrt |
 | E-80 | **Ist „gelesen" dasselbe Ereignis wie „gesammelt"?** Am 03.09.2026 gefragt, weil drei Stellen des Reiseführers einen Zeitpunkt brauchen und `CollectedFactsStore` nur Kennungen in Sammelreihenfolge hält: die Pille „Weiterlesen" (`screen-wallet.jsx:899-912`), die Kachel „seit" auf dem Buchdeckel (`:551`) und die Sortierung der gesammelten Fakten (`wltCollectedFactsForCity`, `:91-100`). Die PWA führt dafür **zwei** Listen, `Storage.getCollected()` und `Storage.getReadHistory()`, sagt aber nirgends, dass das Absicht ist. **Am 03.09.2026 entschieden: dasselbe.** Janek: „Ja, gesammelt ist gelesen! man sammelt etwas und fertig." Folge für den Bau: der Sammel-Speicher bekommt einen Zeitstempel je Kennung, es entsteht **keine** zweite Liste, und der Begriff „ungelesen" existiert im Neubau nicht. Bestehende Einträge ohne Zeit bleiben gültig und zeigen auf dem Buchdeckel den Gedankenstrich, den die Quelle bei leerem Verlauf auch zeigt. | 2 | **entschieden 03.09.2026** |
 | E-81 | **Derselbe Fakt trägt seit dem 03.09.2026 an drei Stellen drei verschiedene Kategorienamen, und das ist eine Nebenwirkung von E-78.** Für einen Fakt der Kategorie `Kunst & Kultur` gilt heute: der Ballon auf der Karte trägt die Kultur-Farbe (`factCategoryStyles`, zwölf Einträge), die Fakt-Akte schreibt „Historisch" (`factCategoryLook`, acht Einträge, Rückfall auf `hist`), und der Reiseführer schreibt „Kunst & Kultur" (elf Kapitel). Dasselbe gilt für Dunkel & Kriminell. **Die Ursache ist behoben, die Folge nicht.** Die Akte benutzt bewusst die **kleinere** Tabelle der Quelle, weil `cat.kult`, `cat.dark` und `cat.kirche` keinen Text hatten und ein Nutzer sonst den nackten Schlüssel gesehen hätte (siehe den Kopf von `fact_category_look.dart`, Schritt 21). Genau diese Lücke ist mit E-78 für `kult` und `dark` geschlossen: beide stehen jetzt zweisprachig in `app_strings_supplement.dart`. Der Grund für die kleine Tabelle gilt damit nur noch für `kirche`, und dort fehlt kein Text, sondern eine Abbildung: das Wörterbuch führt „Kirche & Glaube" unter `cat.chr`. Der Reiseführer hat sie in `libraryChapterNameKey`. **Der Stolperdraht hat ausgelöst und ist stehen geblieben.** `fact_category_look_test.dart` trug den Satz „bekommt die PWA die Schlüssel nachträglich, fällt dieser Test und die Tabelle darf wachsen"; er ist am 03.09.2026 rot geworden. Ausgelöst hat ihn nicht die PWA, sondern die eigene Entscheidung. **Nicht mitgeändert, und das ist Absicht:** die Tabelle der Akte zu erweitern ändert, was ein fertiger Bildschirm für Fakten in vier Kategorien anzeigt. Das gehört als eigener Schritt entschieden und nicht als Nebenwirkung der Kapitel-Arbeit. Ein Test hält die Dreierlei-Benennung sichtbar, damit sie nicht in Vergessenheit gerät. **Zu entscheiden ist nur die Reihenfolge, nicht die Richtung:** dass drei Bildschirme denselben Fakt gleich benennen sollen, ist keine Geschmacksfrage. | 2 | vor dem Gerätelauf |
+| E-84 | **Der Avatar ist immer dieselbe Figur, und die Quelle lässt wählen.** Am 04.09.2026 mit Schritt 18 aufgenommen. `tourist-character.js` nimmt `gender: 'male' | 'female'` und hat zwei getrennte Modelle; die PWA liest die Wahl aus dem Speicher. Im Neubau gibt es dafür keinen Ort: kein Einstellungs-Bildschirm, kein Profilfeld. Genommen ist `male`, die Vorgabe, auf die die Figur selbst zurückfällt. **Das ist eine Vorgabe und keine Aussage über das Produkt**, und der Weg dorthin ist gebaut: `AvatarGender` ist ein Wertebereich mit zwei Fällen, `avatarSetGenderScript` schickt ihn, und `avatarScriptsToSend` sorgt dafür, dass ein Wechsel die Szene genau einmal neu aufsetzt. Es fehlt allein die Stelle, an der ein Nutzer sie ändert. **Zu entscheiden ist mehr als der Schalter:** ob es bei zwei Fassungen bleibt, und ob die Wahl lokal liegt oder am Profil hängt. Das zweite berührt das Schema. Hängt am Einstellungs-Bildschirm, wie E-71 und E-15. | 2 | mit dem Einstellungs-Bildschirm |
 | E-82 | **Der Lesemodus behält die Reiterleiste, die Quelle blendet sie aus.** Am 03.09.2026 mit Schritt 47 aufgenommen. `screen-wallet.jsx:1919` rendert die Leiste nur für `view !== 'reader'`, die Buchseite ist dort also Vollbild. Hier trägt die `StatefulShellRoute` die Leiste, und eine Seite darin kann sie nicht verstecken; dafür bräuchte es eine achte Route **außerhalb** der Shell, und E-25 hat die öffentliche Routenfläche auf sieben Pfade festgelegt. **Genommen ist der Zustand, den die Akte schon hat:** `/map/fact/:factId` ist ebenfalls ein Kind der Shell und zeigt die Leiste. Zwei Vollbild-Lesearten mit verschiedenem Rahmen wären der schlechtere Zustand als eine, die in beiden Fällen dieselbe Leiste behält. **Zu entscheiden ist, ob Lesen Vollbild sein soll.** Wenn ja, betrifft es zwei Bildschirme und nicht einen, und es ist eine Änderung an der Routenfläche, also an ADR-004 und E-25. Wenn nein, ist nichts zu tun und dieser Eintrag fällt weg. | 2 | vor dem Gerätelauf |
 | E-83 | **„Frag Claude zu diesem Fakt" ist nicht gebaut, und die Entscheidung dahinter ist keine technische.** Am 03.09.2026 mit Schritt 47 aufgenommen. Die Buchseite der Quelle hat unten eine Eingabezeile, die den Fakt und eine Frage an die Anthropic-Schnittstelle schickt (`screen-wallet.jsx:1685-1755`, `Api.askAboutFact`), mit einem Kontingent von zehn Fragen je Nutzer (`Storage.getClaudeQuota`) und einem Schlüssel, den der Nutzer selbst im Creator-Bildschirm einträgt. **Drei Dinge davon sind je einzeln eine Eigentümer-Entscheidung nach `docs/ai/escalation.md`:** laufende Kosten, ein Geheimnis im Client und Nutzerdaten, die das Gerät verlassen. Zusammen ist es keine Frage, die dieser Schritt beantworten darf. **Dazu ein gemessener Zustand:** der ausgelieferte OpenAI-Schlüssel der Quelle ist seit dem 03.09.2026 deaktiviert (E-70), und für Anthropic gilt derselbe Gedanke — ein Schlüssel im Client ist ein veröffentlichter Schlüssel. Wenn die Funktion kommt, dann über eine Edge Function mit serverseitigem Schlüssel und serverseitigem Kontingent, wie E-15 es für die Cloud-Stimme festlegt. **Der Rest der Buchseite hängt nicht daran:** die Seite ist ohne die Leiste vollständig, es fehlt kein Weg und kein Text. | 3 | Produktentscheidung |
 | E-70 | **In der Quelle liegt ein vollständiger OpenAI-API-Schlüssel im Klartext, in einer Datei, die jeder Browser ausgeliefert bekommt.** Am 02.09.2026 beim Zuschnitt von Schritt 25 gefunden. Fundstelle: `02_Frontend/app/audio-player.jsx:12`, eine Konstante `OPENAI_KEY` mit einem echten `sk-proj-…`-Schlüssel, direkt darunter Stimme und Modell. **Die Datei wird ausgeliefert, nicht gebündelt:** `index.html:180` lädt sie als `<script type="text/babel" src="audio-player.jsx?v=5">`, also im Quelltext und ohne jede Verarbeitung. Wer die Seite offen hatte, konnte den Schlüssel lesen. **Vier Fundstellen, und meine erste Zählung war falsch:** sie stand kurz als „genau eine", weil die Suche auf `02_Frontend` begrenzt war und gebaute Artefakte übersprungen hat. Tatsächlich sind es `02_Frontend/app/audio-player.jsx:12` (die Quelle), `02_Frontend/dist/assets/index-4JDjuKco.js` (das gebaute Web-Bündel), `02_Frontend/android/app/src/main/assets/public/assets/index-4JDjuKco.js` (dasselbe Bündel in den Android-Assets, also im Paket, wenn es je verteilt wurde) und `06_Planung/plans/2026-05-14-openai-tts.md:275`. Nicht im Backend, nicht im eingefrorenen Flutter-Port. **Der Schlüssel selbst steht bewusst nirgends in diesem Repository**, auch nicht hier; dieses Repository ist öffentlich (E-64). **Es war eine bewusste Abwägung und kein Versehen:** das Planungsdokument sagt, der Schlüssel werde im Quelltext sichtbar sein, das sei „acceptable for a personal project at this scale", und man solle rotieren, falls unerwartete Kosten auftauchen. Das war der 14.05.2026; seither gibt es `DACH_Rollout_Plan.md` und den Weg in die App Stores. **Ob die Abwägung heute noch gilt, entscheidet der Eigentümer, nicht dieses Repository.** **Die Behebung ist nicht Code:** den Schlüssel bei OpenAI zurückziehen und neu ausstellen. Ihn nur aus den Dateien zu löschen genügt nicht, er steht in der Versionsgeschichte des anderen Repositories und war ausgeliefert. Für den Neubau ändert sich dadurch nichts, er bestätigt die Entscheidung: E-15 legt „Gerät zuerst" fest, und Janek hat am 31.08.2026 dazu gesagt „soll aber nirgends rumliegen, ist ja schließlich ein api key". Die Cloud-Variante läuft über Edge Function und Proxy, nie über einen Schlüssel im Client. **Am 03.09.2026 erledigt:** „api key ist deaktiviert bei open AI". Der Widerruf ist die vollständige Behebung; die vier Dateien tragen jetzt einen toten Schlüssel, und sie aufzuräumen ist Kosmetik im Lese-Repo. **Die laufende PWA bricht nicht, nachgesehen und nicht angenommen:** `audio-player.jsx:171` wirft bei jeder Antwort, die nicht `ok` ist, und der `catch` liest über `SpeechSynthesisUtterance` vor, mit gespeicherter Geschwindigkeit und gewählter Stimme. Ein 401 fällt also auf die Browserstimme zurück statt zu schweigen; verloren geht `tts-1-hd`/`nova`, nicht die Funktion. Zwei Nebenwirkungen: jedes Vorlesen macht erst einen vergeblichen HTTP-Weg, und weil der Blob-Zwischenspeicher sich nie füllt, fällt der bei **jedem** Abspielen an. Nebenbei bestätigt das Schritt 25: was die PWA seit dem 03.09.2026 tatsächlich tut, ist die Gerätestimme, und genau die baut `flutter_tts`. | 4 | **erledigt 03.09.2026** |

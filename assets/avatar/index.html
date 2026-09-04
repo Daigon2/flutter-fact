@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>FACT Avatar</title>
+  <!--
+    Der Wirt für die 3D-Figur, `08_Flutter/assets/tourist/index.html`.
+
+    ## Was hier gegenüber der Vorlage fehlt, und das ist Absicht
+
+    Die Vorlage trägt drei Dinge in einem WebView: den Pulsring, die
+    Einflug-Animation und die Figur. Hier ist nur die **Figur** drin, die
+    anderen zwei zeichnet Flutter.
+
+    Drei Gründe, und der dritte ist der wichtigste:
+
+    1. Ein WebView ist der teuerste Baustein auf dieser Karte. 72 mal 100
+       Punkte kosten weniger Zusammensetzung als 190 mal 190.
+    2. Ein Pulsring ist ein radialer Verlauf und eine Skalierung. Dafür
+       braucht es keine Browser-Engine.
+    3. **Eine CSS-Animation kann `MediaQuery.disableAnimations` nicht lesen.**
+       Wer im Betriebssystem „Bewegung reduzieren" einschaltet, bekommt von
+       Flutter eine Antwort und von einer Keyframe-Regel keine. Der Ring liegt
+       deshalb dort, wo diese Einstellung ankommt.
+
+    ## Was hier stehen bleibt
+
+    `pointer-events: none` auf allem, damit jede Geste an die Karte
+    durchgeht. Das ist dieselbe Absicht wie `IgnorePointer` auf der
+    Flutter-Seite; beide braucht es, weil der WebView ein eigener Empfänger
+    ist.
+  -->
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #figur {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+  <div id="figur"></div>
+
+  <script src="three.min.js"></script>
+  <script src="tourist-character.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      var host = document.getElementById('figur');
+      var instanz = null;
+      var animation = 'idle';
+      var geschlecht = 'male';
+
+      function mount() {
+        if (!window.FactTourist || !host) {
+          return false;
+        }
+        if (instanz) {
+          try {
+            instanz.dispose();
+          } catch (e) {
+            // Ein Aufräumen, das scheitert, darf das Neuaufsetzen nicht
+            // verhindern: die alte Szene ist dann verwaist, die neue steht.
+          }
+          instanz = null;
+        }
+        instanz = window.FactTourist.mount(host, {
+          background: 'transparent',
+          animation: animation,
+          autoRotate: false,
+          gender: geschlecht,
+          // Auf einem Telefon mit dreifacher Pixeldichte kostet die volle
+          // Auflösung dieser Figur mehr, als man ihr ansieht. Zwei ist die
+          // Grenze, ab der es nicht mehr besser aussieht.
+          pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        });
+        return true;
+      }
+
+      // Die Schnittstelle, die Flutter aufruft. Absichtlich klein: zwei
+      // Setzer und eine Frage. Alles, was mehr wäre, würde Zustand in den
+      // WebView legen, und der ist die Seite, die man nicht testen kann.
+      window.FactAvatar = {
+        setAnim: function (name) {
+          animation = (name === 'walk' || name === 'wave') ? name : 'idle';
+          if (instanz) {
+            instanz.play(animation);
+          }
+          return animation;
+        },
+        setGender: function (wert) {
+          var naechstes = (wert === 'female') ? 'female' : 'male';
+          if (naechstes === geschlecht && instanz) {
+            return geschlecht;
+          }
+          geschlecht = naechstes;
+          mount();
+          return geschlecht;
+        },
+        // Damit die Flutter-Seite nicht raten muss, ob die Szene steht.
+        isReady: function () {
+          return instanz !== null;
+        },
+      };
+
+      if (document.readyState === 'complete') {
+        mount();
+      } else {
+        window.addEventListener('load', mount);
+      }
+    })();
+  </script>
+</body>
+</html>

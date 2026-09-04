@@ -142,7 +142,10 @@ den Schritten 33 bis 37 und 39.
 **Am 03.09.2026 ist Schritt 47 zu Ende gebaut**, mit der Buchseite. Damit sind
 es 34, und der Reiseführer ist bis auf die Trophäen vollständig.
 
-**Fertig sind 34 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 31, 33 bis 37, 39, 45 und 46. Schritt 14 ist
+**Am 04.09.2026 ist Schritt 18 gebaut**, der 3D-Avatar, und damit ist Phase 2
+abgeschlossen. Die Karte zeigt zum ersten Mal den eigenen Standort.
+
+**Fertig sind 35 von 50:** 1 bis 17, dazu 19 bis 22, 25, 26, 27, 31, 33 bis 37, 39, 45 und 46. Schritt 14 ist
 am 31.08.2026 dazugekommen, in zwei Teilen. Der
 Zählwiderspruch vom 29.08.2026 ist geklärt: `REBUILD_STATUS.md` führte Schritt
 19 als offen, obwohl `map_top_chrome.dart` mit neun Teildateien und 34 Tests
@@ -156,7 +159,7 @@ fertig. **An der Zahl 22 ändert das nichts**, er war schon vorher so gezählt.
 Wer aufaddiert, zählt also keinen Fortschritt, sondern bekommt eine Zahl, die
 jetzt stimmt.
 
-**Kennzahlen:** 2838 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
+**Kennzahlen:** 2888 Tests grün, alle vier Gates auf Exit-Code 0 und der Analysator seit dem 02.09.2026 auf **null Meldungen**, mit `--fatal-infos` festgenagelt, dazu die
 **drei** Drift-Werkzeuge `generate_i18n`, `bake_map_style` und
 `generate_curated_data`, alle mit `--check` auf Exit-Code 0.
 
@@ -461,6 +464,42 @@ ist die Reihenfolge danach.
 Neueste zuerst. Ein Eintrag je abgeschlossenem Schritt oder größerem Block, zwei
 bis vier Sätze: was entstanden ist, und was daran überraschend war. Alle Belege
 dazu stehen in `REBUILD_STATUS.md`.
+
+### 04.09.2026, Schritt 18: die Karte zeigt, wo man ist
+
+Ein 3D-Tourist aus Three.js in einem durchsichtigen WebView, geografisch auf
+der Karte verankert, mit Pulsring darunter. Damit ist Phase 2 zu Ende.
+
+**Der erste Fund war die Ausgangslage.** Ich wollte eine 2D-Figur durch eine 3D
+ersetzen und habe nachgesehen: es gab keine. Kein `myLocationEnabled`, kein
+Nutzermarker, und der Tutorial-Anker `userMarker` zeigte seit Tagen auf nichts.
+Der Avatar ist der **erste** eigene Standort auf dieser Karte, nicht der
+zweite.
+
+**Was überraschend war und 88 Tests gekostet hat.** Der Pulsring läuft über
+`AnimationController.repeat()`, und das wird nie fertig. `pumpAndSettle` wartet
+darauf, dass nichts mehr aussteht — ein Ring, der immer läuft, lässt also
+**jeden** Test hängen, der die App aufbaut. 88 Fehlschläge, alle mit
+„pumpAndSettle timed out", keiner mit einem Hinweis auf den Avatar. Behoben mit
+derselben Sperre, die die Ballons für den Akku haben: der Taktgeber läuft nur,
+solange der Marker sichtbar ist.
+
+**Und die Mutation dazu hat zuerst überlebt**, was der eigentliche Lehrsatz
+ist: der naheliegende Test „ohne Ortung läuft nichts" tötet sie nicht, weil die
+geprüfte Zeile ohne Ortung gar nicht läuft. Erst der Weg sichtbar → unsichtbar
+prüft beide Richtungen.
+
+**Zwei Architekturregeln haben den Entwurf umgestellt, und beide zu Recht.**
+Der Marker lag zuerst im Feature; Regel 18 lässt einem Feature vom Karten-Host
+nur `map/domain/` sehen, und die Figur liegt wegen Regel 19 in
+`map/presentation/avatar/`. Jetzt liegt der Marker dort und bekommt die
+Koordinate von `app_routes.dart` hereingereicht, genau wie `mapSurface`. Er
+kennt damit keinen Provider für den Standort und kein Feature.
+
+**Nebenbei zwei Zahlen berichtigt.** Die Assets sind 704 KB und nicht 270, wie
+`REBUILD_STATUS.md` behauptete; `three.min.js` allein wiegt 670. Und es ist die
+**letzte** UMD-Fassung, die three.js ausgeliefert hat: r160, deren erste Zeile
+ihre eigene Abkündigung ist.
 
 ### 03.09.2026, Gate 5c: das Schema wird jetzt auf Inhalt geprüft
 
